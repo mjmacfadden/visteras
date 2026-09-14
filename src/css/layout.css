@@ -480,7 +480,12 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .magic_erase:after{ background-image: url('../images/icons/magic_erase.svg'); }
 .sidebar_left .fill:after{ background-image: url('../images/icons/fill.svg'); }
 .sidebar_left .media:after{ background-image: url('../images/icons/media.svg'); }
-.sidebar_left .shape:after{ background-image: url('../images/icons/shape.svg'); }
+.sidebar_left .shape:after{ background-image: url('../images/icons/rectangle.svg'); }
+.sidebar_left .rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
+.sidebar_left .ellipse:after{ background-image: url('../images/icons/ellipse.svg'); }
+.sidebar_left .polygon:after{ background-image: url('../images/icons/polygon.svg'); }
+.sidebar_left .star:after{ background-image: url('../images/icons/star.svg'); }
+.sidebar_left .custom_shape:after{ background-image: url('../images/icons/custom_shape.svg'); }
 .sidebar_left .pen:after{ background-image: url('../images/icons/pen.svg'); }
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 16px auto; }
@@ -512,6 +517,11 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .sidebar_left .item.selection.marquee_ellipse:after{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .sidebar_left .item.selection.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .item.brush.marquee_pencil:after{ background-image: url('../images/icons/pencil.svg'); }
+.sidebar_left .item.rectangle.marquee_rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
+.sidebar_left .item.rectangle.marquee_ellipse:after{ background-image: url('../images/icons/ellipse.svg'); }
+.sidebar_left .item.rectangle.marquee_polygon:after{ background-image: url('../images/icons/polygon.svg'); }
+.sidebar_left .item.rectangle.marquee_star:after{ background-image: url('../images/icons/star.svg'); }
+.sidebar_left .item.rectangle.marquee_custom_shape:after{ background-image: url('../images/icons/custom_shape.svg'); }
 .sidebar_left .item .corner_triangle{
 	position: absolute;
 	right: 0;
@@ -564,6 +574,11 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.lasso{ background-image: url('../images/icons/lasso.svg'); }
 .tg_icon.brush{ background-image: url('../images/icons/brush.svg'); }
 .tg_icon.pencil{ background-image: url('../images/icons/pencil.svg'); }
+.tg_icon.rectangle{ background-image: url('../images/icons/rectangle.svg'); }
+.tg_icon.ellipse{ background-image: url('../images/icons/ellipse.svg'); }
+.tg_icon.polygon{ background-image: url('../images/icons/polygon.svg'); }
+.tg_icon.star{ background-image: url('../images/icons/star.svg'); }
+.tg_icon.custom_shape{ background-image: url('../images/icons/custom_shape.svg'); }
 
 @media screen and (max-width:550px){
 	#sidebar_left{

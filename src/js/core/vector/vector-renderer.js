@@ -77,24 +77,88 @@ export class Vector_renderer_class {
 		ctx.save();
 		ctx.globalAlpha = Math.max(0, Math.min(1, (vector.opacity ?? 100) / 100));
 
-		this.draw_vector_path(ctx, vector);
-
 		// Fill
 		if (vector.fill && vector.fill !== 'none') {
+			this.draw_vector_path(ctx, vector);
 			ctx.fillStyle = vector.fill;
 			ctx.fill(vector.fill_rule || 'nonzero');
 		}
 
 		// Stroke
 		if (vector.stroke && vector.stroke !== 'none' && (vector.stroke_width || 0) > 0) {
-			ctx.strokeStyle = vector.stroke;
-			ctx.lineWidth = vector.stroke_width;
-			ctx.lineCap = vector.stroke_cap || 'round';
-			ctx.lineJoin = vector.stroke_join || 'round';
-			ctx.stroke();
+			const align = (vector.stroke_align || 'center').toLowerCase();
+			const lineJoin = vector.stroke_join || 'miter';
+			const lineCap = vector.stroke_cap || (lineJoin === 'round' ? 'round' : 'butt');
+
+			if (align === 'center') {
+				// Center stroke (standard native anti-aliasing)
+				ctx.strokeStyle = vector.stroke;
+				ctx.lineWidth = vector.stroke_width;
+				ctx.lineCap = lineCap;
+				ctx.lineJoin = lineJoin;
+				ctx.miterLimit = 10;
+				this.draw_vector_path(ctx, vector);
+				ctx.stroke();
+			} else {
+				// Anti-aliased Inside or Outside Stroke compositing
+				// Uses offscreen alpha blending to ensure subpixel anti-aliasing on both stroke edges
+				const targetCanvas = ctx.canvas;
+				const W = targetCanvas ? targetCanvas.width : (config.WIDTH || 1000);
+				const H = targetCanvas ? targetCanvas.height : (config.HEIGHT || 1000);
+				const { canvas: bCanvas, ctx: bctx } = this._get_buffer_canvas(W, H);
+
+				const transform = (typeof ctx.getTransform === 'function') ? ctx.getTransform() : null;
+				if (transform) {
+					bctx.setTransform(transform);
+				} else {
+					bctx.setTransform(1, 0, 0, 1, 0, 0);
+				}
+
+				// Draw double-width center stroke onto buffer
+				bctx.strokeStyle = vector.stroke;
+				bctx.lineWidth = vector.stroke_width * 2;
+				bctx.lineCap = lineCap;
+				bctx.lineJoin = lineJoin;
+				bctx.miterLimit = 10;
+				this.draw_vector_path(bctx, vector);
+				bctx.stroke();
+
+				// Smooth subpixel clipping via alpha composition
+				if (align === 'inside') {
+					bctx.globalCompositeOperation = 'destination-in';
+					bctx.fillStyle = '#ffffff';
+					this.draw_vector_path(bctx, vector);
+					bctx.fill(vector.fill_rule || 'nonzero');
+				} else if (align === 'outside') {
+					bctx.globalCompositeOperation = 'destination-out';
+					bctx.fillStyle = '#ffffff';
+					this.draw_vector_path(bctx, vector);
+					bctx.fill(vector.fill_rule || 'nonzero');
+				}
+
+				// Blit anti-aliased stroke back to target context
+				ctx.save();
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.drawImage(bCanvas, 0, 0);
+				ctx.restore();
+			}
 		}
 
 		ctx.restore();
+	}
+
+	_get_buffer_canvas(width, height) {
+		if (!this._buffer_canvas) {
+			this._buffer_canvas = document.createElement('canvas');
+		}
+		if (this._buffer_canvas.width !== width || this._buffer_canvas.height !== height) {
+			this._buffer_canvas.width = Math.max(1, width);
+			this._buffer_canvas.height = Math.max(1, height);
+		}
+		const bctx = this._buffer_canvas.getContext('2d');
+		bctx.setTransform(1, 0, 0, 1, 0, 0);
+		bctx.clearRect(0, 0, width, height);
+		return { canvas: this._buffer_canvas, ctx: bctx };
 	}
 
 	/**

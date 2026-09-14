@@ -46,7 +46,10 @@ export class Insert_vector_action extends Base_action {
 					mode: vector.mode,
 					fill: vector.fill,
 					stroke: vector.stroke,
-					stroke_width: vector.stroke_width
+					stroke_width: vector.stroke_width,
+					stroke_align: vector.stroke_align || 'center',
+					stroke_join: vector.stroke_join || 'miter',
+					stroke_cap: vector.stroke_cap || 'butt'
 				},
 				x: 0,
 				y: 0,

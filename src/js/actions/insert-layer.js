@@ -70,6 +70,8 @@ export class Insert_layer_action extends Base_action {
 			visible: true,
 			locked: false,
 			is_vector: false,
+			vector_id: null,
+			vector: null,
 			hide_selection_if_active: false,
 			opacity: 100,
 			order: target_order,

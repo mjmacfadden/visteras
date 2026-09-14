@@ -7,6 +7,7 @@ import app from '../../app.js';
 import config from '../../config.js';
 import Helper_class from '../../libs/helpers.js';
 import Vector_manager from '../vector/vector-manager.js';
+import Vector_renderer from '../vector/vector-renderer.js';
 import { Vector } from '../vector/vector-model.js';
 import { Insert_vector_action } from '../../actions/vector/insert-vector.js';
 import { Delete_vector_action } from '../../actions/vector/delete-vector.js';
@@ -283,14 +284,15 @@ class GUI_vectors_class {
 			ctx.drawImage(config.layer.link, config.layer.x || 0, config.layer.y || 0);
 		}
 
-		ctx.save();
-		ctx.strokeStyle = vec.stroke || config.COLOR || '#008000';
-		ctx.lineWidth = vec.stroke_width || 2;
-		ctx.lineCap = vec.stroke_cap || 'round';
-		ctx.lineJoin = vec.stroke_join || 'round';
-		Vector_manager.get_active_vector() && Vector_renderer.draw_vector_path(ctx, vec);
-		ctx.stroke();
-		ctx.restore();
+		// Create a stroke-only clone vector for precise rendering with full anti-aliasing
+		const strokeVec = vec.clone();
+		strokeVec.fill = 'none';
+		strokeVec.stroke = vec.stroke || config.COLOR || '#008000';
+		strokeVec.stroke_width = vec.stroke_width || 2;
+		strokeVec.stroke_align = vec.stroke_align || 'center';
+		strokeVec.stroke_join = vec.stroke_join || 'round';
+		strokeVec.stroke_cap = vec.stroke_cap || 'round';
+		Vector_renderer.render_vector(ctx, strokeVec);
 
 		app.State.do_action(
 			new app.Actions.Update_layer_image_action(canvas)
@@ -318,11 +320,11 @@ class GUI_vectors_class {
 			ctx.drawImage(config.layer.link, config.layer.x || 0, config.layer.y || 0);
 		}
 
-		ctx.save();
-		ctx.fillStyle = vec.fill || config.COLOR || '#008000';
-		Vector_renderer.draw_vector_path(ctx, vec);
-		ctx.fill(vec.fill_rule || 'nonzero');
-		ctx.restore();
+		// Create a fill-only clone vector for precise rendering with full anti-aliasing
+		const fillVec = vec.clone();
+		fillVec.stroke = 'none';
+		fillVec.fill = vec.fill || config.COLOR || '#008000';
+		Vector_renderer.render_vector(ctx, fillVec);
 
 		app.State.do_action(
 			new app.Actions.Update_layer_image_action(canvas)

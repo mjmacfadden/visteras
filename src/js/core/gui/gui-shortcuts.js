@@ -34,7 +34,7 @@ class GUI_shortcuts_class {
 			'l': 'lasso',
 			'n': 'pencil',
 			'm': 'selection',
-			'u': 'sharpen',
+			'u': 'rectangle',
 			'j': 'desaturate',
 			'o': 'bulge_pinch',
 			'a': 'direct_select',

@@ -2,6 +2,12 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Base_tools_class from './../../core/base-tools.js';
 import Base_layers_class from './../../core/base-layers.js';
+import Vector_manager from './../../core/vector/vector-manager.js';
+import Vector_renderer from './../../core/vector/vector-renderer.js';
+import { Vector } from './../../core/vector/vector-model.js';
+import { create_line_subpath } from './../../core/vector/vector-shapes.js';
+import { Insert_vector_action } from './../../actions/vector/insert-vector.js';
+import { Modify_path_action } from './../../actions/vector/modify-path.js';
 
 class Line_class extends Base_tools_class {
 
@@ -14,6 +20,7 @@ class Line_class extends Base_tools_class {
 		this.best_ratio = 1;
 		this.snap_line_info = {x: null, y: null};
 		this.mouse_click = {x: null, y: null};
+		this.is_drawing = false;
 	}
 
 	load() {
@@ -21,176 +28,172 @@ class Line_class extends Base_tools_class {
 	}
 
 	mousedown(e) {
-		var mouse = this.get_mouse_info(e);
-		if (mouse.click_valid == false)
-			return;
+		const mouse = this.get_mouse_info(e);
+		if (!mouse.click_valid) return;
 
-		var mouse_x = mouse.x;
-		var mouse_y = mouse.y;
+		let mouse_x = mouse.x;
+		let mouse_y = mouse.y;
 
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
+		// Apply snapping
+		const snap_info = this.calc_snap_position(e, mouse_x, mouse_y);
+		if (snap_info) {
+			if (snap_info.x !== null) mouse_x = snap_info.x;
+			if (snap_info.y !== null) mouse_y = snap_info.y;
 		}
 
 		this.mouse_click.x = mouse_x;
 		this.mouse_click.y = mouse_y;
 
-		//register new object - current layer is not ours or params changed
-		this.layer = {
-			type: this.name,
-			params: this.clone(this.getParams()),
-			status: 'draft',
-			render_function: [this.name, 'render'],
-			x: mouse_x,
-			y: mouse_y,
-			rotate: null,
-			is_vector: true,
-			color: config.COLOR,
-			mask: this.selection_clip_mask(),
-		};
-		app.State.do_action(
-			new app.Actions.Bundle_action('new_line_layer', 'New Line Layer', [
-				new app.Actions.Insert_layer_action(this.layer)
-			])
-		);
+		const params = this.getParams();
+		const stroke = params.stroke || config.COLOR || '#000000';
+		const stroke_width = Number(params.size || params.stroke_width || 4);
+
+		const subpath = create_line_subpath(mouse_x, mouse_y, mouse_x, mouse_y);
+		const vectorCount = (config.vectors ? config.vectors.length : 0) + 1;
+
+		const vec = new Vector({
+			name: 'Line ' + vectorCount,
+			mode: 'shape',
+			fill: null,
+			stroke: stroke,
+			stroke_width: stroke_width,
+			stroke_align: 'center',
+			stroke_join: 'miter',
+			stroke_cap: 'round',
+			paths: [subpath]
+		});
+
+		app.State.do_action(new Insert_vector_action(vec));
+		this.is_drawing = true;
+		config.need_render = true;
 	}
 
 	mousemove(e) {
-		var mouse = this.get_mouse_info(e);
-		if (mouse.is_drag == false)
-			return;
-		if (mouse.click_valid == false) {
-			return;
+		const mouse = this.get_mouse_info(e);
+		if (!this.is_drawing || !mouse.is_drag || !mouse.click_valid) return;
+
+		let mouse_x = Math.round(mouse.x);
+		let mouse_y = Math.round(mouse.y);
+		const click_x = Math.round(this.mouse_click.x);
+		const click_y = Math.round(this.mouse_click.y);
+
+		const snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer ? config.layer.id : null);
+		if (snap_info) {
+			if (snap_info.x !== null) mouse_x = snap_info.x;
+			if (snap_info.y !== null) mouse_y = snap_info.y;
 		}
 
-		var mouse_x = Math.round(mouse.x);
-		var mouse_y = Math.round(mouse.y);
-		var click_x = Math.round(this.mouse_click.x);
-		var click_y = Math.round(this.mouse_click.y);
-
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer.id);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
+		if (e.shiftKey) {
+			// Constrain to 0, 45, 90 degrees
+			const dx = mouse_x - click_x;
+			const dy = mouse_y - click_y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			const snap = Math.PI / 4;
+			const angle = Math.round(Math.atan2(dy, dx) / snap) * snap;
+			mouse_x = Math.round(click_x + Math.cos(angle) * dist);
+			mouse_y = Math.round(click_y + Math.sin(angle) * dist);
 		}
 
-		var width = mouse_x - this.layer.x;
-		var height = mouse_y - this.layer.y;
-		if (e.ctrlKey == true || e.metaKey) {
-			//one direction only
-			if (Math.abs(width) < Math.abs(height))
-				width = 0;
-			else
-				height = 0;
+		const subpath = create_line_subpath(click_x, click_y, mouse_x, mouse_y);
+
+		const vec = Vector_manager.get_active_vector();
+		if (vec) {
+			vec.paths = [subpath];
 		}
 
-		//more data
-		config.layer.width = width;
-		config.layer.height = height;
+		if (config.layer && config.layer.type === 'vector') {
+			config.layer.x = Math.min(click_x, mouse_x);
+			config.layer.y = Math.min(click_y, mouse_y);
+			config.layer.width = Math.abs(mouse_x - click_x);
+			config.layer.height = Math.abs(mouse_y - click_y);
+		}
 
-		this.Base_layers.render();
+		config.need_render = true;
 	}
 
 	mouseup(e) {
-		var mouse = this.get_mouse_info(e);
-		if (mouse.click_valid == false) {
-			config.layer.status = null;
-			return;
+		if (!this.is_drawing) return;
+		this.is_drawing = false;
+		this.snap_line_info = { x: null, y: null };
+
+		const mouse = this.get_mouse_info(e);
+		let mouse_x = Math.round(mouse.x);
+		let mouse_y = Math.round(mouse.y);
+		const click_x = Math.round(this.mouse_click.x);
+		const click_y = Math.round(this.mouse_click.y);
+
+		if (e.shiftKey) {
+			const dx = mouse_x - click_x;
+			const dy = mouse_y - click_y;
+			const dist = Math.sqrt(dx * dx + dy * dy);
+			const snap = Math.PI / 4;
+			const angle = Math.round(Math.atan2(dy, dx) / snap) * snap;
+			mouse_x = Math.round(click_x + Math.cos(angle) * dist);
+			mouse_y = Math.round(click_y + Math.sin(angle) * dist);
 		}
 
-		var mouse_x = Math.round(mouse.x);
-		var mouse_y = Math.round(mouse.y);
-		var click_x = Math.round(this.mouse_click.x);
-		var click_y = Math.round(this.mouse_click.y);
+		const vec = Vector_manager.get_active_vector();
+		if (!vec) return;
 
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer.id);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
-		}
-		this.snap_line_info = {x: null, y: null};
-
-
-		var width = mouse_x - this.layer.x;
-		var height = mouse_y - this.layer.y;
-
-		if (width == 0 && height == 0) {
-			//same coordinates - cancel
-			app.State.scrap_last_action();
-			return;
+		// If click without drag, create a default 100px horizontal line
+		if (mouse_x === click_x && mouse_y === click_y) {
+			mouse_x = click_x + 100;
 		}
 
-		if (e.ctrlKey == true || e.metaKey) {
-			//one direction only
-			if (Math.abs(width) < Math.abs(height))
-				width = 0;
-			else
-				height = 0;
-		}
+		const subpath = create_line_subpath(click_x, click_y, mouse_x, mouse_y);
+		vec.paths = [subpath];
 
-		//more data
 		app.State.do_action(
-			new app.Actions.Update_layer_action(config.layer.id, {
-				width,
-				height,
-				status: null
-			}),
-			{ merge_with_history: 'new_line_layer' }
+			new Modify_path_action(vec.id, vec.paths, 'Create Line', {
+				active_subpath_index: 0,
+				active_anchor_index: 1
+			})
 		);
+
+		Vector_manager.set_active_vector(vec.id);
+		Vector_manager.active_subpath_index = 0;
+		config.need_render = true;
 	}
 
-	render_overlay(ctx){
-		var ctx = this.Base_layers.ctx;
+	render_overlay(ctx) {
+		const vec = Vector_manager.get_active_vector();
+		if (vec) {
+			Vector_renderer.render_overlay(ctx, {
+				vector: vec,
+				active_subpath_index: Vector_manager.active_subpath_index,
+				active_anchor_index: Vector_manager.active_anchor_index
+			});
+		}
 		this.render_overlay_parent(ctx);
 	}
 
 	demo(ctx, x, y, width, height) {
-		var coords = [
-			[0, 0],
-			[100, 100],
-		];
-		this.draw_shape(ctx, x, y, width, height, coords);
-	}
-
-	render(ctx, layer) {
-		if (layer.width == 0 && layer.height == 0)
-			return;
-
-		var params = layer.params;
-
-		//set styles
-		ctx.fillStyle = layer.color;
-		ctx.strokeStyle = layer.color;
-		ctx.lineWidth = params.size;
-		ctx.lineCap = 'round';
-
-		var width = layer.x + layer.width;
-		var height = layer.y + layer.height;
-
-		//draw line
 		ctx.beginPath();
-		ctx.moveTo(layer.x, layer.y);
-		ctx.lineTo(width, height);
+		ctx.moveTo(x, y + height);
+		ctx.lineTo(x + width, y);
 		ctx.stroke();
 	}
 
+	render(ctx, layer, is_preview) {
+		if (!layer || layer.visible === false) return;
+		const vecId = layer.vector_id || (layer.params && layer.params.vector_id);
+		const vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
+		if (vec && vec.visible !== false) {
+			Vector_renderer.render_vector(ctx, vec);
+			return;
+		}
+
+		// Fallback for legacy raster layers
+		const params = layer.params || {};
+		ctx.save();
+		ctx.strokeStyle = layer.color || config.COLOR || '#000000';
+		ctx.lineWidth = params.size || 4;
+		ctx.beginPath();
+		ctx.moveTo(layer.x, layer.y);
+		ctx.lineTo(layer.x + layer.width, layer.y + layer.height);
+		ctx.stroke();
+		ctx.restore();
+	}
 }
 
 export default Line_class;

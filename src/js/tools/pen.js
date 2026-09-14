@@ -50,7 +50,13 @@ class Pen_tool_class extends Base_tools_class {
 	}
 
 	on_activate() {
-		// When activating pen tool, ensure we have an active vector
+		// When activating pen tool, sync active vector with current vector layer if selected
+		if (config.layer && config.layer.type === 'vector') {
+			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+			if (vecId) {
+				Vector_manager.set_active_vector(vecId);
+			}
+		}
 		const vec = Vector_manager.get_active_vector();
 		if (!vec && config.vectors && config.vectors.length > 0) {
 			Vector_manager.set_active_vector(config.vectors[0].id);
@@ -85,6 +91,22 @@ class Pen_tool_class extends Base_tools_class {
 		if (params.stroke_width) {
 			updates.stroke_width = Number(params.stroke_width.value || params.stroke_width);
 		}
+		if (params.stroke_align) {
+			updates.stroke_align = (params.stroke_align.value || params.stroke_align).toLowerCase();
+		}
+		if (params.stroke_corners || params.corners) {
+			const cVal = (params.stroke_corners?.value || params.stroke_corners || params.corners?.value || params.corners).toLowerCase();
+			if (cVal.includes('round')) {
+				updates.stroke_join = 'round';
+				updates.stroke_cap = 'round';
+			} else if (cVal.includes('cap') || cVal.includes('bevel')) {
+				updates.stroke_join = 'bevel';
+				updates.stroke_cap = 'square';
+			} else {
+				updates.stroke_join = 'miter';
+				updates.stroke_cap = 'butt';
+			}
+		}
 
 		if (Object.keys(updates).length > 0) {
 			app.State.do_action(new Update_vector_action(vec.id, updates));
@@ -104,6 +126,19 @@ class Pen_tool_class extends Base_tools_class {
 		if (vec.stroke) toolConfig.attributes.stroke = vec.stroke;
 		if (vec.stroke_width && toolConfig.attributes.stroke_width) {
 			toolConfig.attributes.stroke_width.value = vec.stroke_width;
+		}
+		if (vec.stroke_align && toolConfig.attributes.stroke_align) {
+			toolConfig.attributes.stroke_align.value = vec.stroke_align.charAt(0).toUpperCase() + vec.stroke_align.slice(1).toLowerCase();
+		}
+		if (toolConfig.attributes.stroke_corners) {
+			const join = vec.stroke_join || 'miter';
+			if (join === 'round') {
+				toolConfig.attributes.stroke_corners.value = 'Rounded';
+			} else if (join === 'bevel') {
+				toolConfig.attributes.stroke_corners.value = 'Capped';
+			} else {
+				toolConfig.attributes.stroke_corners.value = 'Right Angle';
+			}
 		}
 	}
 
@@ -138,16 +173,18 @@ class Pen_tool_class extends Base_tools_class {
 		// Shift angle constraint when placing or dragging
 		if (e.shiftKey && this._has_active_endpoint()) {
 			const prevPt = this._get_active_endpoint();
-			const constrained = this._constrain_angle(prevPt, { x: mouse_x, y: mouse_y });
-			mouse_x = constrained.x;
-			mouse_y = constrained.y;
+			if (prevPt) {
+				const constrained = this._constrain_angle(prevPt, { x: mouse_x, y: mouse_y });
+				mouse_x = constrained.x;
+				mouse_y = constrained.y;
+			}
 		}
 
 		this.drag_start_world = { x: mouse_x, y: mouse_y };
 		const isCtrlCmd = e.ctrlKey || e.metaKey;
 		const isAlt = e.altKey;
 
-		// 1. Ensure active vector exists
+		// 1. Sync active vector with selected vector layer if applicable
 		let vec = Vector_manager.get_active_vector();
 		if (config.layer && config.layer.type === 'vector') {
 			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
@@ -159,36 +196,23 @@ class Pen_tool_class extends Base_tools_class {
 				}
 			}
 		}
-		if (!vec) {
-			const params = this.getParams();
-			const mode = (params.mode?.value || params.mode || 'Shape').toLowerCase();
-			vec = new Vector({
-				name: 'Vector ' + ((config.vectors ? config.vectors.length : 0) + 1),
-				mode: mode,
-				fill: mode === 'shape' ? (params.fill || '#cccccc') : null,
-				stroke: params.stroke || '#000000',
-				stroke_width: Number(params.stroke_width?.value || params.stroke_width || 2)
-			});
-			app.State.do_action(new Insert_vector_action(vec));
-		}
-
-		this.initial_paths_snapshot = vec.paths.map(p => p.clone());
 
 		// 2. Direct selection mode with Ctrl/Cmd
-		if (isCtrlCmd) {
+		if (isCtrlCmd && vec) {
 			const hit = Vector_manager.hit_test({ x: mouse_x, y: mouse_y }, vec);
 			if (hit) {
 				Vector_manager.active_subpath_index = hit.subpath_idx;
 				Vector_manager.active_anchor_index = hit.anchor_idx;
 				this.drag_mode = (hit.type === 'anchor') ? 'move_anchor' : 'move_handle';
 				this.drag_target = hit;
+				this.initial_paths_snapshot = vec.paths.map(p => p.clone());
 			}
 			config.need_render = true;
 			return;
 		}
 
-		// 3. Hit test anchors & handles
-		const hit = Vector_manager.hit_test({ x: mouse_x, y: mouse_y }, vec);
+		// 3. Hit test anchors & handles on active vector
+		const hit = vec ? Vector_manager.hit_test({ x: mouse_x, y: mouse_y }, vec) : null;
 
 		// Handle Hit (moving Bézier control point)
 		if (hit && (hit.type === 'handle_in' || hit.type === 'handle_out')) {
@@ -196,6 +220,7 @@ class Pen_tool_class extends Base_tools_class {
 			this.drag_target = hit;
 			Vector_manager.active_subpath_index = hit.subpath_idx;
 			Vector_manager.active_anchor_index = hit.anchor_idx;
+			this.initial_paths_snapshot = vec.paths.map(p => p.clone());
 			config.need_render = true;
 			return;
 		}
@@ -256,13 +281,14 @@ class Pen_tool_class extends Base_tools_class {
 			Vector_manager.active_anchor_index = hit.anchor_idx;
 			this.drag_mode = 'move_anchor';
 			this.drag_target = hit;
+			this.initial_paths_snapshot = vec.paths.map(p => p.clone());
 			config.need_render = true;
 			return;
 		}
 
 		// 4. Hit test on segment: split segment & insert anchor
 		const params = this.getParams();
-		if (params.auto_add_delete !== false) {
+		if (vec && params.auto_add_delete !== false) {
 			const segmentHit = Vector_manager.hit_test_segment({ x: mouse_x, y: mouse_y }, vec);
 			if (segmentHit) {
 				const subpath = vec.paths[segmentHit.subpath_idx];
@@ -294,16 +320,47 @@ class Pen_tool_class extends Base_tools_class {
 			}
 		}
 
-		// 5. Creating a new Anchor in active subpath or starting a new subpath
-		let activeSubpath = (Vector_manager.active_subpath_index !== null && vec.paths[Vector_manager.active_subpath_index])
+		// 5. Creating a new Anchor in active subpath or starting a new object on its own layer
+		let activeSubpath = (vec && Vector_manager.active_subpath_index !== null && vec.paths[Vector_manager.active_subpath_index])
 			? vec.paths[Vector_manager.active_subpath_index]
 			: null;
 
-		if (!activeSubpath || activeSubpath.closed) {
+		// If no active open subpath (no vector, or activeSubpath doesn't exist, or activeSubpath is closed, or current vector already has paths),
+		// create a brand new Vector and layer so each closed object is on its own layer.
+		if (!vec || !activeSubpath || activeSubpath.closed) {
+			const mode = (params.mode?.value || params.mode || 'Shape').toLowerCase();
+			const vectorCount = (config.vectors ? config.vectors.length : 0) + 1;
+			let strokeJoin = 'miter';
+			let strokeCap = 'butt';
+			const cornersVal = (params.stroke_corners?.value || params.stroke_corners || params.corners?.value || params.corners || '').toLowerCase();
+			if (cornersVal.includes('round')) {
+				strokeJoin = 'round';
+				strokeCap = 'round';
+			} else if (cornersVal.includes('cap') || cornersVal.includes('bevel')) {
+				strokeJoin = 'bevel';
+				strokeCap = 'square';
+			}
+
+			const newVec = new Vector({
+				name: 'Shape ' + vectorCount,
+				mode: mode,
+				fill: mode === 'shape' ? (params.fill || '#cccccc') : null,
+				stroke: params.stroke || '#000000',
+				stroke_width: Number(params.stroke_width?.value || params.stroke_width || 2),
+				stroke_align: (params.stroke_align?.value || params.stroke_align || 'center').toLowerCase(),
+				stroke_join: strokeJoin,
+				stroke_cap: strokeCap,
+				paths: []
+			});
+			app.State.do_action(new Insert_vector_action(newVec));
+			vec = Vector_manager.get_active_vector() || newVec;
+
 			activeSubpath = new Subpath({ closed: false, anchors: [] });
 			vec.paths.push(activeSubpath);
-			Vector_manager.active_subpath_index = vec.paths.length - 1;
+			Vector_manager.active_subpath_index = 0;
 		}
+
+		this.initial_paths_snapshot = vec.paths.map(p => p.clone());
 
 		const newAnchor = new Anchor({
 			point: { x: mouse_x, y: mouse_y },

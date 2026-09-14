@@ -145,6 +145,8 @@ class GUI_properties_class {
 		const strokeVal = vector.stroke || '#008000';
 		const hasStroke = !!vector.stroke && vector.stroke !== 'none';
 		const strokeWidth = vector.stroke_width || 2;
+		const strokeAlign = (vector.stroke_align || 'center').toLowerCase();
+		const strokeJoin = (vector.stroke_join || 'miter').toLowerCase();
 		const fillRule = vector.fill_rule || 'nonzero';
 		const mode = vector.mode || 'path';
 
@@ -201,6 +203,22 @@ class GUI_properties_class {
 					<label class="properties_label trn">Width</label>
 					<input type="number" class="properties_number_input" id="prop_vector_stroke_width" min="1" max="100" value="${strokeWidth}" />
 				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Align</label>
+					<select class="properties_select" id="prop_vector_stroke_align">
+						<option value="center" ${strokeAlign === 'center' ? 'selected' : ''}>Center</option>
+						<option value="inside" ${strokeAlign === 'inside' ? 'selected' : ''}>Inside</option>
+						<option value="outside" ${strokeAlign === 'outside' ? 'selected' : ''}>Outside</option>
+					</select>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Corners</label>
+					<select class="properties_select" id="prop_vector_stroke_corners">
+						<option value="miter" ${strokeJoin === 'miter' ? 'selected' : ''}>Right Angle</option>
+						<option value="round" ${strokeJoin === 'round' ? 'selected' : ''}>Rounded</option>
+						<option value="bevel" ${strokeJoin === 'bevel' ? 'selected' : ''}>Capped</option>
+					</select>
+				</div>
 
 				<div class="properties_group_title trn">Path Details</div>
 				<div class="properties_row">
@@ -219,6 +237,8 @@ class GUI_properties_class {
 		const hasStrokeCb = target.querySelector('#prop_vector_has_stroke');
 		const strokeColorInput = target.querySelector('#prop_vector_stroke_color');
 		const strokeWidthInput = target.querySelector('#prop_vector_stroke_width');
+		const strokeAlignSel = target.querySelector('#prop_vector_stroke_align');
+		const strokeCornersSel = target.querySelector('#prop_vector_stroke_corners');
 
 		if (modeSel) {
 			modeSel.addEventListener('change', () => {
@@ -258,6 +278,19 @@ class GUI_properties_class {
 			strokeWidthInput.addEventListener('change', () => {
 				const stroke_width = Math.max(1, parseInt(strokeWidthInput.value, 10) || 1);
 				app.State.do_action(new Update_vector_action(vector.id, { stroke_width }));
+			});
+		}
+		if (strokeAlignSel) {
+			strokeAlignSel.addEventListener('change', () => {
+				app.State.do_action(new Update_vector_action(vector.id, { stroke_align: strokeAlignSel.value }));
+			});
+		}
+		if (strokeCornersSel) {
+			strokeCornersSel.addEventListener('change', () => {
+				const val = strokeCornersSel.value;
+				const stroke_join = val;
+				const stroke_cap = val === 'round' ? 'round' : (val === 'bevel' ? 'square' : 'butt');
+				app.State.do_action(new Update_vector_action(vector.id, { stroke_join, stroke_cap }));
 			});
 		}
 	}

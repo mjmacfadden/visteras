@@ -114,6 +114,8 @@ var ADJ_SEPIA = 6;
 var ADJ_THRESHOLD = 7;
 
 var VERT_SHADER = `
+precision mediump float;
+
 attribute vec2 a_position;
 attribute vec2 a_texCoord;
 uniform vec2 u_resolution;

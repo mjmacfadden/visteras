@@ -137,8 +137,9 @@ export class Vector {
 	 * @param {'nonzero'|'evenodd'} [options.fill_rule='nonzero']
 	 * @param {string|null} [options.stroke='#008000']
 	 * @param {number} [options.stroke_width=2]
-	 * @param {'butt'|'round'|'square'} [options.stroke_cap='round']
-	 * @param {'miter'|'round'|'bevel'} [options.stroke_join='round']
+	 * @param {'center'|'inside'|'outside'} [options.stroke_align='center']
+	 * @param {'butt'|'round'|'square'} [options.stroke_cap='butt']
+	 * @param {'miter'|'round'|'bevel'} [options.stroke_join='miter']
 	 * @param {Subpath[]} [options.paths=[]]
 	 */
 	constructor(options = {}) {
@@ -152,8 +153,9 @@ export class Vector {
 		this.fill_rule = options.fill_rule === 'evenodd' ? 'evenodd' : 'nonzero';
 		this.stroke = options.stroke !== undefined ? options.stroke : '#008000';
 		this.stroke_width = (typeof options.stroke_width === 'number') ? options.stroke_width : 2;
-		this.stroke_cap = options.stroke_cap || 'round';
-		this.stroke_join = options.stroke_join || 'round';
+		this.stroke_align = options.stroke_align || 'center'; // 'center' | 'inside' | 'outside'
+		this.stroke_cap = options.stroke_cap || 'butt';
+		this.stroke_join = options.stroke_join || 'miter';
 		this.paths = Array.isArray(options.paths)
 			? options.paths.map(p => (p instanceof Subpath ? p.clone() : Subpath.fromJSON(p)))
 			: [];
@@ -178,6 +180,7 @@ export class Vector {
 			fill_rule: this.fill_rule,
 			stroke: this.stroke,
 			stroke_width: this.stroke_width,
+			stroke_align: this.stroke_align,
 			stroke_cap: this.stroke_cap,
 			stroke_join: this.stroke_join,
 			paths: this.paths.map(p => p.clone())
@@ -196,6 +199,7 @@ export class Vector {
 			fill_rule: this.fill_rule,
 			stroke: this.stroke,
 			stroke_width: this.stroke_width,
+			stroke_align: this.stroke_align,
 			stroke_cap: this.stroke_cap,
 			stroke_join: this.stroke_join,
 			paths: this.paths.map(p => p.toJSON())
@@ -215,8 +219,9 @@ export class Vector {
 			fill_rule: data.fill_rule,
 			stroke: data.stroke,
 			stroke_width: data.stroke_width,
-			stroke_cap: data.stroke_cap,
-			stroke_join: data.stroke_join,
+			stroke_align: data.stroke_align,
+			stroke_cap: data.stroke_cap || 'butt',
+			stroke_join: data.stroke_join || 'miter',
 			paths: Array.isArray(data.paths) ? data.paths.map(Subpath.fromJSON) : []
 		});
 	}

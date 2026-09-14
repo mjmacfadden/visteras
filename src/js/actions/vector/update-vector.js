@@ -45,6 +45,9 @@ export class Update_vector_action extends Base_action {
 			layer.params.fill = vec.fill;
 			layer.params.stroke = vec.stroke;
 			layer.params.stroke_width = vec.stroke_width;
+			layer.params.stroke_align = vec.stroke_align;
+			layer.params.stroke_join = vec.stroke_join;
+			layer.params.stroke_cap = vec.stroke_cap;
 			layer.params.mode = vec.mode;
 		}
 
@@ -86,6 +89,9 @@ export class Update_vector_action extends Base_action {
 			layer.params.fill = vec.fill;
 			layer.params.stroke = vec.stroke;
 			layer.params.stroke_width = vec.stroke_width;
+			layer.params.stroke_align = vec.stroke_align;
+			layer.params.stroke_join = vec.stroke_join;
+			layer.params.stroke_cap = vec.stroke_cap;
 			layer.params.mode = vec.mode;
 		}
 
