@@ -476,9 +476,7 @@ config.TOOLS = [
 					'Speech Bubble',
 					'Moon',
 					'Water Drop',
-					'Gear',
-					'Cylinder',
-					'Human'
+					'Gear'
 				],
 			},
 			mode: {

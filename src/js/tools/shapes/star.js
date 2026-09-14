@@ -115,7 +115,7 @@ class Star_class extends Base_tools_class {
 			height = height * 2;
 		}
 
-		const vec = Vector_manager.get_vector_by_id(this.active_vector_id);
+		const vec = Vector_manager.get_active_vector() || Vector_manager.get_vector_by_id(this.active_vector_id);
 		if (!vec) return;
 
 		const corners = Number(params.corners?.value ?? params.corners ?? 5);
@@ -123,32 +123,89 @@ class Star_class extends Base_tools_class {
 		const subpath = create_star_subpath(start_x, start_y, width, height, corners, inner_radius);
 		vec.paths = [subpath];
 
-		app.State.do_action(
-			new Modify_path_action(this.active_vector_id, {
-				subpath_index: 0,
-				subpath: subpath
-			})
-		);
+		if (config.layer && config.layer.type === 'vector') {
+			config.layer.x = start_x;
+			config.layer.y = start_y;
+			config.layer.width = width;
+			config.layer.height = height;
+		}
+
 		config.need_render = true;
 	}
 
 	mouseup(e) {
 		if (!this.is_drawing) return;
 		this.is_drawing = false;
-		this.active_vector_id = null;
 		this.snap_line_info = { x: null, y: null };
+
+		const mouse = this.get_mouse_info(e);
+		let mouse_x = Math.round(mouse.x);
+		let mouse_y = Math.round(mouse.y);
+		const click_x = Math.round(this.mouse_click.x);
+		const click_y = Math.round(this.mouse_click.y);
+
+		const params = this.getParams();
+		const isShift = e.shiftKey || params.square === true;
+		const isAlt = e.altKey;
+
+		let width = Math.abs(mouse_x - click_x);
+		let height = Math.abs(mouse_y - click_y);
+
+		if (isShift) {
+			const size = Math.max(width, height);
+			width = size;
+			height = size;
+		}
+
+		let start_x = mouse_x >= click_x ? click_x : click_x - width;
+		let start_y = mouse_y >= click_y ? click_y : click_y - height;
+
+		if (isAlt) {
+			start_x = click_x - width;
+			start_y = click_y - height;
+			width = width * 2;
+			height = height * 2;
+		}
+
+		const vec = Vector_manager.get_active_vector() || Vector_manager.get_vector_by_id(this.active_vector_id);
+		if (!vec) return;
+
+		// If click without drag, create a default 100x100 star
+		if (width < 2 && height < 2) {
+			start_x = click_x - 50;
+			start_y = click_y - 50;
+			width = 100;
+			height = 100;
+		}
+
+		const corners = Number(params.corners?.value ?? params.corners ?? 5);
+		const inner_radius = Number(params.inner_radius?.value ?? params.inner_radius ?? 40) / 100;
+		const subpath = create_star_subpath(start_x, start_y, width, height, corners, inner_radius);
+		vec.paths = [subpath];
+
+		app.State.do_action(
+			new Modify_path_action(vec.id, vec.paths, 'Create Star', {
+				active_subpath_index: 0,
+				active_anchor_index: 0
+			})
+		);
+
+		Vector_manager.set_active_vector(vec.id);
+		Vector_manager.active_subpath_index = 0;
+		this.active_vector_id = null;
 		config.need_render = true;
 	}
 
 	render_overlay(ctx) {
-		const vec = Vector_manager.get_vector_by_id(this.active_vector_id);
-		if (vec && this.is_drawing) {
+		const vec = Vector_manager.get_active_vector() || Vector_manager.get_vector_by_id(this.active_vector_id);
+		if (vec) {
 			Vector_renderer.render_overlay(ctx, {
 				vector: vec,
-				active_subpath_index: 0,
-				active_anchor_index: null
+				active_subpath_index: Vector_manager.active_subpath_index || 0,
+				active_anchor_index: Vector_manager.active_anchor_index
 			});
 		}
+		this.render_overlay_parent(ctx);
 	}
 
 	demo(ctx, x, y, width, height) {
@@ -163,9 +220,10 @@ class Star_class extends Base_tools_class {
 	}
 
 	render(ctx, layer, is_preview) {
+		if (!layer || layer.visible === false) return;
 		const vecId = layer.vector_id || (layer.params && layer.params.vector_id);
-		const vec = Vector_manager.get_vector_by_id(vecId);
-		if (vec && vec.visible) {
+		const vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
+		if (vec && vec.visible !== false) {
 			Vector_renderer.render_vector(ctx, vec);
 		}
 	}
