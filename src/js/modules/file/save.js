@@ -785,6 +785,15 @@ class File_save_class {
 		//fonts
 		export_data.user_fonts = config.user_fonts;
 
+		//vectors
+		export_data.vectors = [];
+		if (config.vectors && Array.isArray(config.vectors)) {
+			for (var v of config.vectors) {
+				export_data.vectors.push(v.toJSON ? v.toJSON() : v);
+			}
+		}
+		export_data.active_vector_id = config.active_vector_id || null;
+
 		//layers
 		export_data.layers = [];
 		for (var i in config.layers) {

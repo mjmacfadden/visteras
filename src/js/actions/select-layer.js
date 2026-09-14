@@ -1,6 +1,7 @@
 import app from '../app.js';
 import config from '../config.js';
 import { Base_action } from './base.js';
+import Vector_manager from '../core/vector/vector-manager.js';
 
 export class Select_layer_action extends Base_action {
 	/**
@@ -51,6 +52,12 @@ export class Select_layer_action extends Base_action {
 					textTool.update_tool_attributes(new_layer, editor);
 				}
 			}
+			if (new_layer && new_layer.type === 'vector') {
+				const vecId = new_layer.vector_id || (new_layer.params && new_layer.params.vector_id);
+				if (vecId) {
+					Vector_manager.set_active_vector(vecId);
+				}
+			}
 		} else if (!this.ignore_same_selection) {
 			throw new Error('Aborted - Layer already selected');
 		}
@@ -90,6 +97,12 @@ export class Select_layer_action extends Base_action {
 		}
 
 		config.layer = this.old_layer;
+		if (this.old_layer && this.old_layer.type === 'vector') {
+			const vecId = this.old_layer.vector_id || (this.old_layer.params && this.old_layer.params.vector_id);
+			if (vecId) {
+				Vector_manager.set_active_vector(vecId);
+			}
+		}
 		this.old_layer = null;
 		config.mask_active = this.old_mask_active;
 		this.old_mask_active = false;

@@ -17,6 +17,7 @@ import alertify from "./../../../node_modules/alertifyjs/build/alertify.min.js";
 import { create_renderer, get_renderer, switch_renderer } from "./renderer/index.js";
 import Composite_cache_class from "./renderer/composite-cache.js";
 import { is_group, is_effectively_visible } from "./../libs/layer-tree.js";
+import Vector_renderer from "./vector/vector-renderer.js";
 
 var instance = null;
 
@@ -239,10 +240,24 @@ class Base_layers_class {
 		ctx.clearRect(0, 0, config.WIDTH, config.HEIGHT);
 		const tempCanvas = this.create_new_canvas(null, config.WIDTH, config.HEIGHT);
 		this.render_objects(ctx, tempCanvas, layers, () => ctx.save());
+		this.render_vectors(ctx);
 		ctx.restore();
 		cache.documentDirty = false;
 		cache.previewDirty = true;
 		cache.activeLayerId = null;
+	}
+
+	render_vectors(ctx) {
+		if (!config.vectors || !Array.isArray(config.vectors)) return;
+		for (let i = 0; i < config.vectors.length; i++) {
+			const vec = config.vectors[i];
+			if (vec && vec.visible) {
+				const hasLayer = config.layers && config.layers.some(l => l.type === 'vector' && (l.vector_id === vec.id || (l.params && l.params.vector_id === vec.id)));
+				if (!hasLayer) {
+					Vector_renderer.render_vector(ctx, vec);
+				}
+			}
+		}
 	}
 
 	render_interactive_layer_cache(layer, layers) {

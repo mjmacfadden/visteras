@@ -2,6 +2,7 @@ import config from '../config.js';
 import app from './../app.js';
 import { Base_action } from './base.js';
 import { is_group, get_children, get_descendant_ids } from './../libs/layer-tree.js';
+import Vector_manager from './../core/vector/vector-manager.js';
 
 export class Delete_layer_action extends Base_action {
 	/**
@@ -18,6 +19,8 @@ export class Delete_layer_action extends Base_action {
 		this.select_layer_action = null;
 		this.delete_index = null;
 		this.deleted_layer = null;
+		this.deleted_vector = null;
+		this.deleted_vector_index = -1;
 		// Group delete policy: delete group AND its contents (PS default without prompt).
 		this.child_delete_actions = [];
 	}
@@ -129,6 +132,25 @@ export class Delete_layer_action extends Base_action {
 		// Remove layer from list
 		this.deleted_layer = config.layers.splice(this.delete_index, 1)[0];
 
+		// If deleting a vector layer, also remove corresponding vector
+		if (this.deleted_layer && this.deleted_layer.type === 'vector') {
+			const vecId = this.deleted_layer.vector_id || (this.deleted_layer.params && this.deleted_layer.params.vector_id);
+			if (vecId && config.vectors) {
+				const vIdx = config.vectors.findIndex(v => v.id === vecId);
+				if (vIdx > -1) {
+					this.deleted_vector = config.vectors.splice(vIdx, 1)[0];
+					this.deleted_vector_index = vIdx;
+					if (Vector_manager.active_vector_id === vecId) {
+						const nextVec = config.vectors[Math.max(0, vIdx - 1)] || null;
+						Vector_manager.set_active_vector(nextVec ? nextVec.id : null);
+					}
+					if (app.GUI && app.GUI.GUI_vectors) {
+						app.GUI.GUI_vectors.render_vectors();
+					}
+				}
+			}
+		}
+
 		// Invalidate renderer texture cache for deleted layer
 		app.Layers.notify_layer_data_changed(id);
 
@@ -178,6 +200,21 @@ export class Delete_layer_action extends Base_action {
 			this.delete_index = null;
 			this.deleted_layer = null;
 		}
+
+		if (this.deleted_vector && config.vectors) {
+			if (this.deleted_vector_index >= 0 && this.deleted_vector_index <= config.vectors.length) {
+				config.vectors.splice(this.deleted_vector_index, 0, this.deleted_vector);
+			} else {
+				config.vectors.push(this.deleted_vector);
+			}
+			Vector_manager.set_active_vector(this.deleted_vector.id);
+			this.deleted_vector = null;
+			this.deleted_vector_index = -1;
+			if (app.GUI && app.GUI.GUI_vectors) {
+				app.GUI.GUI_vectors.render_vectors();
+			}
+		}
+
 		// Undo child deletes in reverse order (restore deepest first was do; undo shallow-last)
 		for (let i = this.child_delete_actions.length - 1; i >= 0; i--) {
 			await this.child_delete_actions[i].undo();
@@ -207,6 +244,7 @@ export class Delete_layer_action extends Base_action {
 			delete this.deleted_layer.link;
 			delete this.deleted_layer.data;
 		}
+		this.deleted_vector = null;
 		for (const a of this.child_delete_actions) {
 			a.free();
 		}

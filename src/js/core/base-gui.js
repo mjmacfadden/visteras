@@ -11,6 +11,7 @@ import GUI_preview_class from './gui/gui-preview.js';
 import GUI_colors_class from './gui/gui-colors.js';
 import GUI_swatches_class from './gui/gui-swatches.js';
 import GUI_layers_class from './gui/gui-layers.js';
+import GUI_vectors_class from './gui/gui-vectors.js';
 import GUI_information_class from './gui/gui-information.js';
 import GUI_details_class from './gui/gui-details.js';
 import GUI_adjustments_class from './gui/gui-adjustments.js';
@@ -67,6 +68,7 @@ class Base_gui_class {
 		this.GUI_colors = new GUI_colors_class(this);
 		this.GUI_swatches = new GUI_swatches_class(this);
 		this.GUI_layers = new GUI_layers_class(this);
+		this.GUI_vectors = new GUI_vectors_class(this);
 		this.GUI_information = new GUI_information_class(this);
 		this.GUI_details = new GUI_details_class(this);
 		this.GUI_adjustments = new GUI_adjustments_class(this);
@@ -182,6 +184,7 @@ class Base_gui_class {
 		this.GUI_colors.render_main_colors();
 		this.GUI_swatches.render_main_swatches();
 		this.GUI_layers.render_main_layers();
+		this.GUI_vectors.render_main_vectors();
 		this.GUI_information.render_main_information();
 		this.GUI_details.render_main_details();
 		this.GUI_adjustments.render_main_adjustments();
@@ -316,6 +319,79 @@ class Base_gui_class {
 		}
 
 		this.init_adjustments_panel_tabs();
+		this.init_layers_panel_tabs();
+	}
+
+	init_layers_panel_tabs() {
+		const layersBlock = document.querySelector('.sidebar_right .layers.block');
+		if (layersBlock && !layersBlock.dataset.panelTabsDelegated) {
+			layersBlock.dataset.panelTabsDelegated = '1';
+			layersBlock.addEventListener('click', (e) => {
+				const btn = e.target && e.target.closest
+					? e.target.closest('#tab_btn_layers, #tab_btn_vectors')
+					: null;
+				if (!btn || !layersBlock.contains(btn)) return;
+				e.preventDefault();
+				e.stopPropagation();
+				if (btn.id === 'tab_btn_vectors') {
+					this.activate_layers_tab('vectors');
+				} else {
+					this.activate_layers_tab('layers');
+				}
+			});
+		}
+
+		if (document.getElementById('tab_btn_layers') && document.getElementById('tab_btn_vectors')) {
+			let savedTab = 'layers';
+			try { savedTab = localStorage.getItem('vantage_active_layers_tab') || 'layers'; } catch (e) {}
+			if (savedTab === 'vectors') {
+				this.activate_layers_tab('vectors');
+			}
+		}
+	}
+
+	/**
+	 * Switch between Layers / Vectors tabs in the shared sidebar block.
+	 * @param {'layers'|'vectors'} tab
+	 */
+	activate_layers_tab(tab) {
+		const tabLayers = document.getElementById('tab_btn_layers');
+		const tabVectors = document.getElementById('tab_btn_vectors');
+		const paneLayers = document.getElementById('layers_base');
+		const paneVectors = document.getElementById('vectors_base');
+		const wrapper = document.getElementById('toggle_layers_wrapper');
+		const collapseHeader = document.querySelector('.layers.block h2.toggle');
+
+		if (!tabLayers || !tabVectors || !paneLayers || !paneVectors) return;
+
+		if (wrapper && wrapper.classList.contains('hidden')) {
+			wrapper.classList.remove('hidden');
+			if (collapseHeader) collapseHeader.classList.remove('toggled');
+			this.Helper.setCookie('toggle_layers_wrapper', 1);
+		}
+
+		const block = document.querySelector('.sidebar_right .layers.block');
+		if (block && block.classList.contains('hidden')) {
+			block.classList.remove('hidden');
+			this.Helper.setCookie('panel_visible_layers', 1);
+		}
+
+		if (tab === 'vectors') {
+			tabLayers.classList.remove('active');
+			tabVectors.classList.add('active');
+			paneLayers.classList.add('hidden');
+			paneVectors.classList.remove('hidden');
+			if (this.GUI_vectors) {
+				this.GUI_vectors.render_vectors();
+			}
+			try { localStorage.setItem('vantage_active_layers_tab', 'vectors'); } catch (e) {}
+		} else {
+			tabVectors.classList.remove('active');
+			tabLayers.classList.add('active');
+			paneVectors.classList.add('hidden');
+			paneLayers.classList.remove('hidden');
+			try { localStorage.setItem('vantage_active_layers_tab', 'layers'); } catch (e) {}
+		}
 	}
 
 	/**

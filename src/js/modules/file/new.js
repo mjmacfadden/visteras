@@ -181,7 +181,7 @@ class File_new_class {
 						WIDTH: parseInt(width),
 						HEIGHT: parseInt(height),
 						ALPHA: 255,
-						COLOR: '#008000',
+						COLOR: '#000000',
 						mouse: {},
 						visible_width: null,
 						visible_height: null,

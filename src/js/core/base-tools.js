@@ -1,13 +1,14 @@
-/*
- * miniPaint - https://github.com/viliusle/miniPaint
- * author: Vilius L.
- */
-
 import config from './../config.js';
 import Base_layers_class from './base-layers.js';
 import Base_gui_class from './base-gui.js';
 import app from "../app";
 import Helper_class from "../libs/helpers";
+import Vector_manager from './vector/vector-manager.js';
+import Vector_renderer from './vector/vector-renderer.js';
+import { Vector } from './vector/vector-model.js';
+import { create_coords_subpath, create_star_subpath } from './vector/vector-shapes.js';
+import { Insert_vector_action } from '../actions/vector/insert-vector.js';
+import { Modify_path_action } from '../actions/vector/modify-path.js';
 
 /**
  * Base tools class, can be used for extending on tools like brush, provides various helping methods.
@@ -550,167 +551,199 @@ class Base_tools_class {
 	}
 
 	shape_mousedown(e) {
-		var mouse = this.get_mouse_info(e);
-		if (mouse.click_valid == false)
-			return;
+		const mouse = this.get_mouse_info(e);
+		if (!mouse.click_valid) return;
 
-		var mouse_x = mouse.x;
-		var mouse_y = mouse.y;
+		let mouse_x = mouse.x;
+		let mouse_y = mouse.y;
 
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
+		// Apply snapping
+		const snap_info = this.calc_snap_position(e, mouse_x, mouse_y);
+		if (snap_info) {
+			if (snap_info.x !== null) mouse_x = snap_info.x;
+			if (snap_info.y !== null) mouse_y = snap_info.y;
 		}
 
 		this.shape_mouse_click.x = mouse_x;
 		this.shape_mouse_click.y = mouse_y;
 
-		//register new object - current layer is not ours or params changed
-		this.layer = {
-			type: this.name,
-			params: this.clone(this.getParams()),
-			status: 'draft',
-			render_function: [this.name, 'render'],
-			x: Math.round(mouse_x),
-			y: Math.round(mouse_y),
-			color: null,
-			is_vector: true,
-			mask: this.selection_clip_mask(),
-		};
-		app.State.do_action(
-			new app.Actions.Bundle_action('new_'+this.name+'_layer', 'New '+this.Helper.ucfirst(this.name)+' Layer', [
-				new app.Actions.Insert_layer_action(this.layer)
-			])
-		);
+		const params = this.getParams();
+		const hasFill = params.fill !== false;
+		const hasStroke = params.border !== false && (params.border_size || params.stroke_width || 0) > 0;
+
+		const fill = hasFill ? (params.fill_color || '#aaaaaa') : null;
+		const stroke = hasStroke ? (params.border_color || '#555555') : null;
+		const stroke_width = Number(params.border_size || params.stroke_width || 4);
+
+		let subpath;
+		if (this.name === 'star') {
+			subpath = create_star_subpath(mouse_x, mouse_y, 0, 0, params.corners || 5, (params.inner_radius || 40) / 100);
+		} else {
+			subpath = create_coords_subpath(mouse_x, mouse_y, 0, 0, this.coords || []);
+		}
+
+		const vectorCount = (config.vectors ? config.vectors.length : 0) + 1;
+		const vec = new Vector({
+			name: this.Helper.ucfirst(this.name) + ' ' + vectorCount,
+			mode: 'shape',
+			fill: fill,
+			stroke: stroke,
+			stroke_width: stroke_width,
+			stroke_align: 'center',
+			stroke_join: 'miter',
+			stroke_cap: 'butt',
+			paths: [subpath]
+		});
+
+		app.State.do_action(new Insert_vector_action(vec));
+		this.is_drawing_shape = true;
+		config.need_render = true;
 	}
 
 	shape_mousemove(e) {
-		var mouse = this.get_mouse_info(e);
-		var params = this.getParams();
+		const mouse = this.get_mouse_info(e);
+		if (!this.is_drawing_shape || !mouse.is_drag || !mouse.click_valid) return;
 
-		if (mouse.is_drag == false)
-			return;
-		if (mouse.click_valid == false) {
-			return;
+		let mouse_x = Math.round(mouse.x);
+		let mouse_y = Math.round(mouse.y);
+		const click_x = Math.round(this.shape_mouse_click.x);
+		const click_y = Math.round(this.shape_mouse_click.y);
+
+		const snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer ? config.layer.id : null);
+		if (snap_info) {
+			if (snap_info.x !== null) mouse_x = snap_info.x;
+			if (snap_info.y !== null) mouse_y = snap_info.y;
 		}
 
-		var mouse_x = Math.round(mouse.x);
-		var mouse_y = Math.round(mouse.y);
-		var click_x = Math.round(this.shape_mouse_click.x);
-		var click_y = Math.round(this.shape_mouse_click.y);
+		const params = this.getParams();
+		const isShift = e.shiftKey;
+		const isAlt = e.altKey;
 
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer.id);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
-		}
+		let width = Math.abs(mouse_x - click_x);
+		let height = Math.abs(mouse_y - click_y);
 
-		var x = Math.min(mouse_x, click_x);
-		var y = Math.min(mouse_y, click_y);
-		var width = Math.abs(mouse_x - click_x);
-		var height = Math.abs(mouse_y - click_y);
-
-		if (e.ctrlKey == true || e.metaKey) {
-			if (width  < height * this.best_ratio) {
-				width = height * this.best_ratio;
-			}
-			else {
-				height = width / this.best_ratio;
-			}
-			if (mouse_x < click_x) {
-				x = click_x - width;
-			}
-			if (mouse_y < click_y) {
-				y = click_y - height;
+		if (isShift || e.ctrlKey || e.metaKey) {
+			const ratio = this.best_ratio || 1;
+			if (width < height * ratio) {
+				width = height * ratio;
+			} else {
+				height = width / ratio;
 			}
 		}
 
-		//more data
-		config.layer.x = x;
-		config.layer.y = y;
-		config.layer.width = width;
-		config.layer.height = height;
+		let x, y;
+		if (isAlt) {
+			x = click_x - width;
+			y = click_y - height;
+			width *= 2;
+			height *= 2;
+		} else {
+			x = mouse_x < click_x ? click_x - width : click_x;
+			y = mouse_y < click_y ? click_y - height : click_y;
+		}
 
-		this.Base_layers.render();
+		let subpath;
+		if (this.name === 'star') {
+			subpath = create_star_subpath(x, y, width, height, params.corners || 5, (params.inner_radius || 40) / 100);
+		} else {
+			subpath = create_coords_subpath(x, y, width, height, this.coords || []);
+		}
+
+		const vec = Vector_manager.get_active_vector();
+		if (vec) {
+			vec.paths = [subpath];
+		}
+
+		if (config.layer && config.layer.type === 'vector') {
+			config.layer.x = x;
+			config.layer.y = y;
+			config.layer.width = width;
+			config.layer.height = height;
+		}
+
+		config.need_render = true;
 	}
 
 	shape_mouseup(e) {
-		var mouse = this.get_mouse_info(e);
-		var params = this.getParams();
+		if (!this.is_drawing_shape) return;
+		this.is_drawing_shape = false;
+		this.snap_line_info = { x: null, y: null };
 
-		if (mouse.click_valid == false) {
-			config.layer.status = null;
-			return;
-		}
+		const mouse = this.get_mouse_info(e);
+		let mouse_x = Math.round(mouse.x);
+		let mouse_y = Math.round(mouse.y);
+		const click_x = Math.round(this.shape_mouse_click.x);
+		const click_y = Math.round(this.shape_mouse_click.y);
 
-		var mouse_x = Math.round(mouse.x);
-		var mouse_y = Math.round(mouse.y);
-		var click_x = Math.round(this.shape_mouse_click.x);
-		var click_y = Math.round(this.shape_mouse_click.y);
+		const params = this.getParams();
+		const isShift = e.shiftKey;
+		const isAlt = e.altKey;
 
-		//apply snap
-		var snap_info = this.calc_snap_position(e, mouse_x, mouse_y, config.layer.id);
-		if(snap_info != null){
-			if(snap_info.x != null) {
-				mouse_x = snap_info.x;
-			}
-			if(snap_info.y != null) {
-				mouse_y = snap_info.y;
-			}
-		}
-		this.snap_line_info = {x: null, y: null};
+		let width = Math.abs(mouse_x - click_x);
+		let height = Math.abs(mouse_y - click_y);
 
-		var x = Math.min(mouse_x, click_x);
-		var y = Math.min(mouse_y, click_y);
-		var width = Math.abs(mouse_x - click_x);
-		var height = Math.abs(mouse_y - click_y);
-
-		if (e.ctrlKey == true || e.metaKey) {
-			if (width  < height * this.best_ratio) {
-				width = height * this.best_ratio;
-			}
-			else {
-				height = width / this.best_ratio;
-			}
-			if (mouse_x < click_x) {
-				x = click_x - width;
-			}
-			if (mouse_y < click_y) {
-				y = click_y - height;
+		if (isShift || e.ctrlKey || e.metaKey) {
+			const ratio = this.best_ratio || 1;
+			if (width < height * ratio) {
+				width = height * ratio;
+			} else {
+				height = width / ratio;
 			}
 		}
 
-		if (width == 0 && height == 0) {
-			//same coordinates - cancel
-			app.State.scrap_last_action();
-			return;
+		let x, y;
+		if (isAlt) {
+			x = click_x - width;
+			y = click_y - height;
+			width *= 2;
+			height *= 2;
+		} else {
+			x = mouse_x < click_x ? click_x - width : click_x;
+			y = mouse_y < click_y ? click_y - height : click_y;
 		}
 
-		//more data
+		const vec = Vector_manager.get_active_vector();
+		if (!vec) return;
+
+		// Default size if click without drag
+		if (width < 2 && height < 2) {
+			x = click_x - 50;
+			y = click_y - 50;
+			width = 100;
+			height = 100;
+		}
+
+		let subpath;
+		if (this.name === 'star') {
+			subpath = create_star_subpath(x, y, width, height, params.corners || 5, (params.inner_radius || 40) / 100);
+		} else {
+			subpath = create_coords_subpath(x, y, width, height, this.coords || []);
+		}
+
+		vec.paths = [subpath];
+
 		app.State.do_action(
-			new app.Actions.Update_layer_action(config.layer.id, {
-				x,
-				y,
-				width,
-				height,
-				status: null
-			}),
-			{ merge_with_history: 'new_'+this.name+'_layer' }
+			new Modify_path_action(vec.id, vec.paths, 'Create ' + this.Helper.ucfirst(this.name), {
+				active_subpath_index: 0,
+				active_anchor_index: 0
+			})
 		);
+
+		Vector_manager.set_active_vector(vec.id);
+		Vector_manager.active_subpath_index = 0;
+		config.need_render = true;
 	}
 
 	render_overlay_parent(ctx){
+		const vec = Vector_manager.get_active_vector();
+		if (vec) {
+			Vector_renderer.render_overlay(ctx, {
+				vector: vec,
+				active_subpath_index: Vector_manager.active_subpath_index,
+				active_anchor_index: Vector_manager.active_anchor_index
+			});
+		}
+
 		//x
 		if(this.snap_line_info.x !== null) {
 			this.Helper.draw_special_line(

@@ -10,7 +10,7 @@ config.WIDTH = null;
 config.HEIGHT = null;
 config.visible_width = null;
 config.visible_height = null;
-config.COLOR = '#008000';
+config.COLOR = '#000000';
 config.ALPHA = 255;
 config.COLOR_BG = '#ffffff';
 config.ALPHA_BG = 255;
@@ -28,6 +28,8 @@ config.google_webfonts_key = (typeof window !== 'undefined' && window.__VP_KEYS_
 	|| '';
 config.layers = [];
 config.layer = null;
+config.vectors = [];
+config.active_vector_id = null;
 config.selected_layer_ids = []; // multi-select in Layers panel (primary remains config.layer)
 config.layer_select_anchor_id = null; // Shift+click range anchor
 var need_render = false;
@@ -266,55 +268,286 @@ config.TOOLS = [
 		},
 	},
 	{
-		name: 'shape',
-		on_activate: 'on_activate',
-		title: 'Shapes (H)',
-		attributes: {
-			size: 3,
-			stroke: '#00aa00',
-		},
-	},
-	{
-		name: 'line',
-		visible: false,
-		attributes: {
-			size: 4,
-		},
-	},
-	{
-		name: 'arrow',
-		visible: false,
-		attributes: {
-			size: 4,
-		},
-	},
-	{
 		name: 'rectangle',
-		visible: false,
+		title: 'Rectangle Tool [U]',
+		tool_group: {
+			label: 'Shape Tools',
+			hidden: false,
+			items: [
+				{
+					shape: 'rectangle',
+					title: 'Rectangle Tool',
+					icon: 'rectangle',
+					tool: 'rectangle',
+				},
+				{
+					shape: 'ellipse',
+					title: 'Ellipse Tool',
+					icon: 'ellipse',
+					tool: 'ellipse',
+				},
+				{
+					shape: 'polygon',
+					title: 'Polygon Tool',
+					icon: 'polygon',
+					tool: 'polygon',
+				},
+				{
+					shape: 'star',
+					title: 'Star Tool',
+					icon: 'star',
+					tool: 'star',
+				},
+				{
+					shape: 'custom_shape',
+					title: 'Custom Shape Tool',
+					icon: 'custom_shape',
+					tool: 'custom_shape',
+				},
+			],
+		},
 		attributes: {
-			border_size: 4,
-			border: true,
-			fill: true,
-			border_color: '#555555',
-			fill_color: '#aaaaaa',
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 0,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
 			radius: {
+				title: 'Corner Radius',
 				value: 0,
 				min: 0,
+				max: 500,
+				step: 1,
 			},
-			square: false,
 		},
 	},
 	{
 		name: 'ellipse',
+		title: 'Ellipse Tool',
 		visible: false,
 		attributes: {
-			border_size: 4,
-			border: true,
-			fill: true,
-			border_color: '#555555',
-			fill_color: '#aaaaaa',
-			circle: false,
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 0,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
 		},
+	},
+	{
+		name: 'polygon',
+		title: 'Polygon Tool',
+		visible: false,
+		attributes: {
+			sides: {
+				title: 'Sides',
+				value: 5,
+				min: 3,
+				max: 100,
+				step: 1,
+			},
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 0,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
+		},
+	},
+	{
+		name: 'star',
+		title: 'Star Tool',
+		visible: false,
+		attributes: {
+			corners: {
+				title: 'Points',
+				value: 5,
+				min: 3,
+				max: 100,
+				step: 1,
+			},
+			inner_radius: {
+				title: 'Inner Radius (%)',
+				value: 40,
+				min: 5,
+				max: 95,
+				step: 1,
+			},
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 0,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
+		},
+	},
+	{
+		name: 'custom_shape',
+		title: 'Custom Shape Tool',
+		visible: false,
+		attributes: {
+			shape: {
+				title: 'Shape',
+				value: 'Heart',
+				values: [
+					'Heart',
+					'Triangle',
+					'Right Triangle',
+					'Arrow',
+					'Plus',
+					'Hexagon',
+					'Pentagon',
+					'Diamond',
+					'Trapezoid',
+					'Parallelogram',
+					'Speech Bubble',
+					'Moon',
+					'Water Drop',
+					'Gear',
+					'Cylinder',
+					'Human'
+				],
+			},
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 0,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
+		},
+	},
+	{
+		name: 'pen',
+		title: 'Pen Tool (P)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		on_update: 'on_params_update',
+		attributes: {
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 1,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
+			rubber_band: true,
+			auto_add_delete: true,
+		},
+	},
+	{
+		name: 'direct_select',
+		title: 'Direct Selection Tool (A)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		attributes: {},
 	},
 	{
 		name: 'media',
@@ -588,7 +821,7 @@ config.TOOLS = [
 				value: false,
 				icon: `strikethrough.svg`
 			},
-			fill: '#008000',
+			fill: '#000000',
 			halign: {
 				type: 'button_group',
 				value: 'Left',
@@ -622,7 +855,7 @@ config.TOOLS = [
 	{
 		name: 'gradient',
 		attributes: {
-			color_1: '#008000',
+			color_1: '#000000',
 			color_2: '#ffffff',
 			alpha: 0,
 			radial: false,
@@ -739,17 +972,6 @@ config.TOOLS = [
 		attributes: {
 			play: false,
 			delay: 400,
-		},
-	},
-	{
-		name: 'polygon',
-		visible: false,
-		attributes: {
-			border_size: 4,
-			border: true,
-			fill: true,
-			border_color: '#555555',
-			fill_color: '#aaaaaa',
 		},
 	},
 	{

@@ -384,6 +384,22 @@ class GUI_layers_class {
 				return;
 			}
 
+			// If double-clicking a vector layer thumbnail or row (not the rename label)
+			if (dbl_layer && dbl_layer.type === 'vector' && target.id !== 'layer_name') {
+				(async () => {
+					if (config.layer && config.layer.id !== dbl_layer.id) {
+						await app.State.do_action(
+							new app.Actions.Select_layer_action(dbl_layer.id, true)
+						);
+					}
+					const activeTool = config.TOOL ? config.TOOL.name : '';
+					if (activeTool !== 'pen' && activeTool !== 'direct_select') {
+						await app.GUI.GUI_tools.activate_tool('pen');
+					}
+				})();
+				return;
+			}
+
 			if (target.id == 'layer_name') {
 				var target_layer_id = parseInt(target.dataset.id);
 				var target_dbl_layer = app.Layers.get_layer(target_layer_id);
@@ -1115,6 +1131,9 @@ class GUI_layers_class {
 		}
 		if (layer.type === 'gradient') {
 			return '<svg class="thumb_icon thumb_gradient" viewBox="0 0 16 16"><defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="currentColor"/><stop offset="100%" stop-color="currentColor" stop-opacity="0.2"/></linearGradient></defs><rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="url(#tg)" stroke="currentColor" stroke-width="1.2"/></svg>';
+		}
+		if (layer.type === 'vector') {
+			return '<svg class="thumb_icon thumb_vector" viewBox="0 0 16 16" fill="currentColor"><path d="M1 15 L2.5 10.5 L6.5 9.5 L8.5 4.5 L14 1 L11.5 6.5 L6.5 8.5 L5.5 12.5 Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><circle cx="1.5" cy="14.5" r="1.5" fill="currentColor"/><circle cx="13.5" cy="1.5" r="1.5" fill="currentColor"/><line x1="6.5" y1="9.5" x2="13.5" y2="1.5" stroke="currentColor" stroke-width="1.2"/></svg>';
 		}
 		// Default: shape/other layers
 		return '<svg class="thumb_icon thumb_shape" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.5" y="2.5" width="11" height="11" rx="1"/></svg>';

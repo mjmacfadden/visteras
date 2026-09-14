@@ -99,8 +99,16 @@
 			</div>
 			
 			<div class="layers block">
-				<h2 class="trn">Layers</h2>
-				<div class="content" id="layers_base"></div>
+				<h2 class="toggle panel_tabs_header" data-target="toggle_layers_wrapper">
+					<span class="panel_tabs">
+						<button type="button" class="panel_tab_btn trn active" id="tab_btn_layers">Layers</button>
+						<button type="button" class="panel_tab_btn trn" id="tab_btn_vectors">Vectors</button>
+					</span>
+				</h2>
+				<div class="content panel_tabs_content" id="toggle_layers_wrapper">
+					<div id="layers_base" class="panel_tab_pane"></div>
+					<div id="vectors_base" class="panel_tab_pane hidden"></div>
+				</div>
 			</div>
 		</div>
 	</div>

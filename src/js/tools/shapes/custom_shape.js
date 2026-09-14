@@ -5,17 +5,17 @@ import Base_layers_class from './../../core/base-layers.js';
 import Vector_manager from './../../core/vector/vector-manager.js';
 import Vector_renderer from './../../core/vector/vector-renderer.js';
 import { Vector } from './../../core/vector/vector-model.js';
-import { create_star_subpath } from './../../core/vector/vector-shapes.js';
+import { create_custom_shape_subpath } from './../../core/vector/vector-shapes.js';
 import { Insert_vector_action } from './../../actions/vector/insert-vector.js';
 import { Modify_path_action } from './../../actions/vector/modify-path.js';
 
-class Star_class extends Base_tools_class {
+class Custom_shape_class extends Base_tools_class {
 
 	constructor(ctx) {
 		super();
 		this.Base_layers = new Base_layers_class();
 		this.ctx = ctx;
-		this.name = 'star';
+		this.name = 'custom_shape';
 		this.layer = {};
 		this.best_ratio = 1;
 		this.snap_line_info = { x: null, y: null };
@@ -26,6 +26,14 @@ class Star_class extends Base_tools_class {
 
 	load() {
 		this.default_events();
+	}
+
+	_get_shape_name(params) {
+		const shape = params ? params.shape : null;
+		if (shape != null && typeof shape === 'object') {
+			return String(shape.value || shape.shape || shape.title || 'Heart').trim();
+		}
+		return typeof shape === 'string' && shape ? shape.trim() : 'Heart';
 	}
 
 	mousedown(e) {
@@ -46,21 +54,20 @@ class Star_class extends Base_tools_class {
 		this.mouse_click.y = mouse_y;
 
 		const params = this.getParams();
-		const fill = (params.fill && params.fill !== 'none' && params.fill !== false) ? (params.fill_color || params.fill || '#cccccc') : null;
-		const stroke = (params.stroke && params.stroke !== 'none' && params.border !== false) ? (params.border_color || params.stroke || '#000000') : null;
+		const shapeName = this._get_shape_name(params);
+		const fill = (params.fill && params.fill !== 'none') ? (params.fill_color || params.fill || '#cccccc') : null;
+		const stroke = (params.stroke && params.stroke !== 'none') ? (params.border_color || params.stroke || '#000000') : null;
 		const stroke_width = Number(params.stroke_width?.value ?? params.stroke_width ?? params.border_size ?? 2);
 		const stroke_align = (params.stroke_align?.value ?? params.stroke_align ?? 'center').toLowerCase();
 		const stroke_corners = (params.stroke_corners?.value ?? params.stroke_corners ?? 'right angle').toLowerCase();
 		const stroke_join = stroke_corners === 'rounded' ? 'round' : (stroke_corners === 'capped' ? 'bevel' : 'miter');
 		const stroke_cap = stroke_join === 'round' ? 'round' : (stroke_join === 'bevel' ? 'square' : 'butt');
-		const corners = Number(params.corners?.value ?? params.corners ?? 5);
-		const inner_radius = Number(params.inner_radius?.value ?? params.inner_radius ?? 40) / 100;
 
-		const subpath = create_star_subpath(mouse_x, mouse_y, 0, 0, corners, inner_radius);
+		const subpath = create_custom_shape_subpath(shapeName, mouse_x, mouse_y, 0, 0);
 		const vectorCount = (config.vectors ? config.vectors.length : 0) + 1;
 
 		const vec = new Vector({
-			name: 'Star ' + vectorCount,
+			name: shapeName + ' ' + vectorCount,
 			mode: (params.mode === 'Path' || params.mode?.value === 'Path') ? 'path' : 'shape',
 			fill: fill,
 			stroke: stroke,
@@ -93,7 +100,8 @@ class Star_class extends Base_tools_class {
 		}
 
 		const params = this.getParams();
-		const isShift = e.shiftKey || params.square === true;
+		const shapeName = this._get_shape_name(params);
+		const isShift = e.shiftKey || params.square === true || params.circle === true;
 		const isAlt = e.altKey;
 
 		let width = Math.abs(mouse_x - click_x);
@@ -118,9 +126,7 @@ class Star_class extends Base_tools_class {
 		const vec = Vector_manager.get_vector_by_id(this.active_vector_id);
 		if (!vec) return;
 
-		const corners = Number(params.corners?.value ?? params.corners ?? 5);
-		const inner_radius = Number(params.inner_radius?.value ?? params.inner_radius ?? 40) / 100;
-		const subpath = create_star_subpath(start_x, start_y, width, height, corners, inner_radius);
+		const subpath = create_custom_shape_subpath(shapeName, start_x, start_y, width, height);
 		vec.paths = [subpath];
 
 		app.State.do_action(
@@ -152,7 +158,9 @@ class Star_class extends Base_tools_class {
 	}
 
 	demo(ctx, x, y, width, height) {
-		const subpath = create_star_subpath(x, y, width, height, 5, 0.4);
+		const params = this.getParams();
+		const shapeName = this._get_shape_name(params);
+		const subpath = create_custom_shape_subpath(shapeName, x, y, width, height);
 		const demoVec = new Vector({
 			fill: '#aaaaaa',
 			stroke: '#555555',
@@ -172,4 +180,4 @@ class Star_class extends Base_tools_class {
 
 }
 
-export default Star_class;
+export default Custom_shape_class;
