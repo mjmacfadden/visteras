@@ -10,7 +10,7 @@ config.WIDTH = null;
 config.HEIGHT = null;
 config.visible_width = null;
 config.visible_height = null;
-config.COLOR = '#008000';
+config.COLOR = '#000000';
 config.ALPHA = 255;
 config.COLOR_BG = '#ffffff';
 config.ALPHA_BG = 255;
@@ -28,6 +28,8 @@ config.google_webfonts_key = (typeof window !== 'undefined' && window.__VP_KEYS_
 	|| '';
 config.layers = [];
 config.layer = null;
+config.vectors = [];
+config.active_vector_id = null;
 config.selected_layer_ids = []; // multi-select in Layers panel (primary remains config.layer)
 config.layer_select_anchor_id = null; // Shift+click range anchor
 var need_render = false;
@@ -273,6 +275,38 @@ config.TOOLS = [
 			size: 3,
 			stroke: '#00aa00',
 		},
+	},
+	{
+		name: 'pen',
+		title: 'Pen Tool (P)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		on_update: 'on_params_update',
+		attributes: {
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 1,
+				max: 100,
+				step: 1,
+			},
+			rubber_band: true,
+			auto_add_delete: true,
+		},
+	},
+	{
+		name: 'direct_select',
+		title: 'Direct Selection Tool (A)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		attributes: {},
 	},
 	{
 		name: 'line',
@@ -588,7 +622,7 @@ config.TOOLS = [
 				value: false,
 				icon: `strikethrough.svg`
 			},
-			fill: '#008000',
+			fill: '#000000',
 			halign: {
 				type: 'button_group',
 				value: 'Left',
@@ -622,7 +656,7 @@ config.TOOLS = [
 	{
 		name: 'gradient',
 		attributes: {
-			color_1: '#008000',
+			color_1: '#000000',
 			color_2: '#ffffff',
 			alpha: 0,
 			radial: false,

@@ -104,6 +104,15 @@ class Select_tool_class extends Base_tools_class {
 				let y = config.layer.y;
 				config.layer.x = this.keyboard_move_start_position.x;
 				config.layer.y = this.keyboard_move_start_position.y;
+				if (config.layer.type === 'vector') {
+					const dx = this.keyboard_move_start_position.x - x;
+					const dy = this.keyboard_move_start_position.y - y;
+					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+					const vec = (config.vectors || []).find(v => v.id === vecId);
+					if (vec && typeof vec.translate === 'function') {
+						vec.translate(dx, dy);
+					}
+				}
 				var keyboard_actions = [
 					new app.Actions.Update_layer_action(config.layer.id, { x, y })
 				];
@@ -303,6 +312,16 @@ class Select_tool_class extends Base_tools_class {
 					if (config.layer.params.anchor_x != null) config.layer.params.anchor_x += dx;
 					if (config.layer.params.anchor_y != null) config.layer.params.anchor_y += dy;
 				}
+
+				if (config.layer.type === 'vector') {
+					const dx = config.layer.x - prevMoveX;
+					const dy = config.layer.y - prevMoveY;
+					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+					const vec = (config.vectors || []).find(v => v.id === vecId);
+					if (vec && typeof vec.translate === 'function') {
+						vec.translate(dx, dy);
+					}
+				}
 			}
 
 			if (this.Base_layers.render_interactive_layer) {
@@ -479,6 +498,15 @@ class Select_tool_class extends Base_tools_class {
 				if (config.layer.type === 'text' && config.layer.params) {
 					if (this.mousedown_dimensions.anchor_x != null) config.layer.params.anchor_x = this.mousedown_dimensions.anchor_x;
 					if (this.mousedown_dimensions.anchor_y != null) config.layer.params.anchor_y = this.mousedown_dimensions.anchor_y;
+				}
+				if (config.layer.type === 'vector') {
+					const dx = this.mousedown_dimensions.x - new_x;
+					const dy = this.mousedown_dimensions.y - new_y;
+					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+					const vec = (config.vectors || []).find(v => v.id === vecId);
+					if (vec && typeof vec.translate === 'function') {
+						vec.translate(dx, dy);
+					}
 				}
 				if (this.mousedown_mask_dimensions != null) {
 					Object.assign(config.layer.mask, this.mousedown_mask_dimensions);
@@ -756,8 +784,19 @@ class Select_tool_class extends Base_tools_class {
 		if (event.shiftKey == true)
 			power = 1;
 
+		const prevX = config.layer.x;
+		const prevY = config.layer.y;
 		config.layer.x += direction_x * power;
 		config.layer.y += direction_y * power;
+		if (config.layer.type === 'vector') {
+			const dx = config.layer.x - prevX;
+			const dy = config.layer.y - prevY;
+			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+			const vec = (config.vectors || []).find(v => v.id === vecId);
+			if (vec && typeof vec.translate === 'function') {
+				vec.translate(dx, dy);
+			}
+		}
 		this.Base_layers.render_interactive_layer(config.layer.id);
 	}
 

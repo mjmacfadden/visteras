@@ -126,6 +126,8 @@ class Base_documents_class {
 			action_history: options.action_history || [],
 			action_history_index: options.action_history_index || 0,
 			auto_increment: options.auto_increment || 2,
+			vectors: options.vectors || [],
+			active_vector_id: options.active_vector_id || null,
 			transparency: true,
 			is_dirty: options.is_dirty || false,
 			selection: options.selection || null,
@@ -181,6 +183,8 @@ class Base_documents_class {
 		doc.guides = config.guides;
 		doc.user_fonts = config.user_fonts;
 		doc.transparency = config.TRANSPARENCY;
+		doc.vectors = config.vectors ? config.vectors.map(v => (v.clone ? v.clone() : v)) : [];
+		doc.active_vector_id = config.active_vector_id || null;
 		if (app.State) {
 			doc.action_history = app.State.action_history;
 			doc.action_history_index = app.State.action_history_index;
@@ -252,6 +256,8 @@ class Base_documents_class {
 		config.HEIGHT = doc.height;
 		config.layers = (doc.layers && Array.isArray(doc.layers) && doc.layers.length > 0) ? doc.layers : (config.layers || []);
 		config.layer = doc.layer || (config.layers ? config.layers[0] : null);
+		config.vectors = (doc.vectors && Array.isArray(doc.vectors)) ? doc.vectors : [];
+		config.active_vector_id = doc.active_vector_id || (config.vectors[0] ? config.vectors[0].id : null);
 		config.ZOOM = doc.zoom || 1;
 		config.guides = doc.guides || [];
 		config.user_fonts = Object.assign({}, app.FontManager ? app.FontManager.get_user_fonts() : {}, doc.user_fonts || {});
@@ -259,6 +265,9 @@ class Base_documents_class {
 		if (this.Base_gui && this.Base_gui.render_canvas_background) {
 			this.Base_gui.render_canvas_background('canvas_minipaint');
 			this.Base_gui.render_canvas_background('canvas_preview', 8);
+		}
+		if (app.GUI && app.GUI.GUI_vectors) {
+			app.GUI.GUI_vectors.render_vectors();
 		}
 
 		// 4. Restore Undo/Redo State

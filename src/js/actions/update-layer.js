@@ -141,6 +141,29 @@ export class Update_layer_action extends Base_action {
 			}
 		}
 
+		if (this.reference_layer.type === 'vector') {
+			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
+			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
+			if (vec) {
+				const new_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
+				const new_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
+				const dx = new_x - old_x;
+				const dy = new_y - old_y;
+				if (dx !== 0 || dy !== 0) {
+					if (typeof vec.translate === 'function') {
+						vec.translate(dx, dy);
+					}
+				}
+				if ('name' in this.settings) vec.name = this.reference_layer.name;
+				if ('visible' in this.settings) vec.visible = this.reference_layer.visible;
+				if ('locked' in this.settings) vec.locked = this.reference_layer.locked;
+				if ('opacity' in this.settings) vec.opacity = this.reference_layer.opacity;
+			}
+			if (app.GUI && app.GUI.GUI_vectors) {
+				app.GUI.GUI_vectors.render_vectors();
+			}
+		}
+
 		if (this.settings.params || this.settings.width || this.settings.height) {
 			config.need_render_changed_params = true;
 		}
@@ -215,6 +238,31 @@ export class Update_layer_action extends Base_action {
 					}
 				}
 			}
+			if (this.reference_layer.type === 'vector') {
+				const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
+				const vec = config.vectors && config.vectors.find(v => v.id === vecId);
+				if (vec) {
+					const cur_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
+					const cur_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
+					const old_x = (this.old_settings.x != null) ? this.old_settings.x : cur_x;
+					const old_y = (this.old_settings.y != null) ? this.old_settings.y : cur_y;
+					const dx = old_x - cur_x;
+					const dy = old_y - cur_y;
+					if (dx !== 0 || dy !== 0) {
+						if (typeof vec.translate === 'function') {
+							vec.translate(dx, dy);
+						}
+					}
+					if ('name' in this.old_settings) vec.name = this.reference_layer.name;
+					if ('visible' in this.old_settings) vec.visible = this.reference_layer.visible;
+					if ('locked' in this.old_settings) vec.locked = this.reference_layer.locked;
+					if ('opacity' in this.old_settings) vec.opacity = this.reference_layer.opacity;
+				}
+				if (app.GUI && app.GUI.GUI_vectors) {
+					app.GUI.GUI_vectors.render_vectors();
+				}
+			}
+
 			if (this.old_settings.params || this.old_settings.width || this.old_settings.height) {
 				config.need_render_changed_params = true;
 			}

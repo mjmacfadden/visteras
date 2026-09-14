@@ -847,6 +847,11 @@ class File_open_class {
 		if (json.info.guides != undefined) {
 			config.guides = json.info.guides;
 		}
+		if (json.vectors && Array.isArray(json.vectors)) {
+			for (var v of json.vectors) {
+				actions.push(new app.Actions.Insert_vector_action(v));
+			}
+		}
 		actions.push(
 			new app.Actions.Set_object_property_action(this.Base_layers, 'auto_increment', max_id_order + 1),
 			new app.Actions.Update_config_action({

@@ -28,6 +28,7 @@ class GUI_shortcuts_class {
 			'i': 'pick_color',
 			'g': 'fill',
 			't': 'text',
+			'p': 'pen',
 			'c': 'crop',
 			's': 'clone',
 			'l': 'lasso',
@@ -36,7 +37,7 @@ class GUI_shortcuts_class {
 			'u': 'sharpen',
 			'j': 'desaturate',
 			'o': 'bulge_pinch',
-			'a': 'gradient',
+			'a': 'direct_select',
 		};
 
 		this.load();

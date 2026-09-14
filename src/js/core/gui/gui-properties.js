@@ -3,6 +3,8 @@ import config from './../../config.js';
 import Base_layers_class from './../base-layers.js';
 import Helper_class from './../../libs/helpers.js';
 import Tools_translate_class from './../../modules/tools/translate.js';
+import Vector_manager from './../vector/vector-manager.js';
+import { Update_vector_action } from './../../actions/vector/update-vector.js';
 
 /**
  * GUI class responsible for the Properties panel.
@@ -96,6 +98,17 @@ class GUI_properties_class {
 		const target = document.getElementById('toggle_properties');
 		if (!target) return;
 
+		const activeVec = Vector_manager.get_active_vector();
+		const isVectorContext = activeVec && (
+			(config.TOOL && config.TOOL.name === 'pen') ||
+			(document.getElementById('tab_btn_vectors') && document.getElementById('tab_btn_vectors').classList.contains('active'))
+		);
+
+		if (isVectorContext) {
+			this.render_vector_properties(target, activeVec, bind_events);
+			return;
+		}
+
 		const layer = config.layer;
 		if (layer && layer.type === 'adjustment') {
 			this.render_adjustment_properties(target, layer, bind_events);
@@ -106,7 +119,12 @@ class GUI_properties_class {
 			return;
 		}
 
-		target.innerHTML = '<div class="properties_placeholder trn">Select an adjustment or text layer</div>';
+		if (activeVec) {
+			this.render_vector_properties(target, activeVec, bind_events);
+			return;
+		}
+
+		target.innerHTML = '<div class="properties_placeholder trn">Select a layer or vector</div>';
 		this.bound_layer_id = null;
 		this.bound_kind = null;
 		this.params_at_interaction_start = null;
@@ -114,6 +132,133 @@ class GUI_properties_class {
 		delete target.dataset.textSig;
 		if (config.LANG != 'en') {
 			this.Tools_translate.translate(config.LANG, target);
+		}
+	}
+
+	render_vector_properties(target, vector, bind_events = false) {
+		const bounds = vector.getBounds() || { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+		const subpathCount = vector.paths ? vector.paths.length : 0;
+		const totalAnchors = vector.paths ? vector.paths.reduce((acc, p) => acc + (p.anchors ? p.anchors.length : 0), 0) : 0;
+
+		const fillVal = vector.fill || '#555555';
+		const hasFill = !!vector.fill && vector.fill !== 'none';
+		const strokeVal = vector.stroke || '#008000';
+		const hasStroke = !!vector.stroke && vector.stroke !== 'none';
+		const strokeWidth = vector.stroke_width || 2;
+		const fillRule = vector.fill_rule || 'nonzero';
+		const mode = vector.mode || 'path';
+
+		target.innerHTML = `
+			<div class="properties_vector_controls">
+				<div class="properties_section_header trn">Vector: ${this.esc(vector.name)}</div>
+				
+				<div class="properties_group_title trn">Geometry</div>
+				<div class="properties_row">
+					<label class="properties_label">Position</label>
+					<div class="properties_coord_pair">
+						<span class="properties_val_pill">X: ${Math.round(bounds.minX)}</span>
+						<span class="properties_val_pill">Y: ${Math.round(bounds.minY)}</span>
+					</div>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label">Dimensions</label>
+					<div class="properties_coord_pair">
+						<span class="properties_val_pill">W: ${Math.round(bounds.width)}</span>
+						<span class="properties_val_pill">H: ${Math.round(bounds.height)}</span>
+					</div>
+				</div>
+
+				<div class="properties_group_title trn">Appearance</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Mode</label>
+					<select class="properties_select" id="prop_vector_mode">
+						<option value="path" ${mode === 'path' ? 'selected' : ''}>Path (Work Vector)</option>
+						<option value="shape" ${mode === 'shape' ? 'selected' : ''}>Shape (Fill / Stroke)</option>
+					</select>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Fill</label>
+					<div class="properties_input_group">
+						<input type="checkbox" id="prop_vector_has_fill" ${hasFill ? 'checked' : ''} />
+						<input type="color" class="properties_color_picker" id="prop_vector_fill_color" value="${fillVal}" ${!hasFill ? 'disabled' : ''} />
+					</div>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Fill Rule</label>
+					<select class="properties_select" id="prop_vector_fill_rule">
+						<option value="nonzero" ${fillRule === 'nonzero' ? 'selected' : ''}>Non-Zero Winding</option>
+						<option value="evenodd" ${fillRule === 'evenodd' ? 'selected' : ''}>Even-Odd</option>
+					</select>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Stroke</label>
+					<div class="properties_input_group">
+						<input type="checkbox" id="prop_vector_has_stroke" ${hasStroke ? 'checked' : ''} />
+						<input type="color" class="properties_color_picker" id="prop_vector_stroke_color" value="${strokeVal}" ${!hasStroke ? 'disabled' : ''} />
+					</div>
+				</div>
+				<div class="properties_row">
+					<label class="properties_label trn">Width</label>
+					<input type="number" class="properties_number_input" id="prop_vector_stroke_width" min="1" max="100" value="${strokeWidth}" />
+				</div>
+
+				<div class="properties_group_title trn">Path Details</div>
+				<div class="properties_row">
+					<span class="properties_subinfo_text">${subpathCount} ${subpathCount === 1 ? 'subpath' : 'subpaths'}, ${totalAnchors} total anchors</span>
+				</div>
+			</div>
+		`;
+
+		this.bound_layer_id = vector.id;
+		this.bound_kind = 'vector';
+
+		const modeSel = target.querySelector('#prop_vector_mode');
+		const hasFillCb = target.querySelector('#prop_vector_has_fill');
+		const fillColorInput = target.querySelector('#prop_vector_fill_color');
+		const fillRuleSel = target.querySelector('#prop_vector_fill_rule');
+		const hasStrokeCb = target.querySelector('#prop_vector_has_stroke');
+		const strokeColorInput = target.querySelector('#prop_vector_stroke_color');
+		const strokeWidthInput = target.querySelector('#prop_vector_stroke_width');
+
+		if (modeSel) {
+			modeSel.addEventListener('change', () => {
+				app.State.do_action(new Update_vector_action(vector.id, { mode: modeSel.value }));
+			});
+		}
+		if (hasFillCb && fillColorInput) {
+			hasFillCb.addEventListener('change', () => {
+				fillColorInput.disabled = !hasFillCb.checked;
+				const fill = hasFillCb.checked ? fillColorInput.value : null;
+				app.State.do_action(new Update_vector_action(vector.id, { fill }));
+			});
+			fillColorInput.addEventListener('change', () => {
+				if (hasFillCb.checked) {
+					app.State.do_action(new Update_vector_action(vector.id, { fill: fillColorInput.value }));
+				}
+			});
+		}
+		if (fillRuleSel) {
+			fillRuleSel.addEventListener('change', () => {
+				app.State.do_action(new Update_vector_action(vector.id, { fill_rule: fillRuleSel.value }));
+			});
+		}
+		if (hasStrokeCb && strokeColorInput) {
+			hasStrokeCb.addEventListener('change', () => {
+				strokeColorInput.disabled = !hasStrokeCb.checked;
+				const stroke = hasStrokeCb.checked ? strokeColorInput.value : null;
+				app.State.do_action(new Update_vector_action(vector.id, { stroke }));
+			});
+			strokeColorInput.addEventListener('change', () => {
+				if (hasStrokeCb.checked) {
+					app.State.do_action(new Update_vector_action(vector.id, { stroke: strokeColorInput.value }));
+				}
+			});
+		}
+		if (strokeWidthInput) {
+			strokeWidthInput.addEventListener('change', () => {
+				const stroke_width = Math.max(1, parseInt(strokeWidthInput.value, 10) || 1);
+				app.State.do_action(new Update_vector_action(vector.id, { stroke_width }));
+			});
 		}
 	}
 

@@ -30,7 +30,7 @@ export const metaDefaults = {
 	italic: false,
 	underline: false,
 	strikethrough: false,
-	fill_color: '#008000',
+	fill_color: '#000000',
 	stroke_size: 0,
 	stroke_color: '#000000'
 };

@@ -28,3 +28,8 @@ export { Update_layer_image_action } from './update-layer-image.js';
 export { Update_layer_mask_action } from './update-layer-mask.js';
 export { Update_layer_mask_image_action } from './update-layer-mask-image.js';
 export { Update_layer_action } from './update-layer.js';
+export { Insert_vector_action } from './vector/insert-vector.js';
+export { Delete_vector_action } from './vector/delete-vector.js';
+export { Update_vector_action } from './vector/update-vector.js';
+export { Reorder_vector_action } from './vector/reorder-vector.js';
+export { Modify_path_action } from './vector/modify-path.js';
