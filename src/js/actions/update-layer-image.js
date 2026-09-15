@@ -80,9 +80,14 @@ export class Update_layer_image_action extends Base_action {
 				if (this.reference_layer._link_database_id) {
 					this.old_image_id = this.reference_layer._link_database_id;
 				} else {
-					const currentSrc = (this.reference_layer.link && this.reference_layer.link.src)
-						? this.reference_layer.link.src
-						: (this.reference_layer.data || '');
+					let currentSrc = '';
+					if (this.reference_layer.link && this.reference_layer.link.src) {
+						currentSrc = this.reference_layer.link.src;
+					} else if (this.reference_layer.link && typeof this.reference_layer.link.toDataURL === 'function') {
+						currentSrc = this.reference_layer.link.toDataURL();
+					} else if (typeof this.reference_layer.data === 'string') {
+						currentSrc = this.reference_layer.data;
+					}
 					this.old_image_id = await image_store.add(currentSrc);
 				}
 			}
@@ -116,6 +121,9 @@ export class Update_layer_image_action extends Base_action {
 				layer.link_canvas = committed_canvas;
 			}
 		}
+		if (!layer.link || !(layer.link instanceof HTMLImageElement)) {
+			layer.link = new Image();
+		}
 		layer.link.onload = () => {
 			if (!this.reference_layer) return;
 			// Stale decode from a superseded commit — leave newer bridge alone.
@@ -144,8 +152,11 @@ export class Update_layer_image_action extends Base_action {
 		if (!this.reference_layer) {
 			this.reference_layer = app.Layers.get_layer(this.layer_id);
 		}
-		if (this.reference_layer && !this.reference_layer.link) {
-			this.reference_layer.link = new Image();
+		if (this.reference_layer) {
+			delete this.reference_layer.link_canvas;
+			if (!this.reference_layer.link || !(this.reference_layer.link instanceof HTMLImageElement)) {
+				this.reference_layer.link = new Image();
+			}
 		}
 
 		// Estimate storage size
@@ -158,7 +169,18 @@ export class Update_layer_image_action extends Base_action {
 		// Restore old image
 		if (this.old_image_id != null && this.reference_layer) {
 			try {
-				this.reference_layer.link.src = await image_store.get(this.old_image_id);
+				const oldSrc = await image_store.get(this.old_image_id);
+				if (oldSrc) {
+					await new Promise((resolve) => {
+						this.reference_layer.link.onload = () => {
+							resolve();
+						};
+						this.reference_layer.link.onerror = () => {
+							resolve();
+						};
+						this.reference_layer.link.src = oldSrc;
+					});
+				}
 			} catch (error) {
 				throw new Error('Failed to retrieve image from store');
 			}
@@ -169,6 +191,7 @@ export class Update_layer_image_action extends Base_action {
 		this.reference_layer = null;
 		config.need_render = true;
 		app.Layers.notify_layer_data_changed(this.layer_id);
+		app.Layers.render();
 	}
 
 	async free() {

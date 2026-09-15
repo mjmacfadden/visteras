@@ -269,24 +269,41 @@ class HokusaiSession {
 		var dirty = this.getDirtyRect();
 		// Full-frame fallback if dirty covers most of the canvas or is missing
 		var useDirty = dirty && (dirty.w * dirty.h) < (this.width * this.height * 0.85);
-		var rgba = whiteBgToStraightRgba(
-			px,
-			this.width,
-			this.height,
-			useDirty ? dirty : null
-		);
-		if (useDirty && dirty) {
-			// Clear previous dirty region content then put only the rect
-			// (strokeCanvas was cleared at beginStroke; subsequent flushes
-			// overwrite growing dirty AABB).
-			var img = new ImageData(dirty.w, dirty.h);
-			for (var row = 0; row < dirty.h; row++) {
-				var srcOff = ((dirty.y + row) * this.width + dirty.x) * 4;
-				var dstOff = row * dirty.w * 4;
-				img.data.set(rgba.subarray(srcOff, srcOff + dirty.w * 4), dstOff);
+		if (useDirty && dirty && dirty.w > 0 && dirty.h > 0) {
+			var dw = dirty.w;
+			var dh = dirty.h;
+			var dx = dirty.x;
+			var dy = dirty.y;
+			var width = this.width;
+			var height = this.height;
+			var img = new ImageData(dw, dh);
+			var out = img.data;
+
+			for (var row = 0; row < dh; row++) {
+				var y = dy + row;
+				if (y < 0 || y >= height) continue;
+				var srcRow = y * width * 4;
+				var dstRow = row * dw * 4;
+				for (var col = 0; col < dw; col++) {
+					var x = dx + col;
+					if (x < 0 || x >= width) continue;
+					var i = srcRow + x * 4;
+					var j = dstRow + col * 4;
+					var r = px[i];
+					var g = px[i + 1];
+					var b = px[i + 2];
+					var a = Math.max(255 - r, 255 - g, 255 - b);
+					if (a <= 0) continue;
+					var af = a / 255;
+					out[j] = Math.min(255, Math.max(0, Math.round((r - 255 * (1 - af)) / af)));
+					out[j + 1] = Math.min(255, Math.max(0, Math.round((g - 255 * (1 - af)) / af)));
+					out[j + 2] = Math.min(255, Math.max(0, Math.round((b - 255 * (1 - af)) / af)));
+					out[j + 3] = a;
+				}
 			}
-			this.strokeCtx.putImageData(img, dirty.x, dirty.y);
+			this.strokeCtx.putImageData(img, dx, dy);
 		} else {
+			var rgba = whiteBgToStraightRgba(px, this.width, this.height, null);
 			var full = new ImageData(rgba, this.width, this.height);
 			this.strokeCtx.putImageData(full, 0, 0);
 		}

@@ -128,7 +128,7 @@ class Base_documents_class {
 			auto_increment: options.auto_increment || 2,
 			vectors: options.vectors || [],
 			active_vector_id: options.active_vector_id || null,
-			transparency: true,
+			transparency: transp,
 			is_dirty: options.is_dirty || false,
 			selection: options.selection || null,
 			selection_mask: options.selection_mask || null,

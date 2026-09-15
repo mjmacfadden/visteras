@@ -7,6 +7,7 @@ import Helper_class from './../libs/helpers.js';
 import Mask_class from './../modules/mask/mask.js';
 import Dialog_class from './../libs/popup.js';
 import { is_box_text, is_point_text } from './text.js';
+import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tree.js';
 
 class Select_tool_class extends Base_tools_class {
 
@@ -21,7 +22,9 @@ class Select_tool_class extends Base_tools_class {
 		this.saved = false;
 		this.mousedown_dimensions = { x: null, y: null, width: null, height: null };
 		this.mousedown_mask_dimensions = null;
+		this.mousedown_multi_positions = null;
 		this.keyboard_move_start_position = null;
+		this.keyboard_move_start_positions = null;
 		this.moving = false;
 		this.resizing = false;
 		this.snap_line_info = {x: null, y: null};
@@ -99,31 +102,47 @@ class Select_tool_class extends Base_tools_class {
 	keyup(event) {
 		var k = event.key;
 		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) {
-			if (this.keyboard_move_start_position && config.layer) {
-				let x = config.layer.x;
-				let y = config.layer.y;
-				config.layer.x = this.keyboard_move_start_position.x;
-				config.layer.y = this.keyboard_move_start_position.y;
-				if (config.layer.type === 'vector') {
-					const dx = this.keyboard_move_start_position.x - x;
-					const dy = this.keyboard_move_start_position.y - y;
-					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
-					const vec = (config.vectors || []).find(v => v.id === vecId);
-					if (vec && typeof vec.translate === 'function') {
-						vec.translate(dx, dy);
+			if (this.keyboard_move_start_positions && this.keyboard_move_start_positions.size > 0) {
+				const movable_layers = this.get_movable_layers();
+				let keyboard_actions = [];
+
+				for (const l of movable_layers) {
+					const start_pos = this.keyboard_move_start_positions.get(l.id);
+					if (!start_pos) continue;
+
+					let x = l.x;
+					let y = l.y;
+					l.x = start_pos.x;
+					l.y = start_pos.y;
+
+					if (l.type === 'vector') {
+						const dx = start_pos.x - x;
+						const dy = start_pos.y - y;
+						const vecId = l.vector_id || (l.params && l.params.vector_id);
+						const vec = (config.vectors || []).find(v => v.id === vecId);
+						if (vec && typeof vec.translate === 'function') {
+							vec.translate(dx, dy);
+						}
+					}
+
+					if (x !== start_pos.x || y !== start_pos.y) {
+						keyboard_actions.push(
+							new app.Actions.Update_layer_action(l.id, { x, y })
+						);
+						keyboard_actions = keyboard_actions.concat(
+							this.Mask.get_linked_mask_actions(l,
+								{ x: start_pos.x, y: start_pos.y, width: start_pos.width, height: start_pos.height },
+								{ x, y, width: start_pos.width, height: start_pos.height })
+						);
 					}
 				}
-				var keyboard_actions = [
-					new app.Actions.Update_layer_action(config.layer.id, { x, y })
-				];
-				keyboard_actions = keyboard_actions.concat(
-					this.Mask.get_linked_mask_actions(config.layer,
-						{ x: this.keyboard_move_start_position.x, y: this.keyboard_move_start_position.y, width: config.layer.width, height: config.layer.height },
-						{ x, y, width: config.layer.width, height: config.layer.height })
-				);
-				app.State.do_action(
-					new app.Actions.Bundle_action('move_layer', 'Move Layer', keyboard_actions)
-				);
+
+				if (keyboard_actions.length > 0) {
+					app.State.do_action(
+						new app.Actions.Bundle_action('move_layers', 'Move Layers', keyboard_actions)
+					);
+				}
+				this.keyboard_move_start_positions = null;
 				this.keyboard_move_start_position = null;
 			}
 		}
@@ -182,7 +201,7 @@ class Select_tool_class extends Base_tools_class {
 			this.Base_selection.find_settings().keep_ratio = aspect_lock;
 			// Point text stays dynamic — transform scales glyphs (Photoshop-like), not convert to box.
 			// Box/paragraph: frame-only resize (never bake/scale fonts). Use shared is_box_text.
-			if (config.layer.type === 'text' && is_point_text(config.layer)) {
+			if (config.layer && config.layer.type === 'text' && is_point_text(config.layer)) {
 				this._resizing_point_text = true;
 			} else {
 				this._resizing_point_text = false;
@@ -192,7 +211,8 @@ class Select_tool_class extends Base_tools_class {
 			this.resizing = false;
 			this.moving = true;
 			await this.auto_select_object(e);
-			if (config.layer.locked === true) {
+			const movable_layers = this.get_movable_layers();
+			if (movable_layers.length === 0) {
 				//locked layers can be selected but not moved or resized
 				this.moving = false;
 				return;
@@ -206,7 +226,27 @@ class Select_tool_class extends Base_tools_class {
 			app.GUI.GUI_tools.update_transform_indicators();
 		}
 
-		this.mousedown_dimensions = {
+		const movable_layers = this.get_movable_layers();
+		this.mousedown_multi_positions = new Map();
+		for (const l of movable_layers) {
+			this.mousedown_multi_positions.set(l.id, {
+				x: Math.round(l.x),
+				y: Math.round(l.y),
+				width: l.width,
+				height: l.height,
+				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
+				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
+				mask: l.mask ? {
+					x: l.mask.x,
+					y: l.mask.y,
+					width: l.mask.width,
+					height: l.mask.height,
+					linked: l.mask.linked !== false,
+				} : null
+			});
+		}
+
+		this.mousedown_dimensions = (config.layer && config.layer.x != null) ? {
 			x: Math.round(config.layer.x),
 			y: Math.round(config.layer.y),
 			width: config.layer.width,
@@ -220,14 +260,16 @@ class Select_tool_class extends Base_tools_class {
 				height: config.layer.mask.height,
 				linked: config.layer.mask.linked !== false,
 			} : null
-		};
-		this.mousedown_mask_dimensions = config.layer.mask ? {
+		} : { x: 0, y: 0, width: 0, height: 0, anchor_x: null, anchor_y: null, mask: null };
+
+		this.mousedown_mask_dimensions = (config.layer && config.layer.mask) ? {
 			x: config.layer.mask.x,
 			y: config.layer.mask.y,
 			width: config.layer.mask.width,
 			height: config.layer.mask.height,
 			linked: config.layer.mask.linked !== false,
 		} : null;
+
 		// Snapshot fonts after dimensions are frozen for this drag
 		if (this._resizing_point_text && config.layer && config.layer.type === 'text') {
 			try {
@@ -261,7 +303,7 @@ class Select_tool_class extends Base_tools_class {
 
 			//also handle rotation
 			let rotate = this.Base_selection.current_angle
-			if(config.layer.rotate != rotate && rotate !== null){
+			if(config.layer && config.layer.rotate != rotate && rotate !== null){
 				config.layer.rotate = rotate;
 			}
 
@@ -287,44 +329,61 @@ class Select_tool_class extends Base_tools_class {
 				config.layer.mask.y = Math.round(mouse.y - mouse.click_y + this.mousedown_mask_dimensions.y);
 				delete config.layer.mask._alpha_canvas;
 				delete config.layer.mask._alpha_source;
-			} else {
-				// Move layer (and linked mask moves with it)
-				const prevMoveX = config.layer.x;
-				const prevMoveY = config.layer.y;
-				config.layer.x = Math.round(mouse.x - mouse.click_x + this.mousedown_dimensions.x);
-				config.layer.y = Math.round(mouse.y - mouse.click_y + this.mousedown_dimensions.y);
-				this.Mask.preview_linked_mask_transform(config.layer, this.mousedown_dimensions, config.layer);
+			} else if (this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
+				let raw_delta_x = Math.round(mouse.x - mouse.click_x);
+				let raw_delta_y = Math.round(mouse.y - mouse.click_y);
 
-				//apply snap
-				var snap_info = this.calc_snap(e, config.layer.x, config.layer.y);
-				if(snap_info != null){
-					if(snap_info.x != null) {
-						config.layer.x = snap_info.x;
-					}
-					if(snap_info.y != null) {
-						config.layer.y = snap_info.y;
+				let delta_x = raw_delta_x;
+				let delta_y = raw_delta_y;
+
+				const primary_pos = (config.layer && this.mousedown_multi_positions.has(config.layer.id))
+					? this.mousedown_multi_positions.get(config.layer.id)
+					: null;
+
+				if (primary_pos && primary_pos.x != null && primary_pos.y != null) {
+					const target_x = primary_pos.x + raw_delta_x;
+					const target_y = primary_pos.y + raw_delta_y;
+					const snap_info = this.calc_snap(e, target_x, target_y);
+					if (snap_info != null) {
+						if (snap_info.x != null) {
+							delta_x = snap_info.x - primary_pos.x;
+						}
+						if (snap_info.y != null) {
+							delta_y = snap_info.y - primary_pos.y;
+						}
 					}
 				}
 
-				if (config.layer.type === 'text' && config.layer.params && config.layer.params.boundary === 'dynamic') {
-					const dx = config.layer.x - prevMoveX;
-					const dy = config.layer.y - prevMoveY;
-					if (config.layer.params.anchor_x != null) config.layer.params.anchor_x += dx;
-					if (config.layer.params.anchor_y != null) config.layer.params.anchor_y += dy;
-				}
+				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+					const layer = app.Layers.get_layer(layer_id);
+					if (!layer) continue;
 
-				if (config.layer.type === 'vector') {
-					const dx = config.layer.x - prevMoveX;
-					const dy = config.layer.y - prevMoveY;
-					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
-					const vec = (config.vectors || []).find(v => v.id === vecId);
-					if (vec && typeof vec.translate === 'function') {
-						vec.translate(dx, dy);
+					const prevMoveX = layer.x;
+					const prevMoveY = layer.y;
+					layer.x = init_pos.x + delta_x;
+					layer.y = init_pos.y + delta_y;
+					this.Mask.preview_linked_mask_transform(layer, init_pos, layer);
+
+					if (layer.type === 'text' && layer.params && layer.params.boundary === 'dynamic') {
+						const dx = layer.x - prevMoveX;
+						const dy = layer.y - prevMoveY;
+						if (layer.params.anchor_x != null) layer.params.anchor_x += dx;
+						if (layer.params.anchor_y != null) layer.params.anchor_y += dy;
+					}
+
+					if (layer.type === 'vector') {
+						const dx = layer.x - prevMoveX;
+						const dy = layer.y - prevMoveY;
+						const vecId = layer.vector_id || (layer.params && layer.params.vector_id);
+						const vec = (config.vectors || []).find(v => v.id === vecId);
+						if (vec && typeof vec.translate === 'function') {
+							vec.translate(dx, dy);
+						}
 					}
 				}
 			}
 
-			if (this.Base_layers.render_interactive_layer) {
+			if (this.Base_layers.render_interactive_layer && config.layer) {
 				this.Base_layers.render_interactive_layer(config.layer.id);
 			}
 			this.Base_layers.render();
@@ -490,65 +549,90 @@ class Select_tool_class extends Base_tools_class {
 						})
 					);
 				}
-			} else {
-				var new_x = Math.round(mouse.x - mouse.click_x + this.mousedown_dimensions.x);
-				var new_y = Math.round(mouse.y - mouse.click_y + this.mousedown_dimensions.y);
-				config.layer.x = this.mousedown_dimensions.x;
-				config.layer.y = this.mousedown_dimensions.y;
-				if (config.layer.type === 'text' && config.layer.params) {
-					if (this.mousedown_dimensions.anchor_x != null) config.layer.params.anchor_x = this.mousedown_dimensions.anchor_x;
-					if (this.mousedown_dimensions.anchor_y != null) config.layer.params.anchor_y = this.mousedown_dimensions.anchor_y;
-				}
-				if (config.layer.type === 'vector') {
-					const dx = this.mousedown_dimensions.x - new_x;
-					const dy = this.mousedown_dimensions.y - new_y;
-					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
-					const vec = (config.vectors || []).find(v => v.id === vecId);
-					if (vec && typeof vec.translate === 'function') {
-						vec.translate(dx, dy);
-					}
-				}
-				if (this.mousedown_mask_dimensions != null) {
-					Object.assign(config.layer.mask, this.mousedown_mask_dimensions);
-				}
+			} else if (this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
+				let raw_delta_x = Math.round(mouse.x - mouse.click_x);
+				let raw_delta_y = Math.round(mouse.y - mouse.click_y);
 
-				if(mouse.x - mouse.click_x || mouse.y - mouse.click_y) {
-					var snap_info = this.calc_snap(e, new_x, new_y);
+				let delta_x = raw_delta_x;
+				let delta_y = raw_delta_y;
+
+				const primary_pos = (config.layer && this.mousedown_multi_positions.has(config.layer.id))
+					? this.mousedown_multi_positions.get(config.layer.id)
+					: null;
+
+				if (primary_pos && primary_pos.x != null && primary_pos.y != null) {
+					const target_x = primary_pos.x + raw_delta_x;
+					const target_y = primary_pos.y + raw_delta_y;
+					const snap_info = this.calc_snap(e, target_x, target_y);
 					if (snap_info != null) {
 						if (snap_info.x != null) {
-							new_x = snap_info.x;
+							delta_x = snap_info.x - primary_pos.x;
 						}
 						if (snap_info.y != null) {
-							new_y = snap_info.y;
+							delta_y = snap_info.y - primary_pos.y;
 						}
 					}
 				}
 
-				if (this.mousedown_dimensions.x !== new_x || this.mousedown_dimensions.y !== new_y) {
-					var move_actions = [
-						new app.Actions.Update_layer_action(config.layer.id, {
-							x: new_x,
-							y: new_y
-						})
-					];
-					//keep a linked mask in sync
-					move_actions = move_actions.concat(
-						this.Mask.get_linked_mask_actions(config.layer, this.mousedown_dimensions, {
-							x: new_x,
-							y: new_y,
-							width: this.mousedown_dimensions.width,
-							height: this.mousedown_dimensions.height
-						})
-					);
-					await app.State.do_action(
-						new app.Actions.Bundle_action('move_layer', 'Move Layer', move_actions)
-					);
+				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+					const layer = app.Layers.get_layer(layer_id);
+					if (!layer) continue;
+
+					layer.x = init_pos.x;
+					layer.y = init_pos.y;
+					if (layer.type === 'text' && layer.params) {
+						if (init_pos.anchor_x != null) layer.params.anchor_x = init_pos.anchor_x;
+						if (init_pos.anchor_y != null) layer.params.anchor_y = init_pos.anchor_y;
+					}
+					if (layer.type === 'vector') {
+						const vecId = layer.vector_id || (layer.params && layer.params.vector_id);
+						const vec = (config.vectors || []).find(v => v.id === vecId);
+						if (vec && typeof vec.translate === 'function') {
+							vec.translate(-delta_x, -delta_y);
+						}
+					}
+					if (init_pos.mask != null && layer.mask) {
+						Object.assign(layer.mask, init_pos.mask);
+					}
+				}
+
+				if (delta_x !== 0 || delta_y !== 0) {
+					let move_actions = [];
+					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+						const layer = app.Layers.get_layer(layer_id);
+						if (!layer) continue;
+
+						const new_x = init_pos.x + delta_x;
+						const new_y = init_pos.y + delta_y;
+
+						move_actions.push(
+							new app.Actions.Update_layer_action(layer.id, {
+								x: new_x,
+								y: new_y
+							})
+						);
+						move_actions = move_actions.concat(
+							this.Mask.get_linked_mask_actions(layer, init_pos, {
+								x: new_x,
+								y: new_y,
+								width: init_pos.width,
+								height: init_pos.height
+							})
+						);
+					}
+
+					if (move_actions.length > 0) {
+						await app.State.do_action(
+							new app.Actions.Bundle_action('move_layers', 'Move Layers', move_actions)
+						);
+					}
 				}
 			}
 		}
 		this.moving = false;
 		this.resizing = false;
 		this.mousedown_mask_dimensions = null;
+		this.mousedown_multi_positions = null;
 
 		if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_transform_indicators === 'function') {
 			app.GUI.GUI_tools.update_transform_indicators();
@@ -560,7 +644,7 @@ class Select_tool_class extends Base_tools_class {
 		var mouse = this.get_mouse_info(event);
 
 		//maybe related tool have additional overlay render handlers?
-		if(config.layer.render_function != null) {
+		if(config.layer && config.layer.render_function != null) {
 			var render_class = config.layer.render_function[0];
 			var render_function = 'select';
 			if (
@@ -592,7 +676,7 @@ class Select_tool_class extends Base_tools_class {
 		var snap_position = { x: null, y: null };
 		var params = this.getParams();
 
-		if(config.SNAP === false || event.shiftKey == true){
+		if(config.SNAP === false || event.shiftKey == true || !config.layer || config.layer.width == null || config.layer.height == null){
 			this.snap_line_info = {x: null, y: null};
 			return null;
 		}
@@ -602,7 +686,7 @@ class Select_tool_class extends Base_tools_class {
 		var max_distance = (config.WIDTH + config.HEIGHT) / 2 * sensitivity / config.ZOOM;
 
 		//collect snap positions
-		var snap_positions = this.get_snap_positions(config.layer.id);
+		var snap_positions = this.get_snap_positions(config.layer ? config.layer.id : null);
 
 		//find closest snap positions
 		var min_group = {
@@ -710,7 +794,7 @@ class Select_tool_class extends Base_tools_class {
 				start_x: min_group.x.start,
 				start_y: 0,
 				end_x: min_group.x.start,
-				end_y: config.HEIGHT,
+				end_y: config.HEIGHT
 			};
 		}
 		else if(min_group.x.end != null && min_group_distance.x.end == min_distance.x) {
@@ -734,7 +818,7 @@ class Select_tool_class extends Base_tools_class {
 				start_x: 0,
 				start_y: min_group.y.center,
 				end_x: config.WIDTH,
-				end_y: min_group.y.center,
+				end_y: min_group.y.center
 			};
 		}
 		else if(min_group.y.start != null && min_group_distance.y.start == min_distance.y) {
@@ -744,7 +828,7 @@ class Select_tool_class extends Base_tools_class {
 				start_x: 0,
 				start_y: min_group.y.start,
 				end_x: config.WIDTH,
-				end_y: min_group.y.start,
+				end_y: min_group.y.start
 			};
 		}
 		else if(min_group.y.end != null && min_group_distance.y.end == min_distance.y) {
@@ -754,7 +838,7 @@ class Select_tool_class extends Base_tools_class {
 				start_x: 0,
 				start_y: min_group.y.end,
 				end_x: config.WIDTH,
-				end_y: min_group.y.end,
+				end_y: min_group.y.end
 			};
 		}
 		else{
@@ -768,14 +852,65 @@ class Select_tool_class extends Base_tools_class {
 		return null;
 	}
 
+	is_layer_locked(layer) {
+		if (!layer || layer.locked === true) return true;
+		const ancestors = get_ancestors(layer.id, config.layers);
+		for (const a of ancestors) {
+			if (a.locked === true) return true;
+		}
+		return false;
+	}
+
+	get_movable_layers() {
+		const selected_ids = (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.length > 0)
+			? config.selected_layer_ids
+			: (config.layer ? [config.layer.id] : []);
+
+		const movable_layers = [];
+		const visited_ids = new Set();
+
+		for (const raw_id of selected_ids) {
+			const id = parseInt(raw_id, 10);
+			const layer = app.Layers.get_layer(id);
+			if (!layer) continue;
+
+			if (is_group(layer)) {
+				const desc_ids = get_descendant_ids(layer.id, config.layers);
+				for (const desc_id of desc_ids) {
+					if (visited_ids.has(desc_id)) continue;
+					const child = app.Layers.get_layer(desc_id);
+					if (child && !is_group(child)) {
+						visited_ids.add(desc_id);
+						if (!this.is_layer_locked(child)) {
+							movable_layers.push(child);
+						}
+					}
+				}
+			} else {
+				if (visited_ids.has(layer.id)) continue;
+				visited_ids.add(layer.id);
+				if (!this.is_layer_locked(layer)) {
+					movable_layers.push(layer);
+				}
+			}
+		}
+		return movable_layers;
+	}
+
 	move(direction_x, direction_y, event) {
-		if (config.layer.locked === true) {
+		const movable_layers = this.get_movable_layers();
+		if (movable_layers.length === 0) {
 			return;
 		}
-		if (!this.keyboard_move_start_position) {
-			this.keyboard_move_start_position = {
-				x: config.layer.x,
-				y: config.layer.y
+		if (!this.keyboard_move_start_positions) {
+			this.keyboard_move_start_positions = new Map();
+			for (const l of movable_layers) {
+				this.keyboard_move_start_positions.set(l.id, {
+					x: l.x,
+					y: l.y,
+					width: l.width,
+					height: l.height
+				});
 			}
 		}
 		var power = 10;
@@ -784,20 +919,28 @@ class Select_tool_class extends Base_tools_class {
 		if (event.shiftKey == true)
 			power = 1;
 
-		const prevX = config.layer.x;
-		const prevY = config.layer.y;
-		config.layer.x += direction_x * power;
-		config.layer.y += direction_y * power;
-		if (config.layer.type === 'vector') {
-			const dx = config.layer.x - prevX;
-			const dy = config.layer.y - prevY;
-			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
-			const vec = (config.vectors || []).find(v => v.id === vecId);
-			if (vec && typeof vec.translate === 'function') {
-				vec.translate(dx, dy);
+		const offset_x = direction_x * power;
+		const offset_y = direction_y * power;
+
+		for (const l of movable_layers) {
+			const prevX = l.x;
+			const prevY = l.y;
+			l.x += offset_x;
+			l.y += offset_y;
+			if (l.type === 'vector') {
+				const dx = l.x - prevX;
+				const dy = l.y - prevY;
+				const vecId = l.vector_id || (l.params && l.params.vector_id);
+				const vec = (config.vectors || []).find(v => v.id === vecId);
+				if (vec && typeof vec.translate === 'function') {
+					vec.translate(dx, dy);
+				}
+			}
+			if (this.Base_layers.render_interactive_layer) {
+				this.Base_layers.render_interactive_layer(l.id);
 			}
 		}
-		this.Base_layers.render_interactive_layer(config.layer.id);
+		this.Base_layers.render();
 	}
 
 	async auto_select_object(e) {
@@ -805,14 +948,28 @@ class Select_tool_class extends Base_tools_class {
 		if (params.auto_select == false)
 			return;
 
+		var movable = this.get_movable_layers();
+		var movable_id_set = new Set(movable.map(l => l.id));
+
+		var selected_ids = (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.length > 0)
+			? config.selected_layer_ids.map(id => parseInt(id, 10))
+			: (config.layer ? [config.layer.id] : []);
+		var selected_id_set = new Set(selected_ids);
+
 		var layers_sorted = this.Base_layers.get_sorted_layers();
 
 		//render main canvas
 		for (var i = 0; i < layers_sorted.length; i++) {
 			var value = layers_sorted[i];
+			if (value.visible === false) continue;
 			var canvas = this.Base_layers.convert_layer_to_canvas(value.id, null, false);
 
 			if (this.check_hit_region(e, canvas.getContext("2d"), value) == true) {
+				// If clicked layer is already part of the active selection (or inside a selected group),
+				// do NOT change or collapse the selection!
+				if (movable_id_set.has(value.id) || selected_id_set.has(value.id)) {
+					return;
+				}
 				await app.State.do_action(
 					new app.Actions.Select_layer_action(value.id)
 				);
