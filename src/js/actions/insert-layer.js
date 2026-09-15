@@ -97,6 +97,18 @@ export class Insert_layer_action extends Base_action {
 			layer[i] = this.settings[i];
 		}
 
+		if (!layer.type) {
+			layer.type = 'image';
+			const blankCanvas = document.createElement('canvas');
+			blankCanvas.width = config.WIDTH || 800;
+			blankCanvas.height = config.HEIGHT || 600;
+			layer.link = blankCanvas;
+			layer.width = config.WIDTH || 800;
+			layer.height = config.HEIGHT || 600;
+			layer.width_original = config.WIDTH || 800;
+			layer.height_original = config.HEIGHT || 600;
+		}
+
 		// Prepare image
 		let image_load_promise;
 		if (layer.type == 'image') {

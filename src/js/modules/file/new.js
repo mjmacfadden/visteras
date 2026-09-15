@@ -117,6 +117,12 @@ class File_new_class {
 							h_input.value = _this.Helper.get_user_unit(h_val, units, resolution);
 						}
 					}
+					if (target_res.toLowerCase().includes('pixel art')) {
+						var trans_input = document.getElementById('pop_data_transparency');
+						if (trans_input) {
+							trans_input.checked = true;
+						}
+					}
 				}
 			},
 			on_finish: function (params) {
@@ -193,12 +199,26 @@ class File_new_class {
 					new app.Actions.Init_canvas_zoom_action(),
 					new app.Actions.Insert_layer_action(
 						transparency
-							? {}
+							? {
+								name: 'Layer 1',
+								locked: false,
+								type: 'image',
+								link: bgCanvas,
+								data: '',
+								width: parseInt(width),
+								height: parseInt(height),
+								width_original: parseInt(width),
+								height_original: parseInt(height),
+							}
 							: {
 								name: 'Background',
-								locked: true,
+								locked: false,
 								type: 'image',
 								data: bgCanvas.toDataURL(),
+								width: parseInt(width),
+								height: parseInt(height),
+								width_original: parseInt(width),
+								height_original: parseInt(height),
 							}
 					)
 				])

@@ -33,3 +33,6 @@ export { Delete_vector_action } from './vector/delete-vector.js';
 export { Update_vector_action } from './vector/update-vector.js';
 export { Reorder_vector_action } from './vector/reorder-vector.js';
 export { Modify_path_action } from './vector/modify-path.js';
+export { Insert_frame_action } from './timeline/insert-frame.js';
+export { Delete_frame_action } from './timeline/delete-frame.js';
+export { Reorder_frame_action } from './timeline/reorder-frame.js';

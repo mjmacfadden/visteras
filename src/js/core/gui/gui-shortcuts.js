@@ -208,6 +208,19 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Ctrl/Cmd + 1 = 100% Zoom (Actual size)
+			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+				&& (event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1')) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['view/zoom']) {
+					app.GUI.modules['view/zoom'].original();
+				} else if (app.GUI && app.GUI.GUI_preview) {
+					app.GUI.GUI_preview.zoom(100);
+				}
+				return;
+			}
+
 			// Ctrl/Cmd + +/- = Zoom in/out
 			if ((event.ctrlKey || event.metaKey) && !event.altKey
 				&& (event.code === 'Equal' || event.code === 'Minus'
@@ -293,10 +306,14 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Space = temporary pan (hand) tool
+			// Space = Play/Pause when timeline is open, otherwise temporary pan (hand) tool
 			if (event.code === 'Space' && !event.ctrlKey && !event.metaKey && !event.altKey) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.GUI_timeline && app.GUI.GUI_timeline.is_visible) {
+					app.GUI.GUI_timeline.toggle_play();
+					return;
+				}
 				if (this.space_pan_tool == null && app.GUI && app.GUI.GUI_tools) {
 					this.abort_active_paint_stroke();
 					this.space_pan_tool = app.GUI.GUI_tools.active_tool;
@@ -629,7 +646,7 @@ class GUI_shortcuts_class {
 
 		// Immediately update the brush cursor on screen
 		var mouseEl = document.getElementById('mouse');
-		if (mouseEl && mouseEl.classList.contains('circle')) {
+		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect'))) {
 			var curW = parseFloat(mouseEl.style.width) || 0;
 			var zoomedSize = newSize * config.ZOOM;
 			var left = parseFloat(mouseEl.style.left) || 0;

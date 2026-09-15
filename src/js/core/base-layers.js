@@ -98,7 +98,7 @@ class Base_layers_class {
 
 		new app.Actions.Insert_layer_action({
 			name: 'Background',
-			locked: true,
+			locked: false,
 			type: 'image',
 			data: bgCanvas.toDataURL(),
 		}).do();
@@ -170,6 +170,10 @@ class Base_layers_class {
 			this.Base_selection.start_marching_ants();
 		} else if (this.Base_selection) {
 			this.Base_selection.stop_marching_ants();
+		}
+
+		if (this.Base_gui && this.Base_gui.GUI_timeline && this.Base_gui.GUI_timeline.is_visible && !this.Base_gui.GUI_timeline.is_playing) {
+			this.Base_gui.GUI_timeline.update_active_thumbnail();
 		}
 	}
 
@@ -297,6 +301,9 @@ class Base_layers_class {
 		this.ctx_preview.drawImage(cache.documentCanvas, 0, 0, w, h);
 		this.ctx_preview.restore();
 		this.Base_gui.GUI_preview.render_preview_active_zone();
+		if (this.Base_gui.GUI_timeline && this.Base_gui.GUI_timeline.is_visible && !this.Base_gui.GUI_timeline.is_playing) {
+			this.Base_gui.GUI_timeline.update_active_thumbnail();
+		}
 		cache.previewDirty = false;
 	}
 
@@ -509,7 +516,24 @@ class Base_layers_class {
 
 	}
 
+	draw_onion_skin(ctx) {
+		if (!app.GUI || !app.GUI.GUI_timeline) return;
+		const fm = app.GUI.GUI_timeline.Frame_manager;
+		if (!fm || !fm.onion_skin || !fm.is_timeline_active) return;
+
+		const prevCanvas = fm.get_previous_frame_canvas();
+		if (!prevCanvas) return;
+
+		ctx.save();
+		zoomView.apply();
+		ctx.globalAlpha = fm.onion_skin_opacity || 0.3;
+		ctx.drawImage(prevCanvas, 0, 0, config.WIDTH, config.HEIGHT);
+		ctx.restore();
+	}
+
 	render_overlay() {
+		this.draw_onion_skin(this.ctx);
+
 		var render_class = config.TOOL.name;
 		var render_function = "render_overlay";
 
@@ -1624,6 +1648,30 @@ class Base_layers_class {
 		if (renderer && renderer.on_layer_data_changed) {
 			renderer.on_layer_data_changed(layerId);
 		}
+	}
+
+	/**
+	 * Notify that all layers have changed (e.g. when switching timeline frames or loading documents).
+	 * Invalidates all 2D composite caches and WebGL texture caches.
+	 */
+	notify_all_layers_changed() {
+		if (this.Composite_cache) {
+			this.Composite_cache.pendingInteractiveLayerId = null;
+			this.Composite_cache.invalidate_document();
+			this.Composite_cache.previewDirty = true;
+			this.Composite_cache.detailsDirty = true;
+			this.Composite_cache.rulerDirty = true;
+		}
+		var renderer = get_renderer();
+		if (renderer) {
+			if (typeof renderer.clear_texture_cache === 'function') {
+				renderer.clear_texture_cache();
+			}
+			if (typeof renderer.invalidate_composite_cache === 'function') {
+				renderer.invalidate_composite_cache();
+			}
+		}
+		this.invalidate({ document: true, full: true, preview: true, details: true, ruler: true });
 	}
 
 	/**

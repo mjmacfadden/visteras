@@ -101,7 +101,7 @@ class File_open_class {
 		a.setAttribute("id", "file_open_as_layer");
 		a.type = 'file';
 		a.multiple = 'multiple';
-		a.accept = 'image/*,.psd,.ttf,.otf,.woff,.woff2,image/vnd.adobe.photoshop,image/x-photoshop';
+		a.accept = 'image/*,.psd,.piskel,.ttf,.otf,.woff,.woff2,image/vnd.adobe.photoshop,image/x-photoshop';
 		document.getElementById("tmp").appendChild(a);
 		document.getElementById('file_open_as_layer').addEventListener('change', function (e) {
 			_this.open_handler_as_layer(e);
@@ -169,8 +169,21 @@ class File_open_class {
 				continue;
 			}
 
-			if (!f.type.match('image.*') && !f.name.match(/\.(png|jpg|jpeg|webp|gif|avif)/i)) {
-				alertify.error('Wrong file type, must be image, psd, or font.');
+			var isPiskel = (f.name && f.name.toLowerCase().endsWith('.piskel'));
+			if (isPiskel) {
+				try {
+					var readResult = await this.read_file_async(f, 'text');
+					var piskelMod = await import(/* webpackChunkName: "piskel" */ './../../core/timeline/piskel-importer.js');
+					await piskelMod.default.load_piskel_file(readResult.result, f.name);
+				} catch (err) {
+					console.error('[Piskel] Error importing as layer:', err);
+					alertify.error('Failed to import Piskel: ' + (err.message || err));
+				}
+				continue;
+			}
+
+			if (!f.type.match('image.*') && !isPiskel && !f.name.match(/\.(png|jpg|jpeg|webp|gif|avif|piskel)/i)) {
+				alertify.error('Wrong file type, must be image, psd, piskel, or font.');
 				continue;
 			}
 
@@ -208,7 +221,7 @@ class File_open_class {
 		a.setAttribute("id", "file_open");
 		a.type = 'file';
 		a.multiple = 'multiple';
-		a.accept = 'image/*,.json,.psd,.ttf,.otf,.woff,.woff2,application/json,image/vnd.adobe.photoshop,image/x-photoshop';
+		a.accept = 'image/*,.json,.psd,.piskel,.ttf,.otf,.woff,.woff2,application/json,image/vnd.adobe.photoshop,image/x-photoshop';
 		document.getElementById("tmp").appendChild(a);
 		document.getElementById('file_open').addEventListener('change', function (e) {
 			_this.open_handler(e);
@@ -447,7 +460,8 @@ class File_open_class {
 				}
 				continue;
 			}
-			var isJson = f.name.toLowerCase().endsWith('.json') || f.type === 'application/json' || f.type === 'text/json';
+			var isPiskel = (f.name && f.name.toLowerCase().endsWith('.piskel'));
+			var isJson = !isPiskel && (f.name.toLowerCase().endsWith('.json') || f.type === 'application/json' || f.type === 'text/json');
 			var isPsd = (f.name && f.name.toLowerCase().endsWith('.psd')) ||
 				f.type === 'image/vnd.adobe.photoshop' ||
 				f.type === 'image/x-photoshop' ||
@@ -455,9 +469,9 @@ class File_open_class {
 				f.type === 'application/photoshop' ||
 				f.type === 'application/psd';
 
-			if (!f.type.match('image.*') && !isJson && !isPsd && !f.name.match(/\.(png|jpg|jpeg|webp|gif|avif|psd)/i)) {
+			if (!f.type.match('image.*') && !isJson && !isPsd && !isPiskel && !f.name.match(/\.(png|jpg|jpeg|webp|gif|avif|psd|piskel)/i)) {
 				if(dir_opened == false) {
-					alertify.error('Wrong file type, must be image, json, psd, or font.');
+					alertify.error('Wrong file type, must be image, json, psd, piskel, or font.');
 				}
 				continue;
 			}
@@ -465,17 +479,34 @@ class File_open_class {
 				this.SAVE_NAME = f.name.split('.')[f.name.split('.').length - 2];
 			}
 
-			var readAs = isJson ? 'text' : (isPsd ? 'arrayBuffer' : 'dataURL');
+			var readAs = (isJson || isPiskel) ? 'text' : (isPsd ? 'arrayBuffer' : 'dataURL');
 			try {
 				var readResult = await this.read_file_async(f, readAs);
-				if (isJson) {
+				if (isPiskel) {
 					var content = readResult.result;
 					if (typeof content === 'string' && content.startsWith('data:')) {
 						try {
 							content = atob(content.split(',')[1]);
 						} catch (e) {}
 					}
-					if (app.Documents) {
+					var piskelMod = await import(/* webpackChunkName: "piskel" */ './../../core/timeline/piskel-importer.js');
+					await piskelMod.default.load_piskel_file(content, f.name);
+				} else if (isJson) {
+					var content = readResult.result;
+					if (typeof content === 'string' && content.startsWith('data:')) {
+						try {
+							content = atob(content.split(',')[1]);
+						} catch (e) {}
+					}
+					let parsedJson = null;
+					try {
+						parsedJson = (typeof content === 'string') ? JSON.parse(content) : content;
+					} catch (e) {}
+
+					if (parsedJson && parsedJson.piskel && parsedJson.piskel.layers) {
+						var piskelMod = await import(/* webpackChunkName: "piskel" */ './../../core/timeline/piskel-importer.js');
+						await piskelMod.default.load_piskel_file(parsedJson, f.name);
+					} else if (app.Documents) {
 						await app.Documents.create_document_from_json(content, f.name);
 					} else {
 						await _this.load_json(content, f.name);

@@ -16,6 +16,7 @@ import GUI_information_class from './gui/gui-information.js';
 import GUI_details_class from './gui/gui-details.js';
 import GUI_adjustments_class from './gui/gui-adjustments.js';
 import GUI_properties_class from './gui/gui-properties.js';
+import GUI_timeline_class from './gui/gui-timeline.js';
 import GUI_menu_class from './gui/gui-menu.js';
 import Tools_translate_class from './../modules/tools/translate.js';
 import Tools_settings_class from './../modules/tools/settings.js';
@@ -53,6 +54,8 @@ class Base_gui_class {
 
 		//common image dimensions
 		this.common_dimensions = [
+			[32, 32, 'pixel art 32 bit'],
+			[64, 64, 'pixel art 64 bit'],
 			[640, 480, '480p'],
 			[800, 600, 'SVGA'],
 			[1024, 768, 'XGA'],
@@ -73,6 +76,7 @@ class Base_gui_class {
 		this.GUI_details = new GUI_details_class(this);
 		this.GUI_adjustments = new GUI_adjustments_class(this);
 		this.GUI_properties = new GUI_properties_class(this);
+		this.GUI_timeline = new GUI_timeline_class();
 		this.GUI_menu = new GUI_menu_class();
 		this.Tools_translate = new Tools_translate_class();
 		this.Tools_settings = new Tools_settings_class();
@@ -93,7 +97,15 @@ class Base_gui_class {
 			if (key.indexOf('Base' + '/') < 0) {
 				var moduleKey = key.replace('./', '').replace('.js', '');
 				var classObj = modules_context(key);
-				_this.modules[moduleKey] = new classObj.default();
+				try {
+					if (typeof classObj.default === 'function') {
+						_this.modules[moduleKey] = new classObj.default();
+					} else if (classObj.default) {
+						_this.modules[moduleKey] = classObj.default;
+					}
+				} catch (err) {
+					console.error('[Base_gui] Error initializing module ' + moduleKey + ':', err);
+				}
 			}
 		});
 	}
@@ -189,6 +201,7 @@ class Base_gui_class {
 		this.GUI_details.render_main_details();
 		this.GUI_adjustments.render_main_adjustments();
 		this.GUI_properties.render_main_properties();
+		this.GUI_timeline.init_dom();
 		this.GUI_menu.render_main();
 		this.init_panel_tabs();
 		this.load_saved_changes();
