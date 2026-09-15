@@ -217,7 +217,9 @@ class Base_selection_class {
 
 		//find data
 		if (settings && typeof settings.data_function === 'function') {
-			settings.data = settings.data_function.call();
+			if (this.mouse_lock !== 'selected_object_actions' || !settings.data) {
+				settings.data = settings.data_function.call();
+			}
 		}
 
 		return settings;
@@ -296,8 +298,6 @@ class Base_selection_class {
 		//padding/misalignment when zooming.
 
 		var block_size = block_size_default;
-		var corner_offset = (block_size / 2.4);
-		var middle_offset = (block_size / 1.9);
 
 		this.ctx.save();
 		this.ctx.globalAlpha = 1;
@@ -419,13 +419,8 @@ class Base_selection_class {
 			}
 		}
 
-		const hitsLeftEdge = isRotated ? false : x < screen_handle;
-		const hitsTopEdge = isRotated ? false : y < screen_handle;
-		const hitsRightEdge = isRotated ? false : x + w > config.WIDTH - screen_handle;
-		const hitsBottomEdge = isRotated ? false : y + h > config.HEIGHT - screen_handle;
-
 		//draw corners - square handles (default blue; Type tool bw; crop PS light)
-		var corner = (x, y, dx, dy, drag_type, cursor) => {
+		var corner = (center_x, center_y, drag_type, cursor) => {
 			if (settings.handle_style === 'bw_square') {
 				this.ctx.strokeStyle = "#000000";
 				this.ctx.fillStyle = "#ffffff";
@@ -438,11 +433,9 @@ class Base_selection_class {
 			}
 			this.ctx.lineWidth = 1 / config.ZOOM;
 
-			var center_x = x + dx * block_size;
-			var center_y = y + dy * block_size;
 			var half = block_size / 2;
 
-			//create path
+			//create path centered on (center_x, center_y)
 			const path = new Path2D();
 			path.rect(center_x - half, center_y - half, block_size, block_size);
 
@@ -461,21 +454,20 @@ class Base_selection_class {
 		//so no dedicated rotation handle is drawn
 		if (settings.enable_controls == true) {
 			this.selected_obj_positions = {};
-			corner(x - corner_offset - wholeLineWidth, y - corner_offset - wholeLineWidth, hitsLeftEdge ? 0.5 : 0, hitsTopEdge ? 0.5 : 0, DRAG_TYPE_LEFT | DRAG_TYPE_TOP, 'nwse-resize');
-			corner(x + w + corner_offset + wholeLineWidth, y - corner_offset - wholeLineWidth, hitsRightEdge ? -0.5 : 0, hitsTopEdge ? 0.5 : 0, DRAG_TYPE_RIGHT | DRAG_TYPE_TOP, 'nesw-resize');
-			corner(x - corner_offset - wholeLineWidth, y + h + corner_offset + wholeLineWidth, hitsLeftEdge ? 0.5 : 0, hitsBottomEdge ? -0.5 : 0, DRAG_TYPE_LEFT | DRAG_TYPE_BOTTOM, 'nesw-resize');
-			corner(x + w + corner_offset + wholeLineWidth, y + h + corner_offset + wholeLineWidth, hitsRightEdge ? -0.5 : 0, hitsBottomEdge ? -0.5 : 0, DRAG_TYPE_RIGHT | DRAG_TYPE_BOTTOM, 'nwse-resize');
-		}
+			// 4 corner handles centered on the corners of the bounding box
+			corner(x, y, DRAG_TYPE_LEFT | DRAG_TYPE_TOP, 'nwse-resize');
+			corner(x + w, y, DRAG_TYPE_RIGHT | DRAG_TYPE_TOP, 'nesw-resize');
+			corner(x, y + h, DRAG_TYPE_LEFT | DRAG_TYPE_BOTTOM, 'nesw-resize');
+			corner(x + w, y + h, DRAG_TYPE_RIGHT | DRAG_TYPE_BOTTOM, 'nwse-resize');
 
-		if (settings.enable_controls == true) {
-			//draw centers
+			// 4 midpoint handles centered on the edges of the bounding box
 			if (Math.abs(w) > block_size * 5) {
-				corner(x + w / 2, y - middle_offset - wholeLineWidth, 0, hitsTopEdge ? 0.5 : 0, DRAG_TYPE_TOP, 'ns-resize');
-				corner(x + w / 2, y + h + middle_offset + wholeLineWidth, 0, hitsBottomEdge ? -0.5 : 0, DRAG_TYPE_BOTTOM, 'ns-resize');
+				corner(x + w / 2, y, DRAG_TYPE_TOP, 'ns-resize');
+				corner(x + w / 2, y + h, DRAG_TYPE_BOTTOM, 'ns-resize');
 			}
 			if (Math.abs(h) > block_size * 5) {
-				corner(x - middle_offset - wholeLineWidth, y + h / 2, hitsLeftEdge ? 0.5 : 0, 0, DRAG_TYPE_LEFT, 'ew-resize');
-				corner(x + w + middle_offset + wholeLineWidth, y + h / 2, hitsRightEdge ? -0.5 : 0, 0, DRAG_TYPE_RIGHT, 'ew-resize');
+				corner(x, y + h / 2, DRAG_TYPE_LEFT, 'ew-resize');
+				corner(x + w, y + h / 2, DRAG_TYPE_RIGHT, 'ew-resize');
 			}
 		}
 
@@ -1466,12 +1458,20 @@ class Base_selection_class {
 						height = this.click_details.height - 2 * dy;
 					}
 				} else {
-					width = this.click_details.width + dx;
-					height = this.click_details.height + dy;
-					if (is_drag_type_top)
-						height = this.click_details.height - dy;
-					if (is_drag_type_left)
+					width = this.click_details.width;
+					height = this.click_details.height;
+
+					if (is_drag_type_right) {
+						width = this.click_details.width + dx;
+					} else if (is_drag_type_left) {
 						width = this.click_details.width - dx;
+					}
+
+					if (is_drag_type_bottom) {
+						height = this.click_details.height + dy;
+					} else if (is_drag_type_top) {
+						height = this.click_details.height - dy;
+					}
 				}
 
 				var orig_w = Math.max(1, this.click_details.width || 1);
