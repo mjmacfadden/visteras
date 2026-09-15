@@ -24,6 +24,7 @@ class Select_tool_class extends Base_tools_class {
 		this.mousedown_dimensions = { x: null, y: null, width: null, height: null };
 		this.mousedown_mask_dimensions = null;
 		this.mousedown_multi_positions = null;
+		this.mousedown_content_bounds = null;
 		this.keyboard_move_start_position = null;
 		this.keyboard_move_start_positions = null;
 		this.moving = false;
@@ -44,6 +45,12 @@ class Select_tool_class extends Base_tools_class {
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
 				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
+				}
+				if (this.resizing && this.Base_selection && this.Base_selection.mouse_lock === 'selected_object_actions') {
+					const s = this.Base_selection.find_settings();
+					if (s && s.data) {
+						return s.data;
+					}
 				}
 				const movable_layers = this.get_movable_layers();
 				const bounds = get_selection_content_bounds(movable_layers);
@@ -212,6 +219,9 @@ class Select_tool_class extends Base_tools_class {
 			this.moving = false;
 			const aspect_lock = (config.aspect_lock !== undefined) ? config.aspect_lock : true;
 			this.Base_selection.find_settings().keep_ratio = aspect_lock;
+			this.mousedown_content_bounds = this.Base_selection.click_details
+				? { ...this.Base_selection.click_details }
+				: null;
 			// Point text stays dynamic — transform scales glyphs (Photoshop-like), not convert to box.
 			// Box/paragraph: frame-only resize (never bake/scale fonts). Use shared is_box_text.
 			if (config.layer && config.layer.type === 'text' && is_point_text(config.layer)) {
@@ -315,9 +325,33 @@ class Select_tool_class extends Base_tools_class {
 		if (this.resizing) {
 
 			//also handle rotation
-			let rotate = this.Base_selection.current_angle
+			let rotate = this.Base_selection.current_angle;
 			if(config.layer && config.layer.rotate != rotate && rotate !== null){
 				config.layer.rotate = rotate;
+			}
+
+			if (this.Base_selection.selected_object_drag_type !== 'rotate') {
+				const s = this.Base_selection.find_settings();
+				if (s && s.data && this.mousedown_content_bounds && this.mousedown_content_bounds.width > 0 && this.mousedown_content_bounds.height > 0) {
+					const origW = this.mousedown_content_bounds.width;
+					const origH = this.mousedown_content_bounds.height;
+					const scale_x = s.data.width / origW;
+					const scale_y = s.data.height / origH;
+
+					if (this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
+						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+							const layer = app.Layers.get_layer(layer_id);
+							if (!layer) continue;
+
+							layer.width = Math.round(init_pos.width * scale_x);
+							layer.height = Math.round(init_pos.height * scale_y);
+							layer.x = Math.round(s.data.x + (init_pos.x - this.mousedown_content_bounds.x) * scale_x);
+							layer.y = Math.round(s.data.y + (init_pos.y - this.mousedown_content_bounds.y) * scale_y);
+
+							this.Mask.preview_linked_mask_transform(layer, init_pos, layer);
+						}
+					}
+				}
 			}
 
 			// Point text: geometric scale_x/y from drag-start snapshot (do not bake font size)
@@ -330,8 +364,12 @@ class Select_tool_class extends Base_tools_class {
 						textTool.apply_point_text_resize(config.layer, config.layer.width, config.layer.height);
 					}
 				} catch (e) { /* ignore */ }
-				this.Base_layers.render();
 			}
+
+			if (this.Base_layers.render_interactive_layer && config.layer) {
+				this.Base_layers.render_interactive_layer(config.layer.id);
+			}
+			this.Base_layers.render();
 
 			return;
 		}
@@ -416,100 +454,127 @@ class Select_tool_class extends Base_tools_class {
 		this.Base_selection.selected_object_actions(e);
 
 		if (this.resizing) {
-			let x = config.layer.x;
-			let y = config.layer.y;
-			let width = config.layer.width;
-			let height = config.layer.height;
-			// Box/paragraph must never enter point-text bake (even if flag was stale).
-			const resizingPointText = config.layer.type === 'text'
+			const resizingPointText = config.layer && config.layer.type === 'text'
 				&& !is_box_text(config.layer)
 				&& (!!this._resizing_point_text || is_point_text(config.layer));
 
-			//reset values
-			config.layer.x = this.mousedown_dimensions.x;
-			config.layer.y = this.mousedown_dimensions.y;
-			config.layer.width = this.mousedown_dimensions.width;
-			config.layer.height = this.mousedown_dimensions.height;
-			if (this.mousedown_mask_dimensions != null) {
-				Object.assign(config.layer.mask, this.mousedown_mask_dimensions);
+			// Record final live sizes/positions
+			const finalPositions = new Map();
+			if (this.mousedown_multi_positions) {
+				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+					const layer = app.Layers.get_layer(layer_id);
+					if (layer) {
+						finalPositions.set(layer_id, {
+							x: layer.x,
+							y: layer.y,
+							width: layer.width,
+							height: layer.height
+						});
+					}
+				}
 			}
-			// End live transform BEFORE the history action renders, or the next
-			// layout pass can treat the drag as a temporary scale and snap back.
+
+			// Reset to mousedown values so Update_layer_action captures correct previous state
+			if (this.mousedown_multi_positions) {
+				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+					const layer = app.Layers.get_layer(layer_id);
+					if (layer) {
+						layer.x = init_pos.x;
+						layer.y = init_pos.y;
+						layer.width = init_pos.width;
+						layer.height = init_pos.height;
+						if (init_pos.mask && layer.mask) {
+							Object.assign(layer.mask, init_pos.mask);
+						}
+					}
+				}
+			}
+
 			this.resizing = false;
 			this._resizing_point_text = false;
-			if (this.mousedown_dimensions.x !== x || this.mousedown_dimensions.y !== y ||
-				this.mousedown_dimensions.width !== width || this.mousedown_dimensions.height !== height
-			) {
-				var layerUpdate = { x, y, width, height };
-				// Point text: bake font size (and residual horizontal scale on skew) into history
-				if (resizingPointText && this.mousedown_dimensions.width > 0 && !is_box_text(config.layer)) {
-					try {
-						const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
-							&& app.GUI.GUI_tools.tools_modules['text']
-							&& app.GUI.GUI_tools.tools_modules['text'].object;
-						if (textTool && typeof textTool.commit_point_text_resize === 'function') {
-							const preData = config.layer.data ? JSON.parse(JSON.stringify(config.layer.data)) : null;
-							const preParams = config.layer.params ? JSON.parse(JSON.stringify(config.layer.params)) : {};
-							if (textTool._point_resize_base_scale_x != null) preParams.scale_x = textTool._point_resize_base_scale_x;
-							if (textTool._point_resize_base_scale_y != null) preParams.scale_y = textTool._point_resize_base_scale_y;
-							// Snapshot fonts if live drag already mutated data somehow — prefer tool snapshot.
-							config.layer.x = this.mousedown_dimensions.x;
-							config.layer.y = this.mousedown_dimensions.y;
-							config.layer.width = this.mousedown_dimensions.width;
-							config.layer.height = this.mousedown_dimensions.height;
-							config.layer.params = JSON.parse(JSON.stringify(preParams));
-							textTool.mousedownBounds = {
-								x: this.mousedown_dimensions.x,
-								y: this.mousedown_dimensions.y,
-								width: this.mousedown_dimensions.width,
-								height: this.mousedown_dimensions.height,
-								boundary: preParams.boundary || 'dynamic'
-							};
-							const committed = textTool.commit_point_text_resize(config.layer, width, height);
-							if (committed) {
-								layerUpdate.x = committed.x;
-								layerUpdate.y = committed.y;
-								layerUpdate.width = committed.width;
-								layerUpdate.height = committed.height;
-								layerUpdate.params = committed.params;
-								layerUpdate.data = committed.data;
-								x = committed.x;
-								y = committed.y;
-								width = committed.width;
-								height = committed.height;
-							}
-							// Restore pre-drag state so Update_layer_action records correct old_settings.
-							config.layer.x = this.mousedown_dimensions.x;
-							config.layer.y = this.mousedown_dimensions.y;
-							config.layer.width = this.mousedown_dimensions.width;
-							config.layer.height = this.mousedown_dimensions.height;
-							config.layer.params = JSON.parse(JSON.stringify(preParams));
-							if (preData) {
-								config.layer.data = preData;
-								if (typeof textTool.get_editor === 'function') {
-									const ed = textTool.get_editor(config.layer);
-									if (ed && ed.set_lines) {
-										ed.set_lines(JSON.parse(JSON.stringify(preData)), true);
-										ed.hasValueChanged = true;
+
+			let resize_actions = [];
+			if (this.mousedown_multi_positions) {
+				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+					const finalPos = finalPositions.get(layer_id);
+					if (!finalPos) continue;
+
+					if (init_pos.x !== finalPos.x || init_pos.y !== finalPos.y ||
+						init_pos.width !== finalPos.width || init_pos.height !== finalPos.height
+					) {
+						const layer = app.Layers.get_layer(layer_id);
+						let layerUpdate = {
+							x: finalPos.x,
+							y: finalPos.y,
+							width: finalPos.width,
+							height: finalPos.height
+						};
+
+						// Point text: bake font size into history
+						if (resizingPointText && layer.id === config.layer?.id && init_pos.width > 0 && !is_box_text(layer)) {
+							try {
+								const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
+									&& app.GUI.GUI_tools.tools_modules['text']
+									&& app.GUI.GUI_tools.tools_modules['text'].object;
+								if (textTool && typeof textTool.commit_point_text_resize === 'function') {
+									const preData = layer.data ? JSON.parse(JSON.stringify(layer.data)) : null;
+									const preParams = layer.params ? JSON.parse(JSON.stringify(layer.params)) : {};
+									if (textTool._point_resize_base_scale_x != null) preParams.scale_x = textTool._point_resize_base_scale_x;
+									if (textTool._point_resize_base_scale_y != null) preParams.scale_y = textTool._point_resize_base_scale_y;
+									layer.x = init_pos.x;
+									layer.y = init_pos.y;
+									layer.width = init_pos.width;
+									layer.height = init_pos.height;
+									layer.params = JSON.parse(JSON.stringify(preParams));
+									textTool.mousedownBounds = {
+										x: init_pos.x,
+										y: init_pos.y,
+										width: init_pos.width,
+										height: init_pos.height,
+										boundary: preParams.boundary || 'dynamic'
+									};
+									const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height);
+									if (committed) {
+										layerUpdate.x = committed.x;
+										layerUpdate.y = committed.y;
+										layerUpdate.width = committed.width;
+										layerUpdate.height = committed.height;
+										layerUpdate.params = committed.params;
+										layerUpdate.data = committed.data;
+									}
+									layer.x = init_pos.x;
+									layer.y = init_pos.y;
+									layer.width = init_pos.width;
+									layer.height = init_pos.height;
+									layer.params = JSON.parse(JSON.stringify(preParams));
+									if (preData) {
+										layer.data = preData;
+										if (typeof textTool.get_editor === 'function') {
+											const ed = textTool.get_editor(layer);
+											if (ed && ed.set_lines) {
+												ed.set_lines(JSON.parse(JSON.stringify(preData)), true);
+												ed.hasValueChanged = true;
+											}
+										}
 									}
 								}
-							}
+							} catch (e) { console.warn('point text scale failed', e); }
 						}
-					} catch (e) { console.warn('point text scale failed', e); }
+
+						resize_actions.push(
+							new app.Actions.Update_layer_action(layer.id, layerUpdate)
+						);
+						resize_actions = resize_actions.concat(
+							this.Mask.get_linked_mask_actions(layer, init_pos, layerUpdate)
+						);
+					}
 				}
-				var resize_actions = [
-					new app.Actions.Update_layer_action(config.layer.id, layerUpdate)
-				];
-				//keep a linked mask in sync
-				resize_actions = resize_actions.concat(
-					this.Mask.get_linked_mask_actions(config.layer, this.mousedown_dimensions, {
-						x, y, width, height
-					})
-				);
+			}
+
+			if (resize_actions.length > 0) {
 				await app.State.do_action(
 					new app.Actions.Bundle_action('resize_layer', 'Resize Layer', resize_actions)
 				);
-				// Ensure Type TOOLS + params.size match baked spans (Size UI only on Type).
 				if (resizingPointText && config.layer && config.layer.type === 'text') {
 					try {
 						const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
@@ -521,7 +586,6 @@ class Select_tool_class extends Base_tools_class {
 					} catch (e) { /* ignore */ }
 				}
 			} else if (resizingPointText) {
-				// No net size change — still clear the drag snapshot
 				try {
 					const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
 						&& app.GUI.GUI_tools.tools_modules['text']
@@ -535,7 +599,6 @@ class Select_tool_class extends Base_tools_class {
 			//also handle rotation
 			let rotate = this.Base_selection.current_angle;
 			if(this.rotate_initial != rotate && rotate !== null){
-				//save state
 				config.layer.rotate = this.rotate_initial;
 				await app.State.do_action(
 					new app.Actions.Bundle_action('resize_layer', 'Resize Layer', [
