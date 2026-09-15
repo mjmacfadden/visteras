@@ -1,0 +1,465 @@
+/**
+ * New Document Modal Styles (Photoshop-inspired Preset Dialog)
+ */
+
+@keyframes newDocModalSpringPop {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, -50%) scale(0.94);
+	}
+	65% {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1.015);
+	}
+	100% {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1);
+	}
+}
+
+#popups .popup.new_doc_popup {
+	position: fixed !important;
+	top: 50% !important;
+	left: 50% !important;
+	transform: translate(-50%, -50%) !important;
+	width: 90vw !important;
+	max-width: 920px !important;
+	height: min(500px, calc(100vh - 40px)) !important;
+	max-height: calc(100vh - 40px) !important;
+	min-height: 380px !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	display: flex !important;
+	flex-direction: column !important;
+	background-color: #2b2b2b !important;
+	color: #e0e0e0 !important;
+	border: 1px solid #444444 !important;
+	border-radius: 8px !important;
+	box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+	overflow: hidden !important;
+	z-index: 100 !important;
+	animation: newDocModalSpringPop 200ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+	box-sizing: border-box !important;
+}
+
+/* Hide default popup.js header, comment, pretitle, and buttons for this custom dialog */
+#popups .popup.new_doc_popup > h2,
+#popups .popup.new_doc_popup > [data-id="popup_close"],
+#popups .popup.new_doc_popup > .buttons,
+#popups .popup.new_doc_popup > [data-id="popup_comment"],
+#popups .popup.new_doc_popup > [data-id="pretitle_area"] {
+	display: none !important;
+}
+
+#popups .popup.new_doc_popup .dialog_content {
+	padding: 0 !important;
+	margin: 0 !important;
+	max-height: none !important;
+	height: 100% !important;
+	flex: 1 1 0% !important;
+	min-height: 0 !important;
+	overflow: hidden !important;
+	display: flex !important;
+	flex-direction: column !important;
+	box-sizing: border-box !important;
+}
+
+#popups .popup.new_doc_popup [data-id="params_content"] {
+	height: 100% !important;
+	flex: 1 1 0% !important;
+	min-height: 0 !important;
+	overflow: hidden !important;
+	display: flex !important;
+	flex-direction: column !important;
+	box-sizing: border-box !important;
+}
+
+.new_doc_container {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+	flex: 1 1 0% !important;
+	min-height: 0 !important;
+	overflow: hidden !important;
+	box-sizing: border-box !important;
+}
+
+.new_doc_header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 16px;
+	background-color: #202020;
+	border-bottom: 1px solid #3a3a3a;
+	user-select: none;
+	flex-shrink: 0;
+}
+
+.new_doc_title {
+	font-size: 13px;
+	font-weight: 600;
+	color: #ffffff;
+	letter-spacing: 0.2px;
+}
+
+.new_doc_close_btn {
+	background: none;
+	border: none;
+	color: #999999;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 4px;
+	transition: color 0.15s, background-color 0.15s;
+	z-index: 10;
+	pointer-events: auto;
+}
+
+.new_doc_close_btn:hover {
+	color: #ffffff;
+	background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Category Navigation Bar */
+.new_doc_categories {
+	display: flex;
+	align-items: center;
+	gap: 3px;
+	padding: 6px 12px;
+	background-color: #242424;
+	border-bottom: 1px solid #383838;
+	overflow-x: auto;
+	scrollbar-width: none;
+	user-select: none;
+	flex-shrink: 0;
+}
+
+.new_doc_categories::-webkit-scrollbar {
+	display: none;
+}
+
+.new_doc_cat_btn {
+	background: none;
+	border: none;
+	padding: 4px 10px;
+	font-size: 12px;
+	font-weight: 500;
+	color: #aaaaaa;
+	border-radius: 4px;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: all 0.15s ease;
+}
+
+.new_doc_cat_btn:hover {
+	color: #ffffff;
+	background-color: rgba(255, 255, 255, 0.06);
+}
+
+.new_doc_cat_btn.active {
+	color: #ffffff;
+	background-color: #3b82f6;
+	font-weight: 600;
+}
+
+/* Main Body Layout: Two-Column Grid (Presets on Left, Sidebar on Right) */
+.new_doc_body {
+	display: grid !important;
+	grid-template-columns: 1fr 275px !important;
+	flex: 1 1 0% !important;
+	min-height: 0 !important;
+	height: 100% !important;
+	overflow: hidden !important;
+	box-sizing: border-box !important;
+}
+
+.new_doc_presets_container {
+	height: 100% !important;
+	max-height: 100% !important;
+	min-height: 0 !important;
+	padding: 12px 14px !important;
+	overflow-y: scroll !important;
+	overflow-x: hidden !important;
+	box-sizing: border-box !important;
+	background-color: #262626 !important;
+	overscroll-behavior: contain;
+}
+
+.new_doc_presets_container::-webkit-scrollbar {
+	width: 8px;
+}
+.new_doc_presets_container::-webkit-scrollbar-track {
+	background: #1e1e1e;
+}
+.new_doc_presets_container::-webkit-scrollbar-thumb {
+	background: #444444;
+	border-radius: 4px;
+}
+.new_doc_presets_container::-webkit-scrollbar-thumb:hover {
+	background: #555555;
+}
+
+.new_doc_presets_grid {
+	display: grid !important;
+	grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)) !important;
+	gap: 10px !important;
+	padding-bottom: 12px !important;
+}
+
+/* Preset Card */
+.new_doc_card {
+	background-color: #323232;
+	border: 1px solid #404040;
+	border-radius: 6px;
+	padding: 8px 6px 7px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	text-align: center;
+	user-select: none;
+}
+
+.new_doc_card:hover {
+	background-color: #3a3a3a;
+	border-color: #555555;
+	transform: translateY(-1px);
+}
+
+.new_doc_card.active {
+	background-color: #2a3a50;
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.new_doc_card_preview_wrap {
+	width: 76px;
+	height: 52px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 4px;
+}
+
+.new_doc_card_aspect_box {
+	background-color: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.25);
+	border-radius: 2px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+	transition: border-color 0.15s, background-color 0.15s;
+}
+
+.new_doc_card.active .new_doc_card_aspect_box {
+	background-color: rgba(59, 130, 246, 0.2);
+	border-color: #60a5fa;
+}
+
+.new_doc_card_name {
+	font-size: 11px;
+	font-weight: 600;
+	color: #f0f0f0;
+	margin-bottom: 2px;
+	line-height: 1.2;
+}
+
+.new_doc_card_dims {
+	font-size: 10px;
+	color: #9ca3af;
+	line-height: 1.2;
+}
+
+/* Preset Details Sidebar */
+.new_doc_details_sidebar {
+	height: 100% !important;
+	max-height: 100% !important;
+	min-height: 0 !important;
+	background-color: #1e1e1e !important;
+	border-left: 1px solid #383838 !important;
+	padding: 10px 14px !important;
+	display: flex !important;
+	flex-direction: column !important;
+	box-sizing: border-box !important;
+	overflow: hidden !important;
+}
+
+.new_doc_details_content {
+	display: flex !important;
+	flex-direction: column !important;
+	gap: 5px !important;
+	overflow-y: auto !important;
+	flex: 1 1 auto !important;
+	min-height: 0 !important;
+	padding-right: 2px !important;
+}
+
+.new_doc_details_content::-webkit-scrollbar {
+	width: 6px;
+}
+.new_doc_details_content::-webkit-scrollbar-track {
+	background: #1a1a1a;
+}
+.new_doc_details_content::-webkit-scrollbar-thumb {
+	background: #3a3a3a;
+	border-radius: 3px;
+}
+
+.new_doc_form_group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.new_doc_form_group label {
+	font-size: 11px;
+	font-weight: 500;
+	color: #9ca3af;
+}
+
+.new_doc_input,
+.new_doc_select {
+	background-color: #2d2d2d;
+	border: 1px solid #444444;
+	border-radius: 4px;
+	color: #ffffff;
+	padding: 2px 7px;
+	font-size: 11px;
+	height: 25px;
+	outline: none;
+	width: 100%;
+	box-sizing: border-box;
+	transition: border-color 0.15s;
+}
+
+.new_doc_input:focus,
+.new_doc_select:focus {
+	border-color: #3b82f6;
+}
+
+.new_doc_row {
+	display: flex;
+	gap: 8px;
+	align-items: flex-end;
+}
+
+.new_doc_row .new_doc_form_group {
+	flex: 1;
+}
+
+/* Orientation Buttons */
+.new_doc_orient_group {
+	display: flex;
+	gap: 6px;
+}
+
+.new_doc_orient_btn {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	padding: 2px 6px;
+	height: 25px;
+	background-color: #2d2d2d;
+	border: 1px solid #444444;
+	border-radius: 4px;
+	color: #a0a0a0;
+	font-size: 11px;
+	cursor: pointer;
+	transition: all 0.15s;
+}
+
+.new_doc_orient_btn:hover {
+	color: #ffffff;
+	border-color: #555555;
+}
+
+.new_doc_orient_btn.active {
+	background-color: rgba(59, 130, 246, 0.15);
+	border-color: #3b82f6;
+	color: #ffffff;
+}
+
+/* Background Color Row */
+.new_doc_bg_row {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.new_doc_color_picker {
+	width: 25px;
+	height: 25px;
+	padding: 0;
+	border: 1px solid #444444;
+	border-radius: 4px;
+	background: none;
+	cursor: pointer;
+	outline: none;
+}
+
+/* Modal Action Footer Buttons */
+.new_doc_actions {
+	display: flex !important;
+	gap: 8px !important;
+	margin-top: 6px !important;
+	padding-top: 8px !important;
+	border-top: 1px solid #333333 !important;
+	flex-shrink: 0 !important;
+}
+
+.new_doc_btn_create {
+	flex: 2 !important;
+	background-color: #2563eb !important;
+	color: #ffffff !important;
+	border: none !important;
+	border-radius: 4px !important;
+	padding: 5px 12px !important;
+	height: 30px !important;
+	font-size: 12px !important;
+	font-weight: 600 !important;
+	cursor: pointer !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	transition: background-color 0.15s !important;
+}
+
+.new_doc_btn_create:hover {
+	background-color: #1d4ed8 !important;
+}
+
+.new_doc_btn_cancel {
+	flex: 1 !important;
+	background-color: #383838 !important;
+	color: #d1d5db !important;
+	border: 1px solid #4b5563 !important;
+	border-radius: 4px !important;
+	padding: 5px 8px !important;
+	height: 30px !important;
+	font-size: 12px !important;
+	cursor: pointer !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	transition: all 0.15s !important;
+}
+
+.new_doc_btn_cancel:hover {
+	background-color: #4b5563 !important;
+	color: #ffffff !important;
+}
+
+@media (max-width: 680px) {
+	#popups .popup.new_doc_popup {
+		width: 98vw !important;
+		height: calc(100vh - 20px) !important;
+		max-height: none !important;
+	}
+	.new_doc_body {
+		grid-template-columns: 1fr 230px !important;
+	}
+}
+
+
