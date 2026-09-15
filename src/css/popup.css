@@ -18,7 +18,7 @@
 	}
 }
 
-#popups .popup {
+#popups .popup:not(.new_doc_popup) {
 	position: fixed;
 	display: none;
 	top: 15vh;
@@ -87,12 +87,12 @@
 	z-index: 0;
 	cursor:move;
 }
-#popups .popup .dialog_content {
+#popups .popup:not(.new_doc_popup) .dialog_content {
 	overflow-y: auto;
 	max-height: calc(80vh - 11rem);
 	padding: 1rem;
 }
-#popups .popup .buttons{
+#popups .popup:not(.new_doc_popup) .buttons{
 	position: absolute;
 	background-color: var(--block-background-color);
 	bottom: 0;
@@ -456,3 +456,5 @@
 	border-radius: 3px;
 	font-size: 12px;
 }
+
+@import './new-document-modal.css';

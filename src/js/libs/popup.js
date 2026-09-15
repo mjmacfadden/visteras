@@ -408,7 +408,7 @@ class Dialog_class {
 
 		//replace color inputs (except in layer_style_dialog where native color inputs are preferred)
 		this.el.querySelectorAll('input[type="color"]').forEach((colorInput) => {
-			if (colorInput.closest('.layer_style_dialog')) return;
+			if (colorInput.closest('.layer_style_dialog') || colorInput.closest('.new_doc_popup')) return;
 			const id = colorInput.getAttribute('id');
 			colorInput.removeAttribute('id');
 			$(colorInput)
@@ -448,16 +448,15 @@ class Dialog_class {
 		this.el.querySelectorAll('input[type="range"][data-default]').forEach((range) => {
 			range.addEventListener('dblclick', (event) => {
 				event.preventDefault();
-				var defRaw = range.getAttribute('data-default');
-				var defVal = parseFloat(defRaw);
-				if (isNaN(defVal)) return;
-				range.value = defVal;
-				var pv = range.parentNode && range.parentNode.parentNode
-					? range.parentNode.parentNode.querySelector('.range_value')
-					: null;
-				if (pv) pv.innerHTML = Math.round(defVal * 100) / 100;
-				this.preview_handler();
-				this.onChangeEvent();
+				const def = range.getAttribute('data-default');
+				if (def !== null && def !== '') {
+					range.value = def;
+					// update range_value display sibling if present
+					const display = range.parentElement ? range.parentElement.parentElement.querySelector('.range_value') : null;
+					if (display) display.textContent = def;
+					range.dispatchEvent(new Event('input', { bubbles: true }));
+					range.dispatchEvent(new Event('change', { bubbles: true }));
+				}
 			});
 		});
 
@@ -506,15 +505,15 @@ class Dialog_class {
 			this.preview_handler();
 		}
 
+		//call translation again to translate popup
+		var lang = this.Base_gui.get_language();
+		this.Tools_translate.translate(lang);
+
 		//onload
 		if (this.onload) {
 			var params = this.get_params();
 			this.onload(params, this);
 		}
-
-		//call translation again to translate popup
-		var lang = this.Base_gui.get_language();
-		this.Tools_translate.translate(lang);
 	}
 
 	generateParamsHtml() {

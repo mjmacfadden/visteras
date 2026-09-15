@@ -101,25 +101,85 @@ export class Subpath {
 	}
 
 	/**
-	 * Computes axis-aligned bounding box for this subpath.
-	 * @returns {{minX: number, minY: number, maxX: number, maxY: number}|null}
+	 * Computes exact geometric axis-aligned bounding box for this subpath.
+	 * @returns {{minX: number, minY: number, maxX: number, maxY: number, width: number, height: number}|null}
 	 */
 	getBounds() {
-		if (this.anchors.length === 0) return null;
+		if (!this.anchors || this.anchors.length === 0) return null;
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-		for (const anchor of this.anchors) {
-			const pts = [anchor.point];
-			if (anchor.handle_in) pts.push(anchor.handle_in);
-			if (anchor.handle_out) pts.push(anchor.handle_out);
-			for (const p of pts) {
-				if (p.x < minX) minX = p.x;
-				if (p.y < minY) minY = p.y;
-				if (p.x > maxX) maxX = p.x;
-				if (p.y > maxY) maxY = p.y;
+		const updateExtrema = (x, y) => {
+			if (typeof x === 'number' && !isNaN(x)) {
+				if (x < minX) minX = x;
+				if (x > maxX) maxX = x;
+			}
+			if (typeof y === 'number' && !isNaN(y)) {
+				if (y < minY) minY = y;
+				if (y > maxY) maxY = y;
+			}
+		};
+
+		const numAnchors = this.anchors.length;
+		const numSegments = this.closed ? numAnchors : numAnchors - 1;
+
+		if (numSegments <= 0) {
+			// Single anchor
+			const pt = this.anchors[0].point;
+			return { minX: pt.x, minY: pt.y, maxX: pt.x, maxY: pt.y, width: 0, height: 0 };
+		}
+
+		const evalBezier = (p0, p1, p2, p3, t) => {
+			const mt = 1 - t;
+			return mt * mt * mt * p0 + 3 * mt * mt * t * p1 + 3 * mt * t * t * p2 + t * t * t * p3;
+		};
+
+		for (let i = 0; i < numSegments; i++) {
+			const a0 = this.anchors[i];
+			const a1 = this.anchors[(i + 1) % numAnchors];
+			const p0 = a0.point;
+			const p1 = a0.handle_out || a0.point;
+			const p2 = a1.handle_in || a1.point;
+			const p3 = a1.point;
+
+			updateExtrema(p0.x, p0.y);
+			updateExtrema(p3.x, p3.y);
+
+			// Check intermediate extrema for curved segments
+			if (a0.handle_out || a1.handle_in) {
+				['x', 'y'].forEach(axis => {
+					const v0 = p0[axis], v1 = p1[axis], v2 = p2[axis], v3 = p3[axis];
+					const a = 3 * (-v0 + 3 * v1 - 3 * v2 + v3);
+					const b = 6 * (v0 - 2 * v1 + v2);
+					const c = 3 * (v1 - v0);
+
+					if (Math.abs(a) < 1e-9) {
+						if (Math.abs(b) > 1e-9) {
+							const t = -c / b;
+							if (t > 0 && t < 1) {
+								const valX = evalBezier(p0.x, p1.x, p2.x, p3.x, t);
+								const valY = evalBezier(p0.y, p1.y, p2.y, p3.y, t);
+								updateExtrema(valX, valY);
+							}
+						}
+					} else {
+						const disc = b * b - 4 * a * c;
+						if (disc >= 0) {
+							const sqrtDisc = Math.sqrt(disc);
+							const t1 = (-b + sqrtDisc) / (2 * a);
+							const t2 = (-b - sqrtDisc) / (2 * a);
+							if (t1 > 0 && t1 < 1) {
+								updateExtrema(evalBezier(p0.x, p1.x, p2.x, p3.x, t1), evalBezier(p0.y, p1.y, p2.y, p3.y, t1));
+							}
+							if (t2 > 0 && t2 < 1) {
+								updateExtrema(evalBezier(p0.x, p1.x, p2.x, p3.x, t2), evalBezier(p0.y, p1.y, p2.y, p3.y, t2));
+							}
+						}
+					}
+				});
 			}
 		}
 
+		if (minX === Infinity || minY === Infinity) return null;
 		return { minX, minY, maxX, maxY, width: Math.max(0, maxX - minX), height: Math.max(0, maxY - minY) };
 	}
 }

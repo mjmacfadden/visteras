@@ -34,6 +34,7 @@ export class Insert_vector_action extends Base_action {
 		// Ensure corresponding vector layer exists in config.layers
 		const existingLayer = config.layers && config.layers.find(l => l.type === 'vector' && (l.vector_id === vector.id || (l.params && l.params.vector_id === vector.id)));
 		if (!existingLayer) {
+			const b = vector.getBounds();
 			const layer_data = {
 				name: vector.name || ('Vector ' + config.vectors.length),
 				type: 'vector',
@@ -51,10 +52,10 @@ export class Insert_vector_action extends Base_action {
 					stroke_join: vector.stroke_join || 'miter',
 					stroke_cap: vector.stroke_cap || 'butt'
 				},
-				x: 0,
-				y: 0,
-				width: config.WIDTH,
-				height: config.HEIGHT,
+				x: (b && b.width > 0) ? b.minX : 0,
+				y: (b && b.height > 0) ? b.minY : 0,
+				width: (b && b.width > 0) ? Math.max(1, b.width) : (config.WIDTH || 800),
+				height: (b && b.height > 0) ? Math.max(1, b.height) : (config.HEIGHT || 600),
 				visible: vector.visible !== false,
 				locked: vector.locked === true,
 				opacity: vector.opacity ?? 100,

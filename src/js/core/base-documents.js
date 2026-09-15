@@ -117,6 +117,7 @@ class Base_documents_class {
 			title: options.title || ('Untitled-' + this.auto_title_count++),
 			width: w,
 			height: h,
+			resolution: options.resolution || (this.Tools_settings ? this.Tools_settings.get_setting('resolution') : 72) || 72,
 			layers: layers,
 			layer: layer || layers[0],
 			zoom: options.zoom || 1,
@@ -183,6 +184,7 @@ class Base_documents_class {
 		doc.guides = config.guides;
 		doc.user_fonts = config.user_fonts;
 		doc.transparency = config.TRANSPARENCY;
+		doc.resolution = config.resolution || (this.Tools_settings ? this.Tools_settings.get_setting('resolution') : 72) || 72;
 		doc.vectors = config.vectors ? config.vectors.map(v => (v.clone ? v.clone() : v)) : [];
 		doc.active_vector_id = config.active_vector_id || null;
 		if (app.State) {
@@ -351,6 +353,13 @@ class Base_documents_class {
 
 		this.Base_gui.check_canvas_offset();
 
+		if (doc.resolution) {
+			config.resolution = doc.resolution;
+			if (this.Tools_settings && typeof this.Tools_settings.save_setting === 'function') {
+				this.Tools_settings.save_setting('resolution', doc.resolution);
+			}
+		}
+
 		// 8. Update UI Panels
 		try {
 			if (app.GUI && app.GUI.GUI_layers) {
@@ -360,6 +369,9 @@ class Base_documents_class {
 				app.GUI.GUI_details.render_details();
 			}
 			if (app.GUI && app.GUI.GUI_information) {
+				if (typeof app.GUI.GUI_information.update_units === 'function') {
+					app.GUI.GUI_information.update_units();
+				}
 				if (typeof app.GUI.GUI_information.show_size === 'function') {
 					app.GUI.GUI_information.show_size(true);
 				}
@@ -413,6 +425,7 @@ class Base_documents_class {
 			if (options.title) doc.title = options.title;
 			if (options.width) doc.width = options.width;
 			if (options.height) doc.height = options.height;
+			if (options.resolution) doc.resolution = options.resolution;
 			if (options.transparency != null) doc.transparency = options.transparency;
 			await this.restore_state(doc);
 			this.render_tabs();
