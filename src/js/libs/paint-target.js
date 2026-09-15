@@ -29,6 +29,51 @@ function insert_blank_image_layer() {
 }
 
 /**
+ * Normalize a raster layer's canvas buffer to the document dimensions if it has been moved or transformed.
+ * This ensures subsequent paint strokes across the canvas are not clipped or masked by layer bounds.
+ *
+ * @param {object} layer
+ */
+export function normalize_raster_layer_to_document(layer) {
+	if (!layer || layer.type !== 'image') return;
+	if (layer.x === 0 && layer.y === 0 && layer.width === config.WIDTH && layer.height === config.HEIGHT && (!layer.rotate || layer.rotate === 0)) {
+		return;
+	}
+
+	const canvas = document.createElement('canvas');
+	canvas.width = config.WIDTH;
+	canvas.height = config.HEIGHT;
+	const ctx = canvas.getContext('2d');
+
+	const src = layer.link_canvas || layer.link;
+	if (src) {
+		ctx.save();
+		ctx.translate((layer.x || 0) + (layer.width || config.WIDTH) / 2, (layer.y || 0) + (layer.height || config.HEIGHT) / 2);
+		if (layer.rotate) {
+			ctx.rotate((layer.rotate * Math.PI) / 180);
+		}
+		ctx.drawImage(
+			src,
+			-(layer.width || config.WIDTH) / 2,
+			-(layer.height || config.HEIGHT) / 2,
+			layer.width || config.WIDTH,
+			layer.height || config.HEIGHT
+		);
+		ctx.restore();
+	}
+
+	layer.x = 0;
+	layer.y = 0;
+	layer.width = config.WIDTH;
+	layer.height = config.HEIGHT;
+	layer.width_original = config.WIDTH;
+	layer.height_original = config.HEIGHT;
+	layer.rotate = 0;
+	layer.link = canvas;
+	delete layer.link_canvas;
+}
+
+/**
  * Ensure the active layer can accept pixel painting (brush, pencil, eraser, clone, heal).
  *
  * Text layers:
@@ -71,6 +116,8 @@ export function ensure_paint_layer(options = {}) {
 
 	if (config.layer.type !== 'image') {
 		Layer_raster.raster();
+	} else {
+		normalize_raster_layer_to_document(config.layer);
 	}
 
 	return config.layer;
@@ -78,4 +125,5 @@ export function ensure_paint_layer(options = {}) {
 
 export default {
 	ensure_paint_layer,
+	normalize_raster_layer_to_document,
 };

@@ -9,6 +9,7 @@ import { Vector } from './vector/vector-model.js';
 import { create_coords_subpath, create_star_subpath } from './vector/vector-shapes.js';
 import { Insert_vector_action } from '../actions/vector/insert-vector.js';
 import { Modify_path_action } from '../actions/vector/modify-path.js';
+import { get_layer_content_bounds } from '../libs/layer-bounds.js';
 
 /**
  * Base tools class, can be used for extending on tools like brush, provides various helping methods.
@@ -791,40 +792,43 @@ class Base_tools_class {
 			}
 		}
 		for(var i in config.layers){
-			if(exclude_id != null && exclude_id == config.layers[i].id){
+			const layer = config.layers[i];
+			if(exclude_id != null && exclude_id == layer.id){
 				continue;
 			}
-			if(config.layers[i].visible == false
-				|| config.layers[i].x === null || config.layers[i].y === null
-				|| config.layers[i].width === null || config.layers[i].height === null){
+			if(layer.visible == false){
+				continue;
+			}
+			const bounds = get_layer_content_bounds(layer);
+			if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
 				continue;
 			}
 
 			//x
-			var x = config.layers[i].x;
+			var x = bounds.x;
 			if(x > 0 && x < config.WIDTH)
 				snap_positions.x.push(x);
 
-			var x = config.layers[i].x + config.layers[i].width/2;
-			if(x > 0 && x < config.WIDTH)
-				snap_positions.x.push(x);
+			var xCenter = bounds.x + bounds.width/2;
+			if(xCenter > 0 && xCenter < config.WIDTH)
+				snap_positions.x.push(xCenter);
 
-			var x = config.layers[i].x + config.layers[i].width;
-			if(x > 0 && x < config.WIDTH)
-				snap_positions.x.push(x);
+			var xEnd = bounds.x + bounds.width;
+			if(xEnd > 0 && xEnd < config.WIDTH)
+				snap_positions.x.push(xEnd);
 
 			//y
-			var y = config.layers[i].y;
+			var y = bounds.y;
 			if(y > 0 && y < config.HEIGHT)
 				snap_positions.y.push(y);
 
-			var y = config.layers[i].y + config.layers[i].height/2;
-			if(y > 0 && y < config.HEIGHT)
-				snap_positions.y.push(y);
+			var yCenter = bounds.y + bounds.height/2;
+			if(yCenter > 0 && yCenter < config.HEIGHT)
+				snap_positions.y.push(yCenter);
 
-			var y = config.layers[i].y + config.layers[i].height;
-			if(y > 0 && y < config.HEIGHT)
-				snap_positions.y.push(y);
+			var yEnd = bounds.y + bounds.height;
+			if(yEnd > 0 && yEnd < config.HEIGHT)
+				snap_positions.y.push(yEnd);
 		}
 
 		return snap_positions;

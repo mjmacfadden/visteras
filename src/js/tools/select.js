@@ -8,6 +8,7 @@ import Mask_class from './../modules/mask/mask.js';
 import Dialog_class from './../libs/popup.js';
 import { is_box_text, is_point_text } from './text.js';
 import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tree.js';
+import { get_layer_content_bounds, get_selection_content_bounds } from './../libs/layer-bounds.js';
 
 class Select_tool_class extends Base_tools_class {
 
@@ -37,14 +38,26 @@ class Select_tool_class extends Base_tools_class {
 			keep_ratio: true,
 			enable_rotation: true,
 			enable_move: true,
-			data_function: function () {
+			data_function: () => {
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
 				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
 				}
-				return config.layer;
+				const movable_layers = this.get_movable_layers();
+				const bounds = get_selection_content_bounds(movable_layers);
+				if (!bounds) {
+					return null;
+				}
+				return {
+					...config.layer,
+					x: bounds.x,
+					y: bounds.y,
+					width: bounds.width,
+					height: bounds.height,
+					rotate: bounds.rotate || (config.layer ? config.layer.rotate : 0)
+				};
 			},
 		};
 		this.Base_selection = new Base_selection_class(ctx, sel_config, this.name);
@@ -676,7 +689,11 @@ class Select_tool_class extends Base_tools_class {
 		var snap_position = { x: null, y: null };
 		var params = this.getParams();
 
-		if(config.SNAP === false || event.shiftKey == true || !config.layer || config.layer.width == null || config.layer.height == null){
+		const contentBounds = get_layer_content_bounds(config.layer);
+		const targetW = contentBounds ? contentBounds.width : config.layer?.width;
+		const targetH = contentBounds ? contentBounds.height : config.layer?.height;
+
+		if(config.SNAP === false || event.shiftKey == true || !config.layer || targetW == null || targetH == null){
 			this.snap_line_info = {x: null, y: null};
 			return null;
 		}
@@ -721,13 +738,13 @@ class Select_tool_class extends Base_tools_class {
 				min_group.x.start = snap_positions.x[i];
 			}
 
-			var distance = Math.abs(pos_x + config.layer.width/2 - snap_positions.x[i]);
+			var distance = Math.abs(pos_x + targetW/2 - snap_positions.x[i]);
 			if(distance < max_distance && (distance < min_group_distance.x.center || min_group_distance.x.center === null)){
 				min_group_distance.x.center = distance;
 				min_group.x.center = snap_positions.x[i];
 			}
 
-			var distance = Math.abs(pos_x + config.layer.width - snap_positions.x[i]);
+			var distance = Math.abs(pos_x + targetW - snap_positions.x[i]);
 			if(distance < max_distance && (distance < min_group_distance.x.end || min_group_distance.x.end === null)){
 				min_group_distance.x.end = distance;
 				min_group.x.end = snap_positions.x[i];
@@ -741,13 +758,13 @@ class Select_tool_class extends Base_tools_class {
 				min_group.y.start = snap_positions.y[i];
 			}
 
-			var distance = Math.abs(pos_y + config.layer.height/2 - snap_positions.y[i]);
+			var distance = Math.abs(pos_y + targetH/2 - snap_positions.y[i]);
 			if(distance < max_distance && (distance < min_group_distance.y.center || min_group_distance.y.center === null)){
 				min_group_distance.y.center = distance;
 				min_group.y.center = snap_positions.y[i];
 			}
 
-			var distance = Math.abs(pos_y + config.layer.height - snap_positions.y[i]);
+			var distance = Math.abs(pos_y + targetH - snap_positions.y[i]);
 			if(distance < max_distance && (distance < min_group_distance.y.end || min_group_distance.y.end === null)){
 				min_group_distance.y.end = distance;
 				min_group.y.end = snap_positions.y[i];
@@ -778,7 +795,7 @@ class Select_tool_class extends Base_tools_class {
 		var success = false;
 		//x
 		if(min_group.x.center != null && min_group_distance.x.center == min_distance.x) {
-			snap_position.x = Math.round(min_group.x.center - config.layer.width / 2);
+			snap_position.x = Math.round(min_group.x.center - targetW / 2);
 			success = true;
 			this.snap_line_info.x = {
 				start_x: min_group.x.center,
@@ -798,7 +815,7 @@ class Select_tool_class extends Base_tools_class {
 			};
 		}
 		else if(min_group.x.end != null && min_group_distance.x.end == min_distance.x) {
-			snap_position.x = Math.round(min_group.x.end - config.layer.width);
+			snap_position.x = Math.round(min_group.x.end - targetW);
 			success = true;
 			this.snap_line_info.x = {
 				start_x: min_group.x.end,
@@ -812,7 +829,7 @@ class Select_tool_class extends Base_tools_class {
 		}
 		//y
 		if(min_group.y.center != null && min_group_distance.y.center == min_distance.y) {
-			snap_position.y = Math.round(min_group.y.center - config.layer.height / 2);
+			snap_position.y = Math.round(min_group.y.center - targetH / 2);
 			success = true;
 			this.snap_line_info.y = {
 				start_x: 0,
@@ -832,7 +849,7 @@ class Select_tool_class extends Base_tools_class {
 			};
 		}
 		else if(min_group.y.end != null && min_group_distance.y.end == min_distance.y) {
-			snap_position.y = Math.round(min_group.y.end - config.layer.height);
+			snap_position.y = Math.round(min_group.y.end - targetH);
 			success = true;
 			this.snap_line_info.y = {
 				start_x: 0,
