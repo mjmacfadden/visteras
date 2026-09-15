@@ -114,6 +114,22 @@ export function ensure_paint_layer(options = {}) {
 		return insert_blank_image_layer();
 	}
 
+	if (config.layer.type == null || config.layer.link == null) {
+		config.layer.type = 'image';
+		const canvas = document.createElement('canvas');
+		canvas.width = config.WIDTH || 800;
+		canvas.height = config.HEIGHT || 600;
+		config.layer.link = canvas;
+		config.layer.width = config.WIDTH || 800;
+		config.layer.height = config.HEIGHT || 600;
+		config.layer.width_original = config.WIDTH || 800;
+		config.layer.height_original = config.HEIGHT || 600;
+		config.layer.x = 0;
+		config.layer.y = 0;
+		config.layer.locked = false;
+		return config.layer;
+	}
+
 	if (config.layer.type !== 'image') {
 		Layer_raster.raster();
 	} else {

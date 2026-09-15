@@ -13,6 +13,8 @@ import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.j
 var template = `
 	<span class="status_item"><span class="trn">Doc:</span> <span id="mouse_info_size">-</span> <span class="id-mouse_info_units"></span></span>
 	<span class="status_divider"></span>
+	<span class="status_item"><span class="trn">Zoom:</span> <span id="mouse_info_zoom">100%</span></span>
+	<span class="status_divider"></span>
 	<span class="status_item"><span class="trn">X:</span> <span id="mouse_info_mouse_x">-</span> <span class="trn">Y:</span> <span id="mouse_info_mouse_y">-</span></span>
 	<span class="status_divider"></span>
 	<span class="status_item"><span class="trn">Resolution:</span> <span id="mouse_info_resolution">-</span> <span class="trn">ppi</span></span>
@@ -48,6 +50,7 @@ class GUI_information_class {
 		}
 		this.set_events();
 		this.show_size();
+		this.update_zoom();
 	}
 
 	set_events() {
@@ -70,6 +73,17 @@ class GUI_information_class {
 			target_x.innerHTML = mouse_x;
 			target_y.innerHTML = mouse_y;
 		}, false);
+
+		var zoomEl = document.getElementById('mouse_info_zoom');
+		if (zoomEl && zoomEl.parentElement) {
+			zoomEl.parentElement.style.cursor = 'pointer';
+			zoomEl.parentElement.title = 'Zoom level (Click or Ctrl/Cmd + 1 for 100%)';
+			zoomEl.parentElement.addEventListener('click', function () {
+				if (app.GUI && app.GUI.modules && app.GUI.modules['view/zoom']) {
+					app.GUI.modules['view/zoom'].original();
+				}
+			});
+		}
 	}
 
 	update_units(){
@@ -78,7 +92,16 @@ class GUI_information_class {
 		this.show_size(true);
 	}
 
+	update_zoom() {
+		var zoomEl = document.getElementById('mouse_info_zoom');
+		if (zoomEl) {
+			var zoomPercent = Math.round((config.ZOOM || 1) * 100);
+			zoomEl.textContent = zoomPercent + '%';
+		}
+	}
+
 	show_size(force) {
+		this.update_zoom();
 		if(force == undefined && this.last_width == config.WIDTH && this.last_height == config.HEIGHT) {
 			this.show_memory(false);
 			return;

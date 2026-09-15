@@ -197,6 +197,7 @@ const menuDefinition = [
 					},
 					{
 						name: 'Original Size',
+						shortcut: 'Ctrl + 1',
 						target: 'view/zoom.original'
 					},
 					{

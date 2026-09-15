@@ -93,7 +93,7 @@ class Base_documents_class {
 			const defaultLayer = {
 				id: 1,
 				name: transp ? 'Layer 1' : 'Background',
-				locked: !transp,
+				locked: false,
 				visible: true,
 				type: 'image',
 				link: bgCanvas,
@@ -208,6 +208,16 @@ class Base_documents_class {
 		const baseSel = (app.Layers && app.Layers.Base_selection) ? app.Layers.Base_selection : (selModule ? selModule.Base_selection : null);
 		if (baseSel) {
 			doc.selection_mask = baseSel.has_selection ? baseSel.clone_mask_canvas() : null;
+		}
+		if (app.GUI && app.GUI.GUI_timeline && app.GUI.GUI_timeline.Frame_manager) {
+			const fm = app.GUI.GUI_timeline.Frame_manager;
+			fm.sync_active_frame();
+			doc.timeline = {
+				frames: fm.clone_layers ? fm.frames : [],
+				active_frame_index: fm.active_frame_index || 0,
+				fps: fm.fps || 12,
+				onion_skin: !!fm.onion_skin,
+			};
 		}
 	}
 
@@ -349,8 +359,28 @@ class Base_documents_class {
 			if (app.GUI && app.GUI.GUI_details) {
 				app.GUI.GUI_details.render_details();
 			}
-			if (app.GUI && app.GUI.GUI_information && typeof app.GUI.GUI_information.show_size === 'function') {
-				app.GUI.GUI_information.show_size(true);
+			if (app.GUI && app.GUI.GUI_information) {
+				if (typeof app.GUI.GUI_information.show_size === 'function') {
+					app.GUI.GUI_information.show_size(true);
+				}
+				if (typeof app.GUI.GUI_information.update_zoom === 'function') {
+					app.GUI.GUI_information.update_zoom();
+				}
+			}
+			if (app.GUI && app.GUI.GUI_timeline && app.GUI.GUI_timeline.Frame_manager) {
+				const fm = app.GUI.GUI_timeline.Frame_manager;
+				if (doc.timeline && doc.timeline.frames && doc.timeline.frames.length > 0) {
+					fm.frames = doc.timeline.frames;
+					fm.active_frame_index = doc.timeline.active_frame_index || 0;
+					fm.fps = doc.timeline.fps || 12;
+					fm.onion_skin = !!doc.timeline.onion_skin;
+					fm.clear_composite_cache();
+				} else {
+					fm.reset_to_current_layers();
+				}
+				if (app.GUI.GUI_timeline.is_visible) {
+					app.GUI.GUI_timeline.render_timeline();
+				}
 			}
 		} catch (e) {
 			console.error('Error updating UI panels during restore_state:', e);
@@ -800,6 +830,91 @@ class Base_documents_class {
 		}
 	}
 
+	async create_document_from_piskel(piskelData) {
+		const w = parseInt(piskelData.width) || 32;
+		const h = parseInt(piskelData.height) || 32;
+		const docTitle = piskelData.name || ('Untitled-' + this.auto_title_count++);
+		const frames = piskelData.frames || [];
+		const fps = parseInt(piskelData.fps) || 12;
+
+		const firstFrame = frames[0] || null;
+		const layers = firstFrame ? firstFrame.layers : [];
+		let max_id_order = 0;
+		for (let l of layers) {
+			if (l.id > max_id_order) max_id_order = l.id;
+			if (l.order != null && l.order > max_id_order) max_id_order = l.order;
+		}
+		let activeLayer = layers[0] || null;
+
+		const timelineObj = {
+			frames: frames,
+			active_frame_index: 0,
+			fps: fps,
+			onion_skin: false
+		};
+
+		const isPristine = this.is_active_document_empty();
+		let targetDoc = null;
+
+		if (isPristine) {
+			const doc = this.get_active_document();
+			doc.title = docTitle;
+			doc.width = w;
+			doc.height = h;
+			doc.layers = layers;
+			doc.layer = activeLayer;
+			doc.auto_increment = max_id_order + 1;
+			doc.guides = [];
+			doc.user_fonts = {};
+			doc.transparency = true;
+			doc.action_history = [];
+			doc.action_history_index = 0;
+			doc.is_dirty = false;
+			doc.selection = null;
+			doc.timeline = timelineObj;
+			doc.save_format = 'PISKEL';
+			doc.source_filename = (docTitle && /\.piskel$/i.test(docTitle)) ? docTitle : (docTitle + '.piskel');
+			doc.fileHandle = null;
+
+			targetDoc = doc;
+		} else {
+			this.save_current_state();
+
+			const newDoc = this._create_doc_model({
+				title: docTitle,
+				width: w,
+				height: h,
+				layers: layers,
+				layer: activeLayer,
+				auto_increment: max_id_order + 1,
+				action_history: [],
+				action_history_index: 0,
+				selection: null,
+				transparency: true,
+				guides: [],
+				user_fonts: {},
+			});
+			newDoc.timeline = timelineObj;
+			newDoc.save_format = 'PISKEL';
+			newDoc.source_filename = (docTitle && /\.piskel$/i.test(docTitle)) ? docTitle : (docTitle + '.piskel');
+			newDoc.fileHandle = null;
+
+			this.documents.push(newDoc);
+			this.active_id = newDoc.id;
+			targetDoc = newDoc;
+		}
+
+		await this.restore_state(targetDoc);
+		if (app.GUI && app.GUI.GUI_timeline) {
+			app.GUI.GUI_timeline.show();
+		}
+		if (app.GUI && app.GUI.GUI_preview) {
+			await app.GUI.GUI_preview.zoom_auto();
+		}
+		this.render_tabs();
+		return targetDoc;
+	}
+
 	update_zoom_display() {
 		const doc = this.get_active_document();
 		if (!doc) return;
@@ -809,6 +924,9 @@ class Base_documents_class {
 			if (activeTabEl) {
 				activeTabEl.textContent = `@ ${Math.round((config.ZOOM || 1) * 100)}%`;
 			}
+		}
+		if (app.GUI && app.GUI.GUI_information && typeof app.GUI.GUI_information.update_zoom === 'function') {
+			app.GUI.GUI_information.update_zoom();
 		}
 	}
 

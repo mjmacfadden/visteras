@@ -91,7 +91,12 @@ export class Activate_tool_action extends Base_action {
 			}
 			// Toggle tool class on middle_area
 			if (middleArea) {
-				middleArea.className = 'middle_area';
+				for (let i = middleArea.classList.length - 1; i >= 0; i--) {
+					const cls = middleArea.classList[i];
+					if (cls.startsWith('tool-')) {
+						middleArea.classList.remove(cls);
+					}
+				}
 				if (config.TOOL && config.TOOL.name) {
 					middleArea.classList.add('tool-' + config.TOOL.name);
 				}
@@ -220,7 +225,12 @@ export class Activate_tool_action extends Base_action {
 		}
 		// Toggle tool class on middle_area
 		if (middleArea) {
-			middleArea.className = 'middle_area';
+			for (let i = middleArea.classList.length - 1; i >= 0; i--) {
+				const cls = middleArea.classList[i];
+				if (cls.startsWith('tool-')) {
+					middleArea.classList.remove(cls);
+				}
+			}
 			if (config.TOOL && config.TOOL.name) {
 				middleArea.classList.add('tool-' + config.TOOL.name);
 			}
@@ -273,7 +283,7 @@ export class Activate_tool_action extends Base_action {
 		element.style.height = px + 'px';
 		element.style.left = (wRect.width / 2 - px / 2) + 'px';
 		element.style.top = (wRect.height / 2 - px / 2) + 'px';
-		element.className = 'circle';
+		element.className = (config.TOOL && config.TOOL.name === 'pencil') ? 'rect' : 'circle';
 	}
 
 	hide_brush_cursor() {

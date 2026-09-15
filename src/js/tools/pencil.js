@@ -112,19 +112,20 @@ class Pencil_class extends Base_tools_class {
 
 		var scale = (layer.width_original || layer.width || 1) / (layer.width || 1);
 		var localSize = Math.max(1, Math.round(size * scale));
-		var color = config.COLOR;
-		var toolOpacity = (params.opacity != null) ? params.opacity / 100 : 1;
-		var alpha = ((config.ALPHA != null) ? config.ALPHA / 255 : 1) * toolOpacity;
+		var color = config.COLOR || '#000000';
 
-		this.paint_dab(this.tmpCanvasCtx, point.x, point.y, localSize, color, alpha);
+		var px = Math.floor(point.x);
+		var py = Math.floor(point.y);
+
+		this.paint_dab(this.tmpCanvasCtx, px, py, localSize, color);
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 
 		config.layer.link_canvas = this.tmpCanvas;
 		this.Base_layers.render_interactive_layer(config.layer.id);
 		this.Base_layers.render();
 
-		this.last_x = point.x;
-		this.last_y = point.y;
+		this.last_x = px;
+		this.last_y = py;
 		this.last_size = localSize;
 	}
 
@@ -142,7 +143,10 @@ class Pencil_class extends Base_tools_class {
 		if (!layer || layer.type !== 'image' || !this.tmpCanvasCtx) return;
 
 		var point = this.get_layer_local_coords(mouse.x, mouse.y, layer);
-		if (point.x === this.last_x && point.y === this.last_y) return;
+		var px = Math.floor(point.x);
+		var py = Math.floor(point.y);
+
+		if (px === this.last_x && py === this.last_y) return;
 
 		var params = this.getParams();
 		var size = params.size || 1;
@@ -152,23 +156,21 @@ class Pencil_class extends Base_tools_class {
 
 		var scale = (layer.width_original || layer.width || 1) / (layer.width || 1);
 		var localSize = Math.max(1, Math.round(size * scale));
-		var color = config.COLOR;
-		var toolOpacity = (params.opacity != null) ? params.opacity / 100 : 1;
-		var alpha = ((config.ALPHA != null) ? config.ALPHA / 255 : 1) * toolOpacity;
+		var color = config.COLOR || '#000000';
 
-		this.paint_stroke_segment(
+		this.paint_stroke_line(
 			this.tmpCanvasCtx,
-			this.last_x, this.last_y, this.last_size,
-			point.x, point.y, localSize,
-			color, alpha
+			this.last_x, this.last_y,
+			px, py,
+			localSize, color
 		);
 
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 		this.Base_layers.render_interactive_layer(config.layer.id);
 		this.Base_layers.render();
 
-		this.last_x = point.x;
-		this.last_y = point.y;
+		this.last_x = px;
+		this.last_y = py;
 		this.last_size = localSize;
 	}
 
@@ -197,35 +199,51 @@ class Pencil_class extends Base_tools_class {
 		this.last_y = null;
 	}
 
-	paint_dab(ctx, x, y, size, color, alpha) {
+	paint_dab(ctx, x, y, size, color) {
 		ctx.save();
 		ctx.fillStyle = color;
-		ctx.globalAlpha = alpha;
+		ctx.globalAlpha = 1.0;
 		ctx.imageSmoothingEnabled = false;
 		var s = Math.max(1, Math.round(size));
 		var sh = Math.floor(s / 2);
-		ctx.fillRect(Math.round(x - sh), Math.round(y - sh), s, s);
+		ctx.fillRect(Math.floor(x) - sh, Math.floor(y) - sh, s, s);
 		ctx.restore();
 	}
 
-	paint_stroke_segment(ctx, x0, y0, s0, x1, y1, s1, color, alpha) {
-		var dx = x1 - x0;
-		var dy = y1 - y0;
-		var dist = Math.sqrt(dx * dx + dy * dy);
-		var s = Math.max(1, Math.round(s1));
-		var sh = Math.floor(s / 2);
-		var steps = Math.max(1, Math.ceil(dist / Math.max(1, s * 0.5)));
-
+	paint_stroke_line(ctx, x0, y0, x1, y1, size, color) {
 		ctx.save();
 		ctx.fillStyle = color;
-		ctx.globalAlpha = alpha;
+		ctx.globalAlpha = 1.0;
 		ctx.imageSmoothingEnabled = false;
-		for (var i = 0; i <= steps; i++) {
-			var t = i / steps;
-			var px = x0 + dx * t;
-			var py = y0 + dy * t;
-			ctx.fillRect(Math.round(px - sh), Math.round(py - sh), s, s);
+
+		var s = Math.max(1, Math.round(size));
+		var sh = Math.floor(s / 2);
+
+		var ix0 = Math.floor(x0);
+		var iy0 = Math.floor(y0);
+		var ix1 = Math.floor(x1);
+		var iy1 = Math.floor(y1);
+
+		var dx = Math.abs(ix1 - ix0);
+		var dy = Math.abs(iy1 - iy0);
+		var sx = (ix0 < ix1) ? 1 : -1;
+		var sy = (iy0 < iy1) ? 1 : -1;
+		var err = dx - dy;
+
+		while (true) {
+			ctx.fillRect(ix0 - sh, iy0 - sh, s, s);
+			if (ix0 === ix1 && iy0 === iy1) break;
+			var e2 = 2 * err;
+			if (e2 > -dy) {
+				err -= dy;
+				ix0 += sx;
+			}
+			if (e2 < dx) {
+				err += dx;
+				iy0 += sy;
+			}
 		}
+
 		ctx.restore();
 	}
 
