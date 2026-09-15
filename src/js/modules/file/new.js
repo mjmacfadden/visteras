@@ -177,7 +177,7 @@ class File_new_class {
 					new app.Actions.Refresh_action_attributes_action('undo'),
 					new app.Actions.Prepare_canvas_action('undo'),
 					new app.Actions.Update_config_action({
-						TRANSPARENCY: true,
+						TRANSPARENCY: !!transparency,
 						WIDTH: parseInt(width),
 						HEIGHT: parseInt(height),
 						ALPHA: 255,
@@ -212,7 +212,7 @@ class File_new_class {
 					}
 					doc.width = parseInt(width);
 					doc.height = parseInt(height);
-					doc.transparency = true;
+					doc.transparency = !!transparency;
 					doc.action_history = [];
 					doc.action_history_index = 0;
 					doc.is_dirty = false;

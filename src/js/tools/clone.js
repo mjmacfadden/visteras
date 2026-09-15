@@ -131,8 +131,14 @@ class Clone_class extends Base_tools_class {
 			return;
 		}
 		var src = layer.link_canvas;
-		if (!src && layer.link && layer.link.complete && layer.link.naturalWidth > 0) {
-			src = layer.link;
+		if (!src && layer.link) {
+			if (typeof layer.link.complete === 'boolean') {
+				if (layer.link.complete && layer.link.naturalWidth > 0) {
+					src = layer.link;
+				}
+			} else if (layer.link.width > 0 && layer.link.height > 0) {
+				src = layer.link;
+			}
 		}
 		if (!src) {
 			alertify.error('Layer image is not ready.');

@@ -84,22 +84,15 @@ class Brush_class extends Base_tools_class {
 	}
 
 	/**
-	 * During a stroke only schedule the interactive fast path.
-	 * Never call Base_layers.render() here — that invalidates the document
-	 * cache and forces a full rebuild (visible flash) every pointer move.
+	 * During a stroke schedule the interactive fast path immediately.
+	 * Base_layers.render_interactive_layer triggers a batched request_render
+	 * without adding redundant animation frame latency.
 	 */
 	request_stroke_preview() {
-		this._raf_dirty = true;
-		if (this._raf_id != null) return;
-		var self = this;
-		this._raf_id = requestAnimationFrame(function () {
-			self._raf_id = null;
-			if (!self._raf_dirty || !self.started || !config.layer) return;
-			self._raf_dirty = false;
-			if (self.Base_layers.render_interactive_layer) {
-				self.Base_layers.render_interactive_layer(config.layer.id);
-			}
-		});
+		if (!this.started || !config.layer) return;
+		if (this.Base_layers && this.Base_layers.render_interactive_layer) {
+			this.Base_layers.render_interactive_layer(config.layer.id);
+		}
 	}
 
 	cancel_stroke_preview() {
@@ -158,10 +151,16 @@ class Brush_class extends Base_tools_class {
 		this.tmpCanvasCtx = this.tmpCanvas.getContext('2d');
 
 		// Prefer live bridge so overlapping commits still seed from latest pixels.
-		// Fall back to link only when decode has completed (avoids blank copy).
+		// For canvas elements, use directly; for images, wait until decode completes.
 		var src = layer.link_canvas;
-		if (!src && layer.link && layer.link.complete && layer.link.naturalWidth > 0) {
-			src = layer.link;
+		if (!src && layer.link) {
+			if (typeof layer.link.complete === 'boolean') {
+				if (layer.link.complete && layer.link.naturalWidth > 0) {
+					src = layer.link;
+				}
+			} else if (layer.link.width > 0 && layer.link.height > 0) {
+				src = layer.link;
+			}
 		}
 		if (src) {
 			this.tmpCanvasCtx.drawImage(src, 0, 0, lw, lh);
@@ -614,7 +613,8 @@ class Brush_class extends Base_tools_class {
 		}
 		var tipPath = null;
 		var useTip = false;
-		if (brush && (brush.engine === 'stamp' || brush.engine === 'classic') && brush.tip) {
+		var isStandardRound = !brush || brush.id === 'classic-round' || brush.id === 'classic-soft';
+		if (brush && (brush.engine === 'stamp' || brush.engine === 'classic') && brush.tip && !isStandardRound) {
 			tipPath = brush.tip;
 			useTip = true;
 			this.ensure_tip_image(tipPath);
@@ -854,6 +854,12 @@ class Brush_class extends Base_tools_class {
 		hardness = Math.round(hardness);
 		var key = size + '_' + hardness + '_' + color;
 		if (this.soft_stamp_cache[key] == null) {
+			var keys = Object.keys(this.soft_stamp_cache);
+			if (keys.length > 120) {
+				for (var i = 0; i < 60; i++) {
+					delete this.soft_stamp_cache[keys[i]];
+				}
+			}
 			this.soft_stamp_cache[key] = this.build_soft_stamp(size, hardness, color);
 		}
 		return this.soft_stamp_cache[key];

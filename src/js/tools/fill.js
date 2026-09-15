@@ -5,6 +5,7 @@ import Base_layers_class from './../core/base-layers.js';
 import Helper_class from './../libs/helpers.js';
 import Mask_class from './../modules/mask/mask.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
+import { normalize_raster_layer_to_document } from './../libs/paint-target.js';
 
 class Fill_class extends Base_tools_class {
 
@@ -68,6 +69,10 @@ class Fill_class extends Base_tools_class {
 		if (config.ALPHA == 0) {
 			alertify.error('Color alpha value can not be zero.');
 			return;
+		}
+
+		if (config.layer.type === 'image') {
+			normalize_raster_layer_to_document(config.layer);
 		}
 
 		//get canvas from layer
