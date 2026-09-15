@@ -3,6 +3,7 @@
  * author: Vilius L.
  */
 
+import app from './../../app.js';
 import config from './../../config.js';
 import Base_layers_class from './../base-layers.js';
 import Tools_settings_class from './../../modules/tools/settings.js';
@@ -88,7 +89,12 @@ class GUI_information_class {
 
 	update_units(){
 		this.units = this.Tools_settings.get_setting('default_units');
-		this.resolution = this.Tools_settings.get_setting('resolution');
+		const activeDoc = (app.Documents && typeof app.Documents.get_active_document === 'function')
+			? app.Documents.get_active_document()
+			: null;
+		this.resolution = (activeDoc && activeDoc.resolution)
+			? activeDoc.resolution
+			: (config.resolution || this.Tools_settings.get_setting('resolution') || 72);
 		this.show_size(true);
 	}
 
@@ -102,6 +108,14 @@ class GUI_information_class {
 
 	show_size(force) {
 		this.update_zoom();
+		const activeDoc = (app.Documents && typeof app.Documents.get_active_document === 'function')
+			? app.Documents.get_active_document()
+			: null;
+		var resolution = (activeDoc && activeDoc.resolution)
+			? activeDoc.resolution
+			: (config.resolution || this.Tools_settings.get_setting('resolution') || 72);
+		this.resolution = resolution;
+
 		if(force == undefined && this.last_width == config.WIDTH && this.last_height == config.HEIGHT) {
 			this.show_memory(false);
 			return;
@@ -111,8 +125,6 @@ class GUI_information_class {
 		var height = this.Helper.get_user_unit(config.HEIGHT, this.units, this.resolution);
 
 		document.getElementById('mouse_info_size').innerHTML = width + ' &times; ' + height;
-
-		var resolution = this.Tools_settings.get_setting('resolution');
 		document.getElementById('mouse_info_resolution').innerHTML = resolution;
 
 		var default_units = this.Tools_settings.get_setting('default_units_short');

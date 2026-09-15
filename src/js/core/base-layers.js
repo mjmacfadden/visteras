@@ -434,7 +434,9 @@ class Base_layers_class {
 				// Draw grid, guides, selection, tool overlays on main canvas (2D)
 				this.Base_gui.draw_grid(this.ctx);
 				this.Base_gui.draw_guides();
-				this.Base_selection.draw_selection();
+				if (this.Base_selection && typeof this.Base_selection.draw_selection === 'function') {
+					this.Base_selection.draw_selection();
+				}
 				this.render_overlay();
 
 				// Render preview
@@ -481,7 +483,9 @@ class Base_layers_class {
 				this.ctx.drawImage(cache.documentCanvas, 0, 0);
 				this.Base_gui.draw_grid(this.ctx);
 				this.Base_gui.draw_guides();
-				this.Base_selection.draw_selection();
+				if (this.Base_selection && typeof this.Base_selection.draw_selection === 'function') {
+					this.Base_selection.draw_selection();
+				}
 				this.render_overlay();
 
 				if (cache.previewDirty) {

@@ -133,7 +133,16 @@ export function get_layer_content_bounds(layer) {
 	}
 
 	if (maxX < minX || maxY < minY) {
-		// Completely transparent layer
+		// Completely transparent or newly created layer - fallback to layer dimensions if defined
+		if (layer.width != null && layer.height != null && layer.width > 0 && layer.height > 0) {
+			return {
+				x: layer.x || 0,
+				y: layer.y || 0,
+				width: layer.width,
+				height: layer.height,
+				rotate: layer.rotate || 0,
+			};
+		}
 		return null;
 	}
 

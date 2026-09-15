@@ -232,6 +232,10 @@ class Base_selection_class {
 		if (this.ctx == null)
 			return;
 		var settings = this.find_settings();
+		if (!settings) {
+			this.selected_obj_positions = {};
+			return;
+		}
 		var data = settings.data;
 
 		//always clear the transform overlay so stray handles never linger.
@@ -266,8 +270,8 @@ class Base_selection_class {
 			return;
 		}
 
-		if (settings.data === null || settings.data.status == 'draft'
-			|| (settings.data.hide_selection_if_active === true && settings.data.type == config.TOOL.name)) {
+		if (!settings.data || settings.data.status == 'draft'
+			|| (settings.data.hide_selection_if_active === true && config.TOOL && settings.data.type == config.TOOL.name)) {
 			this.selected_obj_positions = {};
 			return;
 		}
@@ -1312,11 +1316,10 @@ class Base_selection_class {
 
 	selected_object_actions(e) {
 		var settings = this.find_settings();
-		var data = settings.data;
-
-		if(data == null){
+		if (!settings || !settings.data) {
 			return;
 		}
+		var data = settings.data;
 
 		//locked layers cannot be moved, scaled or rotated
 		if (data.locked === true) {
