@@ -103,14 +103,18 @@ html {
 
 .menu_entry_title {
   height: 100%;
+  line-height: normal;
   padding: 0 8px 1.4px 8px;
   font-size: 11px;
   font-weight: 400;
+  font-family: var(--ui-font);
   color: #cccccc;
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
   display: flex;
   align-items: center;
+  border-radius: 0;
+  box-sizing: border-box;
 }
 
 .menu_entry_title:hover {
