@@ -89,6 +89,13 @@ const menuDefinition = [
 				divider: true
 			},
 			{
+				name: 'Visteras Vector',
+				href: './vector/'
+			},
+			{
+				divider: true
+			},
+			{
 				name: 'Quick Save',
 				shortcut: 'F9',
 				target: 'file/quicksave.quicksave'
@@ -969,6 +976,13 @@ const menuDefinition = [
 				name: 'About',
 				ellipsis: true,
 				target: 'help/about.about'
+			},
+			{
+				divider: true
+			},
+			{
+				name: 'Visteras Vector (Vector Editor)',
+				href: './vector/'
 			}
 		]
 	}

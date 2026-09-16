@@ -1,0 +1,972 @@
+/**
+ * Visteras Vector - Studio Companion Theme & Skin
+ * Tailored for SVG-Edit 7.4.2 to match Visteras Studio pixel-perfect
+ */
+
+:root {
+  --ui-font: "Segoe UI", "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  
+  /* Visteras Studio Theme Colors */
+  --studio-header-bg: #333333;
+  --studio-options-bg: #2d2d2d;
+  --studio-toolbar-bg: #3c3c3c;
+  --studio-panel-bg: #3c3c3c;
+  --studio-workspace-bg: #262626;
+  --studio-chassis-bg: #535353;
+  --studio-border-dark: #1a1a1a;
+  --studio-border-med: #2a2a2a;
+  --studio-border-light: #505050;
+  --studio-blue-active: #2a6bb5;
+  --studio-orange: #fa7c1b;
+  --studio-text: #cccccc;
+  --studio-text-muted: #888888;
+  
+  /* SVG-Edit Theme Variable Overrides */
+  --main-bg-color: #2d2d2d;
+  --text-color: #cccccc;
+  --border-color: #1a1a1a;
+  --canvas-bg-color: #262626;
+  --link-color: #4a9eff;
+  --ruler-color: #333333;
+  --icon-bg-color: #3c3c3c;
+  --icon-bg-color-hover: #505050;
+  --input-color: #242424;
+  --orange-color: #fa7c1b;
+  --top-toolbar-min-height: 45px;
+}
+
+/* App reset */
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--ui-font);
+  background-color: var(--studio-chassis-bg);
+  color: var(--studio-text);
+  font-size: 11px;
+}
+
+#visteras_app_container {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--studio-chassis-bg);
+}
+
+/* ==========================================================================
+   1. Main Menu Bar (Top File Menu) - Styled exactly like Studio .main_menu
+   ========================================================================== */
+
+#visteras_menu_bar {
+  height: 28px;
+  min-height: 28px;
+  background: var(--studio-header-bg);
+  border-bottom: 1px solid #222222;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  z-index: 3000;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.menu_group {
+  display: flex;
+  align-items: stretch;
+}
+
+.menu_entry {
+  position: relative;
+  height: 100%;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.menu_entry_title {
+  height: 100%;
+  line-height: normal;
+  padding: 0 8px 1.4px 8px;
+  font-size: 11px;
+  font-weight: 400;
+  font-family: var(--ui-font);
+  color: #cccccc;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.menu_entry_title:hover {
+  background: #505050;
+  color: #ffffff;
+}
+
+.menu_entry.open .menu_entry_title {
+  background: var(--studio-blue-active);
+  color: #ffffff;
+}
+
+.menu_dropdown_list {
+  display: none;
+  position: absolute;
+  top: 28px;
+  left: 0;
+  background: #3c3c3c;
+  border: 1px solid #505050;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  min-width: 180px;
+  z-index: 3001;
+}
+
+.menu_entry.open > .menu_dropdown_list {
+  display: block;
+}
+
+.menu_dropdown_item {
+  font-size: 11px;
+  color: #cccccc;
+  padding: 4px 16px;
+  line-height: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.menu_dropdown_item:hover:not(.disabled) {
+  background: var(--studio-blue-active);
+  color: #ffffff;
+}
+
+.menu_dropdown_item.disabled {
+  color: #666666;
+  cursor: default;
+}
+
+.menu_dropdown_separator {
+  border: none;
+  border-top: 1px solid #505050;
+  margin: 4px 0;
+  height: 0;
+}
+
+.menu_dropdown_shortcut {
+  color: #888888;
+  font-size: 10px;
+  margin-left: 20px;
+}
+
+.menu_dropdown_item:hover:not(.disabled) .menu_dropdown_shortcut {
+  color: #ffffff;
+}
+
+.menu_right_controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visteras_switch_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaaaaa;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: #242424;
+  border: 1px solid #383838;
+  transition: all 0.15s;
+}
+
+.visteras_switch_btn:hover {
+  background: #333333;
+  color: #ffffff;
+  border-color: #555555;
+}
+
+.visteras_switch_btn .visteras_badge {
+  color: #4a9eff;
+  font-weight: 800;
+}
+
+/* ==========================================================================
+   2. SVG-Edit Layout Overrides - Grid & Studio Gutters
+   ========================================================================== */
+
+#container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  width: 100% !important;
+  height: calc(100vh - 28px) !important;
+}
+
+.svg_editor {
+  display: grid !important;
+  /* Row 1: 45px options bar + 4px Studio chassis gap
+     Row 2: 16px ruler X
+     Row 3: 1fr workspace
+     Row 4: 24px status bar */
+  grid-template-rows: 49px 16px 1fr 24px !important;
+  /* Col 1: 40px left toolbar (36px + 4px gap)
+     Col 2: 16px ruler Y
+     Col 3: 1fr workspace
+     Col 4: 240px right panel */
+  grid-template-columns: 40px 16px 1fr 240px !important;
+  grid-template-areas:
+    "top top top top"
+    "left corner rulerX side"
+    "left rulerY workarea side"
+    "bottom bottom bottom bottom" !important;
+  background: var(--studio-chassis-bg) !important;
+  font-family: var(--ui-font) !important;
+  color: var(--studio-text) !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Options Bar Top - Studio 45px height, #2d2d2d, 1px #1a1a1a border */
+#tools_top {
+  grid-area: top !important;
+  height: 45px !important;
+  min-height: 45px !important;
+  max-height: 45px !important;
+  background-color: var(--studio-options-bg) !important;
+  border-bottom: 1px solid var(--studio-border-dark) !important;
+  margin-bottom: 4px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  padding: 0 8px 0 0 !important;
+  z-index: 500 !important;
+}
+
+#tools_top::-webkit-scrollbar {
+  display: none !important;
+}
+
+#tools_top > * {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  height: 100% !important;
+  background-color: transparent !important;
+}
+
+/* Hide SVG-Edit default main button (handled cleanly by our top menu bar) */
+#main_button {
+  display: none !important;
+}
+
+/* Contextual tools have moved to #properties_panel in the right sidebar */
+#tools_top .selected_panel,
+#tools_top .xy_panel,
+#tools_top .multiselected_panel,
+#tools_top .rect_panel,
+#tools_top .image_panel,
+#tools_top .circle_panel,
+#tools_top .ellipse_panel,
+#tools_top .line_panel,
+#tools_top .text_panel,
+#tools_top .path_node_panel,
+#tools_top .container_panel,
+#tools_top .g_panel,
+#tools_top .use_panel,
+#tools_top .a_panel,
+#tools_top #cur_context_panel {
+  display: none !important;
+}
+
+#title_panel {
+  display: flex !important;
+  align-items: center !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  margin: 0 4px 0 8px !important;
+  background-color: #242424 !important;
+  border: 1px solid #383838 !important;
+  border-radius: 2px !important;
+}
+
+#title_panel p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #a0a0a0 !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
+}
+
+/* Visteras Vector Logo in Options Bar */
+.visteras_vector_logo_wrap {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 1px 8px;
+  margin: 4px;
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 1px;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.visteras_vector_logo_wrap img {
+  height: 28px;
+  width: auto;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.visteras_vector_logo_wrap .logo_text {
+  color: #ffffff;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.visteras_vector_logo_wrap .logo_bold {
+  font-weight: 700;
+}
+
+.visteras_vector_logo_wrap .logo_light {
+  font-weight: 100;
+  opacity: 0.6;
+}
+
+.visteras_top_divider {
+  width: 1px;
+  height: 22px;
+  background: #3c3c3c;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   3. Left Toolbar (Sidebar Left) - Styled like Studio .sidebar_left
+   ========================================================================== */
+
+#tools_left {
+  grid-area: left !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 100% !important;
+  background-color: var(--studio-toolbar-bg) !important;
+  border-right: 1px solid var(--studio-border-dark) !important;
+  margin-right: 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 4px 0 !important;
+  gap: 2px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+  z-index: 100 !important;
+}
+
+/* Tool Buttons */
+#tools_left se-button,
+#tools_left se-flyingbutton {
+  margin: 1px auto !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 2px !important;
+  transition: all 0.12s !important;
+}
+
+/* Tool button states */
+#tools_left se-button:hover,
+#tools_left se-flyingbutton:hover {
+  background-color: #505050 !important;
+}
+
+#tools_left se-button[pressed],
+#tools_left se-flyingbutton[pressed],
+#tools_left [pressed] {
+  background-color: #242424 !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05) !important;
+  border-radius: 2px !important;
+}
+
+/* ==========================================================================
+   4. Middle Workspace (Canvas & Rulers)
+   ========================================================================== */
+
+#workarea {
+  grid-area: workarea !important;
+  background-color: var(--studio-workspace-bg) !important;
+  border: none !important;
+  overflow: auto !important;
+  position: relative !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #4f4f4f #1e1e1e !important;
+}
+
+/* Modern Workspace Scrollbars (Vertical & Horizontal) */
+#workarea::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+#workarea::-webkit-scrollbar-track {
+  background: #1e1e1e !important;
+}
+
+#workarea::-webkit-scrollbar-thumb {
+  background-color: #4f4f4f !important;
+  border-radius: 6px !important;
+  border: 2px solid #1e1e1e !important;
+  background-clip: padding-box !important;
+  min-height: 24px !important;
+  min-width: 24px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#workarea::-webkit-scrollbar-thumb:hover {
+  background-color: #6e6e6e !important;
+}
+
+#workarea::-webkit-scrollbar-thumb:active {
+  background-color: #8e8e8e !important;
+}
+
+#workarea::-webkit-scrollbar-corner {
+  background: #181818 !important;
+}
+
+#svgcanvas {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+#canvasBackground rect {
+  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5)) !important;
+}
+
+#ruler_corner {
+  grid-area: corner !important;
+  background: #2b2b2b !important;
+  border-right: 1px solid #222222 !important;
+  border-bottom: 1px solid #222222 !important;
+  width: 16px !important;
+  height: 16px !important;
+  box-sizing: border-box !important;
+}
+
+#ruler_x {
+  grid-area: rulerX !important;
+  background: #333333 !important;
+  border-bottom: 1px solid #222222 !important;
+  height: 16px !important;
+  box-sizing: border-box !important;
+}
+
+#ruler_y {
+  grid-area: rulerY !important;
+  background: #333333 !important;
+  border-right: 1px solid #222222 !important;
+  width: 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* ==========================================================================
+   5. Right Panel (Layers & Inspector) - Styled like Studio .sidebar_right
+   ========================================================================== */
+
+#sidepanels {
+  grid-area: side !important;
+  width: 240px !important;
+  height: 100% !important;
+  background-color: var(--studio-panel-bg) !important;
+  border-left: 1px solid var(--studio-border-dark) !important;
+  margin-left: 4px !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  z-index: 50 !important;
+}
+
+#sidepanel_handle {
+  display: none !important;
+}
+
+.svg_editor #sidepanel_content {
+  display: block !important;
+  padding: 0 !important;
+}
+
+/* ==========================================================================
+   5a. Properties Panel (Contextual Inspector above Layers)
+   ========================================================================== */
+
+#properties_panel {
+  width: 100% !important;
+  background-color: var(--studio-panel-bg) !important;
+  border-bottom: 1px solid var(--studio-border-dark) !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+#properties_panel .sidebar_block_header {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: #cccccc !important;
+  background-color: #333333 !important;
+  padding: 5px 8px !important;
+  border-bottom: 1px solid #222222 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+}
+
+#properties_panel .sidebar_block_header:hover {
+  background-color: #3a3a3a !important;
+}
+
+#properties_panel .sidebar_block_arrow {
+  font-size: 8px !important;
+  color: #888888 !important;
+  transition: transform 0.15s ease !important;
+}
+
+#properties_panel.collapsed .sidebar_block_arrow {
+  transform: rotate(-90deg) !important;
+}
+
+#properties_panel.collapsed #properties_content {
+  display: none !important;
+}
+
+#properties_content {
+  padding: 0 !important;
+}
+
+.prop_empty_state {
+  padding: 20px 12px !important;
+  text-align: center !important;
+  color: #888888 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+.prop_empty_state .prop_empty_icon {
+  font-size: 16px !important;
+  color: #666666 !important;
+  margin-bottom: 6px !important;
+}
+
+.prop_empty_state .prop_empty_text {
+  font-weight: 600 !important;
+  color: #aaaaaa !important;
+  margin-bottom: 4px !important;
+}
+
+.prop_empty_state .prop_empty_hint {
+  font-size: 10px !important;
+  color: #777777 !important;
+}
+
+.prop_section {
+  border-bottom: 1px solid #242424 !important;
+}
+
+.prop_section:last-child {
+  border-bottom: none !important;
+}
+
+.prop_section_header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 8px !important;
+  background-color: #282828 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #a8a8a8 !important;
+  border-top: 1px solid #1e1e1e !important;
+  transition: background-color 0.12s, color 0.12s !important;
+}
+
+.prop_section_header:hover {
+  background-color: #303030 !important;
+  color: #ffffff !important;
+}
+
+.prop_section_arrow {
+  font-size: 8px !important;
+  width: 10px !important;
+  display: inline-block !important;
+  color: #777777 !important;
+  transition: transform 0.15s ease !important;
+}
+
+.prop_section.collapsed .prop_section_arrow {
+  transform: rotate(-90deg) !important;
+}
+
+.prop_section_body {
+  padding: 6px 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  background-color: #2b2b2b !important;
+  box-sizing: border-box !important;
+}
+
+.prop_section.collapsed .prop_section_body {
+  display: none !important;
+}
+
+.prop_row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_group {
+  width: 100% !important;
+}
+
+.prop_field_pair {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_grid_6col {
+  display: grid !important;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_grid_2col_btns {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_actions_flow {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_actions_flow se-button {
+  flex: 0 0 calc(25% - 3px) !important;
+  min-width: 28px !important;
+  height: 24px !important;
+}
+
+.prop_btn_pair {
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.prop_field_label {
+  font-size: 10px !important;
+  color: #888888 !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
+}
+
+#properties_panel se-spin-input {
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+
+#properties_panel se-button {
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.12s, border-color 0.12s !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+#properties_panel se-button:hover {
+  background: #3d3d3d !important;
+  border-color: #555555 !important;
+}
+
+#properties_panel se-button[pressed] {
+  background: var(--studio-blue-active) !important;
+  border-color: var(--studio-blue-active) !important;
+}
+
+/* Pathfinder Buttons in Properties Panel */
+.prop_pathfinder_grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_pathfinder_btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 28px !important;
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.12s, border-color 0.12s, transform 0.08s !important;
+}
+
+.prop_pathfinder_btn:hover {
+  background: #444444 !important;
+  border-color: #666666 !important;
+}
+
+.prop_pathfinder_btn:active {
+  background: #242424 !important;
+  border-color: var(--studio-orange) !important;
+  transform: translateY(1px) !important;
+}
+
+.prop_pathfinder_btn svg {
+  display: block !important;
+  pointer-events: none !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.prop_pathfinder_btn:hover svg path,
+.prop_pathfinder_btn:hover svg rect {
+  stroke: #ffffff !important;
+}
+
+#properties_panel se-select {
+  width: 100% !important;
+}
+
+#properties_panel se-input {
+  width: 100% !important;
+}
+
+#properties_panel se-list {
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+}
+
+#layerpanel {
+  padding: 6px !important;
+}
+
+#layersLabel {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: #cccccc !important;
+  background-color: #333333 !important;
+  padding: 5px 8px !important;
+  margin: -6px -6px 6px -6px !important;
+  border-bottom: 1px solid #222222 !important;
+  display: block !important;
+}
+
+#layerbuttons {
+  width: 100% !important;
+  height: auto !important;
+  background: #2d2d2d !important;
+  border: 1px solid #383838 !important;
+  border-radius: 2px !important;
+  padding: 3px 6px !important;
+  margin-bottom: 6px !important;
+  display: flex !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
+}
+
+#layerlist {
+  width: 100% !important;
+  border: 1px solid #383838 !important;
+  border-radius: 2px !important;
+  background: #242424 !important;
+  color: #cccccc !important;
+}
+
+#layerlist tr.layer {
+  background-color: #292929 !important;
+  color: #cccccc !important;
+  border-bottom: 1px solid #333333 !important;
+  transition: background 0.12s;
+}
+
+#layerlist tr.layersel {
+  background-color: var(--studio-blue-active) !important;
+  color: #ffffff !important;
+}
+
+#layerlist tr:not(.layer) {
+  display: none !important;
+}
+
+#layerlist td.layervis {
+  width: 24px !important;
+  text-align: center !important;
+  padding: 4px !important;
+}
+
+#layerlist td.layername {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+}
+
+#selLayerNames {
+  margin-top: 8px !important;
+  width: 100% !important;
+}
+
+/* ==========================================================================
+   6. Bottom Bar (Status Bar) - Styled like Studio .status_bar
+   ========================================================================== */
+
+#tools_bottom {
+  grid-area: bottom !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  background-color: var(--studio-header-bg) !important;
+  border-top: 1px solid var(--studio-border-dark) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+  color: #999999 !important;
+  z-index: 100 !important;
+  box-sizing: border-box !important;
+}
+
+#palette {
+  margin-left: auto !important;
+  margin-right: 8px !important;
+}
+
+/* Inputs styling */
+input[type="text"], input[type="number"] {
+  background: #242424 !important;
+  border: 1px solid #444444 !important;
+  color: #ffffff !important;
+  border-radius: 2px !important;
+  font-family: var(--mono-font) !important;
+  font-size: 11px !important;
+  padding: 2px 4px !important;
+}
+
+se-spin-input {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* Modern scrollbars for side panels, layer list, and dialogs */
+#sidepanels,
+#layerlist,
+.dialog_content,
+elix-dialog {
+  scrollbar-width: thin !important;
+  scrollbar-color: #4f4f4f #282828 !important;
+}
+
+#sidepanels::-webkit-scrollbar,
+#layerlist::-webkit-scrollbar,
+.dialog_content::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+#sidepanels::-webkit-scrollbar-track,
+#layerlist::-webkit-scrollbar-track,
+.dialog_content::-webkit-scrollbar-track {
+  background: #282828 !important;
+}
+
+#sidepanels::-webkit-scrollbar-thumb,
+#layerlist::-webkit-scrollbar-thumb,
+.dialog_content::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a !important;
+  border-radius: 4px !important;
+  border: 2px solid #282828 !important;
+  background-clip: padding-box !important;
+}
+
+#sidepanels::-webkit-scrollbar-thumb:hover,
+#layerlist::-webkit-scrollbar-thumb:hover,
+.dialog_content::-webkit-scrollbar-thumb:hover {
+  background-color: #686868 !important;
+}
+
+#sidepanels::-webkit-scrollbar-corner,
+#layerlist::-webkit-scrollbar-corner,
+.dialog_content::-webkit-scrollbar-corner {
+  background: #242424 !important;
+}
+
