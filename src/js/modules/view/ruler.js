@@ -173,8 +173,10 @@ class View_ruler_class {
 		document.body.style.cursor = cursor;
 
 		var onMouseMove = (e) => {
-			var mouse_x = e.pageX - this.GUI.canvas_offset.x;
-			var mouse_y = e.pageY - this.GUI.canvas_offset.y;
+			var canvas_minipaint = document.getElementById('canvas_minipaint');
+			var canvas_rect = canvas_minipaint ? canvas_minipaint.getBoundingClientRect() : null;
+			var mouse_x = canvas_rect ? (e.clientX - (canvas_rect.left + (canvas_minipaint.clientLeft || 0))) : (e.pageX - this.GUI.canvas_offset.x);
+			var mouse_y = canvas_rect ? (e.clientY - (canvas_rect.top + (canvas_minipaint.clientTop || 0))) : (e.pageY - this.GUI.canvas_offset.y);
 			var world_pt = zoomView.toWorld(mouse_x, mouse_y);
 
 			var val = is_vertical ? world_pt.x : world_pt.y;
@@ -201,8 +203,10 @@ class View_ruler_class {
 			var top_rect = ruler_top ? ruler_top.getBoundingClientRect() : { bottom: 48 };
 			var left_rect = ruler_left ? ruler_left.getBoundingClientRect() : { right: 20 };
 
-			var mouse_x = e.pageX - this.GUI.canvas_offset.x;
-			var mouse_y = e.pageY - this.GUI.canvas_offset.y;
+			var canvas_minipaint = document.getElementById('canvas_minipaint');
+			var canvas_rect = canvas_minipaint ? canvas_minipaint.getBoundingClientRect() : null;
+			var mouse_x = canvas_rect ? (e.clientX - (canvas_rect.left + (canvas_minipaint.clientLeft || 0))) : (e.pageX - this.GUI.canvas_offset.x);
+			var mouse_y = canvas_rect ? (e.clientY - (canvas_rect.top + (canvas_minipaint.clientTop || 0))) : (e.pageY - this.GUI.canvas_offset.y);
 			var world_pt = zoomView.toWorld(mouse_x, mouse_y);
 
 			var val = is_vertical ? world_pt.x : world_pt.y;
@@ -213,8 +217,8 @@ class View_ruler_class {
 			}
 
 			var droppedOnRuler = is_vertical
-				? (e.pageX <= left_rect.right)
-				: (e.pageY <= top_rect.bottom);
+				? (e.clientX <= left_rect.right)
+				: (e.clientY <= top_rect.bottom);
 
 			if (existing_index !== null) {
 				if (droppedOnRuler) {
@@ -287,8 +291,13 @@ class View_ruler_class {
 		var middle_area_width = middle_area.clientWidth;
 		var middle_area_height = middle_area.clientHeight;
 
+		var ruler_h = middle_area_height - 48;
+		if (middle_area.classList.contains('has_timeline')) {
+			ruler_h = middle_area_height - 163;
+		}
+
 		ruler_left.width = 15;
-		ruler_left.height = Math.max(10, middle_area_height - 20);
+		ruler_left.height = Math.max(10, ruler_h);
 
 		ruler_top.width = Math.max(10, middle_area_width - 20);
 		ruler_top.height = 15;
@@ -399,9 +408,21 @@ class View_ruler_class {
 		ctx_left.clearRect(0, 0, ruler_left.width, ruler_left.height);
 		ctx_top.clearRect(0, 0, ruler_top.width, ruler_top.height);
 
+		var canvas_minipaint = document.getElementById('canvas_minipaint');
+		if (!canvas_minipaint) return;
+		var canvas_rect = canvas_minipaint.getBoundingClientRect();
+		var top_ruler_rect = ruler_top.getBoundingClientRect();
+		var left_ruler_rect = ruler_left.getBoundingClientRect();
+
+		var clientLeft = canvas_minipaint.clientLeft || 0;
+		var clientTop = canvas_minipaint.clientTop || 0;
+
+		var zoom_x = (zoomView && zoomView.matrix) ? zoomView.matrix[4] : 0;
+		var zoom_y = (zoomView && zoomView.matrix) ? zoomView.matrix[5] : 0;
+
 		// Compute world (0,0) screen offset on rulers
-		const offset_x = (this.GUI.canvas_offset ? this.GUI.canvas_offset.x : 0) + (zoomView.matrix ? zoomView.matrix[4] : 0) - ruler_top.offsetLeft;
-		const offset_y = (this.GUI.canvas_offset ? this.GUI.canvas_offset.y : 0) + (zoomView.matrix ? zoomView.matrix[5] : 0) - ruler_left.offsetTop;
+		const offset_x = (canvas_rect.left + clientLeft - top_ruler_rect.left) + zoom_x;
+		const offset_y = (canvas_rect.top + clientTop - left_ruler_rect.top) + zoom_y;
 
 		const minorStepUnits = majorStep / subdivisions;
 		const minorStepScreen = minorStepUnits * pixelsPerUnit * zoom;
@@ -417,7 +438,8 @@ class View_ruler_class {
 
 		ctx_top.beginPath();
 		for (let u = min_u_x; u <= max_u_x + 1e-6; u += majorStep) {
-			const majorScreenX = offset_x + (u * pixelsPerUnit * zoom);
+			const clean_u = Math.abs(u) < 1e-6 ? 0 : Math.round(u * 1e6) / 1e6;
+			const majorScreenX = offset_x + (clean_u * pixelsPerUnit * zoom);
 			const roundedX = Math.round(majorScreenX) + 0.5;
 
 			if (roundedX >= 0 && roundedX <= ruler_top.width) {
@@ -426,7 +448,7 @@ class View_ruler_class {
 				ctx_top.lineTo(roundedX, size);
 
 				// Label
-				const label = this.format_label(u, unit, majorStep);
+				const label = this.format_label(clean_u, unit, majorStep);
 				ctx_top.fillText(label, roundedX + 3, 9);
 			}
 
@@ -449,13 +471,16 @@ class View_ruler_class {
 		ctx_left.fillStyle = textColor;
 		ctx_left.strokeStyle = strokeColor;
 		ctx_left.lineWidth = 1;
+		ctx_left.textAlign = 'right';
+		ctx_left.textBaseline = 'middle';
 
 		const min_u_y = Math.floor((-offset_y) / (pixelsPerUnit * zoom * majorStep)) * majorStep;
 		const max_u_y = Math.ceil((ruler_left.height - offset_y) / (pixelsPerUnit * zoom * majorStep)) * majorStep;
 
 		ctx_left.beginPath();
 		for (let u = min_u_y; u <= max_u_y + 1e-6; u += majorStep) {
-			const majorScreenY = offset_y + (u * pixelsPerUnit * zoom);
+			const clean_u = Math.abs(u) < 1e-6 ? 0 : Math.round(u * 1e6) / 1e6;
+			const majorScreenY = offset_y + (clean_u * pixelsPerUnit * zoom);
 			const roundedY = Math.round(majorScreenY) + 0.5;
 
 			if (roundedY >= 0 && roundedY <= ruler_left.height) {
@@ -464,9 +489,9 @@ class View_ruler_class {
 				ctx_left.lineTo(size, roundedY);
 
 				// Rotated label on left ruler
-				const label = this.format_label(u, unit, majorStep);
+				const label = this.format_label(clean_u, unit, majorStep);
 				ctx_left.save();
-				ctx_left.translate(10, roundedY - 2);
+				ctx_left.translate(7.5, roundedY + 3);
 				ctx_left.rotate(-Math.PI / 2);
 				ctx_left.fillText(label, 0, 0);
 				ctx_left.restore();

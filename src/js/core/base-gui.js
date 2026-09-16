@@ -778,8 +778,8 @@ class Base_gui_class {
 		if (!canvas_minipaint) return;
 		var canvas_rect = canvas_minipaint.getBoundingClientRect();
 		var main_rect = main_wrapper.getBoundingClientRect();
-		var offset_x = canvas_rect.left - main_rect.left;
-		var offset_y = canvas_rect.top - main_rect.top;
+		var offset_x = canvas_rect.left + (canvas_minipaint.clientLeft || 0) - main_rect.left;
+		var offset_y = canvas_rect.top + (canvas_minipaint.clientTop || 0) - main_rect.top;
 
 		var thick_guides = this.Tools_settings.get_setting('thick_guides');
 		var lineWidth = thick_guides ? 3 : 1;

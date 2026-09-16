@@ -82,11 +82,11 @@ class View_guides_class {
 
 		var canvas_rect = canvas_minipaint.getBoundingClientRect();
 		var main_rect = main_wrapper.getBoundingClientRect();
-		var offset_x = canvas_rect.left - main_rect.left;
-		var offset_y = canvas_rect.top - main_rect.top;
+		var offset_x = canvas_rect.left + (canvas_minipaint.clientLeft || 0) - main_rect.left;
+		var offset_y = canvas_rect.top + (canvas_minipaint.clientTop || 0) - main_rect.top;
 
-		var mouse_screen_x = e.pageX - main_rect.left;
-		var mouse_screen_y = e.pageY - main_rect.top;
+		var mouse_screen_x = e.clientX - main_rect.left;
+		var mouse_screen_y = e.clientY - main_rect.top;
 
 		var threshold = 6;
 
