@@ -345,7 +345,7 @@ html, body {
 
 .visteras_vector_logo_wrap .logo_text {
   color: #ffffff;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 1px;
   text-transform: uppercase;
   white-space: nowrap;
@@ -359,8 +359,6 @@ html, body {
 .visteras_vector_logo_wrap .logo_light {
   font-weight: 100;
   opacity: 0.6;
-  color: #ffffff;
-  margin-left: 4px;
 }
 
 .visteras_top_divider {
