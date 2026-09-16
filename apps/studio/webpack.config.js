@@ -18,6 +18,7 @@ module.exports = function (env, argv) {
 	resolve: {
 		extensions: ['.js', '.css', '.json'],
 		alias: {
+			'@visteras/fonts': path.resolve(__dirname, '../../packages/fonts/src/index.js'),
 			Utilities: path.resolve(__dirname, 'node_modules'),
 			'vp-local-keys': fs.existsSync(path.resolve(__dirname, 'src/js/config.keys.local.js'))
 				? path.resolve(__dirname, 'src/js/config.keys.local.js')

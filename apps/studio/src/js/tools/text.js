@@ -8,6 +8,7 @@ import GUI_tools_class from './../core/gui/gui-tools.js';
 import Helper_class from './../libs/helpers.js';
 import Dialog_class from './../libs/popup.js';
 import WebFont from 'webfontloader';
+import { loadFontFamily as sharedLoadFontFamily } from '@visteras/fonts';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 import googleFontsCache from './../libs/google-fonts-cache.json';
 
@@ -235,30 +236,35 @@ export function load_font_family({ family, variants, source }, successCallback) 
 	// Mark pending before kicking WebFont so concurrent callers coalesce.
 	for (const v of missing) loadedSet.add(v + '::pending');
 	const toLoad = missing;
-	const loadPromise = new Promise((resolve) => {
-		WebFont.load({
-			google: {
-				families: [family + ':' + toLoad.join(',')]
-			},
-			active: () => {
-				for (const v of toLoad) {
-					loadedSet.delete(v + '::pending');
-					loadedSet.add(v);
-				}
-				fontLoadMap.set(family, true);
-				resolve();
-			},
-			inactive: () => {
-				console.warn('Font ' + family + ' (' + toLoad.join(',') + ') could not be loaded.');
-				for (const v of toLoad) {
-					loadedSet.delete(v + '::pending');
-					loadedSet.add(v); // avoid tight-loop retry
-				}
-				fontLoadMap.set(family, true);
-				resolve();
+	// Shared Google load path (@visteras/fonts) — same CSS/FontFace approach as Vector.
+	const loadPromise = sharedLoadFontFamily({ family, source: 'google', variants: toLoad })
+		.then(() => {
+			for (const v of toLoad) {
+				loadedSet.delete(v + '::pending');
+				loadedSet.add(v);
 			}
+			fontLoadMap.set(family, true);
+		})
+		.catch((err) => {
+			console.warn('Font ' + family + ' (' + toLoad.join(',') + ') could not be loaded.', err);
+			for (const v of toLoad) {
+				loadedSet.delete(v + '::pending');
+				loadedSet.add(v); // avoid tight-loop retry
+			}
+			fontLoadMap.set(family, true);
+			// Fallback to webfontloader if shared path fails
+			return new Promise((resolve) => {
+				try {
+					WebFont.load({
+						google: { families: [family + ':' + toLoad.join(',')] },
+						active: resolve,
+						inactive: resolve,
+					});
+				} catch (e) {
+					resolve();
+				}
+			});
 		});
-	});
 	const prev = fontLoadPromiseMap.get(family);
 	// Parallel WebFont loads are fine; settle when both prev and this request finish.
 	const chainedWait = prev ? Promise.all([prev.catch(() => {}), loadPromise]) : loadPromise;

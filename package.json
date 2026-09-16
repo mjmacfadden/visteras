@@ -9,7 +9,8 @@
     "build:studio": "npm run build --prefix apps/studio",
     "dev:vector": "npx --yes serve apps/vector -p 5173",
     "build:vector": "node -e \"console.log('Vector is a static SVG-Edit build under apps/vector; nothing to compile.')\"",
-    "build:site": "bash scripts/build-site.sh"
+    "build:site": "bash scripts/build-site.sh",
+    "build:fonts": "npm run build:vector --prefix packages/fonts"
   },
   "repository": {
     "type": "git",

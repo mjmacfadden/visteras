@@ -537,19 +537,24 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
           font: inherit;
           outline: none;
           text-align: inherit;
+          color: #ffffff;
+          color-scheme: dark;
         }
       </style>
     `),e}get value(){return this[H].value}set value(e){this[va]({value:String(e)})}}}));function Po(e){return class extends e{get[U](){let e=super[U];return e.content.append(Ur.html`
         <style>
           :host {
-            background: white;
-            border: 1px solid gray;
+            background: #242424;
+            border: 1px solid #444444;
             box-sizing: border-box;
+            color: #ffffff;
+            color-scheme: dark;
           }
 
           [part~="input"] {
             background: transparent;
             border-color: transparent;
+            color: #ffffff;
           }
         </style>
       `),e}}}var Fo=t((()=>{Fa(),Gr(),Ii()})),Io,Lo=t((()=>{No(),Fo(),Io=class extends Po(Mo){}})),Ro,zo=t((()=>{Lo(),Ro=class extends Io{},customElements.define(`elix-input`,Ro)})),Bo,Vo,Ho=t((()=>{zo(),Mr(),Bo=document.createElement(`template`),Bo.innerHTML=`
@@ -575,6 +580,11 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
     background-color: var(--input-color);
     border-radius: 3px;
     height: 24px;
+    color: #ffffff;
+    color-scheme: dark;
+  }
+  elix-input::part(input) {
+    color: #ffffff;
   }
   </style>
   <div>
@@ -618,15 +628,18 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
       `),e}}}var os=t((()=>{Fa(),Gr(),Ii()})),ss,cs=t((()=>{is(),os(),ss=class extends as(rs){}}));function ls(e){return class extends e{get[V](){return Object.assign(super[V]||{},{buttonPartType:ss,inputPartType:Io})}get[U](){let e=super[U],t=e.content.getElementById(`upButton`);t.textContent=`▲`;let n=e.content.getElementById(`downButton`);return n.textContent=`▼`,e.content.append(Ur.html`
         <style>
           :host {
-            background: white;
-            border: 1px solid gray;
+            background: #242424;
+            border: 1px solid #444444;
             box-sizing: border-box;
+            color: #ffffff;
+            color-scheme: dark;
           }
 
           [part~="input"] {
             background: transparent;
             border: none;
             width: 4em;
+            color: #ffffff;
           }
 
           [part~="spin-button"] {
@@ -659,6 +672,8 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
           grid-row-start: 1;
           outline: none;
           text-align: right;
+          color: #ffffff;
+          color-scheme: dark;
         }
 
         [part~="spin-button"] {
@@ -716,6 +731,11 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
     width: 3em;
     color: #ffffff;
     font-size: 11px;
+    color-scheme: dark;
+  }
+  elix-number-spin-box {
+    color: #ffffff;
+    color-scheme: dark;
   }
   </style>
   <div>
