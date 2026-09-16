@@ -736,6 +736,15 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 	min-width: 28px;
 	padding: 2px 4px;
 }
+/* Type/align icons are authored white for dark chrome — skip the global invert filter */
+.properties_text_controls .ui_icon_button img,
+#action_attributes .ui_icon_button img[src*="bold.svg"],
+#action_attributes .ui_icon_button img[src*="italic.svg"],
+#action_attributes .ui_icon_button img[src*="underline.svg"],
+#action_attributes .ui_icon_button img[src*="strikethrough.svg"],
+#action_attributes .ui_icon_button img[src*="align-"]{
+	filter: none !important;
+}
 
 /* preview */
 .canvas_preview_wrapper{

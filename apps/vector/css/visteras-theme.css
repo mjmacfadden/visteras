@@ -981,3 +981,11 @@ elix-dialog {
   background: #242424 !important;
 }
 
+
+
+/* Typography style buttons — keep icons light on dark panels */
+#slot_text_styles se-button img,
+#properties_panel #slot_text_styles img,
+#tools_top .text_panel se-button img {
+  filter: none !important;
+}
