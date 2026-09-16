@@ -1,0 +1,8 @@
+{
+    "name": "Visteras Vector",
+    "short_name": "Visteras Vector",
+    "start_url": "./",
+    "theme_color": "#1e1e1e",
+    "display": "fullscreen",
+    "background_color": "#1e1e1e"
+}

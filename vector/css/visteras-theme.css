@@ -1,0 +1,1149 @@
+/* ==========================================================================
+   Visteras Vector Theme
+   Companion Vector Graphics Editor to Visteras Studio
+   Theme Accent: Signature Vector Orange (#fa7c1b)
+   ========================================================================== */
+
+:root, .inverted-undo {
+  /* Visteras Dark Theme Neutrals */
+  --z0: #141414;
+  --z1: #1a1a1a;
+  --z2: #222222;
+  --z3: #282828;
+  --z4: #333333;
+  --z5: #8e8e8e;
+  --z6: #a0a0a0;
+  --z7: #777777;
+  --z8: #999999;
+  --z9: #aaaaaa;
+  --z10: #bbbbbb;
+  --z11: #cccccc;
+  --z12: #dddddd;
+  --z13: #eeeeee;
+  --z14: #f5f5f5;
+  --z15: #ffffff;
+
+  /* Visteras Vector Orange Accents (Illustrator companion) */
+  --accent0: #2d1607;
+  --accent1: #421e0a;
+  --accent2: #5d280d;
+  --accent3: #7e340e;
+  --accent4: #a34311;
+  --accent5: #cc5414;
+  --accent6: #e66016;
+  --accent7: #fa7c1b;
+  --accent8: #ff8c2e;
+  --accent9: #ffa14d;
+  --accent10: #ffb56e;
+  --accent11: #ffc991;
+  --accent12: #ffddb6;
+  --accent13: #ffeedb;
+  --accent14: #fff7ed;
+  --accent15: #ffffff;
+
+  --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --vector-orange: #fa7c1b;
+  --vector-orange-hover: #ff8c2e;
+  --vector-orange-active: #e06c1b;
+  --vector-orange-subtle: rgba(250, 124, 27, 0.18);
+  --vector-orange-glow: 0 0 0 2px rgba(250, 124, 27, 0.25);
+}
+
+/* ==========================================================================
+   Main Application Layout (CSS Grid)
+   ========================================================================== */
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--ui-font);
+  background-color: #1e1e1e;
+  color: #e0e0e0;
+}
+
+#method-draw.app {
+  display: grid !important;
+  grid-template-rows: 28px 38px 1fr 24px;
+  grid-template-columns: 46px 1fr 280px;
+  grid-template-areas:
+    "menu menu menu"
+    "options options options"
+    "toolbar middle panels"
+    "status status status";
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #1e1e1e;
+}
+
+/* ==========================================================================
+   1. Menu Bar (Top File Menu)
+   ========================================================================== */
+
+#menu_bar {
+  grid-area: menu;
+  position: static !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  background: #1e1e1e !important;
+  border-bottom: 1px solid #141414 !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 4px !important;
+  z-index: 1000 !important;
+  box-sizing: border-box;
+}
+
+.menu {
+  position: relative !important;
+  height: 100% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+.menu_title {
+  height: 24px !important;
+  line-height: 24px !important;
+  padding: 0 8px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #cccccc !important;
+  cursor: pointer !important;
+  transition: background 0.15s, color 0.15s !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 2px !important;
+  user-select: none;
+}
+
+.menu_title:hover,
+#menu_bar.active .menu.open .menu_title {
+  background: #333333 !important;
+  color: #ffffff !important;
+}
+
+.menu_title#logo {
+  padding: 0 6px !important;
+}
+
+.menu_title#logo img {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.menu_list {
+  position: absolute !important;
+  top: 26px !important;
+  left: 0 !important;
+  background: #252525 !important;
+  border: 1px solid #3e3e3e !important;
+  border-radius: 0 4px 4px 4px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6) !important;
+  padding: 4px 0 !important;
+  min-width: 200px !important;
+  z-index: 2000 !important;
+}
+
+.menu_list .menu_item {
+  font-size: 12px !important;
+  color: #d0d0d0 !important;
+  padding: 5px 16px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  user-select: none;
+  line-height: 1.4 !important;
+}
+
+.menu_list .menu_item:hover:not(.disabled) {
+  background: var(--vector-orange) !important;
+  color: #ffffff !important;
+}
+
+.menu_list .menu_item.disabled {
+  color: #666666 !important;
+  cursor: default !important;
+}
+
+.menu_list .separator {
+  border-top: 1px solid #353535 !important;
+  margin: 4px 0 !important;
+}
+
+.menu_list .shortcut {
+  color: #888888 !important;
+  font-size: 11px !important;
+  margin-left: 24px !important;
+  font-family: var(--mono-font);
+}
+
+.menu_list .menu_item:hover:not(.disabled) .shortcut {
+  color: #ffffff !important;
+}
+
+.menu-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 6px;
+}
+
+.visteras_switch_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaaaaa;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #292929;
+  border: 1px solid #383838;
+  transition: all 0.15s;
+}
+
+.visteras_switch_btn:hover {
+  background: #333333;
+  color: #ffffff;
+  border-color: #555555;
+}
+
+.visteras_switch_btn .visteras_badge {
+  color: #2a85ff;
+  font-weight: 800;
+}
+
+.menu-icon {
+  background: transparent !important;
+  border: none !important;
+  color: #999999 !important;
+  padding: 3px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  border-radius: 3px !important;
+  transition: all 0.15s !important;
+}
+
+.menu-icon:hover {
+  background: #333333 !important;
+  color: #ffffff !important;
+}
+
+.menu-icon svg {
+  fill: currentColor;
+}
+
+/* ==========================================================================
+   2. Options Bar (Submenu Beneath Menu Bar)
+   ========================================================================== */
+
+#options_bar.submenu {
+  grid-area: options;
+  position: static !important;
+  height: 38px !important;
+  background-color: #2b2b2b !important;
+  border-bottom: 1px solid #1a1a1a !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 10px !important;
+  z-index: 500 !important;
+  box-sizing: border-box;
+}
+
+.options_bar_left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.options_bar_left .logo {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  gap: 8px;
+  text-decoration: none;
+  user-select: none;
+}
+
+.options_bar_left .logo img {
+  height: 22px;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.options_bar_left .logo_text {
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.options_bar_left .logo_bold {
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.options_bar_left .logo_light {
+  font-weight: 700;
+  color: var(--vector-orange);
+  margin-left: 4px;
+}
+
+.options_divider {
+  width: 1px;
+  height: 20px;
+  background: #3a3a3a;
+  margin: 0 6px;
+}
+
+.options_actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.options_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.options_btn:hover {
+  background: #383838;
+  border-color: #4a4a4a;
+  color: #ffffff;
+}
+
+.options_btn:active {
+  background: #202020;
+}
+
+.options_btn img, .options_btn svg {
+  width: 14px;
+  height: 14px;
+  filter: invert(0.8);
+}
+
+.options_btn:hover img, .options_btn:hover svg {
+  filter: invert(1);
+}
+
+.options_bar_center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  margin: 0 16px;
+  overflow: hidden;
+}
+
+.options_quick_stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #aaaaaa;
+}
+
+.options_quick_stat span.val {
+  color: #ffffff;
+  font-weight: 600;
+  font-family: var(--mono-font);
+}
+
+.options_bar_right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header_zoom_control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #202020;
+  border: 1px solid #383838;
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+.header_zoom_control select {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono-font);
+  outline: none;
+  cursor: pointer;
+}
+
+.header_zoom_control select option {
+  background: #252525;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   3. Left Toolbar (Sidebar Left)
+   ========================================================================== */
+
+#tools_left {
+  grid-area: toolbar;
+  position: static !important;
+  width: 46px !important;
+  height: 100% !important;
+  background-color: #222222 !important;
+  border-right: 1px solid #1a1a1a !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 6px 0 !important;
+  gap: 4px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  z-index: 100 !important;
+  box-sizing: border-box;
+}
+
+.tool_button {
+  width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  line-height: 34px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  color: #aaaaaa !important;
+  transition: background 0.15s, color 0.15s, transform 0.15s !important;
+  transform: none !important;
+  position: relative !important;
+  user-select: none;
+}
+
+.tool_button svg {
+  width: 18px !important;
+  height: 18px !important;
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  transition: all 0.15s !important;
+}
+
+.tool_button:hover {
+  background: #333333 !important;
+  color: #ffffff !important;
+  transform: none !important;
+}
+
+.tool_button:hover svg {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.tool_button.current {
+  background: #30261e !important;
+  color: var(--vector-orange) !important;
+  box-shadow: inset 0 0 0 1px var(--vector-orange) !important;
+  transform: none !important;
+}
+
+.tool_button.current svg {
+  fill: var(--vector-orange) !important;
+  stroke: var(--vector-orange) !important;
+}
+
+.toolbar_spacer {
+  flex: 1;
+}
+
+/* Color Tools (Fill & Stroke Swatches) */
+.color_tools_container {
+  margin-top: auto;
+  margin-bottom: 6px;
+  position: relative;
+  width: 36px;
+  height: 48px;
+}
+
+#tool_switch {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaaaaa;
+  transition: color 0.15s;
+}
+
+#tool_switch:hover {
+  color: var(--vector-orange);
+}
+
+#tool_switch svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+#tool_fill {
+  position: absolute;
+  top: 6px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  z-index: 2;
+  border: 1px solid #1a1a1a;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+#tool_fill.active {
+  z-index: 4;
+  border-color: var(--vector-orange);
+  box-shadow: 0 0 0 1.5px var(--vector-orange);
+}
+
+#tool_stroke {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  z-index: 1;
+  border: 1px solid #1a1a1a;
+  border-radius: 3px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  background: #000000;
+  overflow: hidden;
+}
+
+#tool_stroke.active {
+  z-index: 4;
+  border-color: var(--vector-orange);
+  box-shadow: 0 0 0 1.5px var(--vector-orange);
+}
+
+.color_block {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==========================================================================
+   4. Middle Area (Artboard & Rulers)
+   ========================================================================== */
+
+#middle_area {
+  grid-area: middle;
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  background-color: #303030 !important;
+}
+
+#rulers {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  z-index: 20 !important;
+}
+
+#rulers > div {
+  pointer-events: auto !important;
+  position: absolute !important;
+  background: #252525 !important;
+  overflow: hidden !important;
+}
+
+#ruler_corner {
+  top: 0 !important;
+  left: 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  background: #202020 !important;
+  border-right: 1px solid #1a1a1a !important;
+  border-bottom: 1px solid #1a1a1a !important;
+  z-index: 25 !important;
+  border-radius: 0 !important;
+}
+
+#ruler_x {
+  top: 0 !important;
+  left: 16px !important;
+  right: 0 !important;
+  height: 16px !important;
+  border-bottom: 1px solid #1a1a1a !important;
+  z-index: 22 !important;
+  border-radius: 0 !important;
+}
+
+#ruler_y {
+  top: 16px !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 16px !important;
+  border-right: 1px solid #1a1a1a !important;
+  z-index: 22 !important;
+  border-radius: 0 !important;
+}
+
+#workarea {
+  position: absolute !important;
+  top: 16px !important;
+  left: 16px !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: auto !important;
+  background-color: #333333 !important;
+  z-index: 10 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#svgcanvas {
+  background-color: transparent !important;
+}
+
+#canvasBackground {
+  filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5)) !important;
+}
+
+/* ==========================================================================
+   5. Right Sidebar (Inspector Panels)
+   ========================================================================== */
+
+#panels {
+  grid-area: panels;
+  position: static !important;
+  width: 280px !important;
+  height: 100% !important;
+  background-color: #252525 !important;
+  border-left: 1px solid #1a1a1a !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 8px !important;
+  box-sizing: border-box !important;
+  z-index: 50 !important;
+}
+
+.context_panel {
+  background-color: #2b2b2b !important;
+  border: 1px solid #1a1a1a !important;
+  border-radius: 4px !important;
+  margin-bottom: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.context_panel h4 {
+  padding: 6px 10px !important;
+  margin: 0 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  background-color: #222222 !important;
+  border-bottom: 1px solid #1a1a1a !important;
+  color: #e0e0e0 !important;
+}
+
+.context_panel .draginputs {
+  padding: 8px !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px 8px !important;
+}
+
+.context_panel .draginputs .twocol {
+  grid-column: 1 / -1 !important;
+}
+
+.context_panel label.draginput,
+.context_panel .draginput {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  font-size: 11px !important;
+  color: #aaaaaa !important;
+  margin: 0 !important;
+}
+
+.context_panel input[type="text"],
+.context_panel input[type="number"],
+.context_panel select {
+  background: #181818 !important;
+  border: 1px solid #383838 !important;
+  border-radius: 3px !important;
+  color: #ffffff !important;
+  padding: 4px 6px !important;
+  font-size: 12px !important;
+  font-family: inherit !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+.context_panel input:focus,
+.context_panel select:focus {
+  border-color: var(--vector-orange) !important;
+  box-shadow: var(--vector-orange-glow) !important;
+}
+
+.context_panel .button {
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 3px !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  padding: 6px 10px !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  transition: background 0.15s, border-color 0.15s !important;
+  margin: 4px 8px 8px 8px !important;
+}
+
+.context_panel .button:hover {
+  background: #3e3e3e !important;
+  border-color: #555555 !important;
+}
+
+.context_panel .button:active {
+  background: #202020 !important;
+}
+
+/* Alignment Buttons */
+.align_buttons {
+  display: grid !important;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 4px !important;
+  padding: 6px 8px 8px !important;
+}
+
+.align_button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 28px !important;
+  background: #202020 !important;
+  border: 1px solid #383838 !important;
+  border-radius: 3px !important;
+  cursor: pointer !important;
+  transition: background 0.15s, border-color 0.15s !important;
+}
+
+.align_button:hover {
+  background: #333333 !important;
+  border-color: var(--vector-orange) !important;
+}
+
+.align_button svg path {
+  fill: #cccccc !important;
+}
+
+.align_button:hover svg path {
+  fill: #ffffff !important;
+}
+
+/* ==========================================================================
+   6. Bottom Status Bar
+   ========================================================================== */
+
+#tools_bottom {
+  grid-area: status;
+  position: static !important;
+  height: 24px !important;
+  background-color: #1e1e1e !important;
+  border-top: 1px solid #141414 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 10px !important;
+  font-size: 11px !important;
+  color: #888888 !important;
+  z-index: 1000 !important;
+  box-sizing: border-box;
+}
+
+.status_left_info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status_palette_container {
+  display: flex;
+  align-items: center;
+}
+
+#palette {
+  position: static !important;
+  display: flex !important;
+  height: 14px !important;
+  width: auto !important;
+  gap: 2px !important;
+}
+
+.palette_item {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 2px !important;
+  border: 1px solid rgba(0,0,0,0.3) !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  transition: transform 0.1s !important;
+}
+
+.palette_item:hover {
+  transform: scale(1.3) !important;
+  z-index: 10 !important;
+}
+
+.status_right_info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status_app_title {
+  color: #666666;
+  font-weight: 500;
+}
+
+.status_app_title span {
+  color: var(--vector-orange);
+  font-weight: 700;
+}
+
+/* Selection / Bounding Box Accent Color */
+.selectorLine,
+#selectorRubberBand,
+#workarea svg #selectorRubberBand {
+  stroke: var(--vector-orange) !important;
+}
+
+.grip,
+#workarea .grip {
+  fill: var(--vector-orange) !important;
+  stroke: #ffffff !important;
+  stroke-width: 1px !important;
+}
+
+/* ==========================================================================
+   7. Modals, Dialogs, Color Picker, and Popups
+   ========================================================================== */
+
+/* Core Modal Backdrop & Window */
+.modal {
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 10000 !important;
+}
+
+.modal-item {
+  background: #242424 !important;
+  color: #eeeeee !important;
+  border: 1px solid #3c3c3c !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75) !important;
+  font-family: var(--ui-font) !important;
+}
+
+.modal-item h1 {
+  color: #ffffff !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  margin-top: 0 !important;
+  margin-bottom: 14px !important;
+  padding-bottom: 8px !important;
+  border-bottom: 1px solid #333333 !important;
+}
+
+.modal-item p {
+  color: #cccccc !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.modal-item a {
+  color: var(--vector-orange) !important;
+  text-decoration: none !important;
+}
+
+.modal-item a:hover {
+  text-decoration: underline !important;
+}
+
+.modal-item button,
+.modal-item input[type="button"],
+.modal-item input[type="submit"] {
+  background: #333333 !important;
+  border: 1px solid #484848 !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+  padding: 6px 14px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s !important;
+}
+
+.modal-item button:hover {
+  background: #404040 !important;
+  border-color: #585858 !important;
+}
+
+.modal-item button.ok,
+.modal-item button.primary {
+  background: var(--vector-orange) !important;
+  border-color: var(--vector-orange-active) !important;
+  color: #ffffff !important;
+}
+
+.modal-item button.ok:hover,
+.modal-item button.primary:hover {
+  background: var(--vector-orange-hover) !important;
+}
+
+.modal-item button.warning {
+  background: #992222 !important;
+  border-color: #bb3333 !important;
+  color: #ffffff !important;
+}
+
+.modal-item button.warning:hover {
+  background: #bb3333 !important;
+}
+
+/* Keyboard Shortcuts Modal */
+.shortcut-key {
+  color: #ffffff !important;
+  background: #333333 !important;
+  border: 1px solid #4a4a4a !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+}
+
+.shortcut-name {
+  color: #cccccc !important;
+  font-size: 12px !important;
+}
+
+/* Source Code Modal */
+#svg_source_editor {
+  background: #1e1e1e !important;
+  color: #ffffff !important;
+}
+
+#svg_source_textarea {
+  background: #141414 !important;
+  color: #5eead4 !important;
+  border: 1px solid #333333 !important;
+  border-radius: 4px !important;
+  font-family: var(--mono-font) !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  padding: 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Dialog Box Alert/Prompt */
+#dialog_box_overlay {
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(2px) !important;
+  z-index: 50000 !important;
+}
+
+#dialog_container {
+  background: #252525 !important;
+  border: 1px solid #3e3e3e !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+  color: #ffffff !important;
+  z-index: 50001 !important;
+}
+
+#dialog_content {
+  color: #dddddd !important;
+}
+
+#dialog_content h4 {
+  color: #ffffff !important;
+}
+
+#dialog_content input {
+  background: #161616 !important;
+  border: 1px solid #3e3e3e !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+}
+
+#dialog_content input:focus {
+  border-color: var(--vector-orange) !important;
+  box-shadow: var(--vector-orange-glow) !important;
+}
+
+#dialog_buttons input {
+  background: #333333 !important;
+  border: 1px solid #4a4a4a !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+  padding: 6px 14px !important;
+  cursor: pointer !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  transition: all 0.15s !important;
+}
+
+#dialog_buttons input:hover {
+  background: #404040 !important;
+  border-color: #5a5a5a !important;
+}
+
+#dialog_buttons input:first-child {
+  background: var(--vector-orange) !important;
+  border-color: var(--vector-orange-active) !important;
+}
+
+#dialog_buttons input:first-child:hover {
+  background: var(--vector-orange-hover) !important;
+}
+
+/* Shape Library Flyout */
+.tools_flyout {
+  background: #252525 !important;
+  border: 1px solid #3e3e3e !important;
+  border-radius: 6px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+#shape_cats {
+  background: #1c1c1c !important;
+  border-right: 1px solid #303030 !important;
+}
+
+#shape_cats > div {
+  background: #1c1c1c !important;
+  color: #aaaaaa !important;
+  font-size: 12px !important;
+}
+
+#shape_cats div:hover {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+#shape_cats div.current {
+  background: var(--vector-orange) !important;
+  color: #ffffff !important;
+}
+
+#shape_buttons {
+  background: #252525 !important;
+}
+
+.tools_flyout .tool_button {
+  background-color: #2e2e2e !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 4px !important;
+}
+
+.tools_flyout .tool_button:hover {
+  background-color: #3e3e3e !important;
+  border-color: var(--vector-orange) !important;
+}
+
+.tools_flyout .tool_button svg {
+  fill: #cccccc !important;
+}
+
+.tools_flyout .tool_button:hover svg {
+  fill: #ffffff !important;
+}
+
+/* Color Picker Popup */
+#color_picker {
+  background: #252525 !important;
+  border: 1px solid #3e3e3e !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+  color: #cccccc !important;
+}
+
+.jPicker .Move {
+  background-color: #1e1e1e !important;
+  border-color: #333333 !important;
+}
+
+.jPicker td.Text span {
+  color: #aaaaaa !important;
+}
+
+#color_picker input[type="text"],
+#color_picker input[type="number"] {
+  background: #161616 !important;
+  border: 1px solid #3a3a3a !important;
+  color: #ffffff !important;
+}
+
+#color_picker .jPicker .Button input {
+  background: #333333 !important;
+  border: 1px solid #4a4a4a !important;
+  color: #ffffff !important;
+  border-radius: 4px !important;
+  padding: 4px 10px !important;
+}
+
+#color_picker .jPicker .Button input:hover {
+  background: #404040 !important;
+  border-color: #555555 !important;
+}
+
+#color_picker .jPicker .Button input.Ok {
+  background: var(--vector-orange) !important;
+  border-color: var(--vector-orange-active) !important;
+}
+
+#color_picker .jPicker .Button input.Ok:hover {
+  background: var(--vector-orange-hover) !important;
+}
+
