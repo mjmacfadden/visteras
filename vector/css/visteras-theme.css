@@ -1,52 +1,81 @@
 /* ==========================================================================
    Visteras Vector Theme
    Companion Vector Graphics Editor to Visteras Studio
-   Theme Accent: Signature Vector Orange (#fa7c1b)
+   Theme: Exact Visteras Studio Dark Theme & Color Scheme
    ========================================================================== */
 
 :root, .inverted-undo {
-  /* Visteras Dark Theme Neutrals */
+  /* Visteras Studio Dark Theme Neutrals */
+  --menu-background-color: #333333;
+  --section-background-color: #3c3c3c;
+  --area-background-color: #262626;
+  --block-background-color: #2d2d2d;
+  --header-background-color: #1e1e1e;
+
+  --menu-dropdown-background-color: #3c3c3c;
+  --menu-dropdown-border-color: #505050;
+  --menu-dropdown-text-color: #cccccc;
+  --menu-dropdown-text-muted-color: #888888;
+  --menu-dropdown-hover-background-color: #2a6bb5;
+  --menu-dropdown-hover-text-color: #ffffff;
+  --menu-dropdown-divider-color: #505050;
+
+  --button-background-color: #3c3c3c;
+  --button-background-color-hover: #505050;
+  --button-background-color-active: #383838;
+  --button-text-color-active: #ffffff;
+  --button-border-radius: 2px;
+
+  --input-background-color: #1e1e1e;
+  --input-background-color-hover: #2a2a2a;
+  --input-text-color: #cccccc;
+  --input-border-color: #4a4a4a;
+  --input-border-color-active: #4a9eff;
+  --input-border-radius: 2px;
+
+  /* Studio Accent Colors */
+  --studio-blue: #2a6bb5;
+  --studio-blue-light: #4a9eff;
+  --studio-blue-hover: #3780d6;
+  --studio-blue-glow: 0 0 0 2px rgba(74, 158, 255, 0.3);
+
+  /* Method-Draw Scale Variables mapped to Studio Dark */
   --z0: #141414;
-  --z1: #1a1a1a;
-  --z2: #222222;
-  --z3: #282828;
+  --z1: #1e1e1e;
+  --z2: #262626;
+  --z3: #2d2d2d;
   --z4: #333333;
-  --z5: #8e8e8e;
-  --z6: #a0a0a0;
-  --z7: #777777;
-  --z8: #999999;
-  --z9: #aaaaaa;
-  --z10: #bbbbbb;
-  --z11: #cccccc;
-  --z12: #dddddd;
-  --z13: #eeeeee;
-  --z14: #f5f5f5;
+  --z5: #888888;
+  --z6: #aaaaaa;
+  --z7: #bbbbbb;
+  --z8: #cccccc;
+  --z9: #dddddd;
+  --z10: #e0e0e0;
+  --z11: #eaeaea;
+  --z12: #f0f0f0;
+  --z13: #f5f5f5;
+  --z14: #f8f8f8;
   --z15: #ffffff;
 
-  /* Visteras Vector Orange Accents (Illustrator companion) */
-  --accent0: #2d1607;
-  --accent1: #421e0a;
-  --accent2: #5d280d;
-  --accent3: #7e340e;
-  --accent4: #a34311;
-  --accent5: #cc5414;
-  --accent6: #e66016;
-  --accent7: #fa7c1b;
-  --accent8: #ff8c2e;
-  --accent9: #ffa14d;
-  --accent10: #ffb56e;
-  --accent11: #ffc991;
-  --accent12: #ffddb6;
-  --accent13: #ffeedb;
-  --accent14: #fff7ed;
+  --accent0: #0f243a;
+  --accent1: #153250;
+  --accent2: #1b426b;
+  --accent3: #205387;
+  --accent4: #2565a5;
+  --accent5: #2a77c4;
+  --accent6: #2a6bb5;
+  --accent7: #4a9eff;
+  --accent8: #66adff;
+  --accent9: #82bcff;
+  --accent10: #9ecbff;
+  --accent11: #bad9ff;
+  --accent12: #d6e8ff;
+  --accent13: #edf4ff;
+  --accent14: #f7faff;
   --accent15: #ffffff;
 
   --ui-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --vector-orange: #fa7c1b;
-  --vector-orange-hover: #ff8c2e;
-  --vector-orange-active: #e06c1b;
-  --vector-orange-subtle: rgba(250, 124, 27, 0.18);
-  --vector-orange-glow: 0 0 0 2px rgba(250, 124, 27, 0.25);
+  --mono-font: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", monospace;
 }
 
 /* ==========================================================================
@@ -60,14 +89,14 @@ html, body {
   padding: 0;
   overflow: hidden;
   font-family: var(--ui-font);
-  background-color: #1e1e1e;
-  color: #e0e0e0;
+  background-color: #262626;
+  color: #cccccc;
 }
 
 #method-draw.app {
   display: grid !important;
   grid-template-rows: 28px 38px 1fr 24px;
-  grid-template-columns: 46px 1fr 280px;
+  grid-template-columns: 36px 1fr 260px;
   grid-template-areas:
     "menu menu menu"
     "options options options"
@@ -78,11 +107,11 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #1e1e1e;
+  background-color: #262626;
 }
 
 /* ==========================================================================
-   1. Menu Bar (Top File Menu)
+   1. Menu Bar (Top File Menu) - Styled like Studio .main_menu
    ========================================================================== */
 
 #menu_bar {
@@ -90,12 +119,12 @@ html, body {
   position: static !important;
   height: 28px !important;
   line-height: 28px !important;
-  background: #1e1e1e !important;
-  border-bottom: 1px solid #141414 !important;
+  background: #333333 !important;
+  border-bottom: 1px solid #222222 !important;
   display: flex !important;
   align-items: center !important;
-  padding: 0 4px !important;
-  z-index: 1000 !important;
+  padding: 0 4px 0 8px !important;
+  z-index: 3000 !important;
   box-sizing: border-box;
 }
 
@@ -107,63 +136,65 @@ html, body {
 }
 
 .menu_title {
-  height: 24px !important;
-  line-height: 24px !important;
+  height: 28px !important;
+  line-height: 28px !important;
   padding: 0 8px !important;
   font-size: 11px !important;
   font-weight: 500 !important;
   color: #cccccc !important;
   cursor: pointer !important;
-  transition: background 0.15s, color 0.15s !important;
+  transition: background 0.12s, color 0.12s !important;
   display: flex !important;
   align-items: center !important;
-  border-radius: 2px !important;
+  border-radius: 0 !important;
   user-select: none;
 }
 
-.menu_title:hover,
-#menu_bar.active .menu.open .menu_title {
-  background: #333333 !important;
+.menu_title:hover {
+  background: #505050 !important;
   color: #ffffff !important;
 }
 
-.menu_title#logo {
-  padding: 0 6px !important;
+#menu_bar.active .menu.open .menu_title {
+  background: #2a6bb5 !important;
+  color: #ffffff !important;
 }
 
-.menu_title#logo img {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-
+/* Menu Dropdown - Must be hidden unless opened */
 .menu_list {
+  display: none !important;
   position: absolute !important;
-  top: 26px !important;
+  top: 28px !important;
   left: 0 !important;
-  background: #252525 !important;
-  border: 1px solid #3e3e3e !important;
-  border-radius: 0 4px 4px 4px !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6) !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
   padding: 4px 0 !important;
-  min-width: 200px !important;
-  z-index: 2000 !important;
+  min-width: 180px !important;
+  z-index: 3001 !important;
+}
+
+#menu_bar.active .menu.open > .menu_list {
+  display: block !important;
 }
 
 .menu_list .menu_item {
-  font-size: 12px !important;
-  color: #d0d0d0 !important;
-  padding: 5px 16px !important;
+  font-size: 11px !important;
+  color: #cccccc !important;
+  padding: 3px 16px !important;
+  line-height: 20px !important;
   display: flex !important;
   justify-content: space-between !important;
   align-items: center !important;
   cursor: pointer !important;
   user-select: none;
-  line-height: 1.4 !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
 }
 
 .menu_list .menu_item:hover:not(.disabled) {
-  background: var(--vector-orange) !important;
+  background: #2a6bb5 !important;
   color: #ffffff !important;
 }
 
@@ -173,15 +204,17 @@ html, body {
 }
 
 .menu_list .separator {
-  border-top: 1px solid #353535 !important;
+  border: none !important;
+  border-top: 1px solid #505050 !important;
   margin: 4px 0 !important;
+  height: 0 !important;
 }
 
 .menu_list .shortcut {
   color: #888888 !important;
-  font-size: 11px !important;
-  margin-left: 24px !important;
-  font-family: var(--mono-font);
+  font-size: 10px !important;
+  margin-left: 20px !important;
+  font-family: inherit !important;
 }
 
 .menu_list .menu_item:hover:not(.disabled) .shortcut {
@@ -205,7 +238,7 @@ html, body {
   font-weight: 600;
   color: #aaaaaa;
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: 2px;
   background: #292929;
   border: 1px solid #383838;
   transition: all 0.15s;
@@ -218,7 +251,7 @@ html, body {
 }
 
 .visteras_switch_btn .visteras_badge {
-  color: #2a85ff;
+  color: #4a9eff;
   font-weight: 800;
 }
 
@@ -230,12 +263,12 @@ html, body {
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
-  border-radius: 3px !important;
+  border-radius: 2px !important;
   transition: all 0.15s !important;
 }
 
 .menu-icon:hover {
-  background: #333333 !important;
+  background: #505050 !important;
   color: #ffffff !important;
 }
 
@@ -244,19 +277,19 @@ html, body {
 }
 
 /* ==========================================================================
-   2. Options Bar (Submenu Beneath Menu Bar)
+   2. Options Bar (Submenu Beneath Menu Bar) - Styled like Studio .submenu
    ========================================================================== */
 
 #options_bar.submenu {
   grid-area: options;
   position: static !important;
   height: 38px !important;
-  background-color: #2b2b2b !important;
+  background-color: #2d2d2d !important;
   border-bottom: 1px solid #1a1a1a !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 0 10px !important;
+  padding: 0 8px !important;
   z-index: 500 !important;
   box-sizing: border-box;
 }
@@ -267,80 +300,94 @@ html, body {
   gap: 8px;
 }
 
+/* Logo in Options Bar - Identical to Studio .logo */
 .options_bar_left .logo {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  height: 28px;
-  gap: 8px;
+  height: 36px;
+  width: auto;
+  padding: 1px 8px;
+  margin: 0 4px;
+  font-size: 13px;
   text-decoration: none;
-  user-select: none;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 1px;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .options_bar_left .logo img {
-  height: 22px;
+  height: 26px;
+  max-height: 100%;
   width: auto;
+  vertical-align: middle;
   flex-shrink: 0;
 }
 
-.options_bar_left .logo_text {
+.options_bar_left .logo .logo_text {
+  color: #ffffff;
   font-size: 13px;
   letter-spacing: 1px;
   text-transform: uppercase;
+  white-space: nowrap;
   line-height: 1;
 }
 
-.options_bar_left .logo_bold {
-  font-weight: 800;
-  color: #ffffff;
+.options_bar_left .logo .logo_bold {
+  font-weight: 700;
 }
 
-.options_bar_left .logo_light {
-  font-weight: 700;
-  color: var(--vector-orange);
+.options_bar_left .logo .logo_light {
+  font-weight: 100;
+  opacity: 0.6;
+  color: #ffffff;
   margin-left: 4px;
 }
 
 .options_divider {
   width: 1px;
   height: 20px;
-  background: #3a3a3a;
+  background: #3c3c3c;
   margin: 0 6px;
 }
 
 .options_actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
 }
 
 .options_btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  background: #3c3c3c;
+  border: 1px solid #505050;
+  border-radius: 2px;
   color: #cccccc;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .options_btn:hover {
-  background: #383838;
-  border-color: #4a4a4a;
+  background: #505050;
+  border-color: #666666;
   color: #ffffff;
 }
 
 .options_btn:active {
-  background: #202020;
+  background: #242424;
 }
 
 .options_btn img, .options_btn svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   filter: invert(0.8);
 }
 
@@ -362,7 +409,7 @@ html, body {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #aaaaaa;
+  color: #999999;
 }
 
 .options_quick_stat span.val {
@@ -380,17 +427,16 @@ html, body {
 .header_zoom_control {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: #202020;
-  border: 1px solid #383838;
-  border-radius: 3px;
-  padding: 2px 6px;
+  background: #1e1e1e;
+  border: 1px solid #4a4a4a;
+  border-radius: 2px;
+  padding: 2px 4px;
 }
 
 .header_zoom_control select {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: #cccccc;
   font-size: 11px;
   font-weight: 600;
   font-family: var(--mono-font);
@@ -398,27 +444,33 @@ html, body {
   cursor: pointer;
 }
 
+.header_zoom_control select:focus {
+  outline: none;
+}
+
 .header_zoom_control select option {
-  background: #252525;
+  background: #2d2d2d;
   color: #ffffff;
 }
 
 /* ==========================================================================
-   3. Left Toolbar (Sidebar Left)
+   3. Left Toolbar (Sidebar Left) - Styled like Studio .sidebar_left
    ========================================================================== */
 
 #tools_left {
   grid-area: toolbar;
   position: static !important;
-  width: 46px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
   height: 100% !important;
-  background-color: #222222 !important;
-  border-right: 1px solid #1a1a1a !important;
+  background-color: #3c3c3c !important;
+  border-right: 1px solid #2a2a2a !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  padding: 6px 0 !important;
-  gap: 4px !important;
+  padding: 4px 0 !important;
+  gap: 2px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   z-index: 100 !important;
@@ -426,33 +478,35 @@ html, body {
 }
 
 .tool_button {
-  width: 34px !important;
-  height: 34px !important;
-  min-height: 34px !important;
-  line-height: 34px !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  line-height: 26px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 4px !important;
+  border-radius: 2px !important;
   cursor: pointer !important;
   background: transparent !important;
-  color: #aaaaaa !important;
-  transition: background 0.15s, color 0.15s, transform 0.15s !important;
+  color: #cccccc !important;
+  border: none !important;
+  transition: background 0.12s, color 0.12s !important;
   transform: none !important;
   position: relative !important;
   user-select: none;
+  margin: 1px auto !important;
 }
 
 .tool_button svg {
-  width: 18px !important;
-  height: 18px !important;
-  fill: currentColor !important;
-  stroke: currentColor !important;
-  transition: all 0.15s !important;
+  width: 16px !important;
+  height: 16px !important;
+  fill: #cccccc !important;
+  stroke: #cccccc !important;
+  transition: all 0.12s !important;
 }
 
 .tool_button:hover {
-  background: #333333 !important;
+  background-color: #505050 !important;
   color: #ffffff !important;
   transform: none !important;
 }
@@ -462,16 +516,28 @@ html, body {
   stroke: #ffffff !important;
 }
 
-.tool_button.current {
-  background: #30261e !important;
-  color: var(--vector-orange) !important;
-  box-shadow: inset 0 0 0 1px var(--vector-orange) !important;
+/* Active / Selected tool - Matching Studio .sidebar_left .item.active */
+.tool_button.current,
+.tool_button.active,
+.tool_button.push_button_pressed {
+  background-color: #242424 !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05) !important;
+  color: #ffffff !important;
+  border: none !important;
   transform: none !important;
 }
 
-.tool_button.current svg {
-  fill: var(--vector-orange) !important;
-  stroke: var(--vector-orange) !important;
+.tool_button.current:hover,
+.tool_button.active:hover,
+.tool_button.push_button_pressed:hover {
+  background-color: #1e1e1e !important;
+}
+
+.tool_button.current svg,
+.tool_button.active svg,
+.tool_button.push_button_pressed svg {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 .toolbar_spacer {
@@ -483,16 +549,16 @@ html, body {
   margin-top: auto;
   margin-bottom: 6px;
   position: relative;
-  width: 36px;
-  height: 48px;
+  width: 32px;
+  height: 42px;
 }
 
 #tool_switch {
   position: absolute;
   top: 0;
   right: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   cursor: pointer;
   z-index: 10;
   display: flex;
@@ -503,25 +569,25 @@ html, body {
 }
 
 #tool_switch:hover {
-  color: var(--vector-orange);
+  color: #ffffff;
 }
 
 #tool_switch svg {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   fill: currentColor;
 }
 
 #tool_fill {
   position: absolute;
-  top: 6px;
+  top: 4px;
   left: 2px;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   z-index: 2;
   border: 1px solid #1a1a1a;
-  border-radius: 3px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   background: #ffffff;
   overflow: hidden;
@@ -529,20 +595,20 @@ html, body {
 
 #tool_fill.active {
   z-index: 4;
-  border-color: var(--vector-orange);
-  box-shadow: 0 0 0 1.5px var(--vector-orange);
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 1.5px #4a9eff;
 }
 
 #tool_stroke {
   position: absolute;
   bottom: 2px;
   right: 2px;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   z-index: 1;
   border: 1px solid #1a1a1a;
-  border-radius: 3px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   cursor: pointer;
   background: #000000;
   overflow: hidden;
@@ -550,8 +616,8 @@ html, body {
 
 #tool_stroke.active {
   z-index: 4;
-  border-color: var(--vector-orange);
-  box-shadow: 0 0 0 1.5px var(--vector-orange);
+  border-color: #4a9eff;
+  box-shadow: 0 0 0 1.5px #4a9eff;
 }
 
 .color_block {
@@ -560,7 +626,7 @@ html, body {
 }
 
 /* ==========================================================================
-   4. Middle Area (Artboard & Rulers)
+   4. Middle Area (Artboard & Rulers) - Styled like Studio Workspace
    ========================================================================== */
 
 #middle_area {
@@ -569,7 +635,7 @@ html, body {
   width: 100% !important;
   height: 100% !important;
   overflow: hidden !important;
-  background-color: #303030 !important;
+  background-color: #262626 !important;
 }
 
 #rulers {
@@ -585,7 +651,7 @@ html, body {
 #rulers > div {
   pointer-events: auto !important;
   position: absolute !important;
-  background: #252525 !important;
+  background: #333333 !important;
   overflow: hidden !important;
 }
 
@@ -594,9 +660,9 @@ html, body {
   left: 0 !important;
   width: 16px !important;
   height: 16px !important;
-  background: #202020 !important;
-  border-right: 1px solid #1a1a1a !important;
-  border-bottom: 1px solid #1a1a1a !important;
+  background: #2b2b2b !important;
+  border-right: 1px solid #222222 !important;
+  border-bottom: 1px solid #222222 !important;
   z-index: 25 !important;
   border-radius: 0 !important;
 }
@@ -606,7 +672,7 @@ html, body {
   left: 16px !important;
   right: 0 !important;
   height: 16px !important;
-  border-bottom: 1px solid #1a1a1a !important;
+  border-bottom: 1px solid #222222 !important;
   z-index: 22 !important;
   border-radius: 0 !important;
 }
@@ -616,7 +682,7 @@ html, body {
   left: 0 !important;
   bottom: 0 !important;
   width: 16px !important;
-  border-right: 1px solid #1a1a1a !important;
+  border-right: 1px solid #222222 !important;
   z-index: 22 !important;
   border-radius: 0 !important;
 }
@@ -628,7 +694,7 @@ html, body {
   right: 0 !important;
   bottom: 0 !important;
   overflow: auto !important;
-  background-color: #333333 !important;
+  background-color: #262626 !important;
   z-index: 10 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -643,46 +709,46 @@ html, body {
 }
 
 /* ==========================================================================
-   5. Right Sidebar (Inspector Panels)
+   5. Right Sidebar (Inspector Panels) - Styled like Studio .sidebar_right
    ========================================================================== */
 
 #panels {
   grid-area: panels;
   position: static !important;
-  width: 280px !important;
+  width: 260px !important;
   height: 100% !important;
-  background-color: #252525 !important;
-  border-left: 1px solid #1a1a1a !important;
+  background-color: #3c3c3c !important;
+  border-left: 1px solid #2a2a2a !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  padding: 8px !important;
+  padding: 6px !important;
   box-sizing: border-box !important;
   z-index: 50 !important;
 }
 
 .context_panel {
-  background-color: #2b2b2b !important;
-  border: 1px solid #1a1a1a !important;
-  border-radius: 4px !important;
-  margin-bottom: 8px !important;
+  background-color: #2d2d2d !important;
+  border: 1px solid #383838 !important;
+  border-radius: 2px !important;
+  margin-bottom: 6px !important;
   overflow: hidden !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
 }
 
 .context_panel h4 {
-  padding: 6px 10px !important;
+  padding: 5px 8px !important;
   margin: 0 !important;
   font-size: 11px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  background-color: #222222 !important;
-  border-bottom: 1px solid #1a1a1a !important;
-  color: #e0e0e0 !important;
+  background-color: #333333 !important;
+  border-bottom: 1px solid #222222 !important;
+  color: #cccccc !important;
 }
 
 .context_panel .draginputs {
-  padding: 8px !important;
+  padding: 6px 8px !important;
   display: grid !important;
   grid-template-columns: 1fr 1fr !important;
   gap: 6px 8px !important;
@@ -698,19 +764,19 @@ html, body {
   flex-direction: column !important;
   gap: 3px !important;
   font-size: 11px !important;
-  color: #aaaaaa !important;
+  color: #999999 !important;
   margin: 0 !important;
 }
 
 .context_panel input[type="text"],
 .context_panel input[type="number"],
 .context_panel select {
-  background: #181818 !important;
-  border: 1px solid #383838 !important;
-  border-radius: 3px !important;
-  color: #ffffff !important;
-  padding: 4px 6px !important;
-  font-size: 12px !important;
+  background: #1e1e1e !important;
+  border: 1px solid #4a4a4a !important;
+  border-radius: 2px !important;
+  color: #cccccc !important;
+  padding: 3px 6px !important;
+  font-size: 11px !important;
   font-family: inherit !important;
   outline: none !important;
   box-sizing: border-box !important;
@@ -720,18 +786,18 @@ html, body {
 
 .context_panel input:focus,
 .context_panel select:focus {
-  border-color: var(--vector-orange) !important;
-  box-shadow: var(--vector-orange-glow) !important;
+  border-color: #4a9eff !important;
+  box-shadow: 0 0 0 1px #4a9eff !important;
 }
 
 .context_panel .button {
-  background: #333333 !important;
-  border: 1px solid #444444 !important;
-  border-radius: 3px !important;
-  color: #ffffff !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  border-radius: 2px !important;
+  color: #cccccc !important;
   font-size: 11px !important;
   font-weight: 600 !important;
-  padding: 6px 10px !important;
+  padding: 5px 10px !important;
   text-align: center !important;
   cursor: pointer !important;
   transition: background 0.15s, border-color 0.15s !important;
@@ -739,19 +805,20 @@ html, body {
 }
 
 .context_panel .button:hover {
-  background: #3e3e3e !important;
-  border-color: #555555 !important;
+  background: #505050 !important;
+  border-color: #666666 !important;
+  color: #ffffff !important;
 }
 
 .context_panel .button:active {
-  background: #202020 !important;
+  background: #242424 !important;
 }
 
 /* Alignment Buttons */
 .align_buttons {
   display: grid !important;
   grid-template-columns: repeat(6, 1fr) !important;
-  gap: 4px !important;
+  gap: 3px !important;
   padding: 6px 8px 8px !important;
 }
 
@@ -759,17 +826,17 @@ html, body {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  height: 28px !important;
-  background: #202020 !important;
-  border: 1px solid #383838 !important;
-  border-radius: 3px !important;
+  height: 26px !important;
+  background: #242424 !important;
+  border: 1px solid #3c3c3c !important;
+  border-radius: 2px !important;
   cursor: pointer !important;
   transition: background 0.15s, border-color 0.15s !important;
 }
 
 .align_button:hover {
-  background: #333333 !important;
-  border-color: var(--vector-orange) !important;
+  background: #505050 !important;
+  border-color: #2a6bb5 !important;
 }
 
 .align_button svg path {
@@ -788,8 +855,8 @@ html, body {
   grid-area: status;
   position: static !important;
   height: 24px !important;
-  background-color: #1e1e1e !important;
-  border-top: 1px solid #141414 !important;
+  background-color: #2d2d2d !important;
+  border-top: 1px solid #1a1a1a !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -846,62 +913,62 @@ html, body {
 }
 
 .status_app_title span {
-  color: var(--vector-orange);
+  color: #4a9eff;
   font-weight: 700;
 }
 
-/* Selection / Bounding Box Accent Color */
+/* Selection / Bounding Box & Rubberband Accent Color (Studio Blue) */
 .selectorLine,
 #selectorRubberBand,
 #workarea svg #selectorRubberBand {
-  stroke: var(--vector-orange) !important;
+  stroke: #4a9eff !important;
 }
 
 .grip,
 #workarea .grip {
-  fill: var(--vector-orange) !important;
+  fill: #4a9eff !important;
   stroke: #ffffff !important;
   stroke-width: 1px !important;
 }
 
 /* ==========================================================================
-   7. Modals, Dialogs, Color Picker, and Popups
+   7. Modals, Dialogs, Color Picker, and Popups (Studio Style)
    ========================================================================== */
 
 /* Core Modal Backdrop & Window */
 .modal {
-  background: rgba(0, 0, 0, 0.7) !important;
-  backdrop-filter: blur(4px) !important;
+  background: rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(2px) !important;
   z-index: 10000 !important;
 }
 
 .modal-item {
-  background: #242424 !important;
-  color: #eeeeee !important;
-  border: 1px solid #3c3c3c !important;
-  border-radius: 8px !important;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75) !important;
+  background: #2d2d2d !important;
+  color: #cccccc !important;
+  border: 1px solid #505050 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
   font-family: var(--ui-font) !important;
 }
 
 .modal-item h1 {
   color: #ffffff !important;
-  font-size: 18px !important;
+  font-size: 16px !important;
   font-weight: 600 !important;
   margin-top: 0 !important;
-  margin-bottom: 14px !important;
-  padding-bottom: 8px !important;
-  border-bottom: 1px solid #333333 !important;
+  margin-bottom: 12px !important;
+  padding-bottom: 6px !important;
+  border-bottom: 1px solid #3c3c3c !important;
 }
 
 .modal-item p {
   color: #cccccc !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   line-height: 1.6 !important;
 }
 
 .modal-item a {
-  color: var(--vector-orange) !important;
+  color: #4a9eff !important;
   text-decoration: none !important;
 }
 
@@ -912,32 +979,33 @@ html, body {
 .modal-item button,
 .modal-item input[type="button"],
 .modal-item input[type="submit"] {
-  background: #333333 !important;
-  border: 1px solid #484848 !important;
-  color: #ffffff !important;
-  border-radius: 4px !important;
-  padding: 6px 14px !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  color: #cccccc !important;
+  border-radius: 2px !important;
+  padding: 5px 12px !important;
   cursor: pointer !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
   transition: all 0.15s !important;
 }
 
 .modal-item button:hover {
-  background: #404040 !important;
-  border-color: #585858 !important;
+  background: #505050 !important;
+  border-color: #666666 !important;
+  color: #ffffff !important;
 }
 
 .modal-item button.ok,
 .modal-item button.primary {
-  background: var(--vector-orange) !important;
-  border-color: var(--vector-orange-active) !important;
+  background: #2a6bb5 !important;
+  border-color: #3780d6 !important;
   color: #ffffff !important;
 }
 
 .modal-item button.ok:hover,
 .modal-item button.primary:hover {
-  background: var(--vector-orange-hover) !important;
+  background: #3780d6 !important;
 }
 
 .modal-item button.warning {
@@ -953,14 +1021,15 @@ html, body {
 /* Keyboard Shortcuts Modal */
 .shortcut-key {
   color: #ffffff !important;
-  background: #333333 !important;
-  border: 1px solid #4a4a4a !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  border-radius: 2px !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
 }
 
 .shortcut-name {
   color: #cccccc !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
 }
 
 /* Source Code Modal */
@@ -973,33 +1042,33 @@ html, body {
   background: #141414 !important;
   color: #5eead4 !important;
   border: 1px solid #333333 !important;
-  border-radius: 4px !important;
+  border-radius: 2px !important;
   font-family: var(--mono-font) !important;
   font-size: 12px !important;
   line-height: 1.4 !important;
-  padding: 10px !important;
+  padding: 8px !important;
   width: 100% !important;
   box-sizing: border-box !important;
 }
 
 /* Dialog Box Alert/Prompt */
 #dialog_box_overlay {
-  background: rgba(0, 0, 0, 0.65) !important;
+  background: rgba(0, 0, 0, 0.6) !important;
   backdrop-filter: blur(2px) !important;
   z-index: 50000 !important;
 }
 
 #dialog_container {
-  background: #252525 !important;
-  border: 1px solid #3e3e3e !important;
-  border-radius: 8px !important;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+  background: #2d2d2d !important;
+  border: 1px solid #505050 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
   color: #ffffff !important;
   z-index: 50001 !important;
 }
 
 #dialog_content {
-  color: #dddddd !important;
+  color: #cccccc !important;
 }
 
 #dialog_content h4 {
@@ -1007,89 +1076,91 @@ html, body {
 }
 
 #dialog_content input {
-  background: #161616 !important;
-  border: 1px solid #3e3e3e !important;
+  background: #1e1e1e !important;
+  border: 1px solid #4a4a4a !important;
   color: #ffffff !important;
-  border-radius: 4px !important;
-  padding: 6px 10px !important;
+  border-radius: 2px !important;
+  padding: 5px 8px !important;
   width: 100% !important;
   box-sizing: border-box !important;
   outline: none !important;
 }
 
 #dialog_content input:focus {
-  border-color: var(--vector-orange) !important;
-  box-shadow: var(--vector-orange-glow) !important;
+  border-color: #4a9eff !important;
+  box-shadow: 0 0 0 1px #4a9eff !important;
 }
 
 #dialog_buttons input {
-  background: #333333 !important;
-  border: 1px solid #4a4a4a !important;
-  color: #ffffff !important;
-  border-radius: 4px !important;
-  padding: 6px 14px !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  color: #cccccc !important;
+  border-radius: 2px !important;
+  padding: 5px 12px !important;
   cursor: pointer !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
   font-weight: 500 !important;
   transition: all 0.15s !important;
 }
 
 #dialog_buttons input:hover {
-  background: #404040 !important;
-  border-color: #5a5a5a !important;
+  background: #505050 !important;
+  border-color: #666666 !important;
+  color: #ffffff !important;
 }
 
 #dialog_buttons input:first-child {
-  background: var(--vector-orange) !important;
-  border-color: var(--vector-orange-active) !important;
+  background: #2a6bb5 !important;
+  border-color: #3780d6 !important;
+  color: #ffffff !important;
 }
 
 #dialog_buttons input:first-child:hover {
-  background: var(--vector-orange-hover) !important;
+  background: #3780d6 !important;
 }
 
 /* Shape Library Flyout */
 .tools_flyout {
-  background: #252525 !important;
-  border: 1px solid #3e3e3e !important;
-  border-radius: 6px !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+  background: #2d2d2d !important;
+  border: 1px solid #505050 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
 }
 
 #shape_cats {
-  background: #1c1c1c !important;
-  border-right: 1px solid #303030 !important;
+  background: #242424 !important;
+  border-right: 1px solid #3c3c3c !important;
 }
 
 #shape_cats > div {
-  background: #1c1c1c !important;
+  background: #242424 !important;
   color: #aaaaaa !important;
-  font-size: 12px !important;
+  font-size: 11px !important;
 }
 
 #shape_cats div:hover {
-  background: #2a2a2a !important;
+  background: #383838 !important;
   color: #ffffff !important;
 }
 
 #shape_cats div.current {
-  background: var(--vector-orange) !important;
+  background: #2a6bb5 !important;
   color: #ffffff !important;
 }
 
 #shape_buttons {
-  background: #252525 !important;
+  background: #2d2d2d !important;
 }
 
 .tools_flyout .tool_button {
-  background-color: #2e2e2e !important;
-  border: 1px solid #3a3a3a !important;
-  border-radius: 4px !important;
+  background-color: #242424 !important;
+  border: 1px solid #3c3c3c !important;
+  border-radius: 2px !important;
 }
 
 .tools_flyout .tool_button:hover {
-  background-color: #3e3e3e !important;
-  border-color: var(--vector-orange) !important;
+  background-color: #505050 !important;
+  border-color: #2a6bb5 !important;
 }
 
 .tools_flyout .tool_button svg {
@@ -1102,16 +1173,16 @@ html, body {
 
 /* Color Picker Popup */
 #color_picker {
-  background: #252525 !important;
-  border: 1px solid #3e3e3e !important;
-  border-radius: 8px !important;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8) !important;
+  background: #2d2d2d !important;
+  border: 1px solid #505050 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
   color: #cccccc !important;
 }
 
 .jPicker .Move {
-  background-color: #1e1e1e !important;
-  border-color: #333333 !important;
+  background-color: #242424 !important;
+  border-color: #383838 !important;
 }
 
 .jPicker td.Text span {
@@ -1120,30 +1191,31 @@ html, body {
 
 #color_picker input[type="text"],
 #color_picker input[type="number"] {
-  background: #161616 !important;
-  border: 1px solid #3a3a3a !important;
+  background: #1e1e1e !important;
+  border: 1px solid #4a4a4a !important;
   color: #ffffff !important;
 }
 
 #color_picker .jPicker .Button input {
-  background: #333333 !important;
-  border: 1px solid #4a4a4a !important;
-  color: #ffffff !important;
-  border-radius: 4px !important;
+  background: #3c3c3c !important;
+  border: 1px solid #505050 !important;
+  color: #cccccc !important;
+  border-radius: 2px !important;
   padding: 4px 10px !important;
 }
 
 #color_picker .jPicker .Button input:hover {
-  background: #404040 !important;
-  border-color: #555555 !important;
+  background: #505050 !important;
+  border-color: #666666 !important;
+  color: #ffffff !important;
 }
 
 #color_picker .jPicker .Button input.Ok {
-  background: var(--vector-orange) !important;
-  border-color: var(--vector-orange-active) !important;
+  background: #2a6bb5 !important;
+  border-color: #3780d6 !important;
+  color: #ffffff !important;
 }
 
 #color_picker .jPicker .Button input.Ok:hover {
-  background: var(--vector-orange-hover) !important;
+  background: #3780d6 !important;
 }
-

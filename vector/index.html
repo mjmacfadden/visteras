@@ -54,20 +54,6 @@
        1. Top Menu Bar (File, Edit, Object, View, Help)
        ==================================================================== -->
   <div id="menu_bar">
-    <a class="menu">
-      <div class="menu_title" id="logo" title="Visteras Vector">
-        <img src="images/visteras_vector_logo.png" alt="Visteras Vector" style="width: 16px; height: 16px;">
-      </div>
-      <div class="menu_list inverted-undo">
-        <div id="modal_about" class="menu_item" data-action="about">About Visteras Vector...</div>
-        <div class="separator"></div>
-        <a href="../" class="menu_item" style="text-decoration: none; color: inherit; display: block;">Open Visteras Studio (Raster)...</a>
-        <div class="separator"></div>
-        <div id="modal_preferences" class="menu_item" data-action="configure">Configure...</div>
-        <div id="modal_shortcuts" class="menu_item" data-action="shortcuts">Keyboard Shortcuts...</div>
-      </div>
-    </a>
-
     <div class="menu">
       <div class="menu_title">File</div>
       <div class="menu_list inverted-undo" id="file_menu"> 
@@ -130,6 +116,18 @@
       </div>
     </div>
 
+    <div class="menu">
+      <div class="menu_title">Help</div>
+      <div class="menu_list inverted-undo" id="help_menu">
+        <div id="modal_about" class="menu_item" data-action="about">About Visteras Vector...</div>
+        <div class="separator"></div>
+        <div id="modal_shortcuts" class="menu_item" data-action="shortcuts">Keyboard Shortcuts...</div>
+        <div id="modal_preferences" class="menu_item" data-action="configure">Preferences...</div>
+        <div class="separator"></div>
+        <a href="../" class="menu_item" style="text-decoration: none; color: inherit; display: block;">Open Visteras Studio...</a>
+      </div>
+    </div>
+
     <div class="menu-right">
       <a href="../" class="visteras_switch_btn" title="Switch to Visteras Studio (Raster Graphics Editor)">
         <span class="visteras_badge">STUDIO</span> ↗
@@ -145,7 +143,7 @@
        ==================================================================== -->
   <div id="options_bar" class="submenu">
     <div class="options_bar_left">
-      <a class="logo" href="#" title="Visteras Vector">
+      <a class="logo" id="options_logo" href="javascript:void(0)" title="Visteras Vector">
         <img src="images/visteras_vector_logo.png" alt="Visteras Vector">
         <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">VECTOR</span></span>
       </a>

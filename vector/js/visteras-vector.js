@@ -1,6 +1,14 @@
 // Visteras Vector UI Bridge & Extensions
 (function() {
   function initVisterasVector() {
+    // Logo click opens About modal
+    $('#options_logo').on('click', function(e) {
+      e.preventDefault();
+      if (typeof editor !== 'undefined' && editor.modal && editor.modal.about) {
+        editor.modal.about.open();
+      }
+    });
+
     // 1. Hook up Options Bar Undo / Redo / Delete
     $('#opt_undo').on('click', function() {
       if (typeof svgCanvas !== 'undefined' && svgCanvas.undo) {
