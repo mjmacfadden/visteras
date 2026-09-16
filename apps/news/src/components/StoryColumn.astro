@@ -1,0 +1,25 @@
+---
+import type { RssStory } from '../data/types';
+interface Props {
+  label: string;
+  stories: RssStory[];
+}
+const { label, stories } = Astro.props;
+---
+<section class="story-column" aria-label={label}>
+  <h2 class="section-label">{label}</h2>
+  {stories.map((s, i) => (
+    <article class="story-item">
+      <h3>
+        <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>
+      </h3>
+      {(i % 2 === 0) && (
+        <div class="image-placeholder story-thumb" aria-hidden="true">
+          {s.image ? 'Thumb' : '—'}
+        </div>
+      )}
+      <p class="deck">{s.description}</p>
+      <div class="meta">{s.source} · link-out</div>
+    </article>
+  ))}
+</section>

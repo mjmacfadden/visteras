@@ -1,0 +1,50 @@
+---
+import type { WeatherConfig } from '../data/types';
+import {
+  renderHourlyWeatherSlotsHtml,
+  renderDaySummaryHtml,
+  type HourlySlot,
+  type DaySummary,
+} from '../lib/weather';
+
+interface Props {
+  weather: WeatherConfig;
+}
+
+const { weather } = Astro.props;
+
+const defaultSummary: DaySummary = {
+  highF: weather.fallback.highF || 76,
+  lowF: weather.fallback.lowF || 58,
+  condition: weather.fallback.summary || 'Partly cloudy',
+  weatherCode: 2,
+};
+
+// Initial SSR fallback slots
+const defaultSlots: HourlySlot[] = [
+  { time: '06:00', hourLabel: '6 AM', tempF: weather.fallback.lowF || 58, condition: 'Clear', weatherCode: 0 },
+  { time: '08:00', hourLabel: '8 AM', tempF: Math.round(((weather.fallback.lowF || 58) * 2 + (weather.fallback.highF || 76)) / 3), condition: 'Clear', weatherCode: 0 },
+  { time: '10:00', hourLabel: '10 AM', tempF: Math.round(((weather.fallback.lowF || 58) + (weather.fallback.highF || 76) * 2) / 3), condition: 'Partly cloudy', weatherCode: 2 },
+  { time: '12:00', hourLabel: '12 PM', tempF: weather.fallback.highF || 76, condition: 'Partly cloudy', weatherCode: 2 },
+  { time: '14:00', hourLabel: '2 PM', tempF: weather.fallback.highF || 76, condition: 'Clear', weatherCode: 0 },
+  { time: '16:00', hourLabel: '4 PM', tempF: (weather.fallback.highF || 76) - 2, condition: 'Clear', weatherCode: 0 },
+  { time: '18:00', hourLabel: '6 PM', tempF: (weather.fallback.highF || 76) - 5, condition: 'Partly cloudy', weatherCode: 2 },
+  { time: '20:00', hourLabel: '8 PM', tempF: (weather.fallback.lowF || 58) + 6, condition: 'Clear', weatherCode: 0 },
+  { time: '22:00', hourLabel: '10 PM', tempF: (weather.fallback.lowF || 58) + 2, condition: 'Clear', weatherCode: 0 },
+];
+
+const initialSummaryHtml = renderDaySummaryHtml(defaultSummary);
+const initialSlotsHtml = renderHourlyWeatherSlotsHtml(defaultSlots);
+---
+<section class="weather-strip" aria-label="Hourly Weather" data-weather-root data-default-zip={weather.zip}>
+  <div class="weather-hourly-bar" data-weather-bar>
+    <div class="weather-badge">
+      <span class="weather-badge-loc" data-weather-label>{weather.locationLabel || 'NORTHBROOK, IL'}</span>
+      <span class="weather-badge-sub">HOURLY FORECAST</span>
+    </div>
+    <div class="weather-summary-day" data-weather-summary set:html={initialSummaryHtml}></div>
+    <div class="weather-slots" data-weather-slots set:html={initialSlotsHtml}></div>
+  </div>
+  <p class="weather-widget-status" data-weather-status hidden></p>
+</section>
+

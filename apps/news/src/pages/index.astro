@@ -1,0 +1,2324 @@
+---
+import '../styles/newspaper.css';
+import { latestEdition } from '../data/editions/latest';
+import { puzzlesForDate } from '../data/puzzles';
+import { buildLiveEdition } from '../lib/edition';
+import { PAPER_NAME_UPPER } from '../lib/site';
+import { NEWS_FEEDS } from '../data/feeds';
+import { COMIC_FEEDS } from '../data/feeds/comics';
+import Masthead from '../components/Masthead.astro';
+import WeatherWidget from '../components/WeatherWidget.astro';
+import Agenda from '../components/Agenda.astro';
+import LeadStory from '../components/LeadStory.astro';
+import AlsoToday from '../components/AlsoToday.astro';
+import MorningRoundup from '../components/MorningRoundup.astro';
+import StoryColumn from '../components/StoryColumn.astro';
+import CrosswordPuzzle from '../components/CrosswordPuzzle.astro';
+import JumblePuzzle from '../components/JumblePuzzle.astro';
+import SportsTrivia from '../components/SportsTrivia.astro';
+import ComicStrip from '../components/ComicStrip.astro';
+import TodayInHistory from '../components/TodayInHistory.astro';
+import Birthdays from '../components/Birthdays.astro';
+import AnswersQr from '../components/AnswersQr.astro';
+import RightSidebarPanels from '../components/RightSidebarPanels.astro';
+import '../styles/visteras-news-theme.css';
+
+const { edition, feedStatus, comicsLive, comicsPool, rssEnabled } = await buildLiveEdition(latestEdition);
+const editionDate = new Date(`${edition.date}T12:00:00`);
+const puzzles = puzzlesForDate(editionDate);
+const feedCatalog = NEWS_FEEDS.map((f) => ({ id: f.id, name: f.name, section: f.section }));
+const comicCatalog = COMIC_FEEDS.map((c) => ({ id: c.id, title: c.title }));
+
+const newsLogo = `${Astro.base || '/news/'}images/visteras_news_logo.svg`;
+const newsFavicon = `${Astro.base || '/news/'}favicon.svg`;
+
+const hasWireStories =
+  Boolean(edition.leadStory?.title) ||
+  edition.alsoToday.length > 0 ||
+  edition.news.length > 0 ||
+  edition.businessTech.length > 0 ||
+  edition.sports.length > 0;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href={newsLogo} />
+    <link rel="icon" href={newsFavicon} />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="THE DAILY MIKE — personal morning newspaper" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#14b8a6" />
+    <title>Visteras News — {edition.dateDisplay}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=Manufacturing+Consent&family=Merriweather:ital,opsz,wght@0,18..144,300;0,18..144,400;0,18..144,700;1,18..144,300;1,18..144,400&family=Playfair+Display:wght@700;900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body
+    data-edition-date={edition.date}
+    data-rss-enabled={rssEnabled ? '1' : '0'}
+    data-feed-ok={feedStatus.ok.join(',')}
+    data-feed-failed={feedStatus.failed.map((f) => f.id).join(',')}
+  >
+    <div id="visteras_app_container">
+      <!-- 1. Main Top Menu Bar -->
+      <nav id="visteras_menu_bar" aria-label="Main Menu">
+        <div class="menu_group">
+          <!-- File Menu -->
+          <div class="menu_entry" id="menu_file">
+            <div class="menu_entry_title">File</div>
+            <div class="menu_dropdown_list">
+              <div class="menu_dropdown_item" id="action_new_edition">New Edition <span class="menu_dropdown_shortcut">⌘N</span></div>
+              <div class="menu_dropdown_item" id="action_load_sample">Load Sample Edition</div>
+              <div class="menu_dropdown_separator"></div>
+              <div class="menu_dropdown_item" id="action_print">Print Edition... <span class="menu_dropdown_shortcut">⌘P</span></div>
+              <div class="menu_dropdown_separator"></div>
+              <a href="../studio/" class="menu_dropdown_item">Open Visteras Studio...</a>
+              <a href="../vector/" class="menu_dropdown_item">Open Visteras Vector...</a>
+            </div>
+          </div>
+
+          <!-- Edit Menu -->
+          <div class="menu_entry" id="menu_edit">
+            <div class="menu_entry_title">Edit</div>
+            <div class="menu_dropdown_list">
+              <div class="menu_dropdown_item" id="action_paste_brief">Paste Grok Brief <span class="menu_dropdown_shortcut">P</span></div>
+              <div class="menu_dropdown_item" id="action_clear_brief">Clear Brief</div>
+              <div class="menu_dropdown_separator"></div>
+              <div class="menu_dropdown_item" id="action_open_settings">Edition Settings... <span class="menu_dropdown_shortcut">S</span></div>
+            </div>
+          </div>
+
+          <!-- View Menu -->
+          <div class="menu_entry" id="menu_view">
+            <div class="menu_entry_title">View</div>
+            <div class="menu_dropdown_list">
+              <div class="menu_dropdown_item" id="action_page_1">Page 1 — News &amp; Weather</div>
+              <div class="menu_dropdown_item" id="action_page_2">Page 2 — Columns &amp; Stories</div>
+              <div class="menu_dropdown_item" id="action_page_3">Page 3 — Games &amp; Comics</div>
+              <div class="menu_dropdown_separator"></div>
+              <div class="menu_dropdown_item" id="action_zoom_fit">Fit to Workspace</div>
+            </div>
+          </div>
+
+          <!-- Tools Menu -->
+          <div class="menu_entry" id="menu_tools">
+            <div class="menu_entry_title">Tools</div>
+            <div class="menu_dropdown_list">
+              <div class="menu_dropdown_item" id="action_tool_paste">Paste Brief <span class="menu_dropdown_shortcut">P</span></div>
+              <div class="menu_dropdown_item" id="action_tool_typography">Typography &amp; Layout <span class="menu_dropdown_shortcut">T</span></div>
+              <div class="menu_dropdown_item" id="action_tool_settings">Edition Settings <span class="menu_dropdown_shortcut">S</span></div>
+              <div class="menu_dropdown_item" id="action_tool_rss">RSS Wires <span class="menu_dropdown_shortcut">R</span></div>
+            </div>
+          </div>
+
+          <!-- Help Menu -->
+          <div class="menu_entry" id="menu_help">
+            <div class="menu_entry_title">Help</div>
+            <div class="menu_dropdown_list">
+              <div class="menu_dropdown_item" id="action_about">About Visteras News...</div>
+              <div class="menu_dropdown_item" id="action_guide">Markdown Format Guide</div>
+              <div class="menu_dropdown_separator"></div>
+              <a href="../studio/" class="menu_dropdown_item">Open Visteras Studio...</a>
+              <a href="../vector/" class="menu_dropdown_item">Open Visteras Vector...</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cross-App Switchers -->
+        <div class="menu_right_controls">
+          <a href="../studio/" class="visteras_switch_btn" title="Switch to Visteras Studio (Raster Image Editor)">
+            <span class="visteras_badge" style="color: #4a9eff;">STUDIO</span> ↗
+          </a>
+          <a href="../vector/" class="visteras_switch_btn" title="Switch to Visteras Vector (SVG Vector Graphics Editor)">
+            <span class="visteras_badge" style="color: #fa7c1b;">VECTOR</span> ↗
+          </a>
+        </div>
+      </nav>
+
+      <!-- 2. Top Options Bar -->
+      <header id="tools_top">
+        <a href="#" class="visteras_news_logo_wrap" title="Visteras News">
+          <img src={newsLogo} alt="Visteras News" />
+          <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">NEWS</span></span>
+        </a>
+
+        <div class="visteras_top_divider"></div>
+
+        <div class="options_pager">
+          <button type="button" id="prev-page" title="Previous Page (←)" aria-label="Previous page">←</button>
+          <span class="options_page_indicator" id="page-indicator">Page 1 / 3</span>
+          <button type="button" id="next-page" title="Next Page (→)" aria-label="Next page">→</button>
+        </div>
+
+        <span class="options_paper_title" id="chrome-paper-name">{PAPER_NAME_UPPER}</span>
+
+        <div class="options_actions_right">
+          <button type="button" id="print-paper" class="btn_visteras_teal" title="Print Letter Page Sheets (⌘P)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Print Edition
+          </button>
+        </div>
+      </header>
+
+      <!-- 3. Left Toolbar -->
+      <aside id="tools_left" aria-label="Tool Selection">
+        <button type="button" class="tool_btn active" id="tool_paste" title="Paste Grok Brief (P)" data-tool="paste">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#CCCCCC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            <line x1="8" y1="11" x2="16" y2="11"/>
+            <line x1="8" y1="15" x2="16" y2="15"/>
+            <line x1="8" y1="19" x2="13" y2="19"/>
+          </svg>
+        </button>
+
+        <button type="button" class="tool_btn" id="tool_typography" title="Typography &amp; Identity (T)" data-tool="typography">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 7 4 4 20 4 20 7"/>
+            <line x1="12" y1="4" x2="12" y2="20"/>
+            <line x1="9" y1="20" x2="15" y2="20"/>
+          </svg>
+        </button>
+
+        <button type="button" class="tool_btn" id="tool_settings" title="Edition Settings (S)" data-tool="settings">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#CCCCCC" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+
+        <button type="button" class="tool_btn" id="tool_rss" title="RSS Feeds &amp; Wires (R)" data-tool="rss">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 11a9 9 0 0 1 9 9"/>
+            <path d="M4 4a16 16 0 0 1 16 16"/>
+            <circle cx="5" cy="19" r="1" fill="#CCCCCC"/>
+          </svg>
+        </button>
+      </aside>
+
+      <!-- 4. Middle Workspace -->
+      <div id="workarea">
+<main class="newspaper-shell" id="newspaper">
+      <!-- One continuous edition document — screen mirrors print packing -->
+      <article class="edition-document" id="edition-document">
+        <section class="edition-band edition-news" data-page-band="news" aria-label="News">
+          <Masthead
+            dateDisplay={edition.dateDisplay}
+            volume={edition.volume}
+            number={edition.number}
+            pageLabel="Morning Edition"
+          />
+          <WeatherWidget weather={edition.weather} />
+
+          <div class="front-pack">
+            <aside class="front-rail">
+              <div data-grok-weather></div>
+              <Agenda items={edition.agenda} />
+              <div data-grok-glance></div>
+              <div data-grok-watch></div>
+            </aside>
+            <div class="front-lead" data-live-lead>
+              {hasWireStories && edition.leadStory.title ? (
+                <>
+                  <LeadStory story={edition.leadStory} />
+                  {edition.morningRoundup && (
+                    <MorningRoundup
+                      headline={edition.morningRoundup.headline}
+                      paragraphs={edition.morningRoundup.paragraphs}
+                      imageCaption={edition.morningRoundup.imageCaption}
+                    />
+                  )}
+                </>
+              ) : (
+                <div class="empty-edition" data-empty-edition>
+                  <h2 class="section-label">Morning edition</h2>
+                  <p class="empty-edition-msg">Paste today’s Grok brief to fill the paper</p>
+                  <p class="empty-edition-hint screen-only">
+                    Use <strong>Paste brief</strong> in the toolbar, or <button type="button" class="empty-edition-load-sample" style="background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0;font-weight:bold;">load sample edition</button>.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dense 3-column newspaper flow — empty blocks collapse */}
+          <div class="stories-flow" id="stories-flow">
+            <div class="flow-block" data-live-also>
+              {hasWireStories && edition.alsoToday.length ? (
+                <AlsoToday stories={edition.alsoToday} />
+              ) : null}
+            </div>
+            <div class="flow-block" data-live-news>
+              {hasWireStories && edition.news.length ? (
+                <StoryColumn label="News" stories={edition.news} />
+              ) : null}
+            </div>
+            <div class="flow-block" data-live-biz>
+              {hasWireStories && edition.businessTech.length ? (
+                <StoryColumn label="Business · Tech" stories={edition.businessTech} />
+              ) : null}
+            </div>
+            <div class="flow-block" data-live-sports>
+              {hasWireStories && edition.sports.length ? (
+                <StoryColumn label="Sports" stories={edition.sports} />
+              ) : null}
+            </div>
+            <div class="flow-block" data-live-custom-feeds></div>
+          </div>
+
+          <p class="feed-status-note screen-only">
+            {rssEnabled
+              ? `RSS: ${feedStatus.ok.length ? `live (${feedStatus.ok.join(', ')})` : 'on · no items'}`
+              : 'RSS disabled · Grok brief fills news'}
+            {feedStatus.failed.length > 0 && ` · skipped ${feedStatus.failed.map((f) => f.id).join(', ')}`}
+            {comicsLive ? ' · comics live' : ' · comics fallback'}
+          </p>
+        </section>
+
+        <section class="edition-band edition-features" data-page-band="features" aria-label="Puzzles and comics">
+          <header class="running-head" aria-hidden="true">
+            <span>THE DAILY MIKE</span>
+            <span>Puzzles &amp; Features</span>
+            <span>{edition.dateDisplay}</span>
+          </header>
+          {/* Fixed last-page block — out of the 3-column news flow */}
+          <div class="page3-features" data-features-block>
+            <div class="comics-band" aria-label="Comics" data-live-comics>
+              {(comicsPool.length ? comicsPool : edition.comics).slice(0, 2).map((c, i) => <ComicStrip comic={c} slotIndex={i} />)}
+            </div>
+            <div class="games-band" aria-label="Games">
+              <div class="game-cell game-crossword">
+                <CrosswordPuzzle puzzle={puzzles.crossword} />
+              </div>
+              <div class="game-cell game-jumble">
+                <div class="jumble-stack">
+                  {puzzles.jumbles.map((j, i) => (
+                    <JumblePuzzle
+                      puzzle={j}
+                      heading={`Jumble ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div class="game-cell game-trivia">
+                <SportsTrivia trivia={puzzles.trivia} />
+              </div>
+            </div>
+            <div class="features-meta-band" aria-label="History and answers">
+              <div class="feature-cell feature-history">
+                <TodayInHistory history={edition.todayInHistory} />
+              </div>
+              <div class="feature-cell feature-birthdays">
+                <Birthdays birthdays={edition.birthdays} />
+              </div>
+              <div class="feature-cell feature-qr">
+                <AnswersQr date={edition.date} />
+              </div>
+            </div>
+          </div>
+          <footer class="page-folio edition-end-folio">
+            <span>THE DAILY MIKE</span>
+            <span>End of edition</span>
+          </footer>
+        </section>
+      </article>
+    </main>
+      </div>
+
+      <!-- 5. Right Sidebar Panels -->
+      <RightSidebarPanels />
+
+      <!-- 6. Bottom Status Bar -->
+      <footer id="tools_bottom">
+        <div class="status_info_left">
+          <span>Edition: <span class="status_tag_teal">{edition.dateDisplay}</span></span>
+          <span class="status_tag">·</span>
+          <span>Vol. {edition.volume}, No. {edition.number}</span>
+          <span class="status_tag">·</span>
+          <span id="status-feed-indicator">{rssEnabled ? "RSS Wires Active" : "Grok Automation News"}</span>
+        </div>
+        <div class="status_info_right">
+          <span id="status_active_tool" class="status_tag_teal">Tool: Paste Brief</span>
+          <span class="status_tag">·</span>
+          <span class="status_tag">Letter 8.5×11in (3 Pages)</span>
+        </div>
+      </footer>
+    </div>
+
+
+    <script id="feed-catalog" type="application/json" set:html={JSON.stringify(feedCatalog)} />
+    <script id="comic-catalog" type="application/json" set:html={JSON.stringify(comicCatalog)} />
+    <script id="comics-pool" type="application/json" set:html={JSON.stringify(comicsPool)} />
+    <script id="edition-bootstrap" type="application/json" set:html={JSON.stringify({
+      date: edition.date,
+      lead: edition.leadStory?.title ? edition.leadStory : null,
+      alsoToday: edition.alsoToday,
+      news: edition.news,
+      businessTech: edition.businessTech,
+      sports: edition.sports,
+      agenda: edition.agenda,
+      weatherFallback: edition.weather.fallback,
+      rssEnabled,
+    })} />
+
+    <script>
+      import {
+        defaultSettings,
+        loadSettings,
+        saveSettings,
+        loadGrokBrief,
+        saveGrokBrief,
+        clearGrokBrief,
+        buildLocalStorageBundle,
+        parseLocalStorageBundle,
+        applyLocalStorageBundle,
+        type PaperSettings,
+        type CustomFeed,
+      } from '../lib/settings';
+      import {
+        normalizeCalendarUrl,
+        fetchMergedAgenda,
+        type CalendarSource,
+      } from '../lib/calendar';
+      import { fetchAllFeeds } from '../lib/rss';
+      import {
+        geoForZip,
+        fetchOpenMeteoWeather,
+        renderDaySummaryHtml,
+        renderHourlyWeatherSlotsHtml,
+      } from '../lib/weather';
+      import {
+        parseGrokBrief,
+        grokItemsAsStories,
+        interleave,
+        type ParsedGrokBrief,
+        type BriefStoryCard,
+      } from '../lib/grokBrief';
+      import { paginateEdition, getPageSheetCount, scrollToPageSheet } from '../lib/pageSheets';
+      import { htmlToMarkdown } from '../lib/htmlToMarkdown';
+      import { applyEditionDate } from '../lib/applyEditionDate';
+
+      const indicator = document.getElementById('page-indicator');
+      const prevBtn = document.getElementById('prev-page') as HTMLButtonElement | null;
+      const nextBtn = document.getElementById('next-page') as HTMLButtonElement | null;
+      const printBtn = document.getElementById('print-paper');
+      const openSettingsBtn = document.getElementById('open-settings');
+      const dialog = document.getElementById('settings-dialog') as HTMLDialogElement | null;
+      const editionEl = document.getElementById('edition-document');
+      let current = 1;
+      let paginateTimer = 0;
+      let paginating = false;
+      let repaginateQueued = false;
+
+      function applyPaperIdentity(name?: string, tagline?: string) {
+        const cleanName = (name || 'The Daily Mike').trim();
+        const upper = cleanName.toUpperCase();
+        const cleanTagline = (tagline || 'NOTEWORTHY EVENTS WEATHER AND SPORTS').trim();
+
+        const chromeName = document.getElementById('chrome-paper-name');
+        if (chromeName) chromeName.textContent = upper;
+
+        document.querySelectorAll<HTMLElement>('[data-masthead-title]').forEach((el) => {
+          el.textContent = upper;
+        });
+        document.querySelectorAll<HTMLElement>('[data-masthead-tagline]').forEach((el) => {
+          el.textContent = cleanTagline;
+        });
+        document.querySelectorAll<HTMLElement>('.running-head span:first-child, .edition-end-folio span:first-child').forEach((el) => {
+          el.textContent = upper;
+        });
+
+        const dateStr = document.querySelector('.masthead-date-line span:first-child')?.textContent || '';
+        if (dateStr) {
+          document.title = `${upper} — ${dateStr}`;
+        }
+      }
+
+      async function runPaginate() {
+        if (paginating) {
+          repaginateQueued = true;
+          return;
+        }
+        paginating = true;
+        repaginateQueued = false;
+        try {
+          const paperUpper = (settings?.paperName || 'The Daily Mike').trim().toUpperCase();
+          const result = await paginateEdition({ paperName: paperUpper });
+          applyLeadImageState();
+          fitComicSourceUrls();
+          const total = result.pageCount || getPageSheetCount() || 1;
+          current = Math.min(Math.max(current, 1), total);
+          if (indicator) indicator.textContent = `Page ${current} / ${total}`;
+          if (prevBtn) prevBtn.disabled = current <= 1;
+          if (nextBtn) nextBtn.disabled = current >= total;
+        } catch (err) {
+          console.error('[pageSheets]', err);
+        } finally {
+          paginating = false;
+          if (repaginateQueued) {
+            repaginateQueued = false;
+            schedulePaginate();
+          }
+        }
+      }
+
+      function schedulePaginate() {
+        window.clearTimeout(paginateTimer);
+        paginateTimer = window.setTimeout(() => {
+          void runPaginate();
+        }, 60);
+      }
+
+      function pageMetrics() {
+        const total = Math.max(1, getPageSheetCount());
+        const chrome = document.querySelector('.screen-chrome') as HTMLElement | null;
+        return { total, chromeH: chrome?.offsetHeight || 0 };
+      }
+
+      function showPage(n: number) {
+        const { total } = pageMetrics();
+        current = Math.min(Math.max(n, 1), total);
+        scrollToPageSheet(current);
+        if (indicator) indicator.textContent = `Page ${current} / ${total}`;
+        if (prevBtn) prevBtn.disabled = current <= 1;
+        if (nextBtn) nextBtn.disabled = current >= total;
+      }
+
+      function syncPageFromScroll() {
+        const sheets = Array.from(document.querySelectorAll<HTMLElement>('#paged-edition .page-sheet'));
+        if (!sheets.length) return;
+        const workarea = document.getElementById('workarea');
+        const scrollY = workarea ? workarea.scrollTop : window.scrollY;
+        let page = 1;
+        for (let i = 0; i < sheets.length; i++) {
+          const top = sheets[i].offsetTop;
+          if (scrollY + 100 >= top) page = i + 1;
+        }
+        if (page !== current) {
+          current = page;
+          const total = sheets.length;
+          if (indicator) indicator.textContent = `Page ${current} / ${total}`;
+          if (prevBtn) prevBtn.disabled = current <= 1;
+          if (nextBtn) nextBtn.disabled = current >= total;
+        }
+      }
+
+      async function triggerPrint() {
+        if (!getPageSheetCount()) {
+          await runPaginate();
+        }
+        window.print();
+      }
+
+      prevBtn?.addEventListener('click', () => showPage(current - 1));
+      nextBtn?.addEventListener('click', () => showPage(current + 1));
+      printBtn?.addEventListener('click', triggerPrint);
+      document.addEventListener('keydown', async (e) => {
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'p' || e.key === 'P')) {
+          const t = e.target as HTMLElement | null;
+          if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+            /* allow native print from form fields */
+          } else {
+            e.preventDefault();
+            await triggerPrint();
+            return;
+          }
+        }
+      });
+      window.addEventListener('scroll', () => syncPageFromScroll(), { passive: true });
+      document.getElementById('workarea')?.addEventListener('scroll', () => syncPageFromScroll(), { passive: true });
+      window.addEventListener('resize', () => {
+        fitComicSourceUrls();
+        schedulePaginate();
+        syncPageFromScroll();
+      });
+      showPage(1);
+
+      let settings: PaperSettings = loadSettings();
+      let customFeeds: CustomFeed[] = [...settings.customFeeds];
+      let calendars: CalendarSource[] = [...settings.calendars];
+      let lastRss: any = null;
+      let lastGrok: ParsedGrokBrief | null = null;
+
+      const bootstrapEl = document.getElementById('edition-bootstrap');
+      const bootstrap = bootstrapEl ? JSON.parse(bootstrapEl.textContent || '{}') : {};
+
+      function setWeatherStatus(msg: string | null) {
+        const el = document.querySelector('[data-weather-status]') as HTMLElement | null;
+        if (!el) return;
+        if (!msg) {
+          el.hidden = true;
+          el.textContent = '';
+          return;
+        }
+        el.hidden = false;
+        el.textContent = msg;
+      }
+
+      /** Fill hourly forecast bar and day summary via Open-Meteo (works identically for screen and print). */
+      async function applyWeather(zip: string) {
+        const label = document.querySelector('[data-weather-label]');
+        const summaryEl = document.querySelector('[data-weather-summary]');
+        const slotsEl = document.querySelector('[data-weather-slots]');
+
+        const geo = await geoForZip(zip);
+        if (label) {
+          label.textContent = geo.stateAbbr
+            ? `${geo.city.toUpperCase()}, ${geo.stateAbbr}`
+            : geo.city.toUpperCase();
+        }
+
+        const weatherData = await fetchOpenMeteoWeather(geo.lat, geo.lon);
+        if (weatherData) {
+          if (summaryEl) {
+            summaryEl.innerHTML = renderDaySummaryHtml(weatherData.summary, escapeHtml);
+          }
+          if (slotsEl) {
+            slotsEl.innerHTML = renderHourlyWeatherSlotsHtml(weatherData.hourly, escapeHtml);
+          }
+          setWeatherStatus(null);
+        } else if (zip !== '60062' && !geo) {
+          setWeatherStatus(`Could not look up ZIP ${zip}; showing Northbrook.`);
+        }
+        schedulePaginate();
+      }
+
+      async function fillPrintWeather(zip: string) {
+        await applyWeather(zip);
+      }
+
+      function escapeHtml(t: string) {
+        return t
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function storyImageHtml(imageUrl?: string) {
+        if (!imageUrl) return '';
+        return `<img class="story-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" decoding="async" />`;
+      }
+
+      const LEAD_POS_Y_KEY = 'daily-mike-lead-image-pos-y';
+      const LEAD_CUSTOM_URL_KEY = 'daily-mike-lead-image-custom-url';
+
+      function loadLeadImagePosY(): number {
+        try {
+          const v = localStorage.getItem(LEAD_POS_Y_KEY);
+          if (v !== null) {
+            const num = parseFloat(v);
+            if (!isNaN(num)) return Math.max(0, Math.min(100, num));
+          }
+        } catch {
+          /* ignore */
+        }
+        return 50;
+      }
+
+      function loadLeadCustomUrl(): string | null {
+        try {
+          return localStorage.getItem(LEAD_CUSTOM_URL_KEY) || null;
+        } catch {
+          return null;
+        }
+      }
+
+      function applyLeadImageState() {
+        const posY = loadLeadImagePosY();
+        const customUrl = loadLeadCustomUrl();
+        document.querySelectorAll<HTMLElement>('.lead-image-frame').forEach((frame) => {
+          const img = frame.querySelector<HTMLImageElement>('.story-image');
+          if (img) {
+            img.style.objectPosition = `center ${posY}%`;
+            if (customUrl) {
+              if (customUrl === '__none__') {
+                img.src = '';
+                frame.classList.add('is-hidden');
+              } else {
+                img.src = customUrl;
+                frame.classList.remove('is-hidden');
+              }
+            }
+          }
+        });
+      }
+
+      function leadStoryImageHtml(imageUrl?: string) {
+        const customUrl = loadLeadCustomUrl();
+        const displayUrl = customUrl === '__none__' ? '' : (customUrl || imageUrl || '');
+        const posY = loadLeadImagePosY();
+        const originalSrc = imageUrl || '';
+        const isHidden = !displayUrl;
+
+        return `<div class="lead-image-frame ${isHidden ? 'is-hidden' : ''}" data-lead-frame>
+          <img class="story-image" data-lead-image data-original-src="${escapeHtml(originalSrc)}" src="${escapeHtml(displayUrl)}" alt="" loading="lazy" decoding="async" style="object-position: center ${posY}%;" />
+          <div class="lead-image-controls" role="toolbar" aria-label="Lead image options">
+            <button type="button" class="lead-image-btn" data-lead-image-change title="Change image" aria-label="Change image">Change Image</button>
+            <button type="button" class="lead-image-btn" data-lead-image-delete title="Delete image" aria-label="Delete image">Delete</button>
+          </div>
+          <div class="lead-image-placeholder-box" data-lead-placeholder-box>
+            <div class="lead-placeholder-header">
+              <span class="lead-placeholder-title">Lead Image</span>
+              <div style="display:flex;gap:0.35rem;">
+                ${originalSrc ? `<button type="button" class="lead-image-btn" data-lead-image-reset title="Reset to original story image">Reset</button>` : ''}
+                <button type="button" class="lead-image-btn" data-lead-image-delete title="Delete image" aria-label="Delete image">Delete</button>
+              </div>
+            </div>
+            <div class="lead-placeholder-form">
+              <input type="url" id="lead-image-url-input" name="leadImageUrl" class="lead-image-url-input" data-lead-image-input placeholder="Enter direct image URL (https://...)..." aria-label="Lead image URL" autocomplete="off" value="${escapeHtml(customUrl && customUrl !== '__none__' ? customUrl : (customUrl === '__none__' ? '' : displayUrl))}" />
+              <button type="button" class="lead-image-btn primary" data-lead-image-save>Apply</button>
+              <button type="button" class="lead-image-btn" data-lead-image-cancel>Cancel</button>
+            </div>
+            <p class="lead-placeholder-hint">Direct link to JPG, PNG, GIF, WebP, or SVG</p>
+          </div>
+        </div>`;
+      }
+
+      function storyHtml(s: {
+        title: string;
+        description: string;
+        paragraphs?: string[];
+        blocks?: { type: 'paragraph' | 'image'; text?: string; src?: string }[];
+        url?: string;
+        source: string;
+        brief?: boolean;
+        imageUrl?: string;
+      }) {
+        const title = s.url
+          ? `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a>`
+          : escapeHtml(s.title);
+        const cls = s.brief ? 'story-item brief-item' : 'story-item';
+
+        let bodyHtml = '';
+        if (Array.isArray(s.blocks) && s.blocks.length) {
+          bodyHtml = s.blocks
+            .map((b) => {
+              if (b.type === 'image' && b.src) {
+                return storyImageHtml(b.src);
+              }
+              if (b.text) {
+                return `<p class="deck">${escapeHtml(b.text)}</p>`;
+              }
+              return '';
+            })
+            .join('');
+        } else {
+          const paragraphs: string[] = Array.isArray(s.paragraphs) && s.paragraphs.length
+            ? s.paragraphs
+            : (s.description || '').split(/\n\s*\n/).filter(Boolean);
+          const parasHtml = paragraphs.length
+            ? paragraphs.map((p) => `<p class="deck">${escapeHtml(p)}</p>`).join('')
+            : `<p class="deck">${escapeHtml(s.description)}</p>`;
+          bodyHtml = `${storyImageHtml(s.imageUrl)}${parasHtml}`;
+        }
+
+        return `<article class="${cls}">
+          <h3>${title}</h3>
+          ${bodyHtml}
+          <p class="meta">${escapeHtml(s.source)}</p>
+        </article>`;
+      }
+
+      function emptyColumnHtml(_label: string, _msg = '') {
+        // Collapse empty flow blocks — do not leave hollow column shells.
+        return '';
+      }
+
+      function emptyLeadHtml() {
+        return `<div class="empty-edition" data-empty-edition>
+          <h2 class="section-label">Morning edition</h2>
+          <p class="empty-edition-msg">Paste today’s Grok brief to fill the paper</p>
+          <p class="empty-edition-hint screen-only">Use <strong>Paste brief</strong> in the toolbar, or <button type="button" class="empty-edition-load-sample" style="background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0;font-weight:bold;">load sample edition</button>.</p>
+        </div>`;
+      }
+
+      function renderColumn(rootSel: string, label: string, stories: any[]) {
+        const root = document.querySelector(rootSel);
+        if (!root) return;
+        if (!stories?.length) {
+          root.innerHTML = emptyColumnHtml(label);
+          return;
+        }
+        root.innerHTML = `<section class="story-column"><h2 class="section-label">${label}</h2>${stories.map((s) => storyHtml(s)).join('')}</section>`;
+      }
+
+      function renderAlso(stories: any[]) {
+        const root = document.querySelector('[data-live-also]');
+        if (!root) return;
+        if (!stories?.length) {
+          root.innerHTML = '';
+          return;
+        }
+        root.innerHTML = `<section class="also-today" aria-label="Also today">
+          <h2 class="section-label">Also today · Local</h2>
+          ${(stories || [])
+            .map(
+              (s) => `<article class="brief ${s.brief ? 'brief-item' : ''}">
+              <h3>${s.url ? `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a>` : escapeHtml(s.title)}</h3>
+              <p>${escapeHtml(s.description || '')}</p>
+              <div class="source">${escapeHtml(s.source || '')}</div>
+            </article>`,
+            )
+            .join('')}
+        </section>`;
+      }
+
+      function renderLead(
+        story: any | null,
+        grokLede?: string | null,
+        grokRoundupParas?: string[],
+        clearRoundup = false,
+      ) {
+        const root = document.querySelector('[data-live-lead]');
+        if (!root) return;
+        if (!story || !story.title) {
+          let roundupHtml = '';
+          if (grokLede || (grokRoundupParas && grokRoundupParas.length)) {
+            const paras = grokRoundupParas?.length ? grokRoundupParas : grokLede ? [grokLede] : [];
+            roundupHtml = `<aside class="roundup-box brief-item" aria-label="Morning brief">
+              <div class="kicker">Brief · Morning roundup</div>
+              <h3 style="font-family: var(--serif-display); font-size: 1.05rem; margin: 0 0 0.25rem;">From the Automation</h3>
+              ${paras.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}
+            </aside>`;
+          }
+          root.innerHTML = roundupHtml || emptyLeadHtml();
+          return;
+        }
+        let roundupHtml = '';
+        if (grokLede || (grokRoundupParas && grokRoundupParas.length)) {
+          const paras = grokRoundupParas?.length
+            ? grokRoundupParas
+            : grokLede
+              ? [grokLede]
+              : [];
+          roundupHtml = `<aside class="roundup-box brief-item" aria-label="Morning brief">
+            <div class="kicker">Brief · Morning roundup</div>
+            <h3 style="font-family: var(--serif-display); font-size: 1.05rem; margin: 0 0 0.25rem;">From the Automation</h3>
+            ${paras.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}
+          </aside>`;
+        } else if (!clearRoundup) {
+          const existing = root.querySelector('.roundup-box');
+          if (existing) roundupHtml = existing.outerHTML;
+        }
+        const customUrl = loadLeadCustomUrl();
+        const hasImg = customUrl === '__none__' ? false : Boolean(story.imageUrl || customUrl);
+        root.innerHTML = `<article class="lead-story ${hasImg ? 'has-image' : 'no-image'}" data-lead-story>
+          <div class="lead-hed-wrap" data-lead-hed-wrap>
+            <h2 class="lead-hed">${story.url ? `<a href="${story.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(story.title)}</a>` : escapeHtml(story.title)}</h2>
+            <div class="lead-hed-controls" role="toolbar" aria-label="Lead story options">
+              <button type="button" class="lead-image-btn" data-lead-image-add title="Add image to lead story" aria-label="Add image">Add Image</button>
+            </div>
+          </div>
+          ${leadStoryImageHtml(story.imageUrl)}
+          <p class="lead-deck">${escapeHtml(story.description || '')}</p>
+          <p class="lead-meta">${escapeHtml(story.source || '')}</p>
+        </article>${roundupHtml}`;
+        applyLeadImageState();
+      }
+
+      const NO_VALID_CALENDAR: { time: string; title: string; note?: string }[] = [
+        { time: '—', title: 'No valid calendar link' },
+      ];
+
+      function renderAgenda(items: { time: string; title: string; note?: string }[]) {
+        const root = document.querySelector('[data-live-agenda]');
+        if (!root) return;
+        const list = Array.isArray(items) ? items : NO_VALID_CALENDAR;
+        const body = list.length
+          ? list
+              .map(
+                (ev) =>
+                  `<li><span class="time">${escapeHtml(ev.time)}</span><span class="desc">${escapeHtml(ev.title)}</span></li>`,
+              )
+              .join('')
+          : '<li class="agenda-empty">Quiet day</li>';
+        root.innerHTML = `<aside class="schedule-box" aria-label="Daily schedule">
+          <h2 class="section-label">Today's Agenda</h2>
+          <ul class="agenda-list">${body}</ul>
+        </aside>`;
+      }
+
+      function renderGrokWeather(grok: ParsedGrokBrief | null) {
+        const root = document.querySelector('[data-grok-weather]');
+        if (!root) return;
+        const sec = grok?.sections.find((s) => s.kind === 'weather');
+        if (!sec || !sec.paragraphs.length) {
+          root.innerHTML = '';
+          return;
+        }
+        root.innerHTML = `<aside class="grok-weather-box weather-box brief-item" aria-label="Weather from Automation">
+          <h2 class="section-label">Weather</h2>
+          <div class="weather-prose">${sec.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}</div>
+        </aside>`;
+      }
+
+      function renderGrokGlance(grok: ParsedGrokBrief | null) {
+        const root = document.querySelector('[data-grok-glance]');
+        if (!root) return;
+        const glance = grok?.sections.find((s) => s.kind === 'glance');
+        const items = glance ? (glance.bullets.length ? glance.bullets : glance.paragraphs) : [];
+        if (!glance || !items.length) {
+          root.innerHTML = '';
+          return;
+        }
+        const heading = glance.heading && glance.heading.trim() ? glance.heading : 'At a glance';
+        root.innerHTML = `<aside class="grok-glance-box glance-box brief-item" aria-label="At a glance">
+          <h2 class="section-label">${escapeHtml(heading)}</h2>
+          <ul class="glance-list">
+            ${items.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}
+          </ul>
+        </aside>`;
+      }
+
+      function renderGrokWatch(grok: ParsedGrokBrief | null) {
+        const root = document.querySelector('[data-grok-watch]');
+        if (!root) return;
+        const watch = grok?.sections.find((s) => s.kind === 'watch');
+        const items = watch ? (watch.bullets.length ? watch.bullets : watch.paragraphs) : [];
+        if (!watch || !items.length) {
+          root.innerHTML = '';
+          return;
+        }
+        const heading = watch.heading && watch.heading.trim() ? watch.heading : 'What to watch';
+        root.innerHTML = `<aside class="grok-watch-box watch-box brief-item" aria-label="What to watch">
+          <h2 class="section-label">${escapeHtml(heading)}</h2>
+          <ul class="watch-list">
+            ${items.map((b) => `<li>${escapeHtml(b)}</li>`).join('')}
+          </ul>
+        </aside>`;
+      }
+
+      function asBriefCards(stories: any[], column: string): any[] {
+        return (stories || []).map((s) => ({ ...s, brief: false, column }));
+      }
+
+      let customFeedPools: Record<string, any[]> = {};
+      let customFeedIndices: Record<string, number> = {};
+
+      function customStoryHtml(feed: { id: string; name: string }, story: any, idx: number, total: number) {
+        const title = story.url
+          ? `<a href="${escapeAttr(story.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(story.title)}</a>`
+          : escapeHtml(story.title);
+        const cycleControls =
+          total > 1
+            ? `<div class="story-cycle-controls" role="toolbar" aria-label="Change article">
+                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="prev" data-feed-id="${escapeAttr(feed.id)}" title="Previous article" aria-label="Previous article">◂ Prev</button>
+                <span class="story-cycle-indicator">${idx + 1} of ${total}</span>
+                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="next" data-feed-id="${escapeAttr(feed.id)}" title="Next article" aria-label="Next article">Next ▸</button>
+              </div>`
+            : '';
+
+        let bodyHtml = '';
+        if (Array.isArray(story.blocks) && story.blocks.length) {
+          bodyHtml = story.blocks
+            .map((b: any) => {
+              if (b.type === 'image' && b.src) {
+                return storyImageHtml(b.src);
+              }
+              if (b.text) {
+                return `<p class="deck">${escapeHtml(b.text)}</p>`;
+              }
+              return '';
+            })
+            .join('');
+        } else {
+          const paragraphs: string[] = Array.isArray(story.paragraphs) && story.paragraphs.length
+            ? story.paragraphs
+            : (story.description || '').split(/\n\s*\n/).filter(Boolean);
+          const parasHtml = paragraphs.length
+            ? paragraphs.map((p) => `<p class="deck">${escapeHtml(p)}</p>`).join('')
+            : `<p class="deck">${escapeHtml(story.description || '')}</p>`;
+          bodyHtml = `${storyImageHtml(story.imageUrl || story.image)}${parasHtml}`;
+        }
+
+        return `<section class="story-column custom-feed-column" data-custom-feed-id="${escapeAttr(feed.id)}">
+          <div class="custom-feed-header">
+            <h2 class="section-label">${escapeHtml(feed.name)}</h2>
+            ${cycleControls}
+          </div>
+          <article class="story-item custom-feed-story" data-feed-id="${escapeAttr(feed.id)}">
+            <h3>${title}</h3>
+            ${bodyHtml}
+            <p class="meta">${escapeHtml(story.source || feed.name)}</p>
+          </article>
+        </section>`;
+      }
+
+      function renderCustomFeeds(customFeedsData?: { id: string; name: string; url: string; stories: any[] }[]) {
+        if (customFeedsData) {
+          customFeedsData.forEach((f) => {
+            if (f.stories?.length) {
+              customFeedPools[f.id] = f.stories;
+            }
+          });
+        }
+        const sectionsHtml = (settings.customFeeds || [])
+          .map((feed) => {
+            const stories = customFeedPools[feed.id] || [];
+            if (!stories.length) return '';
+            const idx = (customFeedIndices[feed.id] ?? 0) % stories.length;
+            const story = stories[idx];
+            return customStoryHtml(feed, story, idx, stories.length);
+          })
+          .filter(Boolean)
+          .join('');
+
+        document.querySelectorAll<HTMLElement>('[data-live-custom-feeds]').forEach((el) => {
+          el.innerHTML = sectionsHtml;
+        });
+      }
+
+      /** Grok maps directly to columns; built-in RSS if settings.rssEnabled; custom RSS in dedicated end sections. */
+      function composeEdition(rss: any, grok: ParsedGrokBrief | null) {
+        const useRss = settings.rssEnabled === true;
+        const newsRss = useRss ? asBriefCards(rss?.news || [], 'news') : [];
+        const bizRss = useRss ? asBriefCards(rss?.businessTech || [], 'businessTech') : [];
+        const sportsRss = useRss ? asBriefCards(rss?.sports || [], 'sports') : [];
+        const alsoRss = useRss ? asBriefCards(rss?.alsoToday || [], 'also') : [];
+        const leadRss = useRss ? rss?.lead?.[0] || rss?.news?.[0] || null : null;
+
+        if (!grok) {
+          if (useRss && (leadRss || newsRss.length || bizRss.length || sportsRss.length || alsoRss.length)) {
+            const newsRssRest =
+              leadRss && newsRss.length && (newsRss[0].title === leadRss.title || newsRss[0].url === leadRss.url)
+                ? newsRss.slice(1)
+                : newsRss;
+            renderLead(leadRss, null, [], true);
+            renderAlso(alsoRss.slice(0, 5));
+            renderColumn('[data-live-news]', 'News', newsRssRest.slice(0, 5));
+            renderColumn('[data-live-biz]', 'Business · Tech', bizRss.slice(0, 5));
+            renderColumn('[data-live-sports]', 'Sports', sportsRss.slice(0, 5));
+          } else {
+            renderLead(null, null, [], true);
+            renderAlso([]);
+            renderColumn('[data-live-news]', 'News', []);
+            renderColumn('[data-live-biz]', 'Business · Tech · Markets', []);
+            renderColumn('[data-live-sports]', 'Sports', []);
+          }
+          renderGrokWeather(null);
+          renderGrokGlance(null);
+          renderGrokWatch(null);
+          renderCustomFeeds(rss?.customFeeds);
+          schedulePaginate();
+          return;
+        }
+
+        const cards = grokItemsAsStories(grok);
+        const briefNews = cards.filter((c) => c.column === 'news').map((c) => ({ ...c, brief: true, url: undefined }));
+        const briefAlso = cards.filter((c) => c.column === 'also').map((c) => ({ ...c, brief: true, url: undefined }));
+        const briefSports = cards.filter((c) => c.column === 'sports').map((c) => ({ ...c, brief: true, url: undefined }));
+        const briefBiz = cards.filter((c) => c.column === 'businessTech').map((c) => ({ ...c, brief: true, url: undefined }));
+
+        // Lead: first national/brief item, or RSS lead if enabled
+        const leadFromGrok = briefNews[0]
+          ? {
+              title: briefNews[0].title,
+              description: briefNews[0].description,
+              source: briefNews[0].source,
+              url: undefined,
+              imageUrl: briefNews[0].imageUrl,
+            }
+          : null;
+        const newsRest = briefNews.slice(leadFromGrok ? 1 : 0);
+        const effectiveLead = leadFromGrok || leadRss;
+        const newsRssRest =
+          !leadFromGrok && leadRss && newsRss.length && (newsRss[0].title === leadRss.title || newsRss[0].url === leadRss.url)
+            ? newsRss.slice(1)
+            : newsRss;
+
+        renderLead(effectiveLead, grok.lede, []);
+        renderGrokWeather(grok);
+        renderGrokGlance(grok);
+        renderGrokWatch(grok);
+
+        if (useRss) {
+          renderAlso(interleave(briefAlso, alsoRss).slice(0, 6));
+          renderColumn('[data-live-news]', 'News', interleave(newsRest, newsRssRest).slice(0, 6));
+          renderColumn('[data-live-biz]', 'Business · Tech', interleave(briefBiz, bizRss).slice(0, 6));
+          renderColumn('[data-live-sports]', 'Sports', interleave(briefSports, sportsRss).slice(0, 6));
+        } else {
+          renderAlso(briefAlso.slice(0, 6));
+          renderColumn('[data-live-news]', 'News', newsRest.slice(0, 6));
+          renderColumn('[data-live-biz]', 'Business · Tech · Markets', briefBiz.slice(0, 6));
+          renderColumn('[data-live-sports]', 'Sports', briefSports.slice(0, 6));
+        }
+        renderCustomFeeds(rss?.customFeeds);
+        schedulePaginate();
+      }
+
+      async function refreshStories(s: PaperSettings) {
+        const status = document.getElementById('settings-status');
+        const hasCustom = Array.isArray(s.customFeeds) && s.customFeeds.length > 0;
+        if (!s.rssEnabled && !hasCustom) {
+          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [] };
+          composeEdition(lastRss, lastGrok);
+          if (status) status.textContent = 'RSS disabled · paper uses Grok brief';
+          return;
+        }
+        if (status) status.textContent = 'Refreshing feeds…';
+        const editionDate = document.body.dataset.editionDate || '';
+        try {
+          const data = await fetchAllFeeds({
+            enabledFeedIds: s.rssEnabled ? s.enabledFeedIds : [],
+            customFeeds: s.customFeeds,
+            editionDate,
+            todayOnlyBuiltIn: true,
+          });
+          lastRss = {
+            news: data.news?.length ? data.news.slice(0, 5) : [],
+            businessTech: data.businessTech?.length ? data.businessTech.slice(0, 5) : [],
+            sports: data.sports?.length ? data.sports.slice(0, 5) : [],
+            lead: data.lead?.length ? data.lead : data.news?.length ? [data.news[0]] : [],
+            alsoToday: data.alsoToday?.length
+              ? data.alsoToday.slice(0, 5)
+              : (data.news || []).slice(1, 5),
+            customFeeds: data.customFeeds || [],
+          };
+          composeEdition(lastRss, lastGrok);
+          if (status) {
+            status.textContent =
+              `Updated · ${(data.okFeeds || []).length} feeds ok` +
+              (data.failedFeeds?.length ? ` · ${data.failedFeeds.length} skipped` : '');
+          }
+        } catch (e) {
+          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [] };
+          composeEdition(lastRss, lastGrok);
+          if (status) {
+            status.textContent =
+              'Could not refresh RSS. ' + (e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
+
+      async function refreshAgenda(s: PaperSettings) {
+        const editionDate = document.body.dataset.editionDate || '';
+        if (!s.calendars.length) {
+          renderAgenda(NO_VALID_CALENDAR);
+          return;
+        }
+        try {
+          const data = await fetchMergedAgenda({ calendars: s.calendars, editionDate });
+          if (data.usedFallback || !Array.isArray(data.ok) || !data.ok.length) {
+            renderAgenda(NO_VALID_CALENDAR);
+            return;
+          }
+          // Valid calendar(s): show real events, or an empty quiet day (no fake agenda).
+          renderAgenda(Array.isArray(data.items) ? data.items : []);
+        } catch {
+          renderAgenda(NO_VALID_CALENDAR);
+        }
+      }
+
+      function ensureRssBootstrap() {
+        if (!lastRss) {
+          lastRss = {
+            news: bootstrap.news || [],
+            businessTech: bootstrap.businessTech || [],
+            sports: bootstrap.sports || [],
+            lead: bootstrap.lead ? [bootstrap.lead] : [],
+            alsoToday: bootstrap.alsoToday || [],
+          };
+        }
+      }
+
+      function setGrokStatus(msg: string, isError = false) {
+        for (const id of ['grok-brief-status', 'grok-paste-status']) {
+          const st = document.getElementById(id);
+          if (st) {
+            st.textContent = msg;
+            st.style.color = isError ? '#8b1a1a' : '';
+          }
+        }
+      }
+
+      function applyGrokText(text: string) {
+        const editionDate = document.body.dataset.editionDate || '';
+        const trimmed = text.trim();
+        ensureRssBootstrap();
+
+        // Clear custom lead image URL whenever a new brief is applied or cleared
+        try {
+          localStorage.removeItem(LEAD_CUSTOM_URL_KEY);
+        } catch {}
+
+        if (!trimmed) {
+          clearGrokBrief();
+          lastGrok = null;
+          composeEdition(lastRss, null);
+          setGrokStatus('Brief cleared');
+          showPage(1);
+          return;
+        }
+
+        saveGrokBrief(trimmed, editionDate);
+        const parsed = parseGrokBrief(trimmed);
+
+        if (!parsed.structured) {
+          lastGrok = null;
+          composeEdition(lastRss, null);
+          setGrokStatus(
+            parsed.warning || 'Paste needs ***Section*** / ## sections and **Headline** stories',
+            true,
+          );
+          showPage(1);
+          return;
+        }
+
+        lastGrok = parsed;
+        composeEdition(lastRss, lastGrok);
+        const n = grokItemsAsStories(lastGrok).length;
+        setGrokStatus(
+          settings.rssEnabled
+            ? `Brief composed · ${lastGrok.sections.length} sections · ${n} stories (+ optional RSS)`
+            : `Brief composed · ${lastGrok.sections.length} sections · ${n} stories`,
+        );
+        showPage(1);
+      }
+
+      function sectionLabel(sec?: string) {
+        if (sec === 'alsoToday') return 'Also today / Local';
+        if (sec === 'businessTech') return 'Business · Tech';
+        if (sec === 'sports') return 'Sports';
+        return 'News';
+      }
+
+      function renderCustomList() {
+        const list = document.getElementById('custom-feeds-list');
+        if (!list) return;
+        list.innerHTML = customFeeds
+          .map(
+            (f, i) => `<div class="custom-feed-row" data-idx="${i}">
+              <span><strong>${escapeHtml(f.name)}</strong> <em style="font-size: 0.72rem; color: #555;">(${sectionLabel(f.section)})</em><br/>${escapeHtml(f.url)}</span>
+              <button type="button" data-remove-custom="${i}">Remove</button>
+            </div>`,
+          )
+          .join('');
+        list.querySelectorAll('[data-remove-custom]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number((btn as HTMLElement).getAttribute('data-remove-custom'));
+            customFeeds.splice(idx, 1);
+            renderCustomList();
+          });
+        });
+      }
+
+      function renderCalendarsList() {
+        const list = document.getElementById('calendars-list');
+        if (!list) return;
+        list.innerHTML = calendars
+          .map(
+            (c, i) => `<div class="custom-feed-row">
+              <span><strong>${escapeHtml(c.label)}</strong><br/>${escapeHtml(c.url)}</span>
+              <button type="button" data-remove-cal="${i}">Remove</button>
+            </div>`,
+          )
+          .join('');
+        list.querySelectorAll('[data-remove-cal]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const idx = Number((btn as HTMLElement).getAttribute('data-remove-cal'));
+            calendars.splice(idx, 1);
+            renderCalendarsList();
+          });
+        });
+      }
+
+      function syncRssGroupsDisabled() {
+        const master = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
+        const groups = document.getElementById('settings-feed-groups');
+        const on = Boolean(master?.checked);
+        if (groups) groups.classList.toggle('is-disabled', !on);
+        document.querySelectorAll<HTMLInputElement>('input[name="feed"]').forEach((cb) => {
+          cb.disabled = !on;
+        });
+      }
+
+      function populateSettingsForm(s: PaperSettings) {
+        const nameInput = document.getElementById('settings-paper-name') as HTMLInputElement | null;
+        if (nameInput) nameInput.value = s.paperName || 'The Daily Mike';
+        const taglineInput = document.getElementById('settings-paper-tagline') as HTMLInputElement | null;
+        if (taglineInput) taglineInput.value = s.paperTagline || 'NOTEWORTHY EVENTS WEATHER AND SPORTS';
+        const zipInput = document.getElementById('settings-zip') as HTMLInputElement | null;
+        if (zipInput) zipInput.value = s.zip;
+        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
+        if (rssMaster) rssMaster.checked = s.rssEnabled === true;
+        document.querySelectorAll<HTMLInputElement>('input[name="feed"]').forEach((cb) => {
+          cb.checked = s.enabledFeedIds.includes(cb.value);
+        });
+        document.querySelectorAll<HTMLInputElement>('input[name="comic"]').forEach((cb) => {
+          cb.checked = s.enabledComicIds.includes(cb.value);
+        });
+        customFeeds = [...s.customFeeds];
+        calendars = [...s.calendars];
+        renderCustomList();
+        renderCalendarsList();
+        syncRssGroupsDisabled();
+        const grokStore = loadGrokBrief();
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) ta.value = grokStore?.text || '';
+      }
+
+      function readSettingsFromForm(): PaperSettings {
+        const nameInput = document.getElementById('settings-paper-name') as HTMLInputElement | null;
+        const paperName = (nameInput?.value || 'The Daily Mike').trim() || 'The Daily Mike';
+        const taglineInput = document.getElementById('settings-paper-tagline') as HTMLInputElement | null;
+        const paperTagline = (taglineInput?.value || 'NOTEWORTHY EVENTS WEATHER AND SPORTS').trim() || 'NOTEWORTHY EVENTS WEATHER AND SPORTS';
+        const zipInput = document.getElementById('settings-zip') as HTMLInputElement | null;
+        const zip = (zipInput?.value || '60062').trim();
+        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
+        const enabledFeedIds = Array.from(
+          document.querySelectorAll<HTMLInputElement>('input[name="feed"]:checked'),
+        ).map((cb) => cb.value);
+        const rssEnabled = Boolean(rssMaster?.checked) || customFeeds.length > 0 || enabledFeedIds.length > 0;
+        const enabledComicIds = Array.from(
+          document.querySelectorAll<HTMLInputElement>('input[name="comic"]:checked'),
+        ).map((cb) => cb.value);
+        return {
+          paperName,
+          paperTagline,
+          zip: /^\d{5}$/.test(zip) ? zip : '60062',
+          rssEnabled,
+          enabledFeedIds,
+          customFeeds: [...customFeeds],
+          enabledComicIds,
+          calendars: calendars.map((c) => ({
+            ...c,
+            url: normalizeCalendarUrl(c.url).url,
+          })),
+        };
+      }
+
+      openSettingsBtn?.addEventListener('click', () => {
+        settings = loadSettings();
+        populateSettingsForm(settings);
+        dialog?.showModal();
+      });
+
+      document.getElementById('settings-rss-enabled')?.addEventListener('change', syncRssGroupsDisabled);
+
+      document.getElementById('custom-feed-add-btn')?.addEventListener('click', () => {
+        const name = (document.getElementById('custom-feed-name') as HTMLInputElement)?.value.trim() || 'Custom';
+        const url = (document.getElementById('custom-feed-url') as HTMLInputElement)?.value.trim();
+        const sectionSelect = document.getElementById('custom-feed-section') as HTMLSelectElement | null;
+        const section = (sectionSelect?.value || 'news') as any;
+        if (!url || !url.startsWith('http')) return;
+        customFeeds.push({ id: `custom-${Date.now()}`, name, url, section });
+        (document.getElementById('custom-feed-name') as HTMLInputElement).value = '';
+        (document.getElementById('custom-feed-url') as HTMLInputElement).value = '';
+
+        // Auto-check RSS master so the user sees RSS is enabled
+        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
+        if (rssMaster && !rssMaster.checked) {
+          rssMaster.checked = true;
+          syncRssGroupsDisabled();
+        }
+
+        renderCustomList();
+      });
+
+      document.getElementById('calendar-add-btn')?.addEventListener('click', () => {
+        const label = (document.getElementById('calendar-label') as HTMLInputElement)?.value.trim() || 'Calendar';
+        const rawUrl = (document.getElementById('calendar-url') as HTMLInputElement)?.value.trim();
+        if (!rawUrl || !rawUrl.startsWith('http')) return;
+        const norm = normalizeCalendarUrl(rawUrl);
+        calendars.push({ id: `cal-${Date.now()}`, label, url: norm.url });
+        (document.getElementById('calendar-label') as HTMLInputElement).value = '';
+        (document.getElementById('calendar-url') as HTMLInputElement).value = '';
+        const status = document.getElementById('settings-status');
+        if (status && norm.convertedFromEmbed) {
+          status.textContent = 'Converted Google embed URL → public ICS. Calendar must be public.';
+        }
+        renderCalendarsList();
+      });
+
+      document.getElementById('settings-reset')?.addEventListener('click', () => {
+        settings = defaultSettings();
+        populateSettingsForm(settings);
+      });
+
+      document.getElementById('settings-export')?.addEventListener('click', () => {
+        const status = document.getElementById('settings-status');
+        try {
+          const bundle = buildLocalStorageBundle({ settings: readSettingsFromForm() });
+          const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const day = new Date().toISOString().slice(0, 10);
+          a.href = url;
+          a.download = `daily-mike-settings-${day}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          if (status) status.textContent = 'Exported settings (Grok brief not included).';
+        } catch (e) {
+          if (status) {
+            status.textContent =
+              'Export failed. ' + (e instanceof Error ? e.message : String(e));
+          }
+        }
+      });
+
+      document.getElementById('settings-import')?.addEventListener('click', () => {
+        document.getElementById('settings-import-file')?.click();
+      });
+
+      document.getElementById('settings-import-file')?.addEventListener('change', async (ev) => {
+        const status = document.getElementById('settings-status');
+        const input = ev.target as HTMLInputElement | null;
+        const file = input?.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const bundle = parseLocalStorageBundle(JSON.parse(text));
+          settings = applyLocalStorageBundle(bundle);
+          populateSettingsForm(settings);
+          applyPaperIdentity(settings.paperName, settings.paperTagline);
+          applyComicVisibility(settings);
+          await Promise.all([
+            applyWeather(settings.zip),
+            refreshStories(settings),
+            refreshAgenda(settings),
+          ]);
+          if (status) {
+            status.textContent = `Imported settings from ${file.name} (Grok brief unchanged).`;
+          }
+        } catch (e) {
+          if (status) {
+            status.textContent =
+              'Import failed. ' + (e instanceof Error ? e.message : String(e));
+          }
+        } finally {
+          if (input) input.value = '';
+        }
+      });
+
+      document.getElementById('settings-save')?.addEventListener('click', async () => {
+        settings = readSettingsFromForm();
+        saveSettings(settings);
+        applyPaperIdentity(settings.paperName, settings.paperTagline);
+        applyComicVisibility(settings);
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) applyGrokText(ta.value);
+        await Promise.all([
+          applyWeather(settings.zip),
+          refreshStories(settings),
+          refreshAgenda(settings),
+        ]);
+      });
+
+      document.getElementById('grok-brief-save')?.addEventListener('click', () => {
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        applyGrokText(ta?.value || '');
+      });
+      document.getElementById('grok-brief-clear')?.addEventListener('click', () => {
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) ta.value = '';
+        applyGrokText('');
+      });
+      async function loadSampleBrief() {
+        try {
+          const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+          const sampleUrl = `${base}/samples/grok-brief-example.md`;
+          const res = await fetch(sampleUrl);
+          let text = '';
+          if (res.ok) text = await res.text();
+          else {
+            text = (document.getElementById('grok-brief-input') as HTMLTextAreaElement)?.value || '';
+          }
+          const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+          if (ta && text) ta.value = text;
+          if (text) applyGrokText(text);
+        } catch {
+          /* ignore */
+        }
+      }
+
+      document.getElementById('grok-brief-sample')?.addEventListener('click', loadSampleBrief);
+      document.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement | null;
+        if (t?.closest?.('.empty-edition-load-sample')) {
+          e.preventDefault();
+          void loadSampleBrief();
+        }
+      });
+
+      const pasteDialog = document.getElementById('grok-paste-dialog') as HTMLDialogElement | null;
+      document.getElementById('open-grok-paste')?.addEventListener('click', () => {
+        const store = loadGrokBrief();
+        const q = document.getElementById('grok-paste-quick') as HTMLTextAreaElement | null;
+        if (q) q.value = store?.text || '';
+        const status = document.getElementById('grok-paste-status');
+        if (status) status.textContent = '';
+        pasteDialog?.showModal();
+        q?.focus();
+      });
+      document.getElementById('grok-paste-apply')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const q = document.getElementById('grok-paste-quick') as HTMLTextAreaElement | null;
+        applyGrokText(q?.value || '');
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta && q) ta.value = q.value;
+        pasteDialog?.close();
+      });
+
+      function attachRichTextPasteHandler(el: HTMLTextAreaElement | null) {
+        if (!el) return;
+        el.addEventListener('paste', (e: ClipboardEvent) => {
+          const clipboardData = e.clipboardData;
+          if (!clipboardData) return;
+
+          const html = clipboardData.getData('text/html');
+          if (!html || !html.trim()) return;
+
+          const markdown = htmlToMarkdown(html);
+          if (!markdown || !markdown.trim()) return;
+
+          // Check if HTML actually contained rich elements or images
+          const plainText = clipboardData.getData('text/plain') || '';
+          const hasRichContent =
+            /<(?:img|h[1-6]|strong|b|em|i|a|ul|ol|li|blockquote|figure)\b/i.test(html);
+          if (!hasRichContent && plainText.trim()) {
+            return; // Allow native plain text paste if no rich elements were present
+          }
+
+          e.preventDefault();
+          const start = el.selectionStart ?? 0;
+          const end = el.selectionEnd ?? 0;
+          const currentVal = el.value;
+          const nextVal = currentVal.substring(0, start) + markdown + currentVal.substring(end);
+          el.value = nextVal;
+          el.selectionStart = el.selectionEnd = start + markdown.length;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      }
+
+      attachRichTextPasteHandler(document.getElementById('grok-paste-quick') as HTMLTextAreaElement | null);
+      attachRichTextPasteHandler(document.getElementById('grok-brief-input') as HTMLTextAreaElement | null);
+
+      function shortComicUrl(href: string) {
+        return href.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+      }
+
+      function fitComicSourceUrls(root: ParentNode = document) {
+        root.querySelectorAll<HTMLElement>('.comic-source-url[data-fit-url]').forEach((el) => {
+          const parent = el.parentElement;
+          if (!parent) return;
+          el.style.fontSize = '';
+          let size = 0.52; // rem
+          el.style.fontSize = `${size}rem`;
+          // Shrink until it fits one line in the comic column
+          for (let i = 0; i < 24 && el.scrollWidth > parent.clientWidth && size > 0.32; i++) {
+            size -= 0.02;
+            el.style.fontSize = `${size}rem`;
+          }
+        });
+      }
+
+      function escapeAttr(t: string) {
+        return escapeHtml(t).replace(/`/g, '&#96;');
+      }
+
+      const NY_GENERIC_BLURB = 'A drawing that riffs on the latest news and happenings.';
+
+      function isNewYorkerFeedIdClient(feedId: string | undefined | null): boolean {
+        if (!feedId) return false;
+        return feedId === 'newyorker-daily' || feedId.startsWith('newyorker');
+      }
+
+      function shouldShowNyCaption(c: {
+        feedId?: string;
+        id: string;
+        title: string;
+        caption: string;
+        imageUrl?: string | null;
+      }): boolean {
+        const feedId = c.feedId || c.id.split('-')[0] || c.id;
+        const cap = (c.caption || '').trim();
+        if (!c.imageUrl || !isNewYorkerFeedIdClient(feedId) || !cap) return false;
+        if (cap === NY_GENERIC_BLURB) return false;
+        if (cap === (c.title || '').trim()) return false;
+        return true;
+      }
+
+      function comicBoxHtml(
+        c: {
+          id: string;
+          feedId?: string;
+          title: string;
+          credit: string;
+          caption: string;
+          imageUrl?: string | null;
+          link?: string;
+          live?: boolean;
+        },
+        slotIndex = 0,
+      ) {
+        const href = c.link || c.imageUrl || '';
+        const feedId = c.feedId || c.id.split('-')[0] || c.id;
+        const img = c.imageUrl
+          ? `<a class="comic-image-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">
+              <img class="comic-image" src="${escapeAttr(c.imageUrl)}" alt="${escapeAttr(c.title)} — ${escapeAttr(c.caption)}" loading="lazy" referrerpolicy="no-referrer" data-comic-img />
+            </a>`
+          : `<p class="comic-caption-only">${escapeHtml(c.caption)}</p>`;
+        const nyCaption = shouldShowNyCaption(c)
+          ? `<p class="comic-caption">${escapeHtml(c.caption)}</p>`
+          : '';
+        const source = href
+          ? `<p class="comic-source"><a class="comic-source-url" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer" data-fit-url>${escapeHtml(shortComicUrl(href))}</a></p>`
+          : '';
+        return `<section class="comic-box" aria-label="${escapeAttr(c.title)}" data-comic-id="${escapeAttr(c.id)}" data-comic-feed-id="${escapeAttr(feedId)}" data-comic-slot="${slotIndex}" data-comic-live="${c.live ? '1' : '0'}">
+          <h2 class="section-label">${escapeHtml(c.title)}</h2>
+          <div class="comic-frame">
+            <div class="comic-credit">${escapeHtml(c.credit)}${c.live === false ? ' <span class="comic-fallback-flag"> · feed fallback</span>' : ''}</div>
+            ${img}
+            ${nyCaption}
+            ${source}
+            <div class="comic-cycle-controls" role="toolbar" aria-label="Change comic strip">
+              <button type="button" class="comic-cycle-btn" data-comic-cycle="prev" title="Previous comic strip" aria-label="Previous comic strip">◂ Prev</button>
+              <button type="button" class="comic-cycle-btn" data-comic-cycle="next" title="Next comic strip" aria-label="Next comic strip">Next ▸</button>
+            </div>
+          </div>
+        </section>`;
+      }
+
+      let comicsPool: {
+        id: string;
+        feedId?: string;
+        title: string;
+        credit: string;
+        caption: string;
+        imageUrl?: string | null;
+        link?: string;
+        live?: boolean;
+      }[] = [];
+      try {
+        const poolEl = document.getElementById('comics-pool');
+        if (poolEl?.textContent) comicsPool = JSON.parse(poolEl.textContent);
+      } catch {
+        comicsPool = [];
+      }
+
+      const failedComicIds = new Set<string>();
+
+      function getSlotIndex(box: HTMLElement): number {
+        const raw = box.dataset.comicSlot;
+        if (raw != null && raw !== '') return Number(raw);
+        const parent = box.parentElement;
+        if (!parent) return 0;
+        const idx = Array.from(parent.children).indexOf(box);
+        return idx >= 0 ? idx : 0;
+      }
+
+      function getOtherSlotComicId(slotIndex: number): string | null {
+        const otherSlot = slotIndex === 0 ? 1 : 0;
+        const otherBox = document.querySelector<HTMLElement>(
+          `.edition-document [data-live-comics] .comic-box[data-comic-slot="${otherSlot}"]`,
+        ) || document.querySelector<HTMLElement>(
+          `#paged-edition [data-live-comics] .comic-box[data-comic-slot="${otherSlot}"]`,
+        );
+        return otherBox?.dataset.comicId || null;
+      }
+
+      function getCandidateComics(slotIndex: number, s: PaperSettings = settings) {
+        const enabled = new Set(s.enabledComicIds);
+        const otherId = getOtherSlotComicId(slotIndex);
+        return comicsPool.filter((c) => {
+          if (!c.imageUrl || failedComicIds.has(c.id)) return false;
+          const feedId = c.feedId || c.id.split('-')[0];
+          if (enabled.size > 0 && !enabled.has(feedId)) return false;
+          if (otherId && c.id === otherId) return false;
+          return true;
+        });
+      }
+
+      function updateComicBoxDom(box: HTMLElement, c: typeof comicsPool[0]) {
+        box.dataset.comicId = c.id;
+        box.dataset.comicFeedId = c.feedId || c.id.split('-')[0];
+        box.dataset.comicLive = c.live ? '1' : '0';
+
+        const label = box.querySelector('.section-label');
+        if (label) label.textContent = c.title;
+
+        const credit = box.querySelector('.comic-credit');
+        if (credit) {
+          credit.innerHTML = `${escapeHtml(c.credit)}${c.live === false ? ' <span class="comic-fallback-flag"> · feed fallback</span>' : ''}`;
+        }
+
+        const href = c.link || c.imageUrl || '';
+        const link = box.querySelector<HTMLAnchorElement>('.comic-image-link');
+        const img = box.querySelector<HTMLImageElement>('.comic-image');
+        if (img && c.imageUrl) {
+          img.src = c.imageUrl;
+          img.alt = `${c.title} — ${c.caption}`;
+        }
+        if (link) {
+          link.href = href || '#';
+        }
+
+        let captionEl = box.querySelector<HTMLParagraphElement>('.comic-caption');
+        if (shouldShowNyCaption(c)) {
+          if (!captionEl) {
+            captionEl = document.createElement('p');
+            captionEl.className = 'comic-caption';
+            const source = box.querySelector('.comic-source');
+            const frame = box.querySelector('.comic-frame');
+            if (source) {
+              source.before(captionEl);
+            } else if (frame) {
+              const controls = frame.querySelector('.comic-cycle-controls');
+              if (controls) controls.before(captionEl);
+              else frame.appendChild(captionEl);
+            }
+          }
+          captionEl.textContent = c.caption;
+        } else if (captionEl) {
+          captionEl.remove();
+        }
+
+        const srcUrl = box.querySelector<HTMLAnchorElement>('.comic-source-url');
+        if (srcUrl) {
+          srcUrl.href = href;
+          srcUrl.textContent = shortComicUrl(href);
+        }
+        fitComicSourceUrls(box);
+      }
+
+      function updateComicSlot(slotIndex: number, c: typeof comicsPool[0]) {
+        document
+          .querySelectorAll<HTMLElement>(`[data-live-comics] .comic-box[data-comic-slot="${slotIndex}"]`)
+          .forEach((box) => {
+            updateComicBoxDom(box, c);
+          });
+      }
+
+      function cycleComicSlot(box: HTMLElement, direction: 'next' | 'prev' = 'next') {
+        const slotIndex = getSlotIndex(box);
+        const candidates = getCandidateComics(slotIndex);
+        if (candidates.length <= 1) return;
+        const currentId = box.dataset.comicId || '';
+        const curIdx = candidates.findIndex((c) => c.id === currentId);
+        let nextIdx = 0;
+        if (direction === 'next') {
+          nextIdx = curIdx >= 0 ? (curIdx + 1) % candidates.length : 0;
+        } else {
+          nextIdx = curIdx >= 0 ? (curIdx - 1 + candidates.length) % candidates.length : candidates.length - 1;
+        }
+        const nextComic = candidates[nextIdx];
+        if (nextComic) {
+          updateComicSlot(slotIndex, nextComic);
+          schedulePaginate();
+        }
+      }
+
+      function applyComicVisibility(s: PaperSettings) {
+        const enabled = new Set(s.enabledComicIds);
+        const activeIds = new Set<string>();
+
+        [0, 1].forEach((slotIndex) => {
+          const boxes = document.querySelectorAll<HTMLElement>(
+            `[data-live-comics] .comic-box[data-comic-slot="${slotIndex}"]`,
+          );
+          const firstBox = boxes[0];
+          if (!firstBox) return;
+
+          let feedId = firstBox.dataset.comicFeedId || firstBox.dataset.comicId?.split('-')[0] || '';
+          let currentId = firstBox.dataset.comicId || '';
+
+          if (!enabled.has(feedId) || failedComicIds.has(currentId) || activeIds.has(currentId)) {
+            const candidate = comicsPool.find((c) => {
+              if (!c.imageUrl || failedComicIds.has(c.id) || activeIds.has(c.id)) return false;
+              const fId = c.feedId || c.id.split('-')[0];
+              return enabled.has(fId);
+            });
+            if (candidate) {
+              updateComicSlot(slotIndex, candidate);
+              feedId = candidate.feedId || candidate.id.split('-')[0];
+              currentId = candidate.id;
+            }
+          }
+
+          const want = Boolean(feedId && enabled.has(feedId) && !activeIds.has(currentId));
+          boxes.forEach((b) => {
+            b.style.display = want ? '' : 'none';
+          });
+          if (want && currentId) {
+            activeIds.add(currentId);
+          }
+        });
+        fitComicSourceUrls();
+        schedulePaginate();
+      }
+
+      document.addEventListener(
+        'error',
+        (e) => {
+          const img = e.target as HTMLElement | null;
+          if (!img || img.tagName !== 'IMG' || !img.hasAttribute('data-comic-img')) return;
+          const box = img.closest('.comic-box') as HTMLElement | null;
+          if (!box) return;
+          const failedId = box.dataset.comicId || '';
+          if (failedId) {
+            if (failedComicIds.has(failedId)) return;
+            failedComicIds.add(failedId);
+          }
+          cycleComicSlot(box, 'next');
+          applyComicVisibility(settings);
+          schedulePaginate();
+        },
+        true,
+      );
+
+      document.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement | null;
+        const customCycleBtn = t?.closest?.('[data-custom-feed-cycle]') as HTMLElement | null;
+        if (customCycleBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const feedId = customCycleBtn.getAttribute('data-feed-id') || '';
+          const dir = customCycleBtn.getAttribute('data-custom-feed-cycle');
+          const stories = customFeedPools[feedId] || [];
+          if (stories.length > 1) {
+            let cur = customFeedIndices[feedId] ?? 0;
+            cur = dir === 'next' ? (cur + 1) % stories.length : (cur - 1 + stories.length) % stories.length;
+            customFeedIndices[feedId] = cur;
+            renderCustomFeeds();
+            schedulePaginate();
+          }
+          return;
+        }
+
+        const cycleBtn = t?.closest?.('[data-comic-cycle]') as HTMLElement | null;
+        if (cycleBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const box = cycleBtn.closest('.comic-box') as HTMLElement | null;
+          const dir = cycleBtn.getAttribute('data-comic-cycle') === 'prev' ? 'prev' : 'next';
+          if (box) cycleComicSlot(box, dir);
+          return;
+        }
+
+        // Lead story Add Image button (hover over title)
+        const addBtn = t?.closest?.('[data-lead-image-add]') as HTMLElement | null;
+        if (addBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+            const frame = story.querySelector<HTMLElement>('.lead-image-frame');
+            if (frame) {
+              frame.classList.remove('is-hidden');
+              frame.classList.add('is-editing');
+            }
+          });
+          schedulePaginate();
+          window.setTimeout(() => {
+            const input = document.querySelector<HTMLInputElement>(
+              '#paged-edition [data-lead-image-input], .lead-image-url-input',
+            );
+            if (input) {
+              input.focus();
+              input.select();
+            }
+          }, 80);
+          return;
+        }
+
+        // Lead image Change Image button
+        const changeBtn = t?.closest?.('[data-lead-image-change]') as HTMLElement | null;
+        if (changeBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          document.querySelectorAll<HTMLElement>('.lead-image-frame').forEach((frame) => {
+            frame.classList.remove('is-hidden');
+            frame.classList.add('is-editing');
+          });
+          schedulePaginate();
+          window.setTimeout(() => {
+            const input = document.querySelector<HTMLInputElement>(
+              '#paged-edition [data-lead-image-input], .lead-image-url-input',
+            );
+            if (input) {
+              input.focus();
+              input.select();
+            }
+          }, 80);
+          return;
+        }
+
+        // Lead image Cancel URL button
+        const cancelBtn = t?.closest?.('[data-lead-image-cancel]') as HTMLElement | null;
+        if (cancelBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+            const frame = story.querySelector<HTMLElement>('.lead-image-frame');
+            const img = frame?.querySelector<HTMLImageElement>('.story-image');
+            const customUrl = loadLeadCustomUrl();
+            const orig = img?.getAttribute('data-original-src');
+            const currentSrc = customUrl || orig || img?.src || '';
+            frame?.classList.remove('is-editing', 'is-failed');
+            if (!currentSrc) {
+              frame?.classList.add('is-hidden');
+              story.classList.add('no-image');
+              story.classList.remove('has-image');
+            } else {
+              frame?.classList.remove('is-hidden');
+              story.classList.add('has-image');
+              story.classList.remove('no-image');
+            }
+          });
+          schedulePaginate();
+          return;
+        }
+
+        // Lead image Delete / Remove button
+        const deleteBtn = t?.closest?.('[data-lead-image-delete]') as HTMLElement | null;
+        if (deleteBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            localStorage.setItem(LEAD_CUSTOM_URL_KEY, '__none__');
+          } catch {}
+          document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+            story.classList.remove('has-image', 'lead-image-failed');
+            story.classList.add('no-image');
+            const frame = story.querySelector<HTMLElement>('.lead-image-frame');
+            if (frame) {
+              frame.classList.remove('is-editing', 'is-failed');
+              frame.classList.add('is-hidden');
+              const img = frame.querySelector<HTMLImageElement>('.story-image');
+              if (img) img.src = '';
+            }
+          });
+          schedulePaginate();
+          return;
+        }
+
+        // Lead image Reset URL button
+        const resetBtn = t?.closest?.('[data-lead-image-reset]') as HTMLElement | null;
+        if (resetBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            localStorage.removeItem(LEAD_CUSTOM_URL_KEY);
+          } catch {}
+          document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+            const frame = story.querySelector<HTMLElement>('.lead-image-frame');
+            const img = frame?.querySelector<HTMLImageElement>('.story-image');
+            const orig = img?.getAttribute('data-original-src');
+            frame?.classList.remove('is-editing', 'is-failed');
+            if (orig) {
+              story.classList.remove('no-image', 'lead-image-failed');
+              story.classList.add('has-image');
+              frame?.classList.remove('is-hidden');
+              if (img) img.src = orig;
+            } else {
+              story.classList.remove('has-image', 'lead-image-failed');
+              story.classList.add('no-image');
+              frame?.classList.add('is-hidden');
+            }
+          });
+          schedulePaginate();
+          return;
+        }
+
+        // Lead image Save / Apply URL button
+        const saveBtn = t?.closest?.('[data-lead-image-save]') as HTMLElement | null;
+        if (saveBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const frame = saveBtn.closest<HTMLElement>('.lead-image-frame');
+          const input = frame?.querySelector<HTMLInputElement>('[data-lead-image-input]');
+          const newUrl = input?.value.trim();
+          if (newUrl) {
+            try {
+              localStorage.setItem(LEAD_CUSTOM_URL_KEY, newUrl);
+            } catch {}
+            document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+              story.classList.remove('no-image', 'lead-image-failed');
+              story.classList.add('has-image');
+              const f = story.querySelector<HTMLElement>('.lead-image-frame');
+              if (f) {
+                f.classList.remove('is-editing', 'is-failed', 'is-hidden');
+                const img = f.querySelector<HTMLImageElement>('.story-image');
+                if (img) img.src = newUrl;
+              }
+            });
+            schedulePaginate();
+          }
+          return;
+        }
+      });
+
+      // Keep input values in sync across document versions (#edition-document vs #paged-edition)
+      document.addEventListener('input', (e) => {
+        const input = e.target as HTMLInputElement | null;
+        if (!input || !input.matches('[data-lead-image-input]')) return;
+        const val = input.value;
+        document.querySelectorAll<HTMLInputElement>('[data-lead-image-input]').forEach((el) => {
+          if (el !== input) {
+            el.value = val;
+          }
+        });
+      });
+
+      // Listen for image load errors on lead images
+      document.addEventListener(
+        'error',
+        (e) => {
+          const t = e.target as HTMLElement | null;
+          if (!t || t.tagName !== 'IMG') return;
+          if (t.matches('[data-lead-image]') || t.closest('.lead-image-frame')) {
+            const firstFrame = document.querySelector<HTMLElement>('.lead-image-frame');
+            if (firstFrame && firstFrame.classList.contains('is-failed')) return;
+            document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+              story.classList.remove('has-image');
+              story.classList.add('no-image', 'lead-image-failed');
+            });
+            document.querySelectorAll<HTMLElement>('.lead-image-frame').forEach((frame) => {
+              frame.classList.add('is-failed');
+              if (!frame.classList.contains('is-editing')) {
+                frame.classList.add('is-hidden');
+              }
+            });
+            schedulePaginate();
+          }
+        },
+        true,
+      );
+
+      // Listen for image load success on lead images
+      document.addEventListener(
+        'load',
+        (e) => {
+          const t = e.target as HTMLElement | null;
+          if (!t || t.tagName !== 'IMG') return;
+          if (t.matches('[data-lead-image]') || t.closest('.lead-image-frame')) {
+            const firstFrame = document.querySelector<HTMLElement>('.lead-image-frame');
+            if (firstFrame && firstFrame.classList.contains('is-failed')) {
+              document.querySelectorAll<HTMLElement>('.lead-story').forEach((story) => {
+                story.classList.remove('lead-image-failed', 'no-image');
+                story.classList.add('has-image');
+              });
+              document.querySelectorAll<HTMLElement>('.lead-image-frame').forEach((frame) => {
+                frame.classList.remove('is-failed');
+                if (!frame.classList.contains('is-editing')) {
+                  frame.classList.remove('is-hidden');
+                }
+              });
+              schedulePaginate();
+            }
+          }
+        },
+        true,
+      );
+
+      // Drag-to-reposition lead image
+      let isDraggingLead = false;
+      let startPointerY = 0;
+      let startPosY = 50;
+      let activeFrame: HTMLElement | null = null;
+
+      document.addEventListener('pointerdown', (e) => {
+        const t = e.target as HTMLElement | null;
+        if (!t || !t.matches('.lead-image-frame .story-image')) return;
+        if (t.closest('[data-lead-placeholder-box]') || t.closest('.lead-image-controls')) return;
+        e.preventDefault();
+        const frame = t.closest<HTMLElement>('.lead-image-frame');
+        if (!frame) return;
+
+        isDraggingLead = true;
+        startPointerY = e.clientY;
+        startPosY = loadLeadImagePosY();
+        activeFrame = frame;
+        frame.classList.add('is-dragging');
+        (t as HTMLElement).setPointerCapture?.(e.pointerId);
+      });
+
+      document.addEventListener('pointermove', (e) => {
+        if (!isDraggingLead || !activeFrame) return;
+        const frameHeight = activeFrame.clientHeight || 220;
+        const dy = e.clientY - startPointerY;
+        const deltaPercent = (dy / frameHeight) * 100;
+        const newPosY = Math.max(0, Math.min(100, Math.round(startPosY - deltaPercent)));
+
+        document.querySelectorAll<HTMLImageElement>('.lead-image-frame .story-image').forEach((img) => {
+          img.style.objectPosition = `center ${newPosY}%`;
+        });
+      });
+
+      function endLeadDrag() {
+        if (!isDraggingLead) return;
+        isDraggingLead = false;
+        if (activeFrame) {
+          activeFrame.classList.remove('is-dragging');
+          const img = activeFrame.querySelector<HTMLImageElement>('.story-image');
+          if (img) {
+            const match = img.style.objectPosition.match(/center\s+(\d+(?:\.\d+)?)%/);
+            const val = match ? parseFloat(match[1]) : 50;
+            const valid = isNaN(val) ? 50 : Math.max(0, Math.min(100, val));
+            try {
+              localStorage.setItem(LEAD_POS_Y_KEY, String(valid));
+            } catch {}
+          }
+        }
+        activeFrame = null;
+      }
+
+      document.addEventListener('pointerup', endLeadDrag);
+      document.addEventListener('pointercancel', endLeadDrag);
+
+      document.addEventListener('keydown', (e) => {
+        const input = e.target as HTMLElement | null;
+        if (!input || !input.matches('[data-lead-image-input]')) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const frame = input.closest<HTMLElement>('.lead-image-frame');
+          frame?.querySelector<HTMLElement>('[data-lead-image-save]')?.click();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          const frame = input.closest<HTMLElement>('.lead-image-frame');
+          frame?.querySelector<HTMLElement>('[data-lead-image-cancel]')?.click();
+        }
+      });
+
+      applyLeadImageState();
+
+      // Static builds bake build-day puzzles/dates; refresh to America/Chicago today.
+      void applyEditionDate({
+        force: true,
+        onApplied: () => schedulePaginate(),
+      });
+
+      void applyWeather(settings.zip);
+      applyPaperIdentity(settings.paperName, settings.paperTagline);
+      applyComicVisibility(settings);
+      lastRss = {
+        news: bootstrap.news || [],
+        businessTech: bootstrap.businessTech || [],
+        sports: bootstrap.sports || [],
+        lead: bootstrap.lead ? [bootstrap.lead] : [],
+        alsoToday: bootstrap.alsoToday || [],
+      };
+      const urlParams = new URLSearchParams(window.location.search);
+      const isSampleParam = urlParams.has('sample');
+
+      if (isSampleParam) {
+        void loadSampleBrief();
+      } else {
+        const storedGrok = loadGrokBrief();
+        if (storedGrok?.text) {
+          const parsed = parseGrokBrief(storedGrok.text);
+          if (parsed.structured) {
+            lastGrok = parsed;
+            composeEdition(lastRss, lastGrok);
+          } else {
+            lastGrok = null;
+            composeEdition(lastRss, null);
+            const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+            if (ta) ta.value = storedGrok.text;
+          }
+        } else {
+          composeEdition(lastRss, null);
+        }
+      }
+
+      if (settings.rssEnabled || (Array.isArray(settings.customFeeds) && settings.customFeeds.length > 0)) {
+        void refreshStories(settings);
+      }
+      if (settings.calendars.length) refreshAgenda(settings);
+
+      // --- Visteras UX & Tool Controller ---
+      populateSettingsForm(settings);
+
+      function selectTool(toolName: string) {
+        const toolButtons = document.querySelectorAll<HTMLElement>('#tools_left .tool_btn');
+        const panels = document.querySelectorAll<HTMLElement>('#sidepanels .sidepanel_pane');
+        const statusActive = document.getElementById('status_active_tool');
+
+        toolButtons.forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-tool') === toolName);
+        });
+
+        panels.forEach((p) => {
+          p.classList.toggle('active', p.getAttribute('data-panel') === toolName);
+        });
+
+        const labels: Record<string, string> = {
+          paste: 'Paste Brief',
+          typography: 'Typography',
+          settings: 'Edition Settings',
+          rss: 'RSS Feeds',
+        };
+        if (statusActive) {
+          statusActive.textContent = `Tool: ${labels[toolName] || toolName}`;
+        }
+      }
+
+      // Toolbar Buttons Click
+      document.querySelectorAll<HTMLElement>('#tools_left .tool_btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tool = btn.getAttribute('data-tool');
+          if (tool) selectTool(tool);
+        });
+      });
+
+      // Accordion Collapsible Sections
+      document.querySelectorAll<HTMLElement>('.panel_section_header').forEach((hdr) => {
+        hdr.addEventListener('click', () => {
+          const section = hdr.closest<HTMLElement>('.panel_section');
+          if (section) {
+            section.classList.toggle('collapsed');
+            const arrow = hdr.querySelector('.panel_section_arrow');
+            if (arrow) {
+              arrow.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+            }
+          }
+        });
+      });
+
+      // Menu Bar Dropdowns
+      const menuEntries = document.querySelectorAll<HTMLElement>('#visteras_menu_bar .menu_entry');
+      menuEntries.forEach((entry) => {
+        const title = entry.querySelector<HTMLElement>('.menu_entry_title');
+        title?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isActive = entry.classList.contains('active');
+          menuEntries.forEach((e2) => e2.classList.remove('active'));
+          if (!isActive) entry.classList.add('active');
+        });
+      });
+      document.addEventListener('click', () => {
+        menuEntries.forEach((e) => e.classList.remove('active'));
+      });
+
+      // Menu Dropdown Actions
+      document.getElementById('action_new_edition')?.addEventListener('click', () => {
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) ta.value = '';
+        clearGrokBrief();
+        lastGrok = null;
+        composeEdition(lastRss, null);
+        selectTool('paste');
+      });
+
+      document.getElementById('action_load_sample')?.addEventListener('click', () => {
+        void loadSampleBrief();
+        selectTool('paste');
+      });
+
+      document.getElementById('action_print')?.addEventListener('click', () => {
+        void triggerPrint();
+      });
+
+      document.getElementById('action_page_1')?.addEventListener('click', () => showPage(1));
+      document.getElementById('action_page_2')?.addEventListener('click', () => showPage(2));
+      document.getElementById('action_page_3')?.addEventListener('click', () => showPage(3));
+
+      document.getElementById('action_paste_brief')?.addEventListener('click', () => {
+        selectTool('paste');
+      });
+
+      document.getElementById('action_clear_brief')?.addEventListener('click', () => {
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) ta.value = '';
+        applyGrokText('');
+      });
+
+      document.getElementById('action_open_settings')?.addEventListener('click', () => {
+        selectTool('settings');
+      });
+
+      document.getElementById('action_tool_paste')?.addEventListener('click', () => {
+        selectTool('paste');
+      });
+
+      document.getElementById('action_tool_typography')?.addEventListener('click', () => {
+        selectTool('typography');
+      });
+
+      document.getElementById('action_tool_settings')?.addEventListener('click', () => {
+        selectTool('settings');
+      });
+
+      document.getElementById('action_tool_rss')?.addEventListener('click', () => {
+        selectTool('rss');
+      });
+
+      document.getElementById('action_refresh_rss')?.addEventListener('click', () => {
+        void refreshStories(settings);
+      });
+
+      document.getElementById('action_refresh_weather')?.addEventListener('click', () => {
+        void applyWeather(settings.zip);
+      });
+
+      document.getElementById('action_repaginate')?.addEventListener('click', () => {
+        void runPaginate();
+      });
+
+      // Live Typography Inspector
+      const typoNameInput = document.getElementById('settings-paper-name') as HTMLInputElement | null;
+      const typoTaglineInput = document.getElementById('settings-paper-tagline') as HTMLInputElement | null;
+      typoNameInput?.addEventListener('input', () => {
+        settings.paperName = typoNameInput.value;
+        saveSettings(settings);
+        applyPaperIdentity(settings.paperName, settings.paperTagline);
+      });
+      typoTaglineInput?.addEventListener('input', () => {
+        settings.paperTagline = typoTaglineInput.value;
+        saveSettings(settings);
+        applyPaperIdentity(settings.paperName, settings.paperTagline);
+      });
+
+      const typoSizeSelect = document.getElementById('typo-body-size') as HTMLSelectElement | null;
+      typoSizeSelect?.addEventListener('change', () => {
+        document.documentElement.style.setProperty('--newspaper-body-size', typoSizeSelect.value);
+        schedulePaginate();
+      });
+
+      const typoLineHeightSelect = document.getElementById('typo-line-height') as HTMLSelectElement | null;
+      typoLineHeightSelect?.addEventListener('change', () => {
+        document.documentElement.style.setProperty('--newspaper-line-height', typoLineHeightSelect.value);
+        schedulePaginate();
+      });
+
+      // Global Keyboard Shortcuts
+      document.addEventListener('keydown', (e) => {
+        const activeEl = document.activeElement;
+        const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable);
+        if (isInput) return;
+
+        if (e.key === 'p' || e.key === 'P') {
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectTool('paste');
+          }
+        } else if (e.key === 't' || e.key === 'T') {
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectTool('typography');
+          }
+        } else if (e.key === 's' || e.key === 'S') {
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectTool('settings');
+          }
+        } else if (e.key === 'r' || e.key === 'R') {
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            selectTool('rss');
+          }
+        }
+      });
+    
+      </script>
+  </body>
+</html>

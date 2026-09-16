@@ -1,0 +1,160 @@
+---
+import '../../styles/newspaper.css';
+import { PAPER_NAME_UPPER, PAPER_TAGLINE } from '../../lib/site';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Puzzle answers · {PAPER_NAME_UPPER}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=Manufacturing+Consent&family=Merriweather:ital,opsz,wght@0,18..144,300;0,18..144,400;0,18..144,700;1,18..144,300;1,18..144,400&family=Playfair+Display:wght@700;900&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="answers-page-body">
+    <main class="answers-page" id="answers-container">
+      <header class="answers-header">
+        <p class="answers-kicker">{PAPER_NAME_UPPER}</p>
+        <h1>Today’s puzzle answers</h1>
+        <p class="answers-date" id="answers-date-label">Loading answers…</p>
+        <p class="answers-tagline">{PAPER_TAGLINE}</p>
+        <p class="answers-spoiler">Spoilers below — finish the paper first.</p>
+      </header>
+
+      <div id="dynamic-answers-content"></div>
+
+      <p class="answers-back">
+        <a href={import.meta.env.BASE_URL || '/'}>← Back to the paper</a>
+      </p>
+    </main>
+
+    <script>
+      import { puzzlesForDate } from '../../data/puzzles';
+      import { chicagoDateKey } from '../../lib/dateFilter';
+      import { PAPER_NAME_UPPER } from '../../lib/site';
+      import { loadSettings } from '../../lib/settings';
+
+      function escapeHtml(t: string) {
+        return (t || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function getParamDate(): string {
+        const params = new URLSearchParams(window.location.search);
+        const d = params.get('date');
+        if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+        return chicagoDateKey();
+      }
+
+      function renderAnswers(isoDate: string) {
+        const dateObj = new Date(`${isoDate}T12:00:00`);
+        const puzzles = puzzlesForDate(dateObj);
+        const { crossword, jumbles, trivia } = puzzles;
+
+        const settings = loadSettings();
+        const nameUpper = (settings.paperName || 'The Daily Mike').trim().toUpperCase();
+        const tagline = (settings.paperTagline || 'NOTEWORTHY EVENTS WEATHER AND SPORTS').trim();
+
+        document.title = `Puzzle answers — ${isoDate} · ${nameUpper}`;
+
+        const kicker = document.querySelector('.answers-kicker');
+        if (kicker) kicker.textContent = nameUpper;
+        const tag = document.querySelector('.answers-tagline');
+        if (tag) tag.textContent = tagline;
+
+        const dateLabel = document.getElementById('answers-date-label');
+        if (dateLabel) {
+          dateLabel.textContent = isoDate;
+        }
+
+        const container = document.getElementById('dynamic-answers-content');
+        if (!container) return;
+
+        let html = '';
+
+        // Jumbles
+        jumbles.forEach((jumble, i) => {
+          html += `
+            <section class="answers-section">
+              <h2>Jumble ${i + 1}</h2>
+              <p class="answers-meta">${escapeHtml(jumble.clue)}</p>
+              <p class="answers-scrambled">${escapeHtml(jumble.scrambled)}</p>
+              <p class="answers-value"><strong>${escapeHtml(jumble.answer)}</strong></p>
+            </section>
+          `;
+        });
+
+        // Sports Trivia
+        html += `
+          <section class="answers-section">
+            <h2>Sports trivia</h2>
+            <ol class="answers-trivia-list">
+              ${trivia
+                .map(
+                  (t) => `
+                <li>
+                  <p class="answers-meta">${escapeHtml(t.category)} — ${escapeHtml(t.question)}</p>
+                  <p class="answers-value">${escapeHtml(t.answer)}</p>
+                </li>
+              `,
+                )
+                .join('')}
+            </ol>
+          </section>
+        `;
+
+        // Crossword
+        const gridCells = crossword.solution
+          .map((cell) => {
+            const isBlock = cell === '.';
+            return `
+              <div class="crossword-cell ${isBlock ? 'block' : ''}">
+                ${!isBlock ? `<span class="answers-letter">${escapeHtml(cell.toUpperCase())}</span>` : ''}
+              </div>
+            `;
+          })
+          .join('');
+
+        const clueItems = crossword.clues
+          .map(
+            (c) => `
+            <li>
+              <strong>${escapeHtml(String(c.num))}${c.dir === 'across' ? 'A' : 'D'}</strong>: ${escapeHtml(c.answer.toUpperCase())}
+              <span class="answers-meta"> — ${escapeHtml(c.clue)}</span>
+            </li>
+          `,
+          )
+          .join('');
+
+        html += `
+          <section class="answers-section">
+            <h2>Crossword · ${escapeHtml(crossword.title)}</h2>
+            <div
+              class="crossword-grid answers-crossword"
+              style="grid-template-columns: repeat(${crossword.size}, 1.6rem);"
+            >
+              ${gridCells}
+            </div>
+            <ul class="answers-clue-list">
+              ${clueItems}
+            </ul>
+          </section>
+        `;
+
+        container.innerHTML = html;
+      }
+
+      const activeDate = getParamDate();
+      renderAnswers(activeDate);
+    </script>
+  </body>
+</html>

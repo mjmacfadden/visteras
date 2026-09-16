@@ -90,7 +90,11 @@ const menuDefinition = [
 			},
 			{
 				name: 'Visteras Vector',
-				href: './vector/'
+				href: '../vector/'
+			},
+			{
+				name: 'Visteras News',
+				href: '../news/'
 			},
 			{
 				divider: true
@@ -982,7 +986,11 @@ const menuDefinition = [
 			},
 			{
 				name: 'Visteras Vector (Vector Editor)',
-				href: './vector/'
+				href: '../vector/'
+			},
+			{
+				name: 'Visteras News (Morning Newspaper)',
+				href: '../news/'
 			}
 		]
 	}

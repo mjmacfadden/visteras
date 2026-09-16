@@ -1,0 +1,19 @@
+---
+import type { TriviaEntry } from '../data/types';
+interface Props {
+  trivia: TriviaEntry[];
+}
+const { trivia } = Astro.props;
+const items = trivia.slice(0, 3);
+---
+<section class="trivia-box" aria-label="Sports trivia">
+  <h2 class="section-label">Sports Trivia</h2>
+  <ol class="trivia-list">
+    {items.map((t) => (
+      <li class="trivia-item">
+        <span class="trivia-cat">{t.category}</span>
+        <p class="trivia-question">{t.question}</p>
+      </li>
+    ))}
+  </ol>
+</section>

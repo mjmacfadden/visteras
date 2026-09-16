@@ -1,0 +1,17 @@
+---
+import type { HistoryItem } from '../data/types';
+interface Props {
+  history: HistoryItem[];
+}
+const { history } = Astro.props;
+---
+<section class="history-box" aria-label="Today in history">
+  <h2 class="section-label">Today in History</h2>
+  <ul class="feature-list">
+    {history.map((h) => (
+      <li>
+        <strong>{h.year} —</strong> {h.text}
+      </li>
+    ))}
+  </ul>
+</section>

@@ -1,0 +1,57 @@
+---
+import type { ComicStripData } from '../data/types';
+import { isDisplayableNewYorkerCaption, isNewYorkerFeedId } from '../lib/comics';
+interface Props {
+  comic: ComicStripData;
+  slotIndex?: number;
+}
+const { comic, slotIndex = 0 } = Astro.props;
+const href = comic.link || comic.imageUrl || '';
+/** Print-friendly display: drop https:// and leading www. */
+const displayUrl = href.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+const feedId = comic.feedId || comic.id.split('-')[0] || comic.id;
+const showNyCaption =
+  Boolean(comic.imageUrl) &&
+  isNewYorkerFeedId(feedId) &&
+  isDisplayableNewYorkerCaption(comic.caption, comic.title);
+---
+<section
+  class="comic-box"
+  aria-label={comic.title}
+  data-comic-id={comic.id}
+  data-comic-feed-id={feedId}
+  data-comic-slot={slotIndex}
+  data-comic-live={comic.live ? '1' : '0'}
+>
+  <h2 class="section-label">{comic.title}</h2>
+  <div class="comic-frame">
+    <div class="comic-credit">
+      {comic.credit}
+      {comic.live === false && <span class="comic-fallback-flag"> · feed fallback</span>}
+    </div>
+    {comic.imageUrl ? (
+      <a class="comic-image-link" href={href || '#'} target="_blank" rel="noopener noreferrer">
+        <img
+          class="comic-image"
+          src={comic.imageUrl}
+          alt={`${comic.title} — ${comic.caption}`}
+          loading="lazy"
+          referrerpolicy="no-referrer"
+          data-comic-img
+        />
+      </a>
+    ) : (
+      <p class="comic-caption-only">{comic.caption}</p>
+    )}
+    {showNyCaption ? <p class="comic-caption">{comic.caption}</p> : null}
+    {href ? (
+      <p class="comic-source">
+        <a class="comic-source-url" href={href} target="_blank" rel="noopener noreferrer" data-fit-url>{displayUrl}</a>
+      </p>
+    ) : null}
+    <div class="comic-cycle-controls" role="toolbar" aria-label="Change comic strip">
+      <button type="button" class="comic-cycle-btn" data-comic-cycle="prev" title="Previous comic strip" aria-label="Previous comic strip">◂ Prev</button>
+      <button type="button" class="comic-cycle-btn" data-comic-cycle="next" title="Next comic strip" aria-label="Next comic strip">Next ▸</button>
+    </div>
+  </div>
+</section>

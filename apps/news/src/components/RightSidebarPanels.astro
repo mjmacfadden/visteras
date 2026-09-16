@@ -1,0 +1,330 @@
+---
+import { NEWS_FEEDS } from '../data/feeds';
+import { COMIC_FEEDS } from '../data/feeds/comics';
+
+const feedsBySection = {
+  news: NEWS_FEEDS.filter((f) => f.section === 'news' || f.section === 'lead' || f.section === 'alsoToday'),
+  businessTech: NEWS_FEEDS.filter((f) => f.section === 'businessTech'),
+  sports: NEWS_FEEDS.filter((f) => f.section === 'sports'),
+};
+---
+
+<aside id="sidepanels" aria-label="Tool Inspector Panels">
+  <!-- 1. PASTE BRIEF PANEL -->
+  <div class="sidepanel_pane active" id="pane_paste" data-panel="paste">
+    <div class="panel_header">
+      <span>Paste Brief</span>
+      <span class="panel_badge">GROK AI</span>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="paste_input_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Automation Brief</span>
+      </div>
+      <div class="panel_section_body" id="paste_input_body">
+        <p class="panel_help">
+          Paste the morning Grok brief markdown below. The stories will automatically parse and compose into the columns.
+        </p>
+        <textarea
+          id="grok-brief-input"
+          name="grokBriefInput"
+          class="panel_textarea"
+          rows="14"
+          placeholder="## National & World&#10;&#10;**Headline**&#10;*Named source: Reuters, September 9*&#10;Body paragraph...&#10;&#10;## Sports&#10;**Headline**&#10;Body..."
+        ></textarea>
+        
+        <div class="panel_actions_row">
+          <button type="button" id="grok-brief-save" class="panel_btn_full btn_visteras_teal">
+            Save &amp; Compose
+          </button>
+        </div>
+        
+        <div class="panel_actions_row">
+          <button type="button" id="grok-brief-sample" class="panel_btn_full btn_visteras_secondary">
+            Load Sample
+          </button>
+          <button type="button" id="grok-brief-clear" class="panel_btn_full btn_visteras_secondary">
+            Clear Brief
+          </button>
+        </div>
+
+        <p class="panel_help" id="grok-brief-status" aria-live="polite" style="color: #4ade80; font-weight: 500; min-height: 16px;"></p>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="paste_guide_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Markdown Syntax Guide</span>
+      </div>
+      <div class="panel_section_body" id="paste_guide_body">
+        <p class="panel_help">
+          <strong>Section Headers:</strong> <code>## Section Name</code> or <code>***Section***</code><br/>
+          <strong>Story Headlines:</strong> <code>**Headline**</code> alone on a line<br/>
+          <strong>Byline / Source:</strong> <code>*Named source: Outlet, Date*</code><br/>
+          <strong>Images:</strong> <code>![caption](https://...)</code> or <code>****https://...****</code><br/>
+          <strong>Weather / Markets:</strong> Prose paragraphs<br/>
+          <strong>What to Watch:</strong> <code>- Bullet points</code>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. TYPOGRAPHY PANEL -->
+  <div class="sidepanel_pane" id="pane_typography" data-panel="typography">
+    <div class="panel_header">
+      <span>Typography</span>
+      <span class="panel_badge">PRINT</span>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="typo_identity_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Masthead &amp; Folio</span>
+      </div>
+      <div class="panel_section_body" id="typo_identity_body">
+        <div class="panel_field">
+          <label class="panel_label" for="settings-paper-name">Newspaper Title</label>
+          <input
+            type="text"
+            id="settings-paper-name"
+            class="panel_input"
+            maxlength="60"
+            value="The Daily Mike"
+            placeholder="The Daily Mike"
+          />
+        </div>
+
+        <div class="panel_field">
+          <label class="panel_label" for="settings-paper-tagline">Tagline / Subtitle</label>
+          <input
+            type="text"
+            id="settings-paper-tagline"
+            class="panel_input"
+            maxlength="100"
+            value="NOTEWORTHY EVENTS WEATHER AND SPORTS"
+            placeholder="NOTEWORTHY EVENTS WEATHER AND SPORTS"
+          />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="typo_scale_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Type Sizing &amp; Leading</span>
+      </div>
+      <div class="panel_section_body" id="typo_scale_body">
+        <div class="panel_field">
+          <label class="panel_label" for="typo-body-size">Body Font Size</label>
+          <select id="typo-body-size" class="panel_select">
+            <option value="9pt">9.0 pt — Extra Compact</option>
+            <option value="9.5pt">9.5 pt — Compact</option>
+            <option value="10pt" selected>10.0 pt — Standard (Print)</option>
+            <option value="10.5pt">10.5 pt — Medium</option>
+            <option value="11pt">11.0 pt — Large</option>
+          </select>
+        </div>
+
+        <div class="panel_field">
+          <label class="panel_label" for="typo-line-height">Line Spacing</label>
+          <select id="typo-line-height" class="panel_select">
+            <option value="1.15" selected>Tight (1.15 — Standard News)</option>
+            <option value="1.25">Normal (1.25)</option>
+            <option value="1.35">Relaxed (1.35)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="typo_fonts_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Font Palette</span>
+      </div>
+      <div class="panel_section_body" id="typo_fonts_body">
+        <p class="panel_help">
+          <strong>Masthead:</strong> Manufacturing Consent<br/>
+          <strong>Headlines:</strong> Playfair Display (Bold / 900)<br/>
+          <strong>Body Text:</strong> Merriweather (Serif 300/400)<br/>
+          <strong>UI &amp; Folios:</strong> Libre Franklin (600/700)
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. SETTINGS PANEL -->
+  <div class="sidepanel_pane" id="pane_settings" data-panel="settings">
+    <div class="panel_header">
+      <span>Edition Settings</span>
+      <span class="panel_badge">PREFS</span>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="settings_location_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Location &amp; Weather</span>
+      </div>
+      <div class="panel_section_body" id="settings_location_body">
+        <div class="panel_field">
+          <label class="panel_label" for="settings-zip">Weather ZIP Code</label>
+          <input
+            type="text"
+            id="settings-zip"
+            class="panel_input"
+            inputmode="numeric"
+            pattern="[0-9]{5}"
+            maxlength="5"
+            value="60062"
+          />
+        </div>
+        <p class="panel_help">
+          Default 60062 (Northbrook, IL). Updates both the on-screen live embed and Open-Meteo print forecast strip.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="settings_calendar_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Public Calendars (ICS)</span>
+      </div>
+      <div class="panel_section_body" id="settings_calendar_body">
+        <p class="panel_help">
+          Paste Google Calendar public / secret iCal addresses (<code>.../basic.ics</code>).
+        </p>
+        <div id="calendars-list" class="custom-feeds-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+        <div class="panel_field" style="margin-top:6px;">
+          <input type="text" id="calendar-label" class="panel_input" placeholder="Label (e.g. Family)" />
+          <input type="url" id="calendar-url" class="panel_input" style="margin-top:4px;" placeholder="https://.../basic.ics" />
+          <button type="button" id="calendar-add-btn" class="panel_btn_full btn_visteras_secondary" style="margin-top:4px;">
+            Add Calendar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="settings_comics_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Comic Strips</span>
+      </div>
+      <div class="panel_section_body" id="settings_comics_body">
+        <p class="panel_help">Strips display along page 3 features:</p>
+        {COMIC_FEEDS.map((c) => (
+          <label class="panel_checkbox_row">
+            <input type="checkbox" id={`comic-${c.id}`} name="comic" value={c.id} data-comic-id={c.id} />
+            <span>{c.title} <em style="color:#888;">({c.credit})</em></span>
+          </label>
+        ))}
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="settings_backup_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Backup &amp; Reset</span>
+      </div>
+      <div class="panel_section_body" id="settings_backup_body">
+        <div class="panel_actions_row">
+          <button type="button" id="settings-export" class="panel_btn_full btn_visteras_secondary">
+            Export JSON
+          </button>
+          <button type="button" id="settings-import" class="panel_btn_full btn_visteras_secondary">
+            Import JSON
+          </button>
+          <input type="file" id="settings-import-file" name="settingsImportFile" accept="application/json,.json" hidden />
+        </div>
+        <button type="button" id="settings-reset" class="panel_btn_full btn_visteras_secondary" style="color:#ef4444; border-color:#7f1d1d;">
+          Reset to Defaults
+        </button>
+        <button type="button" id="settings-save" class="panel_btn_full btn_visteras_teal" style="margin-top:4px;">
+          Save &amp; Refresh
+        </button>
+        <p class="panel_help" id="settings-status" aria-live="polite" style="color: #4ade80;"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. RSS FEEDS PANEL -->
+  <div class="sidepanel_pane" id="pane_rss" data-panel="rss">
+    <div class="panel_header">
+      <span>RSS Feeds</span>
+      <span class="panel_badge">WIRES</span>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="rss_master_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Live RSS Ingestion</span>
+      </div>
+      <div class="panel_section_body" id="rss_master_body">
+        <label class="panel_checkbox_row" style="font-weight:600;">
+          <input type="checkbox" name="rss-enabled" id="settings-rss-enabled" />
+          <span>Enable Live RSS Wires</span>
+        </label>
+        <p class="panel_help">
+          When disabled, stories are populated purely from the Grok Automation paste. Enable to interleave live wires into the edition.
+        </p>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="rss_curated_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Curated News Feeds</span>
+      </div>
+      <div class="panel_section_body" id="rss_curated_body">
+        <div id="settings-feed-groups" style="display:flex; flex-direction:column; gap:8px;">
+          <div>
+            <div class="panel_label" style="margin-bottom:4px;">News &amp; Lead</div>
+            {feedsBySection.news.map((f) => (
+              <label class="panel_checkbox_row">
+                <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+                <span>{f.name}</span>
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <div class="panel_label" style="margin-bottom:4px;">Business &amp; Tech</div>
+            {feedsBySection.businessTech.map((f) => (
+              <label class="panel_checkbox_row">
+                <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+                <span>{f.name}</span>
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <div class="panel_label" style="margin-bottom:4px;">Sports</div>
+            {feedsBySection.sports.map((f) => (
+              <label class="panel_checkbox_row">
+                <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+                <span>{f.name}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="rss_custom_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Custom RSS Feeds</span>
+      </div>
+      <div class="panel_section_body" id="rss_custom_body">
+        <div id="custom-feeds-list" class="custom-feeds-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+        <div class="panel_field" style="margin-top:6px;">
+          <input type="text" id="custom-feed-name" class="panel_input" placeholder="Feed Name (e.g. Hacker News)" />
+          <input type="url" id="custom-feed-url" class="panel_input" style="margin-top:4px;" placeholder="https://.../feed.xml" />
+          <button type="button" id="custom-feed-add-btn" class="panel_btn_full btn_visteras_secondary" style="margin-top:4px;">
+            Add Feed
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</aside>

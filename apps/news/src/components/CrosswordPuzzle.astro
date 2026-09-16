@@ -1,0 +1,47 @@
+---
+import type { CrosswordEntry } from '../data/types';
+interface Props {
+  puzzle: CrosswordEntry;
+}
+const { puzzle } = Astro.props;
+const size = puzzle.size;
+const clueNums = new Map<string, number>();
+for (const c of puzzle.clues) {
+  clueNums.set(`${c.row},${c.col}`, c.num);
+}
+const across = puzzle.clues.filter((c) => c.dir === 'across');
+const down = puzzle.clues.filter((c) => c.dir === 'down');
+---
+<section class="crossword-box" aria-label="Crossword">
+  <h2 class="section-label">Crossword · {puzzle.title}</h2>
+  <div
+    class="crossword-grid"
+    style={`grid-template-columns: repeat(${size}, 1.35rem);`}
+  >
+    {puzzle.solution.map((cell, i) => {
+      const row = Math.floor(i / size);
+      const col = i % size;
+      const isBlock = cell === '.';
+      const num = clueNums.get(`${row},${col}`);
+      return (
+        <div class:list={['crossword-cell', { block: isBlock }]}>
+          {!isBlock && num !== undefined && <span class="num">{num}</span>}
+        </div>
+      );
+    })}
+  </div>
+  <div class="clue-columns">
+    <div>
+      <strong class="clue-heading">Across</strong>
+      <ol class="clue-list">
+        {across.map((c) => <li value={c.num}>{c.clue}</li>)}
+      </ol>
+    </div>
+    <div>
+      <strong class="clue-heading">Down</strong>
+      <ol class="clue-list">
+        {down.map((c) => <li value={c.num}>{c.clue}</li>)}
+      </ol>
+    </div>
+  </div>
+</section>

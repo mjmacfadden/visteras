@@ -1,0 +1,23 @@
+---
+import { PAPER_NAME_UPPER, PAPER_TAGLINE } from '../lib/site';
+interface Props {
+  dateDisplay: string;
+  /** @deprecated kept for call-site compatibility; masthead shows VERSION 1.0 */
+  volume?: number;
+  number?: number;
+  pageLabel?: string;
+}
+const { dateDisplay, pageLabel = 'Morning Edition' } = Astro.props;
+---
+<header class="masthead">
+  <div class="masthead-top">
+    <span>Northbrook, Illinois · 60062</span>
+    <span>{pageLabel}</span>
+  </div>
+  <h1 class="masthead-title" data-masthead-title>{PAPER_NAME_UPPER}</h1>
+  <p class="masthead-tagline" data-masthead-tagline>{PAPER_TAGLINE}</p>
+  <div class="masthead-date-line">
+    <span>{dateDisplay}</span>
+    <span>VERSION 1.0</span>
+  </div>
+</header>
