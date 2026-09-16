@@ -929,6 +929,20 @@
       moveEl('tool_text_decoration_linethrough', 'slot_text_styles');
       moveEl('tool_text_decoration_overline', 'slot_text_styles');
       moveEl('tool_text_anchor', 'slot_text_styles');
+
+      // Force type-tool icons white inside se-button shadow roots (theme CSS cannot pierce).
+      (function whitenTextStyleIcons() {
+        const ids = [
+          'tool_bold', 'tool_italic',
+          'tool_text_decoration_underline', 'tool_text_decoration_linethrough',
+          'tool_text_decoration_overline', 'tool_text_anchor'
+        ];
+        ids.forEach((id) => {
+          const host = document.getElementById(id);
+          const img = host && host.shadowRoot && host.shadowRoot.querySelector('img');
+          if (img) img.style.filter = 'brightness(0) invert(1)';
+        });
+      })();
       moveEl('tool_letter_spacing', 'slot_letter_spacing');
       moveEl('tool_word_spacing', 'slot_word_spacing');
 
