@@ -930,17 +930,32 @@
       moveEl('tool_text_decoration_overline', 'slot_text_styles');
       moveEl('tool_text_anchor', 'slot_text_styles');
 
-      // Force type-tool icons white inside se-button shadow roots (theme CSS cannot pierce).
-      (function whitenTextStyleIcons() {
+      // Match Studio adjustment icons (#cccccc) and kill white hover flash in se-button shadows.
+      (function styleTextStyleIcons() {
         const ids = [
           'tool_bold', 'tool_italic',
           'tool_text_decoration_underline', 'tool_text_decoration_linethrough',
           'tool_text_decoration_overline', 'tool_text_anchor'
         ];
+        const shadowCss = `
+          :host(:hover) :not(.disabled) { animation: none !important; }
+          div, div.pressed { transition: none !important; }
+          :host(:hover) div:not(.disabled):not(.pressed) {
+            background-color: var(--icon-bg-color, #3c3c3c) !important;
+          }
+          img { filter: brightness(0) invert(0.8); }
+        `;
         ids.forEach((id) => {
           const host = document.getElementById(id);
-          const img = host && host.shadowRoot && host.shadowRoot.querySelector('img');
-          if (img) img.style.filter = 'brightness(0) invert(1)';
+          if (!host || !host.shadowRoot) return;
+          if (!host.shadowRoot.querySelector('style[data-visteras-type-chrome]')) {
+            const style = document.createElement('style');
+            style.setAttribute('data-visteras-type-chrome', '1');
+            style.textContent = shadowCss;
+            host.shadowRoot.appendChild(style);
+          }
+          const img = host.shadowRoot.querySelector('img');
+          if (img) img.style.filter = 'brightness(0) invert(0.8)';
         });
       })();
       moveEl('tool_letter_spacing', 'slot_letter_spacing');
