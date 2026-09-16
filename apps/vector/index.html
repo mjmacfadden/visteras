@@ -930,33 +930,47 @@
       moveEl('tool_text_decoration_overline', 'slot_text_styles');
       moveEl('tool_text_anchor', 'slot_text_styles');
 
-      // Match Studio adjustment icons (#cccccc) and kill white hover flash in se-button shadows.
+      // Match Studio adjustment icons (#cccccc); no hover effect on type-style buttons.
       (function styleTextStyleIcons() {
         const ids = [
           'tool_bold', 'tool_italic',
           'tool_text_decoration_underline', 'tool_text_decoration_linethrough',
           'tool_text_decoration_overline', 'tool_text_anchor'
         ];
+        // invert(0.8) ≈ #cccccc from black glyphs; keep identical on hover (no brightening).
+        const iconFilter = 'brightness(0) invert(0.8)';
         const shadowCss = `
           :host(:hover) :not(.disabled) { animation: none !important; }
           div, div.pressed { transition: none !important; }
           :host(:hover) div:not(.disabled):not(.pressed) {
             background-color: var(--icon-bg-color, #3c3c3c) !important;
+            filter: none !important;
           }
-          img { filter: brightness(0) invert(0.8); }
+          :host(:hover) img,
+          img {
+            filter: ${iconFilter} !important;
+            opacity: 1 !important;
+          }
         `;
-        ids.forEach((id) => {
-          const host = document.getElementById(id);
-          if (!host || !host.shadowRoot) return;
-          if (!host.shadowRoot.querySelector('style[data-visteras-type-chrome]')) {
-            const style = document.createElement('style');
-            style.setAttribute('data-visteras-type-chrome', '1');
+        const apply = () => {
+          ids.forEach((id) => {
+            const host = document.getElementById(id);
+            if (!host || !host.shadowRoot) return;
+            let style = host.shadowRoot.querySelector('style[data-visteras-type-chrome]');
+            if (!style) {
+              style = document.createElement('style');
+              style.setAttribute('data-visteras-type-chrome', '1');
+              host.shadowRoot.appendChild(style);
+            }
             style.textContent = shadowCss;
-            host.shadowRoot.appendChild(style);
-          }
-          const img = host.shadowRoot.querySelector('img');
-          if (img) img.style.filter = 'brightness(0) invert(0.8)';
-        });
+            const img = host.shadowRoot.querySelector('img');
+            if (img) img.style.filter = iconFilter;
+          });
+        };
+        apply();
+        // SVG-Edit sometimes rebuilds button shadows after panel moves.
+        setTimeout(apply, 0);
+        setTimeout(apply, 250);
       })();
       moveEl('tool_letter_spacing', 'slot_letter_spacing');
       moveEl('tool_word_spacing', 'slot_word_spacing');

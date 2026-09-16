@@ -729,7 +729,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
   }
   elix-number-spin-box::part(input) {
     width: 3em;
-    color: #ffffff;
+    color: #cccccc;
     font-size: 11px;
     color-scheme: dark;
   }
