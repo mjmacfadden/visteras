@@ -47,6 +47,7 @@ html, body {
   background-color: var(--studio-chassis-bg);
   color: var(--studio-text);
   font-size: 11px;
+  color-scheme: dark;
 }
 
 #visteras_app_container {
@@ -907,14 +908,24 @@ html, body {
 }
 
 /* Inputs styling */
-input[type="text"], input[type="number"] {
+input[type="text"], input[type="number"], input:not([type]), textarea, select {
   background: #242424 !important;
   border: 1px solid #444444 !important;
   color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
   border-radius: 2px !important;
   font-family: var(--mono-font) !important;
   font-size: 11px !important;
   padding: 2px 4px !important;
+  color-scheme: dark;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #888888 !important;
+  -webkit-text-fill-color: #888888 !important;
+  opacity: 1 !important;
 }
 
 se-spin-input {
