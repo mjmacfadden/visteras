@@ -44,6 +44,17 @@ class Vector_manager_class {
 	}
 
 	/**
+	 * Returns a vector by ID.
+	 * @param {string|number|null} id
+	 * @returns {Vector|null}
+	 */
+	get_vector_by_id(id) {
+		if (!id) return null;
+		const vectors = this.get_vectors();
+		return vectors.find(v => v.id === id) || null;
+	}
+
+	/**
 	 * Sets the active vector by ID.
 	 * @param {string|number|null} id 
 	 */
