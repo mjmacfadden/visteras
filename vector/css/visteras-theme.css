@@ -95,7 +95,7 @@ html, body {
 
 #method-draw.app {
   display: grid !important;
-  grid-template-rows: 28px 38px 1fr 24px;
+  grid-template-rows: 28px 49px 1fr 24px;
   grid-template-columns: 36px 1fr 260px;
   grid-template-areas:
     "menu menu menu"
@@ -107,7 +107,7 @@ html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #262626;
+  background-color: #535353;
 }
 
 /* ==========================================================================
@@ -283,15 +283,18 @@ html, body {
 #options_bar.submenu {
   grid-area: options;
   position: static !important;
-  height: 38px !important;
+  height: 45px !important;
+  min-height: 45px !important;
+  max-height: 45px !important;
   background-color: #2d2d2d !important;
   border-bottom: 1px solid #1a1a1a !important;
+  margin-bottom: 4px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
   padding: 0 8px !important;
   z-index: 500 !important;
-  box-sizing: border-box;
+  box-sizing: border-box !important;
 }
 
 .options_bar_left {
@@ -320,7 +323,7 @@ html, body {
 }
 
 .options_bar_left .logo img {
-  height: 26px;
+  height: 28px;
   max-height: 100%;
   width: auto;
   vertical-align: middle;
@@ -879,7 +882,7 @@ html, body {
 }
 
 #palette {
-  position: static !important;
+  position: relative !important;
   display: flex !important;
   height: 14px !important;
   width: auto !important;
@@ -887,6 +890,7 @@ html, body {
 }
 
 .palette_item {
+  position: static !important;
   width: 12px !important;
   height: 12px !important;
   border-radius: 2px !important;
@@ -894,6 +898,15 @@ html, body {
   cursor: pointer !important;
   box-sizing: border-box !important;
   transition: transform 0.1s !important;
+  float: none !important;
+}
+
+.palette_item.transparent, .palette_item.white, .palette_item.black {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  width: 12px !important;
+  height: 12px !important;
 }
 
 .palette_item:hover {
