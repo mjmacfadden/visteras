@@ -1,3 +1,10 @@
-<svg fill="none" height="1200" viewBox="0 0 1200 1200" width="1200" xmlns="http://www.w3.org/2000/svg">
-  <path clip-rule="evenodd" d="m1200 1200h-480v-80h400v-1040h-479.996v160h-400v720h720v-720h-80v-80h159.996v880h-400v160h-640v-1200h1200zm-1120-80h480v-80h-400l.004-400h-80.004zm0-560h80.004v-400h400v-80h-480.004z" fill="#fa7c1b" fill-rule="evenodd"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="visterasVectorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9638"/>
+      <stop offset="50%" stop-color="#fa7c1b"/>
+      <stop offset="100%" stop-color="#e06010"/>
+    </linearGradient>
+  </defs>
+  <path d="M 37.4,83.7 L 36.4,84.8 L 36.4,87.7 L 37.8,90.2 L 251.7,426.2 L 256.4,426.2 L 294.8,368.6 L 458.2,114.9 L 475.3,88.1 L 475.6,85.5 L 474.2,83.7 L 382.9,83.7 L 380.0,86.3 L 329.2,163.1 L 273.8,242.1 L 269.4,242.1 L 169.0,86.3 L 166.5,83.7 Z" fill="url(#visterasVectorGrad)" fill-rule="evenodd"/>
 </svg>
