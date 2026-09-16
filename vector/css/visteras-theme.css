@@ -274,9 +274,49 @@ html, body {
   background-color: transparent !important;
 }
 
-/* Hide SVG-Edit default top buttons that clash with Studio logo bar */
-#title_panel, #main_button {
+/* Hide SVG-Edit default main button (handled cleanly by our top menu bar) */
+#main_button {
   display: none !important;
+}
+
+/* Contextual tools have moved to #properties_panel in the right sidebar */
+#tools_top .selected_panel,
+#tools_top .xy_panel,
+#tools_top .multiselected_panel,
+#tools_top .rect_panel,
+#tools_top .image_panel,
+#tools_top .circle_panel,
+#tools_top .ellipse_panel,
+#tools_top .line_panel,
+#tools_top .text_panel,
+#tools_top .path_node_panel,
+#tools_top .container_panel,
+#tools_top .g_panel,
+#tools_top .use_panel,
+#tools_top .a_panel,
+#tools_top #cur_context_panel {
+  display: none !important;
+}
+
+#title_panel {
+  display: flex !important;
+  align-items: center !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  margin: 0 4px 0 8px !important;
+  background-color: #242424 !important;
+  border: 1px solid #383838 !important;
+  border-radius: 2px !important;
+}
+
+#title_panel p {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #a0a0a0 !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
 }
 
 /* Visteras Vector Logo in Options Bar */
@@ -489,6 +529,242 @@ html, body {
   padding: 0 !important;
 }
 
+/* ==========================================================================
+   5a. Properties Panel (Contextual Inspector above Layers)
+   ========================================================================== */
+
+#properties_panel {
+  width: 100% !important;
+  background-color: var(--studio-panel-bg) !important;
+  border-bottom: 1px solid var(--studio-border-dark) !important;
+  box-sizing: border-box !important;
+  user-select: none !important;
+}
+
+#properties_panel .sidebar_block_header {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: #cccccc !important;
+  background-color: #333333 !important;
+  padding: 5px 8px !important;
+  border-bottom: 1px solid #222222 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  cursor: pointer !important;
+}
+
+#properties_panel .sidebar_block_header:hover {
+  background-color: #3a3a3a !important;
+}
+
+#properties_panel .sidebar_block_arrow {
+  font-size: 8px !important;
+  color: #888888 !important;
+  transition: transform 0.15s ease !important;
+}
+
+#properties_panel.collapsed .sidebar_block_arrow {
+  transform: rotate(-90deg) !important;
+}
+
+#properties_panel.collapsed #properties_content {
+  display: none !important;
+}
+
+#properties_content {
+  padding: 0 !important;
+}
+
+.prop_empty_state {
+  padding: 20px 12px !important;
+  text-align: center !important;
+  color: #888888 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+.prop_empty_state .prop_empty_icon {
+  font-size: 16px !important;
+  color: #666666 !important;
+  margin-bottom: 6px !important;
+}
+
+.prop_empty_state .prop_empty_text {
+  font-weight: 600 !important;
+  color: #aaaaaa !important;
+  margin-bottom: 4px !important;
+}
+
+.prop_empty_state .prop_empty_hint {
+  font-size: 10px !important;
+  color: #777777 !important;
+}
+
+.prop_section {
+  border-bottom: 1px solid #242424 !important;
+}
+
+.prop_section:last-child {
+  border-bottom: none !important;
+}
+
+.prop_section_header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 4px 8px !important;
+  background-color: #282828 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #a8a8a8 !important;
+  border-top: 1px solid #1e1e1e !important;
+  transition: background-color 0.12s, color 0.12s !important;
+}
+
+.prop_section_header:hover {
+  background-color: #303030 !important;
+  color: #ffffff !important;
+}
+
+.prop_section_arrow {
+  font-size: 8px !important;
+  width: 10px !important;
+  display: inline-block !important;
+  color: #777777 !important;
+  transition: transform 0.15s ease !important;
+}
+
+.prop_section.collapsed .prop_section_arrow {
+  transform: rotate(-90deg) !important;
+}
+
+.prop_section_body {
+  padding: 6px 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  background-color: #2b2b2b !important;
+  box-sizing: border-box !important;
+}
+
+.prop_section.collapsed .prop_section_body {
+  display: none !important;
+}
+
+.prop_row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_group {
+  width: 100% !important;
+}
+
+.prop_field_pair {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_grid_6col {
+  display: grid !important;
+  grid-template-columns: repeat(6, 1fr) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_grid_2col_btns {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_actions_flow {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_actions_flow se-button {
+  flex: 0 0 calc(25% - 3px) !important;
+  min-width: 28px !important;
+  height: 24px !important;
+}
+
+.prop_btn_pair {
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+}
+
+.prop_field_label {
+  font-size: 10px !important;
+  color: #888888 !important;
+  text-transform: uppercase !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
+}
+
+#properties_panel se-spin-input {
+  width: 100% !important;
+  justify-content: flex-start !important;
+}
+
+#properties_panel se-button {
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background 0.12s, border-color 0.12s !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+#properties_panel se-button:hover {
+  background: #3d3d3d !important;
+  border-color: #555555 !important;
+}
+
+#properties_panel se-button[pressed] {
+  background: var(--studio-blue-active) !important;
+  border-color: var(--studio-blue-active) !important;
+}
+
+#properties_panel se-select {
+  width: 100% !important;
+}
+
+#properties_panel se-input {
+  width: 100% !important;
+}
+
+#properties_panel se-list {
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+}
+
 #layerpanel {
   padding: 6px !important;
 }
@@ -586,7 +862,7 @@ html, body {
 }
 
 /* Inputs styling */
-input[type="text"], input[type="number"], se-spin-input {
+input[type="text"], input[type="number"] {
   background: #242424 !important;
   border: 1px solid #444444 !important;
   color: #ffffff !important;
@@ -594,6 +870,16 @@ input[type="text"], input[type="number"], se-spin-input {
   font-family: var(--mono-font) !important;
   font-size: 11px !important;
   padding: 2px 4px !important;
+}
+
+se-spin-input {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* Modern scrollbars for side panels, layer list, and dialogs */

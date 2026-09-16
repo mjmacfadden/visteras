@@ -430,8 +430,425 @@
       }, { capture: true });
     }
 
+    // Setup Contextual Properties Panel stacked above Layers Panel in #sidepanels
+    function setupPropertiesPanel() {
+      const sidepanelContent = document.getElementById('sidepanel_content');
+      const layerPanel = document.getElementById('layerpanel');
+      if (!sidepanelContent || !layerPanel) return;
+      if (document.getElementById('properties_panel')) return;
+
+      // Create Properties Panel block container
+      const propPanel = document.createElement('div');
+      propPanel.id = 'properties_panel';
+      propPanel.className = 'sidebar_block';
+      propPanel.innerHTML = `
+        <div class="sidebar_block_header" id="properties_panel_header" title="Toggle Properties Panel">
+          <span class="sidebar_block_title">Properties</span>
+          <span class="sidebar_block_arrow">▾</span>
+        </div>
+        <div class="sidebar_block_content" id="properties_content">
+          
+          <!-- Empty State (when nothing is selected) -->
+          <div id="prop_empty_state" class="prop_empty_state">
+            <div class="prop_empty_icon">✦</div>
+            <div class="prop_empty_text">No selection</div>
+            <div class="prop_empty_hint">Select an object on the canvas to inspect and edit its properties</div>
+          </div>
+
+          <!-- Active Selection Properties -->
+          <div id="prop_active_container" style="display: none;">
+
+            <!-- 1. Transform Section (X, Y, W, H, Angle, Flip) -->
+            <div class="prop_section" id="sec_transform">
+              <div class="prop_section_header" data-target="sec_transform_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Transform</span>
+              </div>
+              <div class="prop_section_body" id="sec_transform_body">
+                <!-- Generic / Rect / Text / Image / Path / Group Position -->
+                <div class="prop_group" id="prop_xy_group">
+                  <div class="prop_field_pair" id="slot_xy"></div>
+                </div>
+
+                <!-- Circle Center Coordinates -->
+                <div class="prop_group circle_panel" id="prop_circle_xy_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_circle_xy"></div>
+                </div>
+
+                <!-- Ellipse Center Coordinates -->
+                <div class="prop_group ellipse_panel" id="prop_ellipse_xy_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_ellipse_xy"></div>
+                </div>
+
+                <!-- Line Coordinates -->
+                <div class="prop_group line_panel" id="prop_line_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_line_pt1"></div>
+                  <div class="prop_field_pair" id="slot_line_pt2" style="margin-top: 4px;"></div>
+                </div>
+
+                <!-- Rect Width / Height -->
+                <div class="prop_group rect_panel" id="prop_rect_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_rect_wh"></div>
+                </div>
+
+                <!-- Image Width / Height -->
+                <div class="prop_group image_panel" id="prop_image_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_image_wh"></div>
+                </div>
+
+                <!-- Circle Radius -->
+                <div class="prop_group circle_panel" id="prop_circle_r_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_circle_r"></div>
+                </div>
+
+                <!-- Ellipse Radii -->
+                <div class="prop_group ellipse_panel" id="prop_ellipse_r_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_ellipse_r"></div>
+                </div>
+
+                <!-- Rotation & Flip Row -->
+                <div class="prop_row" id="prop_rotate_flip_row">
+                  <div id="slot_angle" style="flex:1;"></div>
+                  <div class="prop_btn_pair" id="slot_flip"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Appearance Section (Opacity, Blur, Corner Radius) -->
+            <div class="prop_section" id="sec_appearance">
+              <div class="prop_section_header" data-target="sec_appearance_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Appearance</span>
+              </div>
+              <div class="prop_section_body" id="sec_appearance_body">
+                <div class="prop_row">
+                  <div id="slot_opacity" style="flex:1;"></div>
+                  <div id="slot_blur" style="flex:1;"></div>
+                </div>
+                <div class="prop_row rect_panel" id="prop_row_radius" style="display:none;">
+                  <div id="slot_radius" style="flex:1;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Align & Distribute Section -->
+            <div class="prop_section" id="sec_align">
+              <div class="prop_section_header" data-target="sec_align_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Align & Distribute</span>
+              </div>
+              <div class="prop_section_body" id="sec_align_body">
+                <div class="prop_grid_6col" id="slot_align_btns"></div>
+                <div class="prop_grid_2col_btns" id="slot_distrib_btns"></div>
+                <div class="prop_row" id="prop_align_rel_row">
+                  <div id="slot_align_rel" style="width:100%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Typography Section (shown for text) -->
+            <div class="prop_section text_panel" id="sec_typography" style="display:none;">
+              <div class="prop_section_header" data-target="sec_typography_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Typography</span>
+              </div>
+              <div class="prop_section_body" id="sec_typography_body">
+                <div class="prop_row">
+                  <div id="slot_font_family" style="flex:1;"></div>
+                  <div id="slot_font_size" style="width:70px;"></div>
+                </div>
+                <div class="prop_row" id="slot_text_styles"></div>
+                <div class="prop_row">
+                  <div id="slot_letter_spacing" style="flex:1;"></div>
+                  <div id="slot_word_spacing" style="flex:1;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. Path & Nodes Section (shown in pathedit) -->
+            <div class="prop_section path_node_panel" id="sec_path_node" style="display:none;">
+              <div class="prop_section_header" data-target="sec_path_node_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Path & Nodes</span>
+              </div>
+              <div class="prop_section_body" id="sec_path_node_body">
+                <div class="prop_field_pair" id="slot_node_xy"></div>
+                <div class="prop_row">
+                  <div id="slot_seg_type" style="flex:1;"></div>
+                  <div id="slot_node_link"></div>
+                </div>
+                <div class="prop_actions_flow" id="slot_node_btns"></div>
+              </div>
+            </div>
+
+            <!-- 6. Object Actions Section -->
+            <div class="prop_section" id="sec_actions">
+              <div class="prop_section_header" data-target="sec_actions_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Actions</span>
+              </div>
+              <div class="prop_section_body" id="sec_actions_body">
+                <div class="prop_actions_flow" id="slot_action_btns"></div>
+                <div class="prop_row" style="margin-top: 4px;">
+                  <div id="slot_elem_id" style="flex:1;"></div>
+                  <div id="slot_elem_class" style="flex:1;"></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      // Insert before layers panel in sidebar
+      sidepanelContent.insertBefore(propPanel, layerPanel);
+
+      // Relocate contextual elements from #tools_top and #tools_bottom into properties panel
+      function moveEl(id, slotId) {
+        const el = document.getElementById(id);
+        const slot = document.getElementById(slotId);
+        if (el && slot) {
+          slot.appendChild(el);
+        }
+      }
+
+      // Relocate Transform controls
+      moveEl('selected_x', 'slot_xy');
+      moveEl('selected_y', 'slot_xy');
+      moveEl('circle_cx', 'slot_circle_xy');
+      moveEl('circle_cy', 'slot_circle_xy');
+      moveEl('ellipse_cx', 'slot_ellipse_xy');
+      moveEl('ellipse_cy', 'slot_ellipse_xy');
+      moveEl('line_x1', 'slot_line_pt1');
+      moveEl('line_y1', 'slot_line_pt1');
+      moveEl('line_x2', 'slot_line_pt2');
+      moveEl('line_y2', 'slot_line_pt2');
+      moveEl('rect_width', 'slot_rect_wh');
+      moveEl('rect_height', 'slot_rect_wh');
+      moveEl('image_width', 'slot_image_wh');
+      moveEl('image_height', 'slot_image_wh');
+      moveEl('circle_r', 'slot_circle_r');
+      moveEl('ellipse_rx', 'slot_ellipse_r');
+      moveEl('ellipse_ry', 'slot_ellipse_r');
+      moveEl('angle', 'slot_angle');
+      moveEl('tool_flip_h', 'slot_flip');
+      moveEl('tool_flip_v', 'slot_flip');
+
+      // Relocate Appearance controls
+      moveEl('opacity', 'slot_opacity');
+      moveEl('blur', 'slot_blur');
+      moveEl('rect_rx', 'slot_radius');
+
+      // Relocate Alignment controls
+      moveEl('tool_align_left', 'slot_align_btns');
+      moveEl('tool_align_center', 'slot_align_btns');
+      moveEl('tool_align_right', 'slot_align_btns');
+      moveEl('tool_align_top', 'slot_align_btns');
+      moveEl('tool_align_middle', 'slot_align_btns');
+      moveEl('tool_align_bottom', 'slot_align_btns');
+      moveEl('tool_align_distrib_horiz', 'slot_distrib_btns');
+      moveEl('tool_align_distrib_verti', 'slot_distrib_btns');
+      moveEl('tool_align_relative', 'slot_align_rel');
+
+      // Relocate Typography controls
+      moveEl('tool_font_family', 'slot_font_family');
+      moveEl('font_size', 'slot_font_size');
+      moveEl('tool_bold', 'slot_text_styles');
+      moveEl('tool_italic', 'slot_text_styles');
+      moveEl('tool_text_decoration_underline', 'slot_text_styles');
+      moveEl('tool_text_decoration_linethrough', 'slot_text_styles');
+      moveEl('tool_text_decoration_overline', 'slot_text_styles');
+      moveEl('tool_text_anchor', 'slot_text_styles');
+      moveEl('tool_letter_spacing', 'slot_letter_spacing');
+      moveEl('tool_word_spacing', 'slot_word_spacing');
+
+      // Relocate Path controls
+      moveEl('path_node_x', 'slot_node_xy');
+      moveEl('path_node_y', 'slot_node_xy');
+      moveEl('seg_type', 'slot_seg_type');
+      moveEl('tool_node_link', 'slot_node_link');
+      moveEl('tool_node_clone', 'slot_node_btns');
+      moveEl('tool_node_delete', 'slot_node_btns');
+      moveEl('tool_openclose_path', 'slot_node_btns');
+      moveEl('tool_add_subpath', 'slot_node_btns');
+
+      // Relocate Actions controls
+      moveEl('tool_move_top', 'slot_action_btns');
+      moveEl('tool_move_bottom', 'slot_action_btns');
+      moveEl('tool_group_elements', 'slot_action_btns');
+      moveEl('tool_ungroup', 'slot_action_btns');
+      moveEl('tool_clone', 'slot_action_btns');
+      moveEl('tool_delete', 'slot_action_btns');
+      moveEl('tool_topath', 'slot_action_btns');
+      moveEl('tool_reorient', 'slot_action_btns');
+      moveEl('elem_id', 'slot_elem_id');
+      moveEl('elem_class', 'slot_elem_class');
+
+      // Setup collapsible headers
+      document.getElementById('properties_panel_header')?.addEventListener('click', () => {
+        propPanel.classList.toggle('collapsed');
+      });
+
+      document.querySelectorAll('.prop_section_header').forEach(header => {
+        header.addEventListener('click', () => {
+          const section = header.closest('.prop_section');
+          if (section) section.classList.toggle('collapsed');
+        });
+      });
+
+      // Enhance alignment buttons to align single elements to page and multi elements relative
+      ['left', 'center', 'right', 'top', 'middle', 'bottom'].forEach(dir => {
+        const btn = document.getElementById(`tool_align_${dir}`);
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            let rel = document.getElementById('tool_align_relative')?.value || 'selected';
+            if (!svgEditor.multiselected) {
+              rel = 'page';
+            }
+            svgEditor.svgCanvas.alignSelectedElements(dir, rel);
+          });
+        }
+      });
+
+      ['distrib_horiz', 'distrib_verti'].forEach(dir => {
+        const btn = document.getElementById(`tool_align_${dir}`);
+        if (btn) {
+          btn.addEventListener('click', (e) => {
+            const rel = document.getElementById('tool_align_relative')?.value || 'selected';
+            svgEditor.svgCanvas.alignSelectedElements(dir, rel);
+          });
+        }
+      });
+
+      // Wire flip buttons
+      document.getElementById('tool_flip_h')?.addEventListener('click', () => {
+        svgEditor.svgCanvas.flipSelectedElements('x');
+      });
+      document.getElementById('tool_flip_v')?.addEventListener('click', () => {
+        svgEditor.svgCanvas.flipSelectedElements('y');
+      });
+
+      // Dynamic Contextual Visibility & Sync function
+      function updatePropertiesVisibility() {
+        const sc = svgEditor.svgCanvas;
+        if (!sc) return;
+        const curElem = svgEditor.selectedElement;
+        const isMulti = svgEditor.multiselected;
+        const isPathEdit = sc.getMode() === 'pathedit';
+        const hasSelection = !!(curElem || isMulti || isPathEdit);
+
+        const emptyState = document.getElementById('prop_empty_state');
+        const activeContainer = document.getElementById('prop_active_container');
+
+        if (!hasSelection) {
+          if (emptyState) emptyState.style.display = 'block';
+          if (activeContainer) activeContainer.style.display = 'none';
+          return;
+        }
+
+        if (emptyState) emptyState.style.display = 'none';
+        if (activeContainer) activeContainer.style.display = 'block';
+
+        const tagName = curElem ? curElem.nodeName : '';
+
+        // Transform Position visibility
+        const xyGroup = document.getElementById('prop_xy_group');
+        if (xyGroup) {
+          const hideXY = ['line', 'circle', 'ellipse', 'polygon'].includes(tagName);
+          xyGroup.style.display = (hideXY && !isMulti) ? 'none' : 'block';
+        }
+
+        const circleXY = document.getElementById('prop_circle_xy_group');
+        if (circleXY) circleXY.style.display = (tagName === 'circle') ? 'block' : 'none';
+
+        const ellipseXY = document.getElementById('prop_ellipse_xy_group');
+        if (ellipseXY) ellipseXY.style.display = (tagName === 'ellipse') ? 'block' : 'none';
+
+        const lineGroup = document.getElementById('prop_line_group');
+        if (lineGroup) lineGroup.style.display = (tagName === 'line') ? 'block' : 'none';
+
+        // Dimensions visibility
+        const rectGroup = document.getElementById('prop_rect_group');
+        if (rectGroup) rectGroup.style.display = (tagName === 'rect') ? 'block' : 'none';
+
+        const imgGroup = document.getElementById('prop_image_group');
+        if (imgGroup) imgGroup.style.display = (tagName === 'image') ? 'block' : 'none';
+
+        const circleR = document.getElementById('prop_circle_r_group');
+        if (circleR) circleR.style.display = (tagName === 'circle') ? 'block' : 'none';
+
+        const ellipseR = document.getElementById('prop_ellipse_r_group');
+        if (ellipseR) ellipseR.style.display = (tagName === 'ellipse') ? 'block' : 'none';
+
+        // Appearance Corner radius
+        const radiusRow = document.getElementById('prop_row_radius');
+        if (radiusRow) radiusRow.style.display = (tagName === 'rect') ? 'flex' : 'none';
+
+        // Typography section
+        const typoSec = document.getElementById('sec_typography');
+        if (typoSec) {
+          const isText = (tagName === 'text');
+          typoSec.style.display = isText ? 'block' : 'none';
+        }
+
+        // Path & Nodes section
+        const pathSec = document.getElementById('sec_path_node');
+        if (pathSec) {
+          pathSec.style.display = isPathEdit ? 'block' : 'none';
+        }
+
+        // Action buttons
+        const toPathBtn = document.getElementById('tool_topath');
+        if (toPathBtn) {
+          const canToPath = !['image', 'text', 'path', 'g', 'use'].includes(tagName);
+          toPathBtn.style.display = canToPath ? 'inline-flex' : 'none';
+        }
+
+        const reorientBtn = document.getElementById('tool_reorient');
+        if (reorientBtn) {
+          reorientBtn.style.display = (tagName === 'path') ? 'inline-flex' : 'none';
+        }
+
+        // Keep values in sync
+        if (curElem) {
+          const angleInput = document.getElementById('angle');
+          if (angleInput && sc.getRotationAngle) {
+            angleInput.value = sc.getRotationAngle(curElem) || 0;
+          }
+          const blurInput = document.getElementById('blur');
+          if (blurInput && sc.getBlur) {
+            blurInput.value = Math.round((sc.getBlur(curElem) || 0) * 10);
+          }
+          const opacityInput = document.getElementById('opacity');
+          if (opacityInput && sc.getOpacity) {
+            const op = sc.getOpacity();
+            if (op !== undefined && !isNaN(op)) opacityInput.value = Math.round(op * 100);
+          }
+        }
+      }
+
+      // Hook into topPanel.updateContextPanel
+      if (svgEditor.topPanel && typeof svgEditor.topPanel.updateContextPanel === 'function') {
+        const origUpdate = svgEditor.topPanel.updateContextPanel.bind(svgEditor.topPanel);
+        svgEditor.topPanel.updateContextPanel = function() {
+          origUpdate();
+          updatePropertiesVisibility();
+        };
+      }
+
+      // Canvas event listeners
+      if (svgEditor.svgCanvas) {
+        svgEditor.svgCanvas.bind('selectedChanged', updatePropertiesVisibility);
+        svgEditor.svgCanvas.bind('elementChanged', updatePropertiesVisibility);
+      }
+
+      // Initial visibility sync
+      updatePropertiesVisibility();
+    }
+
     applyStudioSkin();
     setupMenuBar();
+    setupPropertiesPanel();
   </script>
 </body>
 </html>

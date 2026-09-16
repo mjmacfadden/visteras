@@ -672,46 +672,54 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
     `),e}get value(){return this[H].value}set value(e){this[va]({value:String(e)})}}})),ks,As=t((()=>{Fa(),Os(),ks=class extends Ds{attributeChangedCallback(e,t,n){e===`max`?this.max=parseFloat(n):e===`min`?this.min=parseFloat(n):e===`step`?this.step=parseFloat(n):super.attributeChangedCallback(e,t,n)}get[V](){return Object.assign(super[V],{max:null,min:null,step:1})}formatValue(e,t){return Number(e).toFixed(t)}get max(){return this[H].max}set max(e){this[va]({max:e})}get min(){return this[H].min}set min(e){this[va]({min:e})}parseValue(e,t){let n=t===0?parseInt(e):parseFloat(e);return isNaN(n)?0:n}[Sa](e,t){let n=super[Sa];if(t.step){let{step:t}=e,r=/\.(\d)+$/.exec(String(t)),i=r&&r[1]?r[1].length:0;Object.assign(n,{precision:i})}if(t.max||t.min||t.value){let{max:t,min:r,precision:i,value:a}=e,o=parseInt(a,i);a!==``&&isNaN(o)?Object.assign(n,{valid:!1,validationMessage:`Value must be a number`}):t===null||o<=t?r===null||o>=r?Object.assign(n,{valid:!0,validationMessage:``}):Object.assign(n,{valid:!1,validationMessage:`Value must be greater than or equal to ${r}.`}):Object.assign(n,{valid:!1,validationMessage:`Value must be less than or equal to ${t}.`}),Object.assign(n,{canGoUp:isNaN(o)||e.max===null||o<=e.max}),Object.assign(n,{canGoDown:isNaN(o)||e.min===null||o>=e.min})}return n}get step(){return this[H].step}set step(e){isNaN(e)||this[va]({step:e})}stepDown(){super.stepDown();let{max:e,precision:t,value:n}=this[H],r=this.parseValue(n,t)-this.step;e!==null&&(r=Math.min(r,e));let{min:i}=this[H];(i===null||r>=i)&&(this.value=this.formatValue(r,t))}stepUp(){super.stepUp();let{min:e,precision:t,value:n}=this[H],r=this.parseValue(n,t)+this.step;e!==null&&(r=Math.max(r,e));let{max:i}=this[H];(i===null||r<=i)&&(this.value=this.formatValue(r,t))}}})),js,Ms=t((()=>{us(),As(),js=class extends ls(ks){}})),Ns,Ps=t((()=>{Ms(),Ns=class extends js{},customElements.define(`elix-number-spin-box`,Ns)})),Fs,Is,Ls=t((()=>{Ps(),Mr(),Fs=document.createElement(`template`),Fs.innerHTML=`
   <style>
   div {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    white-space: nowrap;
     height: 24px;
-    margin: 5px 1px;
-    padding: 3px;
+    margin: 0 1px;
+    padding: 0 2px;
+    box-sizing: border-box;
   }
   div.imginside {
-    width: var(--global-se-spin-input-width);
+    width: auto;
+    min-width: var(--global-se-spin-input-width, 80px);
   }
   img {
     position: relative;
-    right: -4px;
-    top: 2px;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-right: 4px;
   }
   span {
-    bottom: -0.5em;
-    right: -4px;
     position: relative;
-    margin-left: -4px;
-    margin-right: 1px;
-    color: #fff;
+    flex-shrink: 0;
+    margin-right: 4px;
+    color: #cccccc;
+    font-size: 11px;
+    line-height: 20px;
   }
   elix-number-spin-box {
-    background-color: var(--input-color);
-    border-radius: 3px;
-    height: 20px;
-    margin-top: 1px;
-    vertical-align: top;
+    flex-shrink: 0;
+    background-color: var(--input-color, #242424);
+    border: 1px solid #444444;
+    border-radius: 2px;
+    height: 22px;
+    width: 54px;
+    box-sizing: border-box;
   }
   elix-number-spin-box::part(spin-button) {
     padding: 0px;
   }
   elix-number-spin-box::part(input) {
     width: 3em;
-  }
-  elix-number-spin-box{
-    width: 54px;
-    height: 24px;
+    color: #ffffff;
+    font-size: 11px;
   }
   </style>
   <div>
-  <img alt="icon" width="24" height="24" aria-labelledby="label" />
+  <img alt="icon" width="18" height="18" aria-labelledby="label" />
   <span id="label">label</span>
   <elix-number-spin-box min="1" step="1"></elix-number-spin-box>
   </div>
