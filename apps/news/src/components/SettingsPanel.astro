@@ -1,0 +1,168 @@
+---
+import { NEWS_FEEDS } from '../data/feeds';
+import { COMIC_FEEDS } from '../data/feeds/comics';
+const feedsBySection = {
+  news: NEWS_FEEDS.filter((f) => f.section === 'news' || f.section === 'lead' || f.section === 'alsoToday'),
+  businessTech: NEWS_FEEDS.filter((f) => f.section === 'businessTech'),
+  sports: NEWS_FEEDS.filter((f) => f.section === 'sports'),
+};
+---
+<dialog class="settings-dialog screen-only" id="settings-dialog" aria-labelledby="settings-title">
+  <form method="dialog" class="settings-form" id="settings-form">
+    <header class="settings-header">
+      <h2 id="settings-title">Paper settings</h2>
+      <button type="submit" class="settings-close" value="cancel" aria-label="Close">×</button>
+    </header>
+
+    <section class="settings-section">
+      <h3>Paper Identity</h3>
+      <label class="settings-label" style="margin-bottom: 0.5rem;">
+        Paper name
+        <input type="text" name="paperName" id="settings-paper-name" maxlength="60" placeholder="The Daily Mike" value="The Daily Mike" />
+      </label>
+      <label class="settings-label">
+        Tagline / Subtitle
+        <input type="text" name="paperTagline" id="settings-paper-tagline" maxlength="100" placeholder="NOTEWORTHY EVENTS WEATHER AND SPORTS" value="NOTEWORTHY EVENTS WEATHER AND SPORTS" />
+      </label>
+      <p class="settings-help">
+        Custom masthead title and tagline. Updates the front-page masthead, page folios, and print headers.
+      </p>
+    </section>
+
+    <section class="settings-section">
+      <h3>Weather ZIP</h3>
+      <label class="settings-label">
+        ZIP code
+        <input type="text" name="zip" id="settings-zip" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="60062" />
+      </label>
+      <p class="settings-help">
+        Default 60062 (Northbrook). Changing ZIP looks up lat/lon (zippopotam.us) and updates the
+        <a href="https://forecast7.com/en/42d13n87d83/northbrook/" target="_blank" rel="noopener noreferrer">weatherwidget.io / forecast7</a>
+        embed for that city. Invalid or unknown ZIPs fall back to Northbrook.
+      </p>
+    </section>
+
+    <section class="settings-section">
+      <h3>Grok Automation brief</h3>
+      <p class="settings-help">
+        <strong>Grok is the news backbone.</strong> Canonical Markdown:
+        <code>## Section</code>, <code>**Headline**</code> (or <code>### Headline</code>),
+        <code>*Named source: …*</code>, plain body;
+        images = <code>![alt](https://image-url.jpg)</code> (also accepts <code>!(url)</code> / <code>! (url)</code>).
+        Legacy <code>***</code> / <code>****url****</code> still works.
+        Weather/Markets = prose; What to watch = <code>-</code> bullets. Maps straight to columns
+        (National→News, Local→Also today / Local, Sports→Sports, Markets→Business).
+      </p>
+      <textarea id="grok-brief-input" name="grokBriefInput" class="grok-brief-textarea" rows="10" placeholder="## National &amp; World&#10;&#10;**Headline**&#10;*Named source: Reuters, September 9*&#10;Body…"></textarea>
+      <div class="grok-brief-actions">
+        <button type="button" id="grok-brief-save">Save brief</button>
+        <button type="button" id="grok-brief-clear">Clear</button>
+        <button type="button" id="grok-brief-sample">Load sample</button>
+      </div>
+      <p class="settings-help" id="grok-brief-status" aria-live="polite"></p>
+    </section>
+
+    <section class="settings-section">
+      <h3>Public calendars (ICS / embed)</h3>
+      <p class="settings-help">
+        Paste a Google Calendar <strong>embed</strong> URL
+        (<code>/calendar/embed?src=…</code>), a <strong>public iCal</strong> address,
+        or any <code>.ics</code> URL. Embed links are converted to
+        <code>…/ical/&#123;src&#125;/public/basic.ics</code> automatically. Calendar must be
+        <strong>public</strong> (private calendars return 403). No login.
+        Events for <strong>today</strong> (America/Chicago) merge into the agenda.
+      </p>
+      <div id="calendars-list" class="custom-feeds-list"></div>
+      <div class="custom-feed-add calendar-add">
+        <input type="text" id="calendar-label" name="calendarLabel" placeholder="Label (e.g. Family)" />
+        <input type="url" id="calendar-url" name="calendarUrl" placeholder="embed?src=… or …/ical/…/basic.ics" />
+        <button type="button" id="calendar-add-btn">Add calendar</button>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Comics</h3>
+      <p class="settings-help">Opt in/out. Strips lay across the bottom of page 3 (hotlink + credit).</p>
+      <fieldset class="settings-comics">
+        <legend>Sources</legend>
+        {COMIC_FEEDS.map((c) => (
+          <label class="settings-check">
+            <input type="checkbox" id={`comic-${c.id}`} name="comic" value={c.id} data-comic-id={c.id} />
+            <span>{c.title} <em>({c.credit})</em></span>
+          </label>
+        ))}
+      </fieldset>
+    </section>
+
+    <section class="settings-section">
+      <h3>RSS news feeds <span class="settings-badge">off by default</span></h3>
+      <p class="settings-help">
+        News columns come from the Grok paste. Leave feeds unchecked for <strong>RSS disabled</strong> mode.
+        Check feeds only if you want optional wire stories mixed back in.
+      </p>
+      <label class="settings-check settings-rss-master">
+        <input type="checkbox" name="rss-enabled" id="settings-rss-enabled" />
+        <span>Enable RSS news (optional)</span>
+      </label>
+      <div class="settings-feed-groups" id="settings-feed-groups">
+        <fieldset>
+          <legend>News / lead</legend>
+          {feedsBySection.news.map((f) => (
+            <label class="settings-check">
+              <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+              <span>{f.name}</span>
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Business · Tech</legend>
+          {feedsBySection.businessTech.map((f) => (
+            <label class="settings-check">
+              <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+              <span>{f.name}</span>
+            </label>
+          ))}
+        </fieldset>
+        <fieldset>
+          <legend>Sports</legend>
+          {feedsBySection.sports.map((f) => (
+            <label class="settings-check">
+              <input type="checkbox" id={`feed-${f.id}`} name="feed" value={f.id} data-feed-id={f.id} />
+              <span>{f.name}</span>
+            </label>
+          ))}
+        </fieldset>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Custom RSS feeds</h3>
+      <p class="settings-help">Add custom RSS/Atom feeds. Each feed gets its own section at the end of the news flow.</p>
+      <div id="custom-feeds-list" class="custom-feeds-list"></div>
+      <div class="custom-feed-add">
+        <input type="text" id="custom-feed-name" name="customFeedName" placeholder="Feed name (e.g. Daring Fireball)" />
+        <input type="url" id="custom-feed-url" name="customFeedUrl" placeholder="https://example.com/feed.xml" />
+        <button type="button" id="custom-feed-add-btn">Add feed</button>
+      </div>
+    </section>
+
+    <section class="settings-section">
+      <h3>Backup</h3>
+      <p class="settings-help">
+        Export or import lasting paper settings (ZIP, calendars, comics, RSS). The daily Grok brief is not included.
+        Files may include <strong>secret calendar URLs</strong> — treat the JSON like a password.
+      </p>
+      <div class="settings-backup-actions">
+        <button type="button" id="settings-export">Export settings</button>
+        <button type="button" id="settings-import">Import settings</button>
+        <input type="file" id="settings-import-file" name="settingsImportFile" accept="application/json,.json" hidden />
+      </div>
+    </section>
+
+    <footer class="settings-footer">
+      <button type="button" id="settings-reset">Reset defaults</button>
+      <button type="button" id="settings-save" class="primary">Save &amp; refresh</button>
+    </footer>
+    <p class="settings-status" id="settings-status" aria-live="polite"></p>
+  </form>
+</dialog>

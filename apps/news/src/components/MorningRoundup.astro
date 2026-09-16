@@ -1,0 +1,16 @@
+---
+interface Props {
+  headline: string;
+  paragraphs: string[];
+  imageCaption?: string;
+}
+const { headline, paragraphs, imageCaption } = Astro.props;
+---
+<aside class="roundup-box" aria-label="Morning roundup">
+  <div class="kicker">Optional · Morning Roundup</div>
+  <h3 style="font-family: var(--serif-display); font-size: 1.15rem; margin: 0 0 0.35rem;">
+    {headline}
+  </h3>
+  <div class="image-placeholder">{imageCaption || 'Roundup art placeholder'}</div>
+  {paragraphs.map((p) => <p style="font-size: 0.8rem; margin: 0 0 0.45rem; text-align: justify;">{p}</p>)}
+</aside>

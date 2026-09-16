@@ -1,0 +1,29 @@
+---
+import QRCode from 'qrcode';
+import { answersUrlForDate } from '../lib/site';
+
+interface Props {
+  date: string;
+  caption?: string;
+}
+const { date, caption = `Scan for puzzle answers · ${date}` } = Astro.props;
+const url = answersUrlForDate(date);
+const svg = await QRCode.toString(url, {
+  type: 'svg',
+  margin: 1,
+  errorCorrectionLevel: 'M',
+  color: { dark: '#1a1a1a', light: '#00000000' },
+});
+---
+<aside class="answers-qr" aria-label="Puzzle answers QR code" data-answers-qr>
+  <h2 class="section-label">Puzzle Answers</h2>
+  <div class="answers-qr-body">
+    <div class="answers-qr-svg" set:html={svg} />
+    <p class="answers-qr-caption">
+      <a href={url} target="_blank" rel="noopener noreferrer">{caption}</a>
+    </p>
+    <p class="answers-qr-url screen-only">
+      <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+    </p>
+  </div>
+</aside>

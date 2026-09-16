@@ -1,0 +1,13 @@
+---
+import { PAPER_NAME } from '../lib/site';
+interface Props {
+  page: number;
+  total?: number;
+  title?: string;
+}
+const { page, total = 3, title = PAPER_NAME } = Astro.props;
+---
+<footer class="page-folio">
+  <span>{title}</span>
+  <span>Page {page} of {total}</span>
+</footer>

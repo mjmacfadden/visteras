@@ -1,0 +1,2709 @@
+/* THE DAILY MIKE — print-first newspaper styles
+   Screen mirrors print where practical; @media print is authoritative. */
+
+:root {
+  --paper: #f7f3e8;
+  --paper-white: #fffcf5;
+  --ink: #1a1a1a;
+  --ink-muted: #3a3a3a;
+  --rule: #1a1a1a;
+  --rule-thin: 1px solid var(--rule);
+  --rule-double: 3px double var(--rule);
+  --accent: #1a1a1a;
+  --col-gap: 0.4rem;
+  --page-pad: 0.32in;
+  --serif-display: 'Playfair Display', 'Times New Roman', Times, serif;
+  --serif-masthead: 'Manufacturing Consent', 'UnifrakturCook', 'Times New Roman', serif;
+  --serif-body: 'Merriweather', 'Georgia', 'Times New Roman', serif;
+  --sans-small: 'Libre Franklin', 'Helvetica Neue', Arial, sans-serif;
+  --body-size: 9pt;
+  --body-lh: 1.22;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  background: #e8e2d4;
+  color: var(--ink);
+  font-family: var(--serif-body);
+  font-size: 0.75rem; /* ~12px screen — slightly denser body */
+  line-height: var(--body-lh);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+.screen-only {
+  /* shown on screen; print hides */
+}
+
+.screen-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  color: #f7f3e8;
+  font-family: var(--sans-small);
+  font-size: 0.8rem;
+}
+
+.screen-chrome button,
+.screen-chrome .nav-btn {
+  appearance: none;
+  border: 1px solid #f7f3e8;
+  background: transparent;
+  color: #f7f3e8;
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.screen-chrome button:hover,
+.screen-chrome .nav-btn:hover {
+  background: #f7f3e8;
+  color: #1a1a1a;
+}
+
+.screen-chrome button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.screen-chrome .page-indicator {
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+
+.newspaper-shell {
+  max-width: 8.5in;
+  margin: 0.5rem auto 1rem;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+/* Continuous edition — screen mirrors print packing (no hollow page shells). */
+.edition-document {
+  padding: var(--page-pad);
+  background: var(--paper);
+  min-height: 0;
+}
+
+.edition-band {
+  min-height: 0;
+}
+
+.edition-features {
+  margin-top: 0.55rem;
+  padding-top: 0.45rem;
+  border-top: var(--rule-double);
+}
+
+.running-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom: var(--rule-thin);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.4rem;
+}
+
+.edition-end-folio {
+  margin-top: 0.5rem;
+}
+
+/* Legacy class kept so old print rules / bookmarks don't break */
+.newspaper-page {
+  display: block;
+  padding: 0;
+  min-height: 0;
+  background: transparent;
+}
+
+/* —— Masthead —— */
+.masthead {
+  text-align: center;
+  border-bottom: var(--rule-double);
+  padding-bottom: 0.2rem;
+  margin-bottom: 0.3rem;
+}
+
+.masthead-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--sans-small);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 0.15rem;
+}
+
+.masthead-title {
+  font-family: var(--serif-masthead);
+  font-weight: 400;
+  font-size: clamp(2.35rem, 5.5vw, 3.45rem);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+  margin: 0.15rem 0 0.2rem;
+  text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.masthead-tagline,
+.sheet-masthead .masthead-tagline,
+.masthead .masthead-tagline {
+  font-family: var(--sans-small);
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-align: center !important;
+  width: 100%;
+  margin: 0.15rem auto 0.35rem;
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+
+.masthead-date-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: var(--rule-thin);
+  border-bottom: var(--rule-thin);
+  padding: 0.25rem 0;
+  font-family: var(--sans-small);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.section-label {
+  font-family: var(--sans-small);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-bottom: var(--rule-thin);
+  padding-bottom: 0.15rem;
+  margin: 0 0 0.35rem;
+  font-variant: small-caps;
+  font-variant-caps: all-small-caps;
+}
+
+/* —— Front pack: rail + lead (dense, no empty third column) —— */
+.front-pack {
+  display: grid;
+  grid-template-columns: 1.1fr 2.2fr;
+  gap: var(--col-gap);
+  align-items: stretch;
+  margin-bottom: 0.35rem;
+}
+
+.front-rail {
+  min-width: 0;
+  padding-right: 0.35rem;
+  border-right: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.front-lead {
+  min-width: 0;
+  padding-left: 0.3rem;
+}
+
+/* legacy aliases */
+.page1-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 2.2fr;
+  gap: var(--col-gap);
+  align-items: start;
+}
+
+.page1-main {
+  border-left: 0;
+  border-right: 0;
+  padding: 0 0.35rem;
+}
+
+/* Weather strip — 1-line hourly forecast across top of page 1 */
+.weather-strip {
+  border-top: var(--rule-double, 3px double #000);
+  border-bottom: var(--rule-thin, 1px solid #000);
+  padding: 0.22rem 0.4rem;
+  margin: 0 0 0.45rem;
+  background: transparent;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.weather-hourly-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.4rem;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.weather-badge {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-right: 0.5rem;
+  border-right: 1px solid currentColor;
+}
+
+.weather-badge-loc {
+  font-family: var(--sans-small);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.weather-badge-sub {
+  font-family: var(--sans-small);
+  font-size: 0.5rem;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.weather-summary-day {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  flex-shrink: 0;
+  padding: 0 0.5rem;
+  border-right: 1px solid currentColor;
+  font-family: var(--sans-small);
+}
+
+.weather-slots {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-grow: 1;
+  min-width: 0;
+  gap: 0.15rem;
+}
+
+.weather-slot {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 0 0.35rem;
+  border-right: 1px dotted rgba(0, 0, 0, 0.25);
+  font-family: var(--sans-small);
+  line-height: 1;
+}
+
+.weather-slot:last-child {
+  border-right: none;
+}
+
+.ws-hour {
+  font-weight: 700;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.ws-bottom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+}
+
+.ws-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  color: currentColor;
+}
+
+.ws-icon svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+}
+
+.ws-temp {
+  font-family: var(--serif-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.wsd-temps {
+  font-family: var(--serif-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.weather-widget-status {
+  margin: 0.15rem 0 0;
+  font-family: var(--sans-small);
+  font-size: 0.62rem;
+  color: #8a1f1f;
+}
+
+
+.agenda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.agenda-list li {
+  display: grid;
+  grid-template-columns: 4.2rem 1fr;
+  gap: 0.25rem;
+  padding: 0.14rem 0;
+  border-bottom: 1px dotted #999;
+  font-size: 0.72rem;
+}
+
+.agenda-list .time {
+  font-family: var(--sans-small);
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+
+.agenda-list .title {
+  font-weight: 700;
+}
+
+.agenda-list .note {
+  grid-column: 2;
+  font-size: 0.65rem;
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.lead-story .lead-hed,
+.lead-story h2.lead-hed {
+  font-family: var(--serif-display);
+  font-size: 1.55rem;
+  line-height: 1.1;
+  margin: 0 0 0.3rem;
+  font-weight: 700;
+  border: 0;
+  letter-spacing: normal;
+  text-transform: none;
+  padding: 0;
+}
+
+/* Slightly larger than column story hed so lead reads as the top story without a label */
+.sheet-unit .lead-story .lead-hed {
+  font-size: 1.45rem;
+}
+
+.lead-hed-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.lead-hed-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.lead-story.no-image .lead-hed-wrap:hover .lead-hed-controls,
+.lead-story.no-image .lead-hed-wrap:focus-within .lead-hed-controls,
+.lead-story.lead-image-failed .lead-hed-wrap:hover .lead-hed-controls,
+.lead-story.lead-image-failed .lead-hed-wrap:focus-within .lead-hed-controls,
+.lead-story:not(.has-image) .lead-hed-wrap:hover .lead-hed-controls,
+.lead-story:not(.has-image) .lead-hed-wrap:focus-within .lead-hed-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lead-deck {
+  font-size: 0.78rem;
+  font-style: italic;
+  margin: 0 0 0.35rem;
+  color: var(--ink-muted);
+}
+
+.lead-meta {
+  font-family: var(--sans-small);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.35rem;
+}
+
+.image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100px;
+  background: repeating-linear-gradient(
+    -45deg,
+    #e8e2d4,
+    #e8e2d4 8px,
+    #ddd6c4 8px,
+    #ddd6c4 16px
+  );
+  border: var(--rule-thin);
+  margin: 0.3rem 0 0.4rem;
+  font-family: var(--sans-small);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-align: center;
+  padding: 0.4rem;
+}
+
+.lead-body p {
+  font-size: 0.72rem;
+  margin: 0 0 0.4rem;
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  line-height: var(--body-lh);
+}
+
+.also-today .brief {
+  margin-bottom: 0.28rem;
+  padding-bottom: 0.22rem;
+  border-bottom: 1px dotted #999;
+}
+
+.also-today .brief:last-child {
+  border-bottom: 0;
+}
+
+.also-today h3 {
+  font-family: var(--serif-display);
+  font-size: 0.88rem;
+  line-height: 1.15;
+  margin: 0 0 0.15rem;
+}
+
+.also-today p {
+  font-size: 0.65rem;
+  margin: 0;
+  line-height: var(--body-lh);
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.also-today .source {
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.roundup-box {
+  margin-top: 0.35rem;
+  padding-top: 0.25rem;
+  border-top: var(--rule-double);
+}
+
+.roundup-box .kicker {
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+
+.roundup-box p {
+  font-size: 0.68rem;
+  margin: 0 0 0.35rem;
+  line-height: var(--body-lh);
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* —— Continuous 3-column newspaper story flow —— */
+.stories-flow {
+  column-count: 3;
+  column-gap: var(--col-gap);
+  column-rule: none;
+  margin: 0.4rem 0 0.25rem;
+}
+
+.flow-block {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  margin: 0 0 0.55rem;
+  display: block;
+  width: 100%;
+}
+
+.flow-block:empty {
+  display: none;
+  margin: 0;
+}
+
+/* legacy page2 grid — unused but harmless */
+.page2-grid {
+  display: contents;
+}
+
+.story-column {
+  min-width: 0;
+}
+
+.story-column + .story-column {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.story-item {
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px dotted #999;
+}
+
+.story-item:last-child {
+  border-bottom: 0;
+}
+
+.story-item h3 {
+  font-family: var(--serif-display);
+  font-size: 0.92rem;
+  line-height: 1.15;
+  margin: 0 0 0.15rem;
+}
+
+.story-item .deck {
+  font-size: 0.68rem;
+  margin: 0 0 0.2rem;
+  line-height: var(--body-lh);
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.story-item .meta {
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+/* Brief / Grok story images — fit column, don't blow layout or print */
+.story-image,
+.story-item .story-image,
+.brief .story-image {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  max-height: 160px;
+  object-fit: contain;
+  margin: 0.35rem auto 0.4rem;
+  background: transparent;
+}
+
+/* Lead image: full width of the 2/3 lead column, fixed 220px crop */
+.lead-image-frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.3rem auto 0.4rem;
+}
+
+.lead-image-frame:not(.is-editing):not(.is-failed):not(.is-placeholder) {
+  user-select: none;
+}
+
+.lead-image-frame.is-hidden {
+  display: none !important;
+}
+
+.lead-story .story-image,
+.front-lead .lead-story .story-image,
+.sheet-unit .lead-story .story-image,
+.lead-image-frame .story-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: 220px;
+  max-height: 220px;
+  object-fit: cover;
+  object-position: center 50%;
+  margin: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.lead-image-frame.is-dragging .story-image,
+.lead-image-frame .story-image:active {
+  cursor: grabbing;
+}
+
+.lead-image-controls {
+  position: absolute;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.lead-image-frame:not(.is-editing):not(.is-failed):hover .lead-image-controls,
+.lead-image-frame:not(.is-editing):not(.is-failed):focus-within .lead-image-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* In-place Lead Image Placeholder & Editor */
+.lead-image-placeholder-box {
+  display: none;
+  user-select: auto;
+}
+
+.lead-image-frame.is-failed:not(.is-editing) {
+  display: none !important;
+}
+
+.lead-image-frame.is-editing,
+.lead-image-frame.is-placeholder {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 140px;
+  border: 1.5px dashed var(--rule, #1a1a1a);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--paper, #f7f3e8),
+    var(--paper, #f7f3e8) 8px,
+    #ede6d6 8px 16px
+  );
+  padding: 0.75rem 0.85rem;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.45rem;
+  user-select: auto;
+}
+
+.lead-image-frame.is-editing .story-image,
+.lead-image-frame.is-placeholder .story-image,
+.lead-image-frame.is-editing .lead-image-controls,
+.lead-image-frame.is-placeholder .lead-image-controls {
+  display: none !important;
+}
+
+.lead-image-frame.is-editing .lead-image-placeholder-box,
+.lead-image-frame.is-placeholder .lead-image-placeholder-box {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.lead-placeholder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.lead-placeholder-title {
+  font-family: var(--sans-small);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.lead-placeholder-form {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 28rem;
+}
+
+.lead-placeholder-hint {
+  margin: 0;
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.lead-image-btn {
+  appearance: none;
+  margin: 0;
+  padding: 0.2rem 0.5rem;
+  font: 600 0.65rem/1.2 var(--sans, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #111;
+  background: #f4f4f4;
+  border: 1px solid #333;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.lead-image-btn:hover {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.lead-image-btn.primary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.lead-image-btn.primary:hover {
+  background: #333;
+  border-color: #333;
+}
+
+.lead-image-url-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--sans-small);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.45rem;
+  border: 1px solid #333;
+  border-radius: 2px;
+  background: #fff;
+  color: #000;
+  box-sizing: border-box;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  pointer-events: auto !important;
+}
+
+.lead-image-url-input:focus {
+  outline: 1.5px solid #000;
+  border-color: #000;
+}
+
+.story-thumb {
+  width: 100%;
+  min-height: 56px;
+  margin: 0.2rem 0;
+}
+
+/* —— Last-page features block (out of 3-col news flow) —— */
+.page3-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.comics-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  align-items: stretch;
+  border-bottom: var(--rule-medium, 2px solid #1a1a1a);
+  padding-bottom: 0.35rem;
+}
+
+.comics-band .comic-box {
+  min-width: 0;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.comics-band .comic-frame {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  position: relative;
+}
+
+.comic-cycle-controls {
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.15rem;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.comic-box:hover .comic-cycle-controls,
+.comic-box:focus-within .comic-cycle-controls,
+.comic-frame:hover .comic-cycle-controls,
+.comic-frame:focus-within .comic-cycle-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.comic-cycle-btn {
+  appearance: none;
+  margin: 0;
+  padding: 0.15rem 0.4rem;
+  font: 600 0.65rem/1.2 var(--sans, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #111;
+  background: #f4f4f4;
+  border: 1px solid #333;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.comic-cycle-btn:hover {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* Custom RSS section header & cycle controls */
+.custom-feed-column {
+  position: relative;
+}
+
+.custom-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.2rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid #111;
+}
+
+.custom-feed-header .section-label {
+  margin: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.story-cycle-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.2rem;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  opacity: 0.92;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.custom-feed-column:hover .story-cycle-controls,
+.story-cycle-controls:hover,
+.story-cycle-controls:focus-within {
+  opacity: 1;
+}
+
+.story-cycle-btn {
+  appearance: none;
+  margin: 0;
+  padding: 0.1rem 0.3rem;
+  font: 600 0.58rem/1.2 var(--sans, system-ui, sans-serif);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #111;
+  background: #f4f4f4;
+  border: 1px solid #444;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.story-cycle-btn:hover {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.story-cycle-indicator {
+  font: 600 0.58rem/1.2 var(--sans, system-ui, sans-serif);
+  color: #333;
+  user-select: none;
+  padding: 0 0.15rem;
+}
+
+.comics-band .comic-image {
+  max-height: 2.5in;
+  width: 100%;
+  object-fit: contain;
+}
+
+.games-band {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr;
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.game-cell {
+  min-width: 0;
+  border: 0;
+  padding: 0.15rem 0.1rem;
+  background: transparent;
+}
+
+.features-meta-band {
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr 0.7fr;
+  gap: 0.4rem;
+  align-items: start;
+  border-top: var(--rule-thin, 1px solid #1a1a1a);
+  padding-top: 0.35rem;
+}
+
+.feature-cell {
+  min-width: 0;
+}
+
+.feature-list {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.feature-list li {
+  margin-bottom: 0.25rem;
+}
+
+.birthdays-box .section-label,
+.history-box .section-label,
+.answers-qr .section-label {
+  margin: 0 0 0.55rem;
+  text-align: left;
+  width: 100%;
+}
+
+.feature-qr .answers-qr,
+.answers-qr {
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.answers-qr-body {
+  text-align: center;
+}
+
+/* legacy class kept for older markup / print fallbacks */
+.page3-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: var(--col-gap);
+}
+
+.page3-grid > * + * {
+  border-left: 0;
+  padding-left: 0.35rem;
+}
+
+.crossword-box {
+  text-align: center;
+}
+
+.crossword-box .section-label,
+.crossword-box .clue-columns,
+.crossword-box .clue-list {
+  text-align: left;
+}
+
+.crossword-grid {
+  display: inline-grid;
+  gap: 0;
+  background: transparent;
+  border: 0.75px solid #1a1a1a;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.35rem auto;
+}
+
+.sheet-game-unit .crossword-box,
+.game-crossword .crossword-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sheet-game-unit .crossword-box .section-label,
+.sheet-game-unit .crossword-box .clue-columns,
+.game-crossword .crossword-box .section-label,
+.game-crossword .crossword-box .clue-columns {
+  align-self: stretch;
+}
+
+.crossword-cell {
+  box-sizing: border-box;
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  font-family: var(--sans-small);
+  font-size: 0.5rem;
+  position: relative;
+  /* open cells: show cream/paper through (digital + print) */
+  background: transparent;
+}
+
+.crossword-cell.block {
+  background: #1a1a1a;
+  /* Browsers omit backgrounds in print unless forced */
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  color-adjust: exact;
+}
+
+.crossword-cell .num {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  line-height: 1;
+}
+
+.clue-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.clue-heading {
+  font-family: var(--sans-small);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.clue-list {
+  font-size: 0.65rem;
+  margin: 0.2rem 0 0.35rem;
+  padding-left: 1rem;
+  line-height: 1.25;
+}
+
+.clue-list li {
+  margin-bottom: 0.1rem;
+}
+
+.jumble-box,
+.trivia-box,
+.history-box,
+.comic-box {
+  margin-bottom: 0.35rem;
+}
+
+.puzzle-clue {
+  font-size: 0.72rem;
+  margin: 0;
+}
+
+.trivia-list {
+  margin: 0.15rem 0 0.25rem;
+  padding-left: 1.1rem;
+}
+
+.trivia-item {
+  margin-bottom: 0.35rem;
+}
+
+.trivia-item:last-child {
+  margin-bottom: 0;
+}
+
+.trivia-cat {
+  display: block;
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted, #555);
+  margin-bottom: 0.1rem;
+}
+
+.trivia-question {
+  font-size: 0.78rem;
+  margin: 0.2rem 0;
+  font-weight: 700;
+}
+
+.puzzle-hint-note {
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0.25rem 0 0;
+}
+
+.jumble-box {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  padding: 0 0.25rem 0.45rem;
+  background: transparent;
+}
+
+/* Header left-aligned like Crossword / Sports Trivia; scramble stays centered below */
+.jumble-box .section-label {
+  text-align: left;
+  width: 100%;
+  margin-top: 0;
+}
+
+.jumble-clue,
+.puzzle-clue {
+  font-size: 0.64rem;
+  margin: 0.08rem 0 0.05rem;
+  font-style: italic;
+  text-align: center;
+  transform: rotate(180deg);
+  opacity: 0.85;
+  line-height: 1.15;
+}
+
+.jumble-word-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0.15rem 0 0.08rem;
+  width: 100%;
+}
+
+.jumble-tiles {
+  --jumble-tile: 1.45rem;
+  --jumble-gap: 0.22rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--jumble-gap);
+  margin-bottom: 0.85rem;
+  padding: 0.2rem 0 0;
+}
+
+.jumble-tile {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--jumble-tile);
+  height: var(--jumble-tile);
+  border: 1.5px solid #1a1a1a;
+  border-radius: 50%;
+  background: transparent;
+  font-family: var(--serif-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.jumble-blanks {
+  --jumble-tile: 1.45rem;
+  --jumble-gap: 0.22rem;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: var(--jumble-gap);
+  margin-top: 0.75rem;
+  padding: 0 0 0.15rem;
+  min-height: auto;
+}
+
+.jumble-blank {
+  box-sizing: border-box;
+  display: inline-block;
+  width: var(--jumble-tile);
+  height: 0;
+  border: 0;
+  border-bottom: 1.5px solid #1a1a1a;
+  background: transparent;
+  border-radius: 0;
+  vertical-align: bottom;
+}
+
+.game-jumble {
+  display: flex;
+  justify-content: center;
+}
+
+.game-jumble .jumble-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  width: 100%;
+}
+
+.game-jumble .jumble-box {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Compact stack of three — spacing only, no rules between */
+.jumble-stack .jumble-box .section-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.62rem;
+}
+
+.jumble-stack .jumble-tiles,
+.jumble-stack .jumble-blanks {
+  --jumble-tile: 1.25rem;
+  --jumble-gap: 0.2rem;
+}
+
+.jumble-stack .jumble-tile {
+  font-size: 0.74rem;
+}
+
+.jumble-stack .jumble-tiles {
+  margin-bottom: 2rem;
+  padding: 0.1rem 0;
+}
+
+.jumble-stack .jumble-blanks {
+  margin-top: 0.75rem;
+  padding: 0 0 0.15rem;
+  min-height: auto;
+}
+
+.jumble-stack .jumble-clue {
+  font-size: 0.6rem;
+  margin: 0.08rem 0 0.05rem;
+  line-height: 1.15;
+  text-align: center;
+  transform: rotate(180deg);
+}
+
+.jumble-stack .jumble-word-block {
+  margin: 0.1rem 0 0.05rem;
+  gap: 0;
+}
+
+.jumble-scrambled {
+  font-family: var(--serif-display);
+  font-size: 1.1rem;
+  letter-spacing: 0.18em;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
+
+.crossword-box .section-label,
+.jumble-box .section-label,
+.trivia-box .section-label {
+  margin-top: 0;
+  margin-bottom: 0.55rem;
+}
+
+.games-band > .game-cell {
+  padding-top: 0;
+}
+
+.games-band .section-label {
+  line-height: 1.15;
+  margin-bottom: 0.55rem;
+}
+
+/* Stacked jumbles: keep a little air under each heading rule */
+.jumble-stack .jumble-box .section-label {
+  margin: 0 0 0.35rem;
+}
+
+.trivia-box .trivia-list {
+  margin: 0.15rem 0 0.25rem;
+  padding-left: 1.1rem;
+}
+
+.trivia-item {
+  margin-bottom: 0.35rem;
+}
+
+.trivia-item:last-child {
+  margin-bottom: 0;
+}
+
+.trivia-cat {
+  display: block;
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted, #555);
+  margin-bottom: 0.1rem;
+}
+
+.trivia-question {
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+.comic-frame {
+  min-height: 0;
+  border: var(--rule-thin);
+  background: transparent;
+  padding: 0.35rem;
+  font-size: 0.68rem;
+  font-style: italic;
+}
+
+.comic-credit {
+  font-style: normal;
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.2rem;
+}
+
+.comic-fallback-flag {
+  color: var(--ink-muted);
+}
+
+.comic-image-link {
+  display: block;
+}
+
+.comic-image {
+  display: block;
+  max-width: 100%;
+  max-height: 110px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.comics-band .comic-image {
+  max-height: 2.5in;
+  width: 100%;
+  object-fit: contain;
+}
+
+.comic-caption-only {
+  margin: 0;
+  font-size: 0.68rem;
+}
+
+/* New Yorker art: multiply into paper so white boxes drop out */
+.comic-box[data-comic-feed-id="newyorker-daily"] .comic-image,
+.comic-box[data-comic-feed-id^="newyorker"] .comic-image {
+  mix-blend-mode: multiply;
+}
+
+/* New Yorker Daily Cartoon joke under the art (screen + print) */
+.comic-caption {
+  margin: 0.18rem 0 0;
+  padding: 0 0.2rem;
+  text-align: center;
+  font-family: var(--serif-body);
+  font-style: italic;
+  font-size: 0.6rem;
+  line-height: 1.28;
+  color: inherit;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  /* keep comics band compact; allow ~3 short lines */
+  max-height: 3.5em;
+  overflow: hidden;
+}
+
+.comics-band .comic-caption {
+  font-size: 0.58rem;
+  max-height: 3.5em;
+}
+
+@media print {
+  .comic-caption {
+    font-size: 0.55rem;
+    line-height: 1.22;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.comic-source {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  font-style: normal;
+  font-family: var(--sans-small);
+  letter-spacing: 0.01em;
+  text-transform: none;
+  line-height: 1.15;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+}
+
+.comic-source-url {
+  display: inline-block;
+  max-width: 100%;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+  white-space: nowrap;
+  font-size: 0.52rem; /* JS fitComicSourceUrls may shrink further */
+}
+
+.page-folio {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding-top: 0.18rem;
+  border-top: var(--rule-thin);
+  font-family: var(--sans-small);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* —— Answers QR —— */
+.answers-qr {
+  border: 0;
+  padding: 0;
+  text-align: left;
+  background: transparent;
+  margin: 0;
+  break-inside: avoid;
+}
+
+.answers-qr-body {
+  text-align: center;
+}
+
+.answers-qr-svg {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto;
+  background: transparent;
+}
+
+.answers-qr-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: transparent;
+}
+
+.answers-qr-svg svg rect {
+  fill: transparent !important;
+}
+
+.answers-qr-caption {
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0.3rem 0 0;
+}
+
+.answers-qr-caption a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.answers-qr-caption a:hover {
+  text-decoration: underline;
+}
+
+.answers-qr-url {
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  margin: 0.15rem 0 0;
+  word-break: break-all;
+}
+
+/* —— Settings (screen only) —— */
+.settings-dialog {
+  border: 2px solid #1a1a1a;
+  padding: 0;
+  max-width: 32rem;
+  width: calc(100vw - 2rem);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans-small);
+}
+
+.settings-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.settings-form {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: var(--rule-thin);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+}
+
+.settings-header h2 {
+  font-family: var(--serif-display);
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.settings-close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.settings-section {
+  margin-bottom: 0.85rem;
+}
+
+.settings-section h3 {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 0.35rem;
+}
+
+.settings-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.settings-label input,
+.custom-feed-add input {
+  font: inherit;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #333;
+  background: #fff;
+}
+
+.settings-help {
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  margin: 0.25rem 0 0.4rem;
+}
+
+.settings-feed-groups {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-feed-groups fieldset {
+  border: 1px solid #999;
+  padding: 0.4rem 0.55rem 0.5rem;
+  margin: 0;
+}
+
+.settings-feed-groups legend {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0 0.25rem;
+}
+
+.settings-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  margin: 0.2rem 0;
+}
+
+.custom-feeds-list {
+  display: grid;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.custom-feed-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+  font-size: 0.72rem;
+  padding: 0.3rem;
+  border: 1px dotted #999;
+}
+
+.custom-feed-add {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 0.35rem;
+}
+
+.settings-backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.settings-backup-actions button {
+  appearance: none;
+  border: 1px solid #1a1a1a;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: var(--rule-thin);
+}
+
+.settings-footer button {
+  appearance: none;
+  border: 1px solid #1a1a1a;
+  background: transparent;
+  font: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+.settings-footer button.primary {
+  background: #1a1a1a;
+  color: #f7f3e8;
+}
+
+.settings-status {
+  font-size: 0.7rem;
+  margin: 0.4rem 0 0;
+  min-height: 1em;
+}
+
+/* —— Answers page —— */
+.answers-page-body {
+  background: #e8e2d4;
+}
+
+.answers-page {
+  max-width: 28rem;
+  margin: 1rem auto 2rem;
+  padding: 1.25rem;
+  background: var(--paper);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  font-family: var(--serif-body);
+}
+
+.answers-header h1 {
+  font-family: var(--serif-display);
+  font-size: 1.4rem;
+  margin: 0.2rem 0;
+}
+
+.answers-kicker {
+  font-family: var(--serif-masthead);
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.answers-date,
+.answers-tagline {
+  font-family: var(--sans-small);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0.15rem 0;
+}
+
+.answers-spoiler {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--ink-muted);
+  border-bottom: var(--rule-thin);
+  padding-bottom: 0.5rem;
+}
+
+.answers-section {
+  margin: 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dotted #999;
+}
+
+.answers-section h2 {
+  font-family: var(--serif-display);
+  font-size: 1.05rem;
+  margin: 0 0 0.35rem;
+}
+
+.answers-meta {
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin: 0.15rem 0;
+}
+
+.answers-scrambled {
+  font-family: var(--serif-display);
+  letter-spacing: 0.15em;
+  font-weight: 700;
+}
+
+.answers-value {
+  font-size: 0.95rem;
+  margin: 0.35rem 0 0;
+}
+
+.answers-crossword {
+  display: inline-grid;
+  gap: 0;
+  background: transparent;
+  border: 0.75px solid #1a1a1a;
+  margin: 0.5rem 0 0.75rem;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.answers-crossword .crossword-cell {
+  width: 1.6rem;
+  height: 1.6rem;
+  min-width: 1.6rem;
+  min-height: 1.6rem;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0.5px solid #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.answers-crossword .crossword-cell.block {
+  background: #1a1a1a;
+}
+
+.answers-letter {
+  font-family: var(--sans-small);
+  font-size: 0.78rem;
+  font-weight: 700;
+  width: 100%;
+  text-align: center;
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.answers-trivia-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.answers-trivia-list li {
+  margin-bottom: 0.55rem;
+}
+
+.answers-clue-list {
+  font-size: 0.78rem;
+  padding-left: 1.1rem;
+  margin: 0.5rem 0 0;
+}
+
+.answers-back {
+  font-family: var(--sans-small);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.feed-status-note {
+  font-family: var(--sans-small);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0.25rem 0 0;
+}
+
+/* —— Responsive screen only (never apply when printing letter sheets) —— */
+@media screen and (max-width: 900px) {
+  .front-pack,
+  .page1-grid {
+    grid-template-columns: 1fr 1.4fr;
+  }
+
+  .stories-flow {
+    column-count: 2;
+  }
+
+  .games-band,
+  .features-meta-band,
+  .comics-band {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .games-band {
+    grid-template-columns: 1fr;
+  }
+
+  .masthead-title {
+    font-size: 2.15rem;
+  }
+
+  .custom-feed-add {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .newspaper-shell {
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .edition-document {
+    padding: 0.75rem;
+  }
+
+  .front-pack,
+  .page1-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .front-rail {
+    border-right: 0;
+    padding-right: 0;
+    border-bottom: var(--rule-thin);
+    padding-bottom: 0.35rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .front-lead {
+    padding-left: 0;
+  }
+
+  .stories-flow {
+    column-count: 1;
+    column-rule: none;
+  }
+
+  .game-cell,
+  .comics-band,
+  .games-band,
+  .features-meta-band {
+    grid-template-columns: 1fr;
+  }
+
+  .masthead-title {
+    font-size: 1.85rem;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead-date-line,
+  .masthead-top {
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+}
+
+
+
+/* —— Empty edition (no Grok paste yet) —— */
+.empty-edition,
+.empty-column {
+  border: 1px dashed #999;
+  padding: 0.45rem 0.4rem;
+  background: transparent;
+}
+
+.empty-column {
+  display: none; /* never leave hollow column shells */
+}
+
+.empty-edition-msg {
+  font-family: var(--serif-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+  line-height: 1.25;
+}
+
+.empty-edition-hint {
+  font-family: var(--sans-small);
+  font-size: 0.65rem;
+  color: var(--ink-muted);
+  margin: 0.2rem 0 0;
+}
+
+.settings-badge {
+  display: inline-block;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid #999;
+  padding: 0.05rem 0.3rem;
+  margin-left: 0.25rem;
+  vertical-align: middle;
+  color: var(--ink-muted);
+}
+
+.settings-rss-master {
+  margin-bottom: 0.45rem;
+  font-weight: 700;
+}
+
+.settings-feed-groups.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* —— Brief vs RSS distinction —— */
+.brief-item .meta,
+.brief-item .source,
+.brief-item .kicker {
+  font-style: normal;
+}
+
+.brief-item {
+  background: linear-gradient(90deg, rgba(26, 26, 26, 0.04), transparent 12px);
+  padding-left: 0.35rem;
+}
+
+[data-grok-glance] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+[data-grok-glance]:empty {
+  display: none;
+}
+
+.grok-weather-box,
+.weather-box,
+.grok-watch-box,
+.watch-box,
+.grok-glance-box,
+.glance-box {
+  border: var(--rule-thin);
+  padding: 0.28rem 0.35rem;
+  margin: 0.3rem 0;
+  background: transparent;
+  font-size: 0.7rem;
+}
+
+.grok-glance-box,
+.glance-box {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.grok-weather-box p {
+  margin: 0;
+  line-height: var(--body-lh);
+}
+
+.watch-list,
+.glance-list {
+  margin: 0;
+  padding-left: 0.95rem;
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.glance-list {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.watch-list li,
+.glance-list li {
+  margin-bottom: 0.1rem;
+}
+
+.grok-brief-textarea,
+#grok-paste-quick {
+  width: 100%;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.45rem;
+  border: 1px solid #333;
+  background: #fff;
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.grok-brief-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.grok-brief-actions button,
+.calendar-add button {
+  appearance: none;
+  border: 1px solid #1a1a1a;
+  background: transparent;
+  font: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+
+.grok-paste-dialog {
+  border: 2px solid #1a1a1a;
+  padding: 0;
+  max-width: min(42rem, calc(100vw - 2rem));
+  width: 100%;
+  max-height: min(90vh, 40rem);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans-small);
+  overflow: hidden;
+}
+
+.grok-paste-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.grok-paste-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem 1.15rem;
+  max-height: min(90vh, 40rem);
+  overflow: auto;
+}
+
+.grok-paste-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: var(--rule-thin);
+  margin-bottom: 0.15rem;
+  padding-bottom: 0.35rem;
+}
+
+.grok-paste-header h2 {
+  font-family: var(--serif-display);
+  font-size: 1.15rem;
+  margin: 0;
+  color: var(--ink);
+}
+
+.grok-paste-x {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink);
+  padding: 0.1rem 0.35rem;
+}
+
+.grok-paste-dialog .settings-help {
+  color: var(--ink-muted);
+  margin: 0;
+}
+
+.grok-paste-dialog .primary-ish {
+  background: #1a1a1a;
+  color: #f7f3e8;
+}
+
+.grok-paste-dialog #grok-paste-quick {
+  flex: 1 1 auto;
+  min-height: 14rem;
+  max-height: 50vh;
+  resize: vertical;
+}
+
+.settings-comics {
+  border: 1px solid #999;
+  padding: 0.4rem 0.55rem 0.5rem;
+  margin: 0;
+}
+
+.settings-comics legend {
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0 0.25rem;
+}
+
+.settings-comics em {
+  font-style: normal;
+  color: var(--ink-muted);
+  font-size: 0.7em;
+}
+
+.settings-dialog {
+  max-height: min(90vh, 40rem);
+  overflow: auto;
+}
+
+@media print {
+  .grok-paste-dialog {
+    display: none !important;
+  }
+
+  .brief-item {
+    background: none;
+    padding-left: 0;
+  }
+
+  .grok-weather-box,
+  .grok-watch-box,
+  .grok-glance-box {
+    margin: 0.2rem 0;
+    padding: 0.2rem 0.25rem;
+  }
+}
+
+
+/* —— Fixed letter page sheets (digital = print) —— */
+.newspaper-shell {
+  max-width: 8.5in;
+  margin: 0.5rem auto 1rem;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.edition-document.is-source-only {
+  position: absolute !important;
+  left: -12000px !important;
+  top: 0;
+  width: 7.7in;
+  padding: var(--page-pad);
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: auto;
+  overflow: visible;
+}
+
+.paged-edition {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+
+/* Column body copy — full justify */
+.sheet-unit .deck,
+.sheet-unit p:not(.meta):not(.source):not(.section-label):not(.lead-meta):not(.lead-hed):not(.masthead-tagline):not(.answers-tagline),
+.stories-flow .deck,
+.brief-item p,
+.grok-weather-box p,
+.glance-list,
+.watch-list {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.page-sheet {
+  position: relative;
+  width: 8.5in;
+  height: 11in;
+  box-sizing: border-box;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.page-sheet-inner {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0.4in;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page-sheet-banner {
+  flex: 0 0 auto;
+  margin-bottom: 0.28rem;
+}
+
+.page-sheet-banner .sheet-unit {
+  margin-bottom: 0.28rem;
+}
+
+.page-sheet-banner .sheet-unit:last-child {
+  margin-bottom: 0;
+}
+
+.page-sheet-columns {
+  /* flex-basis 0 so columns consume remaining sheet height after banner/folio */
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.38rem;
+  align-items: stretch;
+}
+
+.page-col {
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  align-self: stretch;
+  overflow: hidden;
+  padding: 0;
+  border-right: 0;
+}
+
+.page-col:first-child {
+  padding-left: 0;
+}
+
+.page-col:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.page-sheet-folio {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.2rem;
+  padding-top: 0.12rem;
+  border-top: var(--rule-thin);
+  font-family: var(--sans-small);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+
+
+/* Letter sheets always keep full feature grids (ignore viewport breakpoints) */
+.page-sheet .games-band,
+.page-sheet--features .games-band {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.9fr;
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.page-sheet .features-meta-band,
+.page-sheet--features .features-meta-band {
+  display: grid;
+  grid-template-columns: 1.15fr 1.15fr 0.7fr;
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.page-sheet .comics-band,
+.page-sheet--features .comics-band {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+/* Dedicated last page: features use most of the sheet (small top spacer only) */
+.page-sheet--features {
+  overflow: visible;
+}
+
+.page-sheet--features .page-sheet-inner {
+  overflow: visible;
+}
+
+.page-sheet--features .page-sheet-columns {
+  display: none;
+}
+
+.page-sheet--features .page-sheet-features {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.page-sheet--features .page-sheet-features-spacer {
+  display: none;
+}
+
+.page-sheet--features .page-sheet-features-body {
+  flex: 1 1 auto;
+  max-height: none;
+  overflow: visible;
+  min-height: 0;
+}
+
+.page-sheet--features .page-sheet-features-body .page3-features {
+  height: auto;
+  max-height: 100%;
+}
+
+.page-sheet--features .comics-band .comic-image {
+  max-height: 2.5in;
+}
+
+.sheet-unit {
+  margin: 0 0 0.4rem;
+  break-inside: avoid;
+}
+
+.sheet-unit:last-child {
+  margin-bottom: 0;
+}
+
+
+.sheet-front-pack.front-pack,
+.sheet-front .front-pack {
+  display: grid;
+  grid-template-columns: 1.05fr 2.1fr;
+  gap: 0.28rem;
+  align-items: start;
+  margin-bottom: 0;
+}
+
+.sheet-game-unit .game-cell,
+.sheet-unit.sheet-game-unit > .game-cell {
+  padding: 0.1rem;
+  border: 0;
+  background: transparent;
+}
+
+.sheet-comic-unit .comic-image,
+.sheet-comic-unit img {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  /* Cap tall strips to column height — never shrink unit fonts */
+  max-height: 8.2in;
+  object-fit: contain;
+}
+
+.sheet-section-heading .section-label,
+.sheet-unit.sheet-section-heading > .section-label {
+  margin-top: 0.15rem;
+}
+
+/* Screen: hide continuous hollow flow once paginated */
+body:has(#paged-edition .page-sheet) .edition-document:not(.is-source-only) {
+  /* fallback if class missing */
+}
+
+
+
+@media print {
+  @page {
+    size: 8.5in 11in;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .screen-chrome,
+  .screen-only,
+  .lead-hed-controls,
+  .lead-image-controls,
+  .lead-image-placeholder-box,
+  .lead-image-frame.is-editing,
+  .lead-image-frame.is-placeholder,
+  .lead-image-frame.is-failed,
+  .comic-cycle-controls,
+  .story-cycle-controls,
+  .settings-dialog,
+  .grok-paste-dialog,
+  .edition-document,
+  .edition-document.is-source-only {
+    display: none !important;
+  }
+
+  .newspaper-shell {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    display: block !important;
+    width: 8.5in !important;
+  }
+
+  .paged-edition {
+    display: block !important;
+    width: 8.5in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+
+  .page-sheet {
+    box-sizing: border-box !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    max-height: 11in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    overflow: hidden !important;
+    display: block !important;
+    position: relative !important;
+  }
+
+  .page-sheet:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .page-sheet-inner {
+    box-sizing: border-box !important;
+    width: 8.5in !important;
+    height: 11in !important;
+    padding: 0.4in !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  .page-sheet-banner {
+    flex: 0 0 auto !important;
+  }
+
+  .page-sheet-columns {
+    flex: 1 1 auto !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 0.38rem !important;
+    align-items: stretch !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .page-col {
+    border-right: 0 !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+    height: 100% !important;
+  }
+
+  .page-sheet-folio {
+    flex: 0 0 auto !important;
+    color: #000 !important;
+    border-top-color: #000 !important;
+  }
+
+  .page-sheet,
+  .page-sheet * {
+    color: #000 !important;
+    visibility: visible !important;
+  }
+
+  .page-sheet--features {
+    overflow: hidden !important;
+  }
+
+  .page-sheet--features .page-sheet-inner {
+    justify-content: flex-start !important;
+  }
+
+  .page-sheet--features .page-sheet-columns {
+    display: none !important;
+  }
+
+  .page-sheet--features .page-sheet-features {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+  }
+
+  .page-sheet--features .page-sheet-features-body {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: visible !important;
+  }
+
+  .page-sheet--features .page-sheet-features-body .page3-features {
+    height: auto !important;
+    max-height: 100% !important;
+  }
+
+  /* Keep last-page feature rows as in the digital letter preview */
+  .page-sheet .games-band,
+  .games-band {
+    display: grid !important;
+    grid-template-columns: 1.2fr 1fr 0.9fr !important;
+  }
+
+  .page-sheet .features-meta-band,
+  .features-meta-band {
+    display: grid !important;
+    grid-template-columns: 1.15fr 1.15fr 0.7fr !important;
+  }
+
+  .page-sheet .comics-band,
+  .comics-band {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Crossword: keep grid lines; open cells transparent; blocks solid black */
+  .crossword-grid,
+  .answers-crossword {
+    border-color: #000 !important;
+    background: transparent !important;
+  }
+
+  .crossword-cell {
+    background: transparent !important;
+    border: 0.5px solid #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  .crossword-cell.block {
+    background: #000 !important;
+    border: 0.5px solid #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    box-shadow: inset 0 0 0 100px #000; /* extra insurance for picky printers */
+  }
+
+  .weather-print,
+  .weather-fallback {
+    display: block !important;
+  }
+}
+

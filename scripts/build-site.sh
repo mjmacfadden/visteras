@@ -8,6 +8,8 @@ SITE="$ROOT/site"
 STUDIO="$ROOT/apps/studio"
 VECTOR="$ROOT/apps/vector"
 
+NEWS="$ROOT/apps/news"
+
 copy_tree() {
   # copy_tree <src_dir> <dest_dir> [--exclude pattern ...]
   local src="$1" dest="$2"
@@ -46,14 +48,17 @@ npm run build:vector --prefix "$ROOT/packages/fonts"
 echo "==> Building Studio (apps/studio → dist/)"
 npm run build --prefix "$STUDIO"
 
+echo "==> Building News (apps/news → dist/)"
+ASTRO_BASE="/news/" npm run build --prefix "$NEWS"
+
 echo "==> Preparing site/"
 rm -rf "$SITE"
-mkdir -p "$SITE/studio" "$SITE/vector"
+mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/news"
 
 # Apex CNAME for visteras.com (GitHub Pages custom domain)
 printf '%s\n' 'visteras.com' > "$SITE/CNAME"
 
-# Simple hub at / — links to the two apps
+# Simple hub at / — links to the apps
 cat > "$SITE/index.html" << 'HTML'
 <!DOCTYPE html>
 <html lang="en">
@@ -74,8 +79,9 @@ cat > "$SITE/index.html" << 'HTML'
   <ul>
     <li><a href="/studio/">Studio</a> — raster image editor</li>
     <li><a href="/vector/">Vector</a> — SVG editor</li>
+    <li><a href="/news/">News</a> — personal morning newspaper</li>
   </ul>
-  <p><noscript>JavaScript is off — open <a href="/studio/">/studio/</a> or <a href="/vector/">/vector/</a>.</noscript></p>
+  <p><noscript>JavaScript is off — open <a href="/studio/">/studio/</a>, <a href="/vector/">/vector/</a>, or <a href="/news/">/news/</a>.</noscript></p>
 </body>
 </html>
 HTML
@@ -102,7 +108,10 @@ copy_tree "$VECTOR" "$SITE/vector" \
   --exclude 'node_modules' \
   --exclude '*.map'
 
+echo "==> Copying News dist tree → site/news/"
+copy_tree "$NEWS/dist" "$SITE/news"
+
 echo "==> site/ ready"
 echo "    Publish this folder to GitHub Pages (Actions or manual gh-pages)."
-echo "    Public URLs: https://visteras.com/studio/  and  https://visteras.com/vector/"
-du -sh "$SITE" "$SITE/studio" "$SITE/vector"
+echo "    Public URLs: https://visteras.com/studio/ , https://visteras.com/vector/ , and https://visteras.com/news/"
+du -sh "$SITE" "$SITE/studio" "$SITE/vector" "$SITE/news"

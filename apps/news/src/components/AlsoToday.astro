@@ -1,0 +1,19 @@
+---
+import type { RssStory } from '../data/types';
+interface Props {
+  stories: RssStory[];
+}
+const { stories } = Astro.props;
+---
+<section class="also-today" aria-label="Also today">
+  <h2 class="section-label">Also Today</h2>
+  {stories.map((s) => (
+    <div class="brief">
+      <h3>
+        <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>
+      </h3>
+      <p>{s.description}</p>
+      <div class="source">{s.source}</div>
+    </div>
+  ))}
+</section>

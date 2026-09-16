@@ -1,0 +1,28 @@
+{
+  "name": "visteras-news",
+  "type": "module",
+  "version": "1.0.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "start": "astro preview"
+  },
+  "dependencies": {
+    "@vivliostyle/print": "^2.45.1",
+    "astro": "^7.3.2",
+    "fast-xml-parser": "^5.11.1",
+    "qrcode": "^1.5.4"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "description": "Visteras News — Client-side morning newspaper",
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6"
+  }
+}

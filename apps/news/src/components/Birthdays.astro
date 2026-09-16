@@ -1,0 +1,17 @@
+---
+import type { BirthdayItem } from '../data/types';
+interface Props {
+  birthdays: BirthdayItem[];
+}
+const { birthdays } = Astro.props;
+---
+<section class="birthdays-box" aria-label="Famous birthdays">
+  <h2 class="section-label">Famous Birthdays</h2>
+  <ul class="feature-list">
+    {birthdays.map((b) => (
+      <li>
+        <strong>{b.name}</strong> ({b.year}){b.note ? ` — ${b.note}` : ''}
+      </li>
+    ))}
+  </ul>
+</section>

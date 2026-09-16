@@ -1,0 +1,84 @@
+---
+import type { RssStory } from '../data/types';
+interface Props {
+  story: RssStory;
+}
+const { story } = Astro.props;
+---
+<article class={`lead-story ${story.image ? 'has-image' : 'no-image'}`} data-lead-story>
+  <div class="lead-hed-wrap" data-lead-hed-wrap>
+    <h2 class="lead-hed">
+      <a href={story.url} target="_blank" rel="noopener noreferrer">{story.title}</a>
+    </h2>
+    <div class="lead-hed-controls" role="toolbar" aria-label="Lead story options">
+      <button
+        type="button"
+        class="lead-image-btn"
+        data-lead-image-add
+        title="Add image to lead story"
+        aria-label="Add image"
+      >
+        Add Image
+      </button>
+    </div>
+  </div>
+  <div class={`lead-image-frame ${story.image ? '' : 'is-hidden'}`} data-lead-frame>
+    <img
+      class="story-image"
+      data-lead-image
+      data-original-src={story.image || ''}
+      src={story.image || ''}
+      alt=""
+      loading="lazy"
+    />
+    <div class="lead-image-controls" role="toolbar" aria-label="Lead image options">
+      <button
+        type="button"
+        class="lead-image-btn"
+        data-lead-image-change
+        title="Change image"
+        aria-label="Change image"
+      >
+        Change Image
+      </button>
+      <button
+        type="button"
+        class="lead-image-btn"
+        data-lead-image-delete
+        title="Delete image"
+        aria-label="Delete image"
+      >
+        Delete
+      </button>
+    </div>
+    <div class="lead-image-placeholder-box" data-lead-placeholder-box>
+      <div class="lead-placeholder-header">
+        <span class="lead-placeholder-title">Lead Image</span>
+        <div style="display:flex;gap:0.35rem;">
+          {story.image ? (
+            <button type="button" class="lead-image-btn" data-lead-image-reset title="Reset to original story image">Reset</button>
+          ) : null}
+          <button type="button" class="lead-image-btn" data-lead-image-delete title="Delete image" aria-label="Delete image">Delete</button>
+        </div>
+      </div>
+      <div class="lead-placeholder-form">
+        <input
+          type="url"
+          id="lead-image-url-input"
+          name="leadImageUrl"
+          class="lead-image-url-input"
+          data-lead-image-input
+          placeholder="Enter direct image URL (https://...)..."
+          aria-label="Lead image URL"
+          autocomplete="off"
+          value={story.image || ''}
+        />
+        <button type="button" class="lead-image-btn primary" data-lead-image-save>Apply</button>
+        <button type="button" class="lead-image-btn" data-lead-image-cancel>Cancel</button>
+      </div>
+      <p class="lead-placeholder-hint">Direct link to JPG, PNG, GIF, WebP, or SVG</p>
+    </div>
+  </div>
+  <p class="lead-deck">{story.description}</p>
+  <div class="lead-meta">{story.source} · {story.category}</div>
+</article>

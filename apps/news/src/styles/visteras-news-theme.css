@@ -1,0 +1,971 @@
+/**
+ * Visteras News - Studio Companion Theme & Layout
+ * Tailored to match Visteras Studio and Vector layout and UX pixel-perfect
+ */
+
+:root {
+  --ui-font: "Segoe UI", "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+  /* Visteras Studio Theme Colors */
+  --studio-header-bg: #333333;
+  --studio-options-bg: #2d2d2d;
+  --studio-toolbar-bg: #3c3c3c;
+  --studio-panel-bg: #3c3c3c;
+  --studio-workspace-bg: #606060;
+  --studio-chassis-bg: #535353;
+  --studio-border-dark: #1a1a1a;
+  --studio-border-med: #2a2a2a;
+  --studio-border-light: #505050;
+  --studio-text: #cccccc;
+  --studio-text-muted: #888888;
+
+  /* Teal Accent for Visteras News */
+  --news-teal: #14b8a6;
+  --news-teal-light: #2dd4bf;
+  --news-teal-dark: #0f766e;
+  --news-teal-bg: rgba(20, 184, 166, 0.15);
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px !important;
+}
+
+@media screen {
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: var(--studio-chassis-bg);
+    color: var(--studio-text);
+    color-scheme: dark;
+  }
+
+  #visteras_app_container {
+    display: grid;
+    grid-template-rows: 28px 45px 1fr 24px;
+    grid-template-columns: 36px 1fr 310px;
+    grid-template-areas:
+      "menu menu menu"
+      "options options options"
+      "tools workarea panels"
+      "status status status";
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--studio-chassis-bg);
+  }
+}
+
+/* Chrome UI Elements font sizing */
+#visteras_menu_bar,
+#tools_top,
+#tools_left,
+#sidepanels,
+#tools_bottom {
+  font-family: var(--ui-font);
+  font-size: 11px;
+}
+
+/* ==========================================================================
+   1. Main Menu Bar (Top File Menu)
+   ========================================================================== */
+#visteras_menu_bar {
+  grid-area: menu;
+  height: 28px;
+  background: var(--studio-header-bg);
+  border-bottom: 1px solid #222222;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px;
+  z-index: 3000;
+  user-select: none;
+}
+
+.menu_group {
+  display: flex;
+  align-items: stretch;
+}
+
+.menu_entry {
+  position: relative;
+  height: 100%;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.menu_entry_title {
+  height: 100%;
+  padding: 0 8px 1.4px 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #cccccc;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+}
+
+.menu_entry_title:hover {
+  background: #505050;
+  color: #ffffff;
+}
+
+.menu_entry.open .menu_entry_title {
+  background: var(--news-teal);
+  color: #ffffff;
+}
+
+.menu_dropdown_list {
+  display: none;
+  position: absolute;
+  top: 28px;
+  left: 0;
+  background: #3c3c3c;
+  border: 1px solid #505050;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  padding: 4px 0;
+  min-width: 180px;
+  z-index: 3001;
+}
+
+.menu_entry.open > .menu_dropdown_list {
+  display: block;
+}
+
+.menu_dropdown_item {
+  font-size: 11px;
+  color: #cccccc;
+  padding: 4px 16px;
+  line-height: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+}
+
+.menu_dropdown_item:hover:not(.disabled) {
+  background: var(--news-teal);
+  color: #ffffff;
+}
+
+.menu_dropdown_item.disabled {
+  color: #666666;
+  cursor: default;
+}
+
+.menu_dropdown_separator {
+  border: none;
+  border-top: 1px solid #505050;
+  margin: 4px 0;
+  height: 0;
+}
+
+.menu_dropdown_shortcut {
+  color: #888888;
+  font-size: 10px;
+  margin-left: 20px;
+}
+
+.menu_dropdown_item:hover:not(.disabled) .menu_dropdown_shortcut {
+  color: #ffffff;
+}
+
+.menu_right_controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visteras_switch_btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaaaaa;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: #242424;
+  border: 1px solid #383838;
+  transition: all 0.15s;
+}
+
+.visteras_switch_btn:hover {
+  background: #333333;
+  color: #ffffff;
+  border-color: #555555;
+}
+
+/* ==========================================================================
+   2. Options Bar (Submenu Top)
+   ========================================================================== */
+#tools_top {
+  grid-area: options;
+  height: 45px;
+  background-color: var(--studio-options-bg);
+  border-bottom: 1px solid var(--studio-border-dark);
+  display: flex;
+  align-items: center;
+  padding: 0 12px 0 0;
+  z-index: 500;
+  user-select: none;
+}
+
+.visteras_news_logo_wrap {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 1px 8px;
+  margin: 4px;
+  font-size: 13px;
+  text-decoration: none;
+  font-weight: bold;
+  color: #ffffff;
+  letter-spacing: 1px;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.visteras_news_logo_wrap img,
+.visteras_news_logo_wrap svg {
+  height: 28px;
+  width: auto;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.visteras_news_logo_wrap .logo_text {
+  color: #ffffff;
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.visteras_news_logo_wrap .logo_bold {
+  font-weight: 700;
+}
+
+.visteras_news_logo_wrap .logo_light {
+  font-weight: 100;
+  opacity: 0.7;
+}
+
+.visteras_top_divider {
+  width: 1px;
+  height: 22px;
+  background: #3c3c3c;
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.options_pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #242424;
+  border: 1px solid #383838;
+  border-radius: 2px;
+  padding: 2px 6px;
+}
+
+.options_pager button {
+  background: #333333;
+  border: 1px solid #444444;
+  color: #cccccc;
+  border-radius: 2px;
+  width: 22px;
+  height: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  padding: 0;
+}
+
+.options_pager button:hover:not(:disabled) {
+  background: #444444;
+  color: #ffffff;
+}
+
+.options_pager button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.options_page_indicator {
+  font-size: 11px;
+  font-weight: 500;
+  color: #bbbbbb;
+  padding: 0 6px;
+  min-width: 72px;
+  text-align: center;
+}
+
+.options_paper_title {
+  font-size: 11px;
+  color: #888888;
+  letter-spacing: 0.3px;
+  margin-left: 6px;
+}
+
+.options_actions_right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn_visteras_teal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--news-teal);
+  color: #ffffff;
+  border: 1px solid var(--news-teal-light);
+  border-radius: 2px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn_visteras_teal:hover {
+  background: var(--news-teal-light);
+  color: #0d3834;
+}
+
+.btn_visteras_secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #333333;
+  color: #cccccc;
+  border: 1px solid #444444;
+  border-radius: 2px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn_visteras_secondary:hover {
+  background: #444444;
+  color: #ffffff;
+  border-color: #666666;
+}
+
+/* ==========================================================================
+   3. Left Toolbar (Tool Icons)
+   ========================================================================== */
+#tools_left {
+  grid-area: tools;
+  width: 36px;
+  height: 100%;
+  background-color: var(--studio-toolbar-bg);
+  border-right: 1px solid var(--studio-border-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  gap: 3px;
+  user-select: none;
+  z-index: 100;
+}
+
+.tool_btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, border-color 0.12s;
+  color: #cccccc;
+}
+
+.tool_btn:hover {
+  background-color: #505050;
+  color: #ffffff;
+}
+
+.tool_btn.active {
+  background-color: #242424;
+  border: 1px solid #1a1a1a;
+  border-left: 2px solid var(--news-teal);
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+}
+
+.tool_btn svg {
+  display: block;
+  pointer-events: none;
+}
+
+.tool_btn.active svg {
+  stroke: var(--news-teal-light) !important;
+}
+
+/* ==========================================================================
+   4. Middle Workspace (Canvas / Paper)
+   ========================================================================== */
+#workarea {
+  grid-area: workarea;
+  background-color: var(--studio-workspace-bg);
+  border: none;
+  overflow-y: auto;
+  overflow-x: auto;
+  position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: #4f4f4f #1e1e1e;
+  padding: 24px 16px 48px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#workarea::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#workarea::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+#workarea::-webkit-scrollbar-thumb {
+  background-color: #4f4f4f;
+  border-radius: 6px;
+  border: 2px solid #1e1e1e;
+  background-clip: padding-box;
+}
+
+#workarea::-webkit-scrollbar-thumb:hover {
+  background-color: #6e6e6e;
+}
+
+/* Newspaper Shell Inside Workspace */
+#newspaper,
+.newspaper-shell {
+  margin: 0 auto;
+  width: 8.5in !important;
+  min-width: 8.5in !important;
+  max-width: 8.5in !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#paged-edition,
+.paged-edition {
+  width: 8.5in !important;
+  min-width: 8.5in !important;
+  max-width: 8.5in !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Make page sheets look like authentic physical paper on the workspace */
+.page-sheet {
+  box-sizing: border-box !important;
+  width: 8.5in !important;
+  min-width: 8.5in !important;
+  max-width: 8.5in !important;
+  height: 11in !important;
+  min-height: 11in !important;
+  max-height: 11in !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.25) !important;
+  margin: 12px 0 24px 0 !important;
+  border-radius: 1px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+  background: var(--paper) !important;
+  color: var(--ink) !important;
+}
+
+.page-sheet-inner {
+  box-sizing: border-box !important;
+  width: 8.5in !important;
+  min-width: 8.5in !important;
+  max-width: 8.5in !important;
+  height: 11in !important;
+  min-height: 11in !important;
+  max-height: 11in !important;
+  padding: 0.4in !important;
+}
+
+/* ==========================================================================
+   5. Right Panels (Inspector / Modals Replacement)
+   ========================================================================== */
+#sidepanels {
+  grid-area: panels;
+  width: 310px;
+  height: 100%;
+  background-color: var(--studio-panel-bg);
+  border-left: 1px solid var(--studio-border-dark);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #4f4f4f #282828;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  z-index: 50;
+}
+
+#sidepanels::-webkit-scrollbar {
+  width: 8px;
+}
+
+#sidepanels::-webkit-scrollbar-track {
+  background: #282828;
+}
+
+#sidepanels::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 4px;
+  border: 2px solid #282828;
+}
+
+.sidepanel_pane {
+  display: none;
+  flex-direction: column;
+  width: 100%;
+}
+
+.sidepanel_pane.active {
+  display: flex;
+}
+
+.panel_header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #cccccc;
+  background-color: #333333;
+  padding: 7px 10px;
+  border-bottom: 1px solid #222222;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel_header .panel_badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: var(--news-teal-bg);
+  color: var(--news-teal-light);
+  border: 1px solid var(--news-teal);
+  font-weight: 700;
+}
+
+.panel_section {
+  border-bottom: 1px solid #282828;
+}
+
+.panel_section_header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: #282828;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaaaaa;
+  border-top: 1px solid #202020;
+  transition: background 0.12s, color 0.12s;
+}
+
+.panel_section_header:hover {
+  background-color: #303030;
+  color: #ffffff;
+}
+
+.panel_section_arrow {
+  font-size: 8px;
+  width: 10px;
+  display: inline-block;
+  color: #777777;
+  transition: transform 0.15s ease;
+}
+
+.panel_section.collapsed .panel_section_arrow {
+  transform: rotate(-90deg);
+}
+
+.panel_section_body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: #2b2b2b;
+}
+
+.panel_section.collapsed .panel_section_body {
+  display: none;
+}
+
+.panel_field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.panel_label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888888;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.panel_row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+}
+
+.panel_textarea {
+  width: 100%;
+  min-height: 180px;
+  background: #242424;
+  border: 1px solid #444444;
+  border-radius: 2px;
+  color: #cccccc;
+  font-family: var(--mono-font);
+  font-size: 11px;
+  padding: 6px 8px;
+  resize: vertical;
+  line-height: 1.4;
+  outline: none;
+}
+
+.panel_textarea:focus {
+  border-color: var(--news-teal);
+}
+
+.panel_input {
+  width: 100%;
+  background: #242424;
+  border: 1px solid #444444;
+  border-radius: 2px;
+  color: #cccccc;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  padding: 4px 6px;
+  outline: none;
+}
+
+.panel_input:focus {
+  border-color: var(--news-teal);
+}
+
+.panel_select {
+  width: 100%;
+  background: #242424;
+  border: 1px solid #444444;
+  border-radius: 2px;
+  color: #cccccc;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  padding: 3px 6px;
+  outline: none;
+}
+
+.panel_help {
+  font-size: 10px;
+  color: #888888;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.panel_checkbox_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #cccccc;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.panel_checkbox_row input[type="checkbox"] {
+  accent-color: var(--news-teal);
+  cursor: pointer;
+}
+
+.panel_actions_row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.panel_btn_full {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.panel_status_badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #222222;
+  color: #aaaaaa;
+  border: 1px solid #333333;
+}
+
+.panel_status_badge.ok {
+  border-color: #22c55e;
+  color: #4ade80;
+}
+
+.panel_status_badge.warn {
+  border-color: #eab308;
+  color: #facc15;
+}
+
+/* ==========================================================================
+   6. Bottom Status Bar
+   ========================================================================== */
+#tools_bottom {
+  grid-area: status;
+  height: 24px;
+  background-color: var(--studio-header-bg);
+  border-top: 1px solid var(--studio-border-dark);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11px;
+  color: #999999;
+  z-index: 100;
+  user-select: none;
+}
+
+.status_info_left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status_tag {
+  color: #777777;
+}
+
+.status_tag_teal {
+  color: var(--news-teal-light);
+  font-weight: 600;
+}
+
+.status_info_right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   7. Print Overrides
+   ========================================================================== */
+@media print {
+  @page {
+    size: 8.5in 11in;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 8.5in !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: var(--serif-body, "Merriweather", serif);
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #visteras_app_container {
+    display: block !important;
+    width: 8.5in !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  #visteras_menu_bar,
+  #tools_top,
+  #tools_left,
+  #sidepanels,
+  #tools_bottom,
+  .screen-chrome,
+  .screen-only,
+  .lead-hed-controls,
+  .lead-image-controls,
+  .lead-image-placeholder-box,
+  .lead-image-frame.is-editing,
+  .lead-image-frame.is-placeholder,
+  .lead-image-frame.is-failed,
+  .comic-cycle-controls,
+  .story-cycle-controls,
+  .settings-dialog,
+  .grok-paste-dialog {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  #workarea {
+    display: block !important;
+    width: 8.5in !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+
+  #newspaper,
+  .newspaper-shell {
+    display: block !important;
+    width: 8.5in !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  #paged-edition,
+  .paged-edition {
+    display: block !important;
+    width: 8.5in !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border: none !important;
+  }
+
+  .edition-document,
+  .edition-document.is-source-only {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .page-sheet {
+    box-sizing: border-box !important;
+    width: 8.5in !important;
+    min-width: 8.5in !important;
+    max-width: 8.5in !important;
+    height: 11in !important;
+    min-height: 11in !important;
+    max-height: 11in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    overflow: hidden !important;
+    display: block !important;
+    position: relative !important;
+  }
+
+  .page-sheet:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  .page-sheet-inner {
+    box-sizing: border-box !important;
+    width: 8.5in !important;
+    min-width: 8.5in !important;
+    max-width: 8.5in !important;
+    height: 11in !important;
+    min-height: 11in !important;
+    max-height: 11in !important;
+    padding: 0.4in !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+}
