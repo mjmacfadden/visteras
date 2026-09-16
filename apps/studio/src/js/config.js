@@ -1,4 +1,5 @@
 import googleFontsCache from './libs/google-fonts-cache.json';
+import { DEFAULT_FONTS as SHARED_DEFAULT_FONTS } from '@visteras/fonts';
 //main config file
 
 var config = {};
@@ -75,44 +76,8 @@ config.themes = [
 ];
 
 //no-translate BEGIN
-config.FONTS = [
-	"Arial",
-	"Courier",
-	"Impact",
-	"Helvetica",
-	"Monospace",
-	"Tahoma",
-	"Times New Roman",
-	"Verdana",
-	"Amatic SC",
-	"Arimo",
-	"Codystar",
-	"Creepster",
-	"Indie Flower",
-	"Lato",
-	"Lora",
-	"Merriweather",
-	"Monoton",
-	"Montserrat",
-	"Mukta",
-	"Muli",
-	"Nosifer",
-	"Nunito",
-	"Oswald",
-	"Orbitron",
-	"Pacifico",
-	"PT Sans",
-	"PT Serif",
-	"Playfair Display",
-	"Poppins",
-	"Raleway",
-	"Roboto",
-	"Rubik",
-	"Special Elite",
-	"Tangerine",
-	"Titillium Web",
-	"Ubuntu"
-];
+// Shared with Vector via @visteras/fonts — keep a single catalog (do not fork this list).
+config.FONTS = [...SHARED_DEFAULT_FONTS];
 //no-translate END
 
 config.TOOLS = [

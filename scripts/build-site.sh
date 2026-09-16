@@ -40,6 +40,9 @@ copy_tree() {
   fi
 }
 
+echo "==> Building shared fonts bundle for Vector"
+npm run build:vector --prefix "$ROOT/packages/fonts"
+
 echo "==> Building Studio (apps/studio → dist/)"
 npm run build --prefix "$STUDIO"
 

@@ -1,0 +1,24 @@
+{
+  "name": "@visteras/fonts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared typeface catalog and font loading for Visteras Studio and Vector.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./catalog": "./src/catalog.js",
+    "./loader": "./src/loader.js",
+    "./weights": "./src/weights.js",
+    "./data/google-fonts-cache.json": "./data/google-fonts-cache.json"
+  },
+  "scripts": {
+    "build:vector": "node ./scripts/build-vector.mjs"
+  },
+  "files": [
+    "src",
+    "data",
+    "README.md"
+  ],
+  "license": "MIT"
+}

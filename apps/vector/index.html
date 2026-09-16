@@ -140,6 +140,7 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js';
+    import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1138,6 +1139,9 @@
     applyStudioSkin();
     setupMenuBar();
     setupPropertiesPanel();
+
+    // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
+    mountVisterasFontPicker({ svgEditor });
   </script>
 </body>
 </html>
