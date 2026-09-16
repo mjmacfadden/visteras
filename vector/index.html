@@ -147,6 +147,10 @@
     await svgEditor.init();
     window.svgEditor = svgEditor;
 
+    if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+      svgEditor.rulers.updateRulers();
+    }
+
     // Enhance SVG-Edit with Visteras Vector UI branding and Studio integration
     function applyStudioSkin() {
       const toolsTop = document.getElementById('tools_top');

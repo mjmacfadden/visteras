@@ -392,6 +392,40 @@ html, body {
   border: none !important;
   overflow: auto !important;
   position: relative !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #4f4f4f #1e1e1e !important;
+}
+
+/* Modern Workspace Scrollbars (Vertical & Horizontal) */
+#workarea::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+#workarea::-webkit-scrollbar-track {
+  background: #1e1e1e !important;
+}
+
+#workarea::-webkit-scrollbar-thumb {
+  background-color: #4f4f4f !important;
+  border-radius: 6px !important;
+  border: 2px solid #1e1e1e !important;
+  background-clip: padding-box !important;
+  min-height: 24px !important;
+  min-width: 24px !important;
+  transition: background-color 0.15s ease !important;
+}
+
+#workarea::-webkit-scrollbar-thumb:hover {
+  background-color: #6e6e6e !important;
+}
+
+#workarea::-webkit-scrollbar-thumb:active {
+  background-color: #8e8e8e !important;
+}
+
+#workarea::-webkit-scrollbar-corner {
+  background: #181818 !important;
 }
 
 #svgcanvas {
@@ -561,3 +595,47 @@ input[type="text"], input[type="number"], se-spin-input {
   font-size: 11px !important;
   padding: 2px 4px !important;
 }
+
+/* Modern scrollbars for side panels, layer list, and dialogs */
+#sidepanels,
+#layerlist,
+.dialog_content,
+elix-dialog {
+  scrollbar-width: thin !important;
+  scrollbar-color: #4f4f4f #282828 !important;
+}
+
+#sidepanels::-webkit-scrollbar,
+#layerlist::-webkit-scrollbar,
+.dialog_content::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+#sidepanels::-webkit-scrollbar-track,
+#layerlist::-webkit-scrollbar-track,
+.dialog_content::-webkit-scrollbar-track {
+  background: #282828 !important;
+}
+
+#sidepanels::-webkit-scrollbar-thumb,
+#layerlist::-webkit-scrollbar-thumb,
+.dialog_content::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a !important;
+  border-radius: 4px !important;
+  border: 2px solid #282828 !important;
+  background-clip: padding-box !important;
+}
+
+#sidepanels::-webkit-scrollbar-thumb:hover,
+#layerlist::-webkit-scrollbar-thumb:hover,
+.dialog_content::-webkit-scrollbar-thumb:hover {
+  background-color: #686868 !important;
+}
+
+#sidepanels::-webkit-scrollbar-corner,
+#layerlist::-webkit-scrollbar-corner,
+.dialog_content::-webkit-scrollbar-corner {
+  background: #242424 !important;
+}
+

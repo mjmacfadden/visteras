@@ -68159,6 +68159,8 @@ var { $id: lz, getTypeMap: uz } = JI, dz = class {
 			for (r = 0; r < this.rulerIntervals.length && (v = this.rulerIntervals[r], C = v, !(S <= v)); r++);
 			let w = C * x;
 			g.font = "9px sans-serif";
+			g.fillStyle = "#b8b8b8";
+			g.strokeStyle = "#999999";
 			let T = u / x % C * x, E = T - w, D = 0;
 			for (; T < h;) {
 				E += w;
@@ -68179,18 +68181,18 @@ var { $id: lz, getTypeMap: uz } = JI, dz = class {
 				for (r = 1; r < 10; r++) {
 					let e = Math.round(T + n * r) + .5;
 					if (_ && e > m) {
-						if (D++, g.stroke(), D >= y) {
+						if (D++, g.strokeStyle = "#999999", g.stroke(), D >= y) {
 							r = 10, T = h;
 							continue;
 						}
-						g = _[D], T -= i, e = Math.round(T + n * r) + .5;
+						g = _[D], g.font = "9px sans-serif", g.fillStyle = "#b8b8b8", g.strokeStyle = "#999999", T -= i, e = Math.round(T + n * r) + .5;
 					}
 					let t = r % 2 ? 12 : 10;
 					s ? (g.moveTo(e, 15), g.lineTo(e, t)) : (g.moveTo(15, e), g.lineTo(t, e));
 				}
 				T += w;
 			}
-			g.strokeStyle = "#000", g.stroke();
+			g.strokeStyle = "#999999", g.stroke();
 		}
 	}
 };
