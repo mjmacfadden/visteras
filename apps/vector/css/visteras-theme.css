@@ -745,11 +745,15 @@ html, body {
   border-color: #555555 !important;
 }
 
-/* Type-style buttons: no hover flash (keep resting chrome) */
+/* Type-style buttons: no hover effect (resting chrome only) */
 #slot_text_styles se-button:hover,
-#properties_panel #slot_text_styles se-button:hover {
+#properties_panel #slot_text_styles se-button:hover,
+#tools_top .text_panel se-button:hover {
   background: #333333 !important;
   border-color: #444444 !important;
+  filter: none !important;
+  box-shadow: none !important;
+  color: #cccccc !important;
 }
 
 #properties_panel se-button[pressed] {
