@@ -745,6 +745,13 @@ html, body {
   border-color: #555555 !important;
 }
 
+/* Type-style buttons: no hover flash (keep resting chrome) */
+#slot_text_styles se-button:hover,
+#properties_panel #slot_text_styles se-button:hover {
+  background: #333333 !important;
+  border-color: #444444 !important;
+}
+
 #properties_panel se-button[pressed] {
   background: var(--studio-blue-active) !important;
   border-color: var(--studio-blue-active) !important;
@@ -911,9 +918,9 @@ html, body {
 input[type="text"], input[type="number"], input:not([type]), textarea, select {
   background: #242424 !important;
   border: 1px solid #444444 !important;
-  color: #ffffff !important;
-  -webkit-text-fill-color: #ffffff !important;
-  caret-color: #ffffff !important;
+  color: #cccccc !important;
+  -webkit-text-fill-color: #cccccc !important;
+  caret-color: #cccccc !important;
   border-radius: 2px !important;
   font-family: var(--mono-font) !important;
   font-size: 11px !important;
@@ -983,8 +990,8 @@ elix-dialog {
 
 
 
-/* Typography style buttons — icons live in open shadow DOM; whitened in index.html after moveEl. */
+/* Typography style buttons — icons tinted #cccccc in index.html (Studio adjustment parity). */
 #slot_text_styles se-button,
 #tools_top .text_panel se-button {
-  color: #ffffff;
+  color: #cccccc;
 }

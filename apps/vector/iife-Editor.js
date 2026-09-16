@@ -537,7 +537,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
           font: inherit;
           outline: none;
           text-align: inherit;
-          color: #ffffff;
+          color: #cccccc;
           color-scheme: dark;
         }
       </style>
@@ -547,14 +547,14 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
             background: #242424;
             border: 1px solid #444444;
             box-sizing: border-box;
-            color: #ffffff;
+            color: #cccccc;
             color-scheme: dark;
           }
 
           [part~="input"] {
             background: transparent;
             border-color: transparent;
-            color: #ffffff;
+            color: #cccccc;
           }
         </style>
       `),e}}}var Fo=t((()=>{Fa(),Gr(),Ii()})),Io,Lo=t((()=>{No(),Fo(),Io=class extends Po(Mo){}})),Ro,zo=t((()=>{Lo(),Ro=class extends Io{},customElements.define(`elix-input`,Ro)})),Bo,Vo,Ho=t((()=>{zo(),Mr(),Bo=document.createElement(`template`),Bo.innerHTML=`
@@ -580,11 +580,11 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
     background-color: var(--input-color);
     border-radius: 3px;
     height: 24px;
-    color: #ffffff;
+    color: #cccccc;
     color-scheme: dark;
   }
   elix-input::part(input) {
-    color: #ffffff;
+    color: #cccccc;
   }
   </style>
   <div>
@@ -631,7 +631,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
             background: #242424;
             border: 1px solid #444444;
             box-sizing: border-box;
-            color: #ffffff;
+            color: #cccccc;
             color-scheme: dark;
           }
 
@@ -639,7 +639,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
             background: transparent;
             border: none;
             width: 4em;
-            color: #ffffff;
+            color: #cccccc;
           }
 
           [part~="spin-button"] {
@@ -672,7 +672,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
           grid-row-start: 1;
           outline: none;
           text-align: right;
-          color: #ffffff;
+          color: #cccccc;
           color-scheme: dark;
         }
 
@@ -734,7 +734,7 @@ This will also erase your undo history!`,QerrorsRevertToSource:`SVG原始碼解�
     color-scheme: dark;
   }
   elix-number-spin-box {
-    color: #ffffff;
+    color: #cccccc;
     color-scheme: dark;
   }
   </style>

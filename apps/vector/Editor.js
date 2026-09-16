@@ -21197,7 +21197,7 @@ var bo, xo, So, Co, wo, To, Eo, Do, Oo, ko, Ao = t((() => {
           font: inherit;
           outline: none;
           text-align: inherit;
-          color: #ffffff;
+          color: #cccccc;
           color-scheme: dark;
         }
       </style>
@@ -21223,14 +21223,14 @@ function Po(e) {
             background: #242424;
             border: 1px solid #444444;
             box-sizing: border-box;
-            color: #ffffff;
+            color: #cccccc;
             color-scheme: dark;
           }
 
           [part~="input"] {
             background: transparent;
             border-color: transparent;
-            color: #ffffff;
+            color: #cccccc;
           }
         </style>
       `), e;
@@ -21244,7 +21244,7 @@ var Fo = t((() => {
 })), Ro, zo = t((() => {
 	Lo(), Ro = class extends Io {}, customElements.define("elix-input", Ro);
 })), Bo, Vo, Ho = t((() => {
-	zo(), Mr(), Bo = document.createElement("template"), Bo.innerHTML = "\n  <style>\n  div {\n    height: 24px;\n    margin: 5px 1px;\n    padding: 3px;\n  }\n  img {\n    top: 2px;\n    left: 4px;\n    position: relative;\n  }\n  span {\n    bottom: 1px;\n    right: -4px;\n    position: relative;\n    margin-right: 4px;\n    color: #fff;\n  }\n  elix-input {\n    background-color: var(--input-color);\n    border-radius: 3px;\n    height: 24px;\n    color: #ffffff;\n    color-scheme: dark;\n  }\n  elix-input::part(input) {\n    color: #ffffff;\n  }\n  </style>\n  <div>\n  <img alt=\"icon\" width=\"12\" height=\"12\" />\n  <span id=\"label\">label</span>\n  <elix-input></elix-input>\n  </div>\n", Vo = class extends HTMLElement {
+	zo(), Mr(), Bo = document.createElement("template"), Bo.innerHTML = "\n  <style>\n  div {\n    height: 24px;\n    margin: 5px 1px;\n    padding: 3px;\n  }\n  img {\n    top: 2px;\n    left: 4px;\n    position: relative;\n  }\n  span {\n    bottom: 1px;\n    right: -4px;\n    position: relative;\n    margin-right: 4px;\n    color: #fff;\n  }\n  elix-input {\n    background-color: var(--input-color);\n    border-radius: 3px;\n    height: 24px;\n    color: #cccccc;\n    color-scheme: dark;\n  }\n  elix-input::part(input) {\n    color: #cccccc;\n  }\n  </style>\n  <div>\n  <img alt=\"icon\" width=\"12\" height=\"12\" />\n  <span id=\"label\">label</span>\n  <elix-input></elix-input>\n  </div>\n", Vo = class extends HTMLElement {
 		constructor() {
 			super(), this._shadowRoot = this.attachShadow({ mode: "open" }), this._shadowRoot.append(Bo.content.cloneNode(!0)), this.$div = this._shadowRoot.querySelector("div"), this.$img = this._shadowRoot.querySelector("img"), this.$label = this.shadowRoot.getElementById("label"), this.$event = new CustomEvent("change"), this.$input = this._shadowRoot.querySelector("elix-input");
 		}
@@ -21497,7 +21497,7 @@ function ls(e) {
             background: #242424;
             border: 1px solid #444444;
             box-sizing: border-box;
-            color: #ffffff;
+            color: #cccccc;
             color-scheme: dark;
           }
 
@@ -21505,7 +21505,7 @@ function ls(e) {
             background: transparent;
             border: none;
             width: 4em;
-            color: #ffffff;
+            color: #cccccc;
           }
 
           [part~="spin-button"] {
@@ -21825,7 +21825,7 @@ var Es, Ds, Os = t((() => {
           grid-row-start: 1;
           outline: none;
           text-align: right;
-          color: #ffffff;
+          color: #cccccc;
           color-scheme: dark;
         }
 
@@ -21927,7 +21927,7 @@ var Es, Ds, Os = t((() => {
 })), Ns, Ps = t((() => {
 	Ms(), Ns = class extends js {}, customElements.define("elix-number-spin-box", Ns);
 })), Fs, Is, Ls = t((() => {
-	Ps(), Mr(), Fs = document.createElement("template"), Fs.innerHTML = "\n  <style>\n  div {\n    display: inline-flex;\n    flex-direction: row;\n    align-items: center;\n    white-space: nowrap;\n    height: 24px;\n    margin: 0 1px;\n    padding: 0 2px;\n    box-sizing: border-box;\n  }\n  div.imginside {\n    width: auto;\n    min-width: var(--global-se-spin-input-width, 80px);\n  }\n  img {\n    position: relative;\n    flex-shrink: 0;\n    width: 18px;\n    height: 18px;\n    margin-right: 4px;\n  }\n  span {\n    position: relative;\n    flex-shrink: 0;\n    margin-right: 4px;\n    color: #cccccc;\n    font-size: 11px;\n    line-height: 20px;\n  }\n  elix-number-spin-box {\n    flex-shrink: 0;\n    background-color: var(--input-color, #242424);\n    border: 1px solid #444444;\n    border-radius: 2px;\n    height: 22px;\n    width: 54px;\n    box-sizing: border-box;\n  }\n  elix-number-spin-box::part(spin-button) {\n    padding: 0px;\n  }\n  elix-number-spin-box::part(input) {\n    width: 3em;\n    color: #ffffff;\n    font-size: 11px;\n    color-scheme: dark;\n  }\n  elix-number-spin-box {\n    color: #ffffff;\n    color-scheme: dark;\n  }\n  </style>\n  <div>\n  <img alt=\"icon\" width=\"18\" height=\"18\" aria-labelledby=\"label\" />\n  <span id=\"label\">label</span>\n  <elix-number-spin-box min=\"1\" step=\"1\"></elix-number-spin-box>\n  </div>\n", Is = class extends HTMLElement {
+	Ps(), Mr(), Fs = document.createElement("template"), Fs.innerHTML = "\n  <style>\n  div {\n    display: inline-flex;\n    flex-direction: row;\n    align-items: center;\n    white-space: nowrap;\n    height: 24px;\n    margin: 0 1px;\n    padding: 0 2px;\n    box-sizing: border-box;\n  }\n  div.imginside {\n    width: auto;\n    min-width: var(--global-se-spin-input-width, 80px);\n  }\n  img {\n    position: relative;\n    flex-shrink: 0;\n    width: 18px;\n    height: 18px;\n    margin-right: 4px;\n  }\n  span {\n    position: relative;\n    flex-shrink: 0;\n    margin-right: 4px;\n    color: #cccccc;\n    font-size: 11px;\n    line-height: 20px;\n  }\n  elix-number-spin-box {\n    flex-shrink: 0;\n    background-color: var(--input-color, #242424);\n    border: 1px solid #444444;\n    border-radius: 2px;\n    height: 22px;\n    width: 54px;\n    box-sizing: border-box;\n  }\n  elix-number-spin-box::part(spin-button) {\n    padding: 0px;\n  }\n  elix-number-spin-box::part(input) {\n    width: 3em;\n    color: #ffffff;\n    font-size: 11px;\n    color-scheme: dark;\n  }\n  elix-number-spin-box {\n    color: #cccccc;\n    color-scheme: dark;\n  }\n  </style>\n  <div>\n  <img alt=\"icon\" width=\"18\" height=\"18\" aria-labelledby=\"label\" />\n  <span id=\"label\">label</span>\n  <elix-number-spin-box min=\"1\" step=\"1\"></elix-number-spin-box>\n  </div>\n", Is = class extends HTMLElement {
 		constructor() {
 			super(), this._shadowRoot = this.attachShadow({ mode: "open" }), this._shadowRoot.append(Fs.content.cloneNode(!0)), this.$div = this._shadowRoot.querySelector("div"), this.$img = this._shadowRoot.querySelector("img"), this.$label = this._shadowRoot.getElementById("label"), this.$event = new CustomEvent("change"), this.$input = this._shadowRoot.querySelector("elix-number-spin-box"), this.imgPath = svgEditor.configObj.curConfig.imgPath;
 		}
