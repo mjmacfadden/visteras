@@ -69,17 +69,31 @@ module.exports = function (env, argv) {
 	],
 	devtool: is_production ? false : "cheap-module-source-map",
 	devServer: {
-		// host: '0.0.0.0',
+		// Match production: Studio at /studio/, Vector at /vector/
+		open: ["/studio/"],
+		devMiddleware: {
+			// HTML uses relative dist/* under /studio/ → /studio/dist/*
+			publicPath: "/studio/dist/",
+		},
 		static: [
 			{
 				directory: path.resolve(__dirname, "./"),
+				publicPath: "/studio",
 			},
 			{
-				// Serve sibling Vector companion at /vector during Studio dev
 				directory: path.resolve(__dirname, "../vector"),
 				publicPath: "/vector",
 			},
 		],
+		setupMiddlewares: function (middlewares, devServer) {
+			if (!devServer || !devServer.app) {
+				throw new Error("webpack-dev-server app is missing");
+			}
+			devServer.app.get("/", function (_req, res) {
+				res.redirect("/studio/");
+			});
+			return middlewares;
+		},
 	}
 };
 };

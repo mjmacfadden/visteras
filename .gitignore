@@ -52,3 +52,6 @@ temp/
 # Local API keys (copy from config.keys.local.example.js)
 apps/studio/src/js/config.keys.local.js
 src/js/config.keys.local.js
+
+# Generated publish tree (npm run build:site)
+site/
