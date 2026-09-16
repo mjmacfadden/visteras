@@ -69,6 +69,12 @@
         <div class="menu_entry" id="menu_view">
           <div class="menu_entry_title">View</div>
           <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_fit_workspace">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
+            <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⇧R</span></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⇧G</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Wireframe Mode <span class="menu_dropdown_shortcut">⇧F</span></div>
@@ -324,6 +330,104 @@
       document.getElementById('action_prefs')?.addEventListener('click', () => {
         document.getElementById('tool_editor_prefs')?.click();
       });
+
+      // Zoom & Fit actions
+      function fitArtboardToWorkspace() {
+        if (!svgEditor) return;
+        if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
+          svgEditor.bottomPanel.changeZoom('canvas');
+        } else if (typeof svgEditor.zoomChanged === 'function') {
+          svgEditor.zoomChanged(window, 'canvas');
+        }
+        svgEditor.updateCanvas(!0);
+        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+          svgEditor.rulers.updateRulers();
+        }
+      }
+
+      function zoomTo100Percent() {
+        if (!svgEditor) return;
+        if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
+          svgEditor.bottomPanel.changeZoom('100');
+        } else if (typeof svgEditor.zoomImage === 'function') {
+          svgEditor.zoomImage();
+        }
+        svgEditor.updateCanvas(!0);
+        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+          svgEditor.rulers.updateRulers();
+        }
+      }
+
+      function zoomIn() {
+        if (!svgEditor || !svgEditor.svgCanvas) return;
+        const curZoom = svgEditor.svgCanvas.getZoom();
+        const newZoom = Math.min(Math.round(curZoom * 1.25 * 100) / 100, 30);
+        if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
+          svgEditor.bottomPanel.changeZoom(newZoom * 100);
+        } else if (typeof svgEditor.zoomImage === 'function') {
+          svgEditor.zoomImage(1.25);
+        }
+        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+          svgEditor.rulers.updateRulers();
+        }
+      }
+
+      function zoomOut() {
+        if (!svgEditor || !svgEditor.svgCanvas) return;
+        const curZoom = svgEditor.svgCanvas.getZoom();
+        const newZoom = Math.max(Math.round(curZoom / 1.25 * 100) / 100, 0.05);
+        if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
+          svgEditor.bottomPanel.changeZoom(newZoom * 100);
+        } else if (typeof svgEditor.zoomImage === 'function') {
+          svgEditor.zoomImage(1 / 1.25);
+        }
+        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+          svgEditor.rulers.updateRulers();
+        }
+      }
+
+      document.getElementById('action_fit_workspace')?.addEventListener('click', fitArtboardToWorkspace);
+      document.getElementById('action_zoom_100')?.addEventListener('click', zoomTo100Percent);
+      document.getElementById('action_zoom_in')?.addEventListener('click', zoomIn);
+      document.getElementById('action_zoom_out')?.addEventListener('click', zoomOut);
+
+      // Keyboard Shortcuts (Cmd/Ctrl + 0, 1, +, -)
+      window.addEventListener('keydown', (e) => {
+        const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+        if (!isCmdOrCtrl || e.altKey) return;
+
+        // Command/Ctrl + 0: Fit artboard to workspace
+        if (e.code === 'Digit0' || e.code === 'Numpad0' || e.key === '0') {
+          e.preventDefault();
+          e.stopPropagation();
+          fitArtboardToWorkspace();
+          return;
+        }
+
+        // Command/Ctrl + 1: 100% Zoom (Actual Size)
+        if (!e.shiftKey && (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1')) {
+          e.preventDefault();
+          e.stopPropagation();
+          zoomTo100Percent();
+          return;
+        }
+
+        // Command/Ctrl + + / = / NumpadAdd: Zoom In
+        if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+' || e.key === '=') {
+          e.preventDefault();
+          e.stopPropagation();
+          zoomIn();
+          return;
+        }
+
+        // Command/Ctrl + - / NumpadSubtract: Zoom Out
+        if (e.code === 'Minus' || e.code === 'NumpadSubtract' || e.key === '-') {
+          e.preventDefault();
+          e.stopPropagation();
+          zoomOut();
+          return;
+        }
+      }, { capture: true });
     }
 
     applyStudioSkin();
