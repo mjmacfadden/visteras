@@ -1,54 +1,18 @@
 {
   "name": "visteras",
   "version": "1.0.0",
-  "author": "Based on miniPaint by Vilius L.",
-  "description": "Visteras - Online image editor.",
-  "keywords": [
-    "canvas",
-    "drawing",
-    "paint",
-    "layers",
-    "effects"
-  ],
+  "private": true,
+  "description": "Visteras monorepo \u2014 Studio (raster) + Vector (SVG-Edit companion).",
+  "license": "MIT",
   "scripts": {
-    "server": "webpack serve --mode development --env development --open",
-    "dev": "webpack --mode development",
-    "build": "webpack --mode production"
+    "dev:studio": "npm run server --prefix apps/studio",
+    "build:studio": "npm run build --prefix apps/studio",
+    "dev:vector": "npx --yes serve apps/vector -p 5173",
+    "build:vector": "node -e \"console.log('Vector is a static SVG-Edit build under apps/vector; nothing to compile.')\""
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/viliusle/miniPaint"
+    "url": "https://github.com/mjmacfadden/visteras"
   },
-  "homepage": "https://github.com/viliusle/miniPaint",
-  "license": "MIT",
-  "devDependencies": {
-    "@babel/core": "^7.14.5",
-    "@babel/plugin-transform-runtime": "^7.14.5",
-    "@babel/preset-env": "^7.14.5",
-    "babel-loader": "^8.2.2",
-    "css-loader": "^5.2.6",
-    "mini-css-extract-plugin": "^2.10.2",
-    "source-map-loader": "^3.0.0",
-    "style-loader": "^2.0.0",
-    "webpack": "^5.106.2",
-    "webpack-cli": "^7.0.2",
-    "webpack-dev-server": "^5.2.3"
-  },
-  "dependencies": {
-    "@babel/runtime": "^7.14.5",
-    "ag-psd": "^31.0.2",
-    "alertifyjs": "^1.13.1",
-    "blueimp-canvas-to-blob": "^3.28.0",
-    "exif-js": "^2.3.0",
-    "file-saver": "^2.0.5",
-    "fuzzysort": "^1.1.4",
-    "gif.js.optimized": "^1.0.1",
-    "hermite-resize": "git+https://github.com/viliusle/Hermite-resize.git",
-    "jquery": "^3.5.1",
-    "paper": "^0.12.18",
-    "pica": "^7.0.0",
-    "semver-compare": "^1.0.0",
-    "uuid": "^8.3.2",
-    "webfontloader": "^1.6.28"
-  }
+  "homepage": "https://github.com/mjmacfadden/visteras"
 }

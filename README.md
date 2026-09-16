@@ -1,41 +1,54 @@
 # Visteras
 
-Visteras is a client-side browser image editor with strong PSD support via ag-psd.
-Your files stay on your device. Editing runs in the browser.
+Visteras is a client-side browser creative suite. Your files stay on your device.
 
+This repository is a **monorepo**:
 
-## Based on miniPaint
+```
+apps/studio/   # Visteras Studio — raster image editor (PSD-capable)
+apps/vector/   # Visteras Vector — SVG-Edit companion
+packages/      # Future shared libraries (placeholder)
+docs/          # Product / engineering notes
+```
 
-This project is a heavily forked descendant of miniPaint by Vilius L. (MIT License).
+Architecture only for now — **no Studio ↔ Vector document compatibility**.
+
+## Based on miniPaint / SVG-Edit
+
+Studio is a heavily forked descendant of miniPaint by Vilius L. (MIT License).
 Upstream: https://github.com/viliusle/miniPaint
-Upstream copyright and permission notices for retained miniPaint code must be preserved.
 
-## Features (highlights)
-
-- Multi-layer editing, masks, adjustment layers, and layer groups
-- Bidirectional PSD import/export (src/js/libs/psd.js + ag-psd)
-- Multi-document tabs, Canvas2D / WebGL rendering paths
-- Type tool (point + paragraph text), swatches, common raster export formats
-
-## Privacy
-
-- Pixel data for local files stays in the browser (IndexedDB recovery / localStorage quicksave are device-local).
-- Optional third-party APIs (stock search, web fonts) only run if you supply keys locally - see src/js/config.js.
-- Do not commit third-party service keys.
+Vector is built on SVG-Edit (companion under `apps/vector`).
 
 ## Run locally
 
-Use the package manager to install deps, then build and serve.
-- npm run build (production -> dist/bundle.js)
-- npm run server
-- npm run dev
+From the repo root (after `npm install` inside each app that needs deps):
 
-Open via the dev server, or serve the repo root statically (e.g. Live Server) after a build. The dist/ folder is intentionally committed for now so static hosting works without CI artifacts.
+```bash
+# Studio (webpack)
+npm install --prefix apps/studio
+npm run dev:studio      # webpack-dev-server; Vector also mounted at /vector
+npm run build:studio    # production -> apps/studio/dist/
+
+# Vector (static SVG-Edit; no compile step)
+npm run dev:vector      # static server on :5173
+npm run build:vector    # no-op (already static)
+```
+
+You can also `cd apps/studio` and use `npm run server` / `npm run build` directly.
+
+Open Studio via the dev server, or serve `apps/studio` statically after a build (`dist/` is intentionally committed for static hosting).
+
+## Privacy
+
+- Pixel data for local files stays in the browser.
+- Optional third-party APIs only run if you supply keys locally — see `apps/studio/src/js/config.js`.
+- Do not commit third-party service keys.
 
 ## Docs
 
-- Product / engineering roadmap: docs/VANTAGE_POINT_ROADMAP.md
-- Security reporting: SECURITY.md
+- Product / engineering roadmap: `docs/VANTAGE_POINT_ROADMAP.md`
+- Security reporting: `SECURITY.md`
 
 ## Repository
 

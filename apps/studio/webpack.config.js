@@ -1,0 +1,85 @@
+var webpack = require('webpack');
+var path = require('path');
+var MiniCssExtractPlugin = require('mini-css-extract-plugin');
+var fs = require('fs');
+
+module.exports = function (env, argv) {
+	var is_production = argv.mode === 'production';
+	return {
+	entry: [
+		'./src/js/main.js',
+	],
+	output: {
+		path: path.resolve(__dirname, 'dist'),
+		filename: 'bundle.js',
+		publicPath: 'auto',
+		clean: true
+	},
+	resolve: {
+		extensions: ['.js', '.css', '.json'],
+		alias: {
+			Utilities: path.resolve(__dirname, 'node_modules'),
+			'vp-local-keys': fs.existsSync(path.resolve(__dirname, 'src/js/config.keys.local.js'))
+				? path.resolve(__dirname, 'src/js/config.keys.local.js')
+				: path.resolve(__dirname, 'src/js/config.keys.stub.js')
+		}
+	},
+	module: {
+		rules: [
+			{
+				test: /\.css$/,
+				use: [
+					MiniCssExtractPlugin.loader,
+					{
+						loader: 'css-loader',
+						options: {url: false}
+					}
+				]
+			},
+			{
+				test: /\.js$/,
+				exclude: /(node_modules|bower_components|libs\/hokusai\/hokusai_wasm\.js)/,
+				use: ['babel-loader']
+			},
+			{
+				test: /\.wasm$/,
+				type: 'asset/resource',
+				generator: {
+					filename: '[name][ext]'
+				}
+			},
+			{
+				test: /\.(myb)$/,
+				type: 'asset/source'
+			},
+		]
+	},
+	plugins: [
+		new MiniCssExtractPlugin({
+			filename: 'styles.css'
+		}),
+		new webpack.ProvidePlugin({
+            $: "jquery",
+            jQuery: "jquery",
+            "window.jQuery": "jquery"
+		}),
+		new webpack.DefinePlugin({
+			VERSION: JSON.stringify(require("./package.json").version)
+		}),
+	],
+	devtool: is_production ? false : "cheap-module-source-map",
+	devServer: {
+		// host: '0.0.0.0',
+		static: [
+			{
+				directory: path.resolve(__dirname, "./"),
+			},
+			{
+				// Serve sibling Vector companion at /vector during Studio dev
+				directory: path.resolve(__dirname, "../vector"),
+				publicPath: "/vector",
+			},
+		],
+	}
+};
+};
