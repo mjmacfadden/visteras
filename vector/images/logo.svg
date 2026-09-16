@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="visterasVectorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9638"/>
+      <stop offset="50%" stop-color="#fa7c1b"/>
+      <stop offset="100%" stop-color="#e06010"/>
+    </linearGradient>
+  </defs>
+  <path d="M 37.4,83.7 L 36.4,84.8 L 36.4,87.7 L 37.8,90.2 L 251.7,426.2 L 256.4,426.2 L 294.8,368.6 L 458.2,114.9 L 475.3,88.1 L 475.6,85.5 L 474.2,83.7 L 382.9,83.7 L 380.0,86.3 L 329.2,163.1 L 273.8,242.1 L 269.4,242.1 L 169.0,86.3 L 166.5,83.7 Z" fill="url(#visterasVectorGrad)" fill-rule="evenodd"/>
+</svg>
