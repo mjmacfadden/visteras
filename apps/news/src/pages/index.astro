@@ -29,8 +29,7 @@ const puzzles = puzzlesForDate(editionDate);
 const feedCatalog = NEWS_FEEDS.map((f) => ({ id: f.id, name: f.name, section: f.section }));
 const comicCatalog = COMIC_FEEDS.map((c) => ({ id: c.id, title: c.title }));
 
-const newsLogo = `${Astro.base || '/news/'}images/visteras_news_logo.svg`;
-const newsFavicon = `${Astro.base || '/news/'}favicon.svg`;
+const newsLogo = `${Astro.base || '/news/'}images/visteras_news_logo.png`;
 
 const hasWireStories =
   Boolean(edition.leadStory?.title) ||
@@ -44,8 +43,8 @@ const hasWireStories =
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/svg+xml" href={newsLogo} />
-    <link rel="icon" href={newsFavicon} />
+    <link rel="icon" type="image/png" href={newsLogo} />
+    <link rel="apple-touch-icon" href={newsLogo} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="THE DAILY MIKE — personal morning newspaper" />
     <meta name="generator" content={Astro.generator} />
