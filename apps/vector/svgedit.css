@@ -2,7 +2,7 @@
   --main-bg-color: #72797A;
   --text-color: #000000;
   --border-color: #808080;
-  --canvas-bg-color: #B2B2B2;
+  --canvas-bg-color: #606060;
   --link-color: #19c;
   --ruler-color: #B2B2B2;
   --icon-bg-color: #72797A;
@@ -56,7 +56,7 @@
 
 #workarea {
   grid-area: workarea;
-  background-color: #A0A0A0;
+  background-color: #606060;
   border: 1px solid var(--border-color);
   overflow: auto;
   text-align: center;

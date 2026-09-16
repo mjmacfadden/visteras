@@ -13,7 +13,7 @@
      id="defs8" />
   <sodipodi:namedview
      id="namedview6"
-     pagecolor="#ffffff"
+     pagecolor="#CCCCCC"
      bordercolor="#000000"
      borderopacity="0.25"
      inkscape:showpageshadow="2"
@@ -32,17 +32,17 @@
      inkscape:current-layer="svg4" />
   <path
      stroke-width="4"
-     stroke="#f9bc01"
+     stroke="#CCCCCC"
      fill="none"
      d="M 0.10978222,43.451827 H 100.10978 Z m 29.99999978,10 H 70.10978 L 64.347943,56.7286 30.109782,73.451827 Z"
      id="path2"
      sodipodi:nodetypes="cccccccc" />
   <path
      stroke-width="4"
-     stroke="#f9bc01"
+     stroke="#CCCCCC"
      fill="none"
      d="m 30.216722,33.403103 h 40 L 60.213097,27.813597 30.216722,13.403103 Z"
      id="path2-3"
      sodipodi:nodetypes="ccccc"
-     style="stroke:#f9dab8;stroke-opacity:1" />
+     style="stroke:#CCCCCC;stroke-opacity:1" />
 </svg>
