@@ -983,9 +983,8 @@ elix-dialog {
 
 
 
-/* Typography style buttons — keep icons light on dark panels */
-#slot_text_styles se-button img,
-#properties_panel #slot_text_styles img,
-#tools_top .text_panel se-button img {
-  filter: none !important;
+/* Typography style buttons — icons live in open shadow DOM; whitened in index.html after moveEl. */
+#slot_text_styles se-button,
+#tools_top .text_panel se-button {
+  color: #ffffff;
 }
