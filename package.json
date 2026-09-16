@@ -45,6 +45,7 @@
     "gif.js.optimized": "^1.0.1",
     "hermite-resize": "git+https://github.com/viliusle/Hermite-resize.git",
     "jquery": "^3.5.1",
+    "paper": "^0.12.18",
     "pica": "^7.0.0",
     "semver-compare": "^1.0.0",
     "uuid": "^8.3.2",

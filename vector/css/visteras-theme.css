@@ -749,6 +749,53 @@ html, body {
   border-color: var(--studio-blue-active) !important;
 }
 
+/* Pathfinder Buttons in Properties Panel */
+.prop_pathfinder_grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
+  gap: 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.prop_pathfinder_btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 28px !important;
+  background: #333333 !important;
+  border: 1px solid #444444 !important;
+  border-radius: 2px !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.12s, border-color 0.12s, transform 0.08s !important;
+}
+
+.prop_pathfinder_btn:hover {
+  background: #444444 !important;
+  border-color: #666666 !important;
+}
+
+.prop_pathfinder_btn:active {
+  background: #242424 !important;
+  border-color: var(--studio-orange) !important;
+  transform: translateY(1px) !important;
+}
+
+.prop_pathfinder_btn svg {
+  display: block !important;
+  pointer-events: none !important;
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.prop_pathfinder_btn:hover svg path,
+.prop_pathfinder_btn:hover svg rect {
+  stroke: #ffffff !important;
+}
+
 #properties_panel se-select {
   width: 100% !important;
 }

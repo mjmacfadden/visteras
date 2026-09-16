@@ -21,6 +21,9 @@
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css" rel="stylesheet" media="all">
 
+  <!-- Vector Pathfinder Engine (Paper.js Core) -->
+  <script src="./lib/paper-core.min.js"></script>
+
   <!-- Browser Support Script -->
   <script type="module" src="./browser-not-supported.js"></script>
 </head>
@@ -96,6 +99,12 @@
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_flip_h">Flip Horizontal</div>
             <div class="menu_dropdown_item" id="action_flip_v">Flip Vertical</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_pathfinder_unite">Pathfinder: Unite</div>
+            <div class="menu_dropdown_item" id="action_pathfinder_minus_front">Pathfinder: Minus Front</div>
+            <div class="menu_dropdown_item" id="action_pathfinder_intersect">Pathfinder: Intersect</div>
+            <div class="menu_dropdown_item" id="action_pathfinder_exclude">Pathfinder: Exclude</div>
+            <div class="menu_dropdown_item" id="action_pathfinder_divide">Pathfinder: Divide</div>
           </div>
         </div>
 
@@ -180,6 +189,217 @@
       // Hide default SVG-Edit main menu button (handled cleanly by our top menu bar)
       const mainBtn = document.getElementById('main_button');
       if (mainBtn) mainBtn.style.display = 'none';
+    }
+
+    // =========================================================================
+    // Pathfinder Boolean Operations Engine (Powered by Paper.js)
+    // Operations: Unite, Minus Front, Intersect, Exclude, Divide
+    // =========================================================================
+    function executePathfinder(operation) {
+      const sc = svgEditor.svgCanvas;
+      if (!sc) return;
+
+      const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
+      if (selElems.length !== 2) {
+        alert('Pathfinder operations require exactly 2 selected objects.');
+        return;
+      }
+
+      const [elemA, elemB] = selElems;
+
+      // Determine stacking order: DOM following means elemB is above elemA
+      const isBFollowingA = (elemA.compareDocumentPosition(elemB) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const bottomElem = isBFollowingA ? elemA : elemB;
+      const topElem = isBFollowingA ? elemB : elemA;
+
+      if (!window.paper) {
+        alert('Pathfinder engine (Paper.js) is loading or unavailable.');
+        return;
+      }
+
+      const scope = new paper.PaperScope();
+      const canvas = document.createElement('canvas');
+      scope.setup(canvas);
+
+      function toPathItem(item) {
+        if (!item) return null;
+        if (item instanceof scope.Shape) return item.toPath(true);
+        if (item instanceof scope.PathItem) {
+          item.closed = true;
+          return item;
+        }
+        if (item instanceof scope.Group) {
+          const children = [...item.children];
+          let combined = null;
+          for (const child of children) {
+            const p = toPathItem(child);
+            if (p) {
+              combined = combined ? combined.unite(p) : p;
+            }
+          }
+          return combined;
+        }
+        return null;
+      }
+
+      try {
+        const itemBottom = toPathItem(scope.project.importSVG(bottomElem));
+        const itemTop = toPathItem(scope.project.importSVG(topElem));
+
+        if (!itemBottom || !itemTop) {
+          alert('Unable to process the geometry of the selected objects. Please ensure both are shapes or paths.');
+          scope.project.clear();
+          return;
+        }
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const parentNode = topElem.parentNode;
+        const { BatchCommand, RemoveElementCommand, InsertElementCommand } = sc.history;
+        const opTitles = {
+          unite: 'Unite',
+          minus_front: 'Minus Front',
+          intersect: 'Intersect',
+          exclude: 'Exclude',
+          divide: 'Divide'
+        };
+        const batchCmd = new BatchCommand(`Pathfinder ${opTitles[operation] || operation}`);
+
+        function copyStyling(source, target) {
+          const attrs = [
+            'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+            'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset',
+            'opacity', 'fill-opacity', 'stroke-opacity', 'filter'
+          ];
+          attrs.forEach(attr => {
+            const val = source.getAttribute(attr);
+            if (val !== null) target.setAttribute(attr, val);
+          });
+          if (source.hasAttribute('style')) {
+            target.setAttribute('style', source.getAttribute('style'));
+          }
+        }
+
+        function createPathFromPaper(paperPathItem, styleSourceElem) {
+          if (!paperPathItem) return null;
+          const svgExport = paperPathItem.exportSVG({ asString: false });
+          let d = '';
+          if (svgExport.tagName.toLowerCase() === 'path') {
+            d = svgExport.getAttribute('d');
+          } else {
+            const paths = svgExport.querySelectorAll('path');
+            const dArr = [];
+            paths.forEach(p => {
+              const pd = p.getAttribute('d');
+              if (pd) dArr.push(pd);
+            });
+            d = dArr.join(' ');
+          }
+          if (!d || !d.trim()) return null;
+
+          const pathEl = document.createElementNS(svgNS, 'path');
+          pathEl.setAttribute('id', sc.getNextId());
+          pathEl.setAttribute('d', d);
+          copyStyling(styleSourceElem, pathEl);
+          const fillRule = svgExport.getAttribute('fill-rule');
+          if (fillRule) pathEl.setAttribute('fill-rule', fillRule);
+          return pathEl;
+        }
+
+        const newElements = [];
+
+        if (operation === 'unite') {
+          const res = itemBottom.unite(itemTop);
+          const newPath = createPathFromPaper(res, topElem);
+          if (newPath) newElements.push(newPath);
+        } else if (operation === 'minus_front') {
+          const overlap = itemBottom.intersect(itemTop);
+          const overlapExport = overlap ? overlap.exportSVG({ asString: false }) : null;
+          const overlapD = overlapExport ? overlapExport.getAttribute('d') : null;
+          if (!overlapD || !overlapD.trim()) {
+            alert('The selected shapes do not overlap.');
+            scope.project.clear();
+            return;
+          }
+          const res = itemBottom.subtract(itemTop);
+          const newPath = createPathFromPaper(res, bottomElem);
+          if (newPath) newElements.push(newPath);
+        } else if (operation === 'intersect') {
+          const res = itemBottom.intersect(itemTop);
+          const newPath = createPathFromPaper(res, topElem);
+          if (!newPath) {
+            alert('The selected shapes do not overlap.');
+            scope.project.clear();
+            return;
+          }
+          newElements.push(newPath);
+        } else if (operation === 'exclude') {
+          const res = itemBottom.exclude(itemTop);
+          const newPath = createPathFromPaper(res, topElem);
+          if (newPath) newElements.push(newPath);
+        } else if (operation === 'divide') {
+          const overlap = itemBottom.intersect(itemTop);
+          const overlapExport = overlap ? overlap.exportSVG({ asString: false }) : null;
+          const overlapD = overlapExport ? overlapExport.getAttribute('d') : null;
+          if (!overlapD || !overlapD.trim()) {
+            alert('The selected shapes do not overlap.');
+            scope.project.clear();
+            return;
+          }
+
+          const pieceBottom = itemBottom.subtract(itemTop);
+          const pieceIntersect = itemBottom.intersect(itemTop);
+          const pieceTop = itemTop.subtract(itemBottom);
+
+          const pathBottom = createPathFromPaper(pieceBottom, bottomElem);
+          const pathIntersect = createPathFromPaper(pieceIntersect, topElem);
+          const pathTop = createPathFromPaper(pieceTop, topElem);
+
+          if (pathBottom) newElements.push(pathBottom);
+          if (pathIntersect) newElements.push(pathIntersect);
+          if (pathTop) newElements.push(pathTop);
+
+          if (newElements.length === 0) {
+            alert('Could not divide the selected shapes.');
+            scope.project.clear();
+            return;
+          }
+        }
+
+        if (newElements.length === 0) {
+          scope.project.clear();
+          return;
+        }
+
+        // Insert new elements before topElem
+        newElements.forEach(el => {
+          parentNode.insertBefore(el, topElem);
+          batchCmd.addSubCommand(new InsertElementCommand(el));
+        });
+
+        // Add remove commands with sibling and parent references
+        batchCmd.addSubCommand(new RemoveElementCommand(bottomElem, bottomElem.nextSibling, bottomElem.parentNode));
+        batchCmd.addSubCommand(new RemoveElementCommand(topElem, topElem.nextSibling, topElem.parentNode));
+
+        bottomElem.remove();
+        topElem.remove();
+
+        sc.undoMgr.addCommandToHistory(batchCmd);
+
+        sc.clearSelection();
+        sc.addToSelection(newElements, true);
+        sc.call('changed', newElements);
+
+        const updateVisibility = window.__updatePropertiesVisibility;
+        if (typeof updateVisibility === 'function') {
+          updateVisibility();
+        }
+
+      } catch (err) {
+        console.error('Pathfinder operation error:', err);
+        alert('Pathfinder error: ' + (err.message || err));
+      } finally {
+        scope.project.clear();
+      }
     }
 
     // Set up Studio Menu Bar Interactions
@@ -309,6 +529,13 @@
       document.getElementById('action_flip_v')?.addEventListener('click', () => {
         sc.flipSelectedElements('y');
       });
+
+      // Pathfinder Menu Actions
+      document.getElementById('action_pathfinder_unite')?.addEventListener('click', () => executePathfinder('unite'));
+      document.getElementById('action_pathfinder_minus_front')?.addEventListener('click', () => executePathfinder('minus_front'));
+      document.getElementById('action_pathfinder_intersect')?.addEventListener('click', () => executePathfinder('intersect'));
+      document.getElementById('action_pathfinder_exclude')?.addEventListener('click', () => executePathfinder('exclude'));
+      document.getElementById('action_pathfinder_divide')?.addEventListener('click', () => executePathfinder('divide'));
 
       document.getElementById('action_toggle_wireframe')?.addEventListener('click', () => {
         document.getElementById('tool_wireframe')?.click();
@@ -545,6 +772,49 @@
               </div>
             </div>
 
+            <!-- 3b. Pathfinder Section (shown when 2 objects are selected) -->
+            <div class="prop_section" id="sec_pathfinder" style="display: none;">
+              <div class="prop_section_header" data-target="sec_pathfinder_body">
+                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_title">Pathfinder</span>
+              </div>
+              <div class="prop_section_body" id="sec_pathfinder_body">
+                <div class="prop_pathfinder_grid">
+                  <button type="button" class="prop_pathfinder_btn" id="btn_pathfinder_unite" title="Unite (Merge selected shapes into one outline)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 3h12v5h5v12H8v-5H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="prop_pathfinder_btn" id="btn_pathfinder_minus_front" title="Minus Front (Subtract top shape from bottom shape)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 3h12v5H8v12H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+                      <rect x="8" y="8" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="prop_pathfinder_btn" id="btn_pathfinder_intersect" title="Intersect (Keep only the overlapping area)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="3" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2"/>
+                      <rect x="8" y="8" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2"/>
+                      <rect x="8" y="8" width="7" height="7" fill="#555555" stroke="#cccccc" stroke-width="1.5"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="prop_pathfinder_btn" id="btn_pathfinder_exclude" title="Exclude (Keep non-overlapping areas)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 3h12v5H8v12H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+                      <path d="M15 8h5v12H8v-5h7V8z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="prop_pathfinder_btn" id="btn_pathfinder_divide" title="Divide (Slice shapes into separate component pieces)">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 3h11v4H7v11H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.2" stroke-linejoin="round"/>
+                      <rect x="8" y="8" width="6" height="6" fill="#fa7c1b" stroke="#cccccc" stroke-width="1.2"/>
+                      <path d="M15 8h5v12H8v-4h7V8z" fill="#555555" stroke="#cccccc" stroke-width="1.2" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- 4. Typography Section (shown for text) -->
             <div class="prop_section text_panel" id="sec_typography" style="display:none;">
               <div class="prop_section_header" data-target="sec_typography_body">
@@ -727,14 +997,23 @@
         svgEditor.svgCanvas.flipSelectedElements('y');
       });
 
+      // Wire Pathfinder buttons
+      ['unite', 'minus_front', 'intersect', 'exclude', 'divide'].forEach(op => {
+        document.getElementById(`btn_pathfinder_${op}`)?.addEventListener('click', (e) => {
+          e.preventDefault();
+          executePathfinder(op);
+        });
+      });
+
       // Dynamic Contextual Visibility & Sync function
       function updatePropertiesVisibility() {
         const sc = svgEditor.svgCanvas;
         if (!sc) return;
-        const curElem = svgEditor.selectedElement;
-        const isMulti = svgEditor.multiselected;
+        const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
+        const curElem = svgEditor.selectedElement || selElems[0];
+        const isMulti = svgEditor.multiselected || selElems.length > 1;
         const isPathEdit = sc.getMode() === 'pathedit';
-        const hasSelection = !!(curElem || isMulti || isPathEdit);
+        const hasSelection = !!(curElem || isMulti || isPathEdit || selElems.length > 0);
 
         const emptyState = document.getElementById('prop_empty_state');
         const activeContainer = document.getElementById('prop_active_container');
@@ -796,6 +1075,13 @@
           pathSec.style.display = isPathEdit ? 'block' : 'none';
         }
 
+        // Pathfinder section (strictly visible when 2 objects are selected)
+        const pathfinderSec = document.getElementById('sec_pathfinder');
+        if (pathfinderSec) {
+          const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
+          pathfinderSec.style.display = (selElems.length === 2 && !isPathEdit) ? 'block' : 'none';
+        }
+
         // Action buttons
         const toPathBtn = document.getElementById('tool_topath');
         if (toPathBtn) {
@@ -826,6 +1112,8 @@
         }
       }
 
+      window.__updatePropertiesVisibility = updatePropertiesVisibility;
+
       // Hook into topPanel.updateContextPanel
       if (svgEditor.topPanel && typeof svgEditor.topPanel.updateContextPanel === 'function') {
         const origUpdate = svgEditor.topPanel.updateContextPanel.bind(svgEditor.topPanel);
@@ -839,6 +1127,8 @@
       if (svgEditor.svgCanvas) {
         svgEditor.svgCanvas.bind('selectedChanged', updatePropertiesVisibility);
         svgEditor.svgCanvas.bind('elementChanged', updatePropertiesVisibility);
+        svgEditor.svgCanvas.bind('selected', updatePropertiesVisibility);
+        svgEditor.svgCanvas.bind('changed', updatePropertiesVisibility);
       }
 
       // Initial visibility sync
