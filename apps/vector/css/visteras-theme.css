@@ -1078,4 +1078,23 @@ elix-dialog {
   font-weight: 300 !important;
 }
 
+/* Type on Path Mode: Canvas & Hover Cursor */
+.visteras-top-mode-active #workarea,
+.visteras-top-mode-active #svgcanvas {
+  cursor: crosshair;
+}
+
+.visteras-top-mode-active #svgcontent path,
+.visteras-top-mode-active #svgcontent rect,
+.visteras-top-mode-active #svgcontent circle,
+.visteras-top-mode-active #svgcontent ellipse,
+.visteras-top-mode-active #svgcontent polygon,
+.visteras-top-mode-active #svgcontent polyline,
+.visteras-top-mode-active #svgcontent line,
+.visteras-top-mode-hover-target,
+.visteras-type-on-path-source.visteras-top-mode-hover {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 18 C7 10 13 10 21 18' fill='none' stroke='%233f8ff7' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12 4 L12 14 M8 4 L16 4' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12 4 L12 14 M8 4 L16 4' fill='none' stroke='%23000000' stroke-width='0.75' stroke-linecap='round'/%3E%3C/svg%3E") 12 14, crosshair !important;
+}
+
+
 

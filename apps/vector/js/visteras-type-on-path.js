@@ -403,7 +403,7 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
     activeEditingContext = null;
 
     removeCaret();
-    const finalVal = currentText.trim() || 'Type on path';
+    const finalVal = currentText.trim() || 'Lorem ipsum';
     tp.textContent = finalVal;
 
     window.removeEventListener('keydown', onKeyDown, true);
@@ -612,7 +612,7 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   const sc = svgEditor.svgCanvas;
   const pathEl = ensurePathElement(svgEditor, shapeEl);
   const { family, size, fill } = readTextStyle(svgEditor);
-  const content = opts.content || 'Type on path';
+  const content = opts.content || 'Lorem ipsum';
   const align = opts.align || 'start';
   const reverse = !!opts.reverse;
 
@@ -795,10 +795,33 @@ function wireOptionsPanel(svgEditor) {
 
 function disarmTypeOnPathMode(svgEditor) {
   svgEditor._waitingForTypeOnPath = false;
+  document.body.classList.remove('visteras-top-mode-active');
+  document.getElementById('visteras_app_container')?.classList.remove('visteras-top-mode-active');
+  document.getElementById('workarea')?.classList.remove('visteras-top-mode-active');
+  document.getElementById('svgcanvas')?.classList.remove('visteras-top-mode-active');
+
+  const hovered = document.querySelectorAll('.visteras-top-mode-hover-target, .visteras-top-hovered');
+  hovered.forEach(el => {
+    el.classList.remove('visteras-top-mode-hover-target');
+    if (!el.classList.contains('visteras-top-selected')) {
+      el.classList.remove('visteras-top-hovered');
+      el.style.stroke = 'transparent';
+    }
+  });
+
   if (svgEditor._topPointerDownHandler) {
     window.removeEventListener('pointerdown', svgEditor._topPointerDownHandler, true);
     svgEditor._topPointerDownHandler = null;
   }
+  if (svgEditor._topPointerMoveHandler) {
+    window.removeEventListener('pointermove', svgEditor._topPointerMoveHandler, true);
+    svgEditor._topPointerMoveHandler = null;
+  }
+  if (svgEditor._topKeyDownHandler) {
+    window.removeEventListener('keydown', svgEditor._topKeyDownHandler, true);
+    svgEditor._topKeyDownHandler = null;
+  }
+
   const btn = document.getElementById('tool_type_on_path');
   if (btn) btn.removeAttribute('pressed');
 }
@@ -810,21 +833,65 @@ function armTypeOnPathMode(svgEditor) {
     return;
   }
 
-  const selected = getSelected(svgEditor);
-  if (selected && isPathLike(selected) && !svgEditor.multiselected) {
-    createTypeOnPath(svgEditor, selected);
-    return;
-  }
-
-  if (selected && isTypeOnPathText(selected)) {
-    startDirectInPlaceEdit(svgEditor, selected);
-    return;
-  }
-
   svgEditor._waitingForTypeOnPath = true;
+  document.body.classList.add('visteras-top-mode-active');
+  document.getElementById('visteras_app_container')?.classList.add('visteras-top-mode-active');
+  document.getElementById('workarea')?.classList.add('visteras-top-mode-active');
+  document.getElementById('svgcanvas')?.classList.add('visteras-top-mode-active');
+
   const btn = document.getElementById('tool_type_on_path');
   if (btn) btn.setAttribute('pressed', 'true');
   showToast('Click a path or shape to place type on it.');
+
+  let lastHovered = null;
+
+  const onPointerMove = (evt) => {
+    if (!svgEditor._waitingForTypeOnPath) return;
+
+    if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) {
+      if (lastHovered) {
+        lastHovered.classList.remove('visteras-top-mode-hover-target');
+        if (!lastHovered.classList.contains('visteras-top-selected')) {
+          lastHovered.classList.remove('visteras-top-hovered');
+          lastHovered.style.stroke = 'transparent';
+        }
+        lastHovered = null;
+      }
+      return;
+    }
+
+    let target = null;
+    const elements = document.elementsFromPoint(evt.clientX, evt.clientY);
+    for (const el of elements) {
+      if (el.closest?.('#svgcontent')) {
+        const p = findPathLike(el);
+        if (p) {
+          target = p;
+          break;
+        }
+      }
+    }
+    if (!target) target = findPathLike(evt.target);
+
+    if (target !== lastHovered) {
+      if (lastHovered) {
+        lastHovered.classList.remove('visteras-top-mode-hover-target');
+        if (!lastHovered.classList.contains('visteras-top-selected')) {
+          lastHovered.classList.remove('visteras-top-hovered');
+          lastHovered.style.stroke = 'transparent';
+        }
+      }
+      lastHovered = target;
+      if (target) {
+        target.classList.add('visteras-top-mode-hover-target');
+        if (target.classList.contains('visteras-type-on-path-source') && !target.classList.contains('visteras-top-selected')) {
+          target.classList.add('visteras-top-hovered');
+          target.style.stroke = STUDIO_BLUE;
+          target.style.strokeWidth = '1px';
+        }
+      }
+    }
+  };
 
   const onPointerDown = (evt) => {
     if (!svgEditor._waitingForTypeOnPath) return;
@@ -857,17 +924,20 @@ function armTypeOnPathMode(svgEditor) {
     }
   };
 
-  svgEditor._topPointerDownHandler = onPointerDown;
-  window.addEventListener('pointerdown', onPointerDown, true);
-
   const onKeyDown = (e) => {
     if (e.key === 'Escape' && svgEditor._waitingForTypeOnPath) {
       disarmTypeOnPathMode(svgEditor);
       showToast('Type on Path cancelled.');
-      window.removeEventListener('keydown', onKeyDown);
     }
   };
-  window.addEventListener('keydown', onKeyDown);
+
+  svgEditor._topPointerMoveHandler = onPointerMove;
+  svgEditor._topPointerDownHandler = onPointerDown;
+  svgEditor._topKeyDownHandler = onKeyDown;
+
+  window.addEventListener('pointermove', onPointerMove, true);
+  window.addEventListener('pointerdown', onPointerDown, true);
+  window.addEventListener('keydown', onKeyDown, true);
 }
 
 function injectToolbarButton(svgEditor) {
@@ -1006,6 +1076,102 @@ function hookSelectorManager(svgEditor) {
 }
 
 /**
+ * Hook into SVG-Edit dimension recalculation and transformation remapping
+ * so that scaling and moving scale/move the underlying path and font-size proportionately.
+ */
+function hookRemapAndDimensions(svgEditor) {
+  const sc = svgEditor.svgCanvas;
+  if (!sc) return;
+
+  if (typeof sc.remapElement === 'function' && !sc._topRemapHooked) {
+    sc._topRemapHooked = true;
+    const origRemap = sc.remapElement.bind(sc);
+
+    sc.remapElement = function(elem, attrs, matrix) {
+      const res = origRemap(elem, attrs, matrix);
+      if (elem && isTypeOnPathText(elem) && matrix) {
+        const tp = elem.querySelector('textPath');
+        if (tp) {
+          const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+          const baseId = href.replace(/_rev$/, '');
+          const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
+          if (pathEl) {
+            const selected = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements() : [];
+            if (!selected.includes(pathEl)) {
+              origRemap(pathEl, { d: pathEl.getAttribute('d') }, matrix);
+            }
+            const defs = getDefs(sc);
+            const revEl = defs?.querySelector(`#${CSS.escape(baseId)}_rev`);
+            if (revEl) {
+              const revD = buildReversedPathD(pathEl);
+              if (revD) revEl.setAttribute('d', revD);
+            }
+          }
+          elem.removeAttribute('x');
+          elem.removeAttribute('y');
+        }
+      }
+      return res;
+    };
+  }
+
+  // Hook deleteSelectedElements to clean up bound paths
+  if (typeof sc.deleteSelectedElements === 'function' && !sc._topDeleteHooked) {
+    sc._topDeleteHooked = true;
+    const origDelete = sc.deleteSelectedElements.bind(sc);
+    sc.deleteSelectedElements = function() {
+      const selected = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements().filter(Boolean) : [];
+      selected.forEach((el) => {
+        if (el && isTypeOnPathText(el)) {
+          const tp = el.querySelector('textPath');
+          if (tp) {
+            const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+            const baseId = href.replace(/_rev$/, '');
+            const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
+            if (pathEl && pathEl.hasAttribute('data-visteras-top-source')) {
+              pathEl.remove();
+            }
+            const defs = getDefs(sc);
+            const revEl = defs?.querySelector(`#${CSS.escape(baseId)}_rev`);
+            if (revEl) revEl.remove();
+          }
+        }
+      });
+      const res = origDelete();
+      if (typeof window.__updatePropertiesVisibility === 'function') {
+        window.__updatePropertiesVisibility();
+      }
+      return res;
+    };
+  }
+
+  // Global Backspace and Delete key listener for deleting selected canvas objects
+  if (!window._visterasGlobalDeleteHooked) {
+    window._visterasGlobalDeleteHooked = true;
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (activeEditingContext) return;
+        const target = e.target;
+        if (target) {
+          const tag = target.tagName?.toLowerCase();
+          if (tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable) return;
+          if (target.shadowRoot?.activeElement) {
+            const shadowTag = target.shadowRoot.activeElement.tagName?.toLowerCase();
+            if (shadowTag === 'input' || shadowTag === 'textarea' || shadowTag === 'select') return;
+          }
+        }
+        const selected = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements().filter(Boolean) : [];
+        if (selected.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          sc.deleteSelectedElements();
+        }
+      }
+    }, true);
+  }
+}
+
+/**
  * Syncs selection state between textPath and attached source paths
  * so that when selected, hover outlines are suppressed (single-line bounding box).
  */
@@ -1051,6 +1217,7 @@ export function mountVisterasTypeOnPath(opts = {}) {
 
   wireOptionsPanel(svgEditor);
   hookSelectorManager(svgEditor);
+  hookRemapAndDimensions(svgEditor);
 
   document.getElementById('action_type_on_path')?.addEventListener('click', () => {
     armTypeOnPathMode(svgEditor);
@@ -1067,14 +1234,6 @@ export function mountVisterasTypeOnPath(opts = {}) {
   if (sc && typeof sc.bind === 'function') {
     sc.bind('selectedChanged', () => {
       syncSelectionState(svgEditor);
-      if (svgEditor._waitingForTypeOnPath) {
-        const sel = getSelected(svgEditor);
-        if (sel && isPathLike(sel)) {
-          disarmTypeOnPathMode(svgEditor);
-          createTypeOnPath(svgEditor, sel);
-          return;
-        }
-      }
       syncOptionsPanel(svgEditor);
     });
     sc.bind('elementChanged', () => {
