@@ -38557,13 +38557,14 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let e = r_();
 			r = document.createElementNS(Eh.SVG, "path"), kg(r, {
 				id: `segline_${n}`,
-				display: "none",
+				display: "inline",
 				fill: "none",
-				stroke: "#0FF",
-				"stroke-width": 2,
+				stroke: "#3f8ff7",
+				"stroke-width": 1,
+				"vector-effect": "non-scaling-stroke",
 				style: "pointer-events:none",
 				d: "M0,0 0,0"
-			}), e.append(r);
+			}), e.prepend(r);
 		}
 		if (t) {
 			let { prev: t } = e;
@@ -38592,10 +38593,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			document.getElementById(`ctrlpointgrip_${this.index}c1`)?.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF"), document.getElementById(`ctrlpointgrip_${this.index}c2`)?.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF");
 		}
 		show(e) {
-			this.ptgrip && (this.ptgrip.setAttribute("display", e ? "inline" : "none"), this.segsel.setAttribute("display", e ? "inline" : "none"), this.showCtrlPts(e));
+			this.ptgrip && this.ptgrip.setAttribute("display", e ? "inline" : "none");
+			this.segsel && this.segsel.setAttribute("display", e ? "inline" : "none");
+			this.showCtrlPts(e && this.selected);
 		}
 		select(e) {
-			this.ptgrip && (this.ptgrip.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF"), this.ptgrip.setAttribute("stroke", "#3f8ff7"), this.ptgrip.setAttribute("stroke-width", "1.5"), this.segsel.setAttribute("display", e ? "inline" : "none"), this.ctrlpts && this.selectCtrls(e), this.selected = e);
+			this.ptgrip && (this.ptgrip.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF"), this.ptgrip.setAttribute("stroke", "#3f8ff7"), this.ptgrip.setAttribute("stroke-width", "1.5"), this.showCtrlPts(e), this.ctrlpts && this.selectCtrls(e), this.selected = e);
 		}
 		addGrip() {
 			this.ptgrip = s_(this, !0), this.ctrlpts = c_(this), this.segsel = u_(this, !0);

@@ -1204,10 +1204,30 @@ elix-dialog {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 11 L16 17 M13 14 L19 14 M16 11 L14.5 12.5 M16 11 L17.5 12.5 M16 17 L14.5 15.5 M16 17 L17.5 15.5 M13 14 L14.5 12.5 M13 14 L14.5 15.5 M19 14 L17.5 12.5 M19 14 L17.5 15.5' fill='none' stroke='%23000000' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, move !important;
 }
 
+/* Path edit segment outline: crisp 1px light blue (#3f8ff7) line for the full path */
+#pathpointgrip_container [id^="segline_"],
+[id^="segline_"] {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  fill: none !important;
+  vector-effect: non-scaling-stroke !important;
+  pointer-events: none !important;
+}
+
+/* Bezier control handle connector lines */
+#pathpointgrip_container [id^="ctrlLine_"],
+[id^="ctrlLine_"] {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  vector-effect: non-scaling-stroke !important;
+  pointer-events: none !important;
+}
+
 /* Direct Selection Anchor Point & Control Point Hover (Shows single anchor manipulation cursor) */
 #pathpointgrip_container circle,
 [id^="pathpointgrip_"],
 [id^="ctrlpointgrip_"] {
+  vector-effect: non-scaling-stroke !important;
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3Crect x='13' y='13' width='6.5' height='6.5' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' rx='0.5'/%3E%3C/svg%3E") 4 4, pointer !important;
   transition: r 0.1s ease, stroke-width 0.1s ease;
 }
