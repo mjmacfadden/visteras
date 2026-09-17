@@ -38127,6 +38127,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		constructor(e, t, n, r) {
 			super(), this.elem = e, this.text = r ? `Move ${e.tagName} to ${r}` : `Move ${e.tagName}`, this.oldNextSibling = t, this.oldParent = n, this.newNextSibling = e.nextSibling, this.newParent = e.parentNode;
 		}
+		type() {
+			return "MoveElementCommand";
+		}
 		apply(e) {
 			super.apply(e, () => {
 				let e = this.newNextSibling && this.newNextSibling.parentNode === this.newParent ? this.newNextSibling : null;
@@ -38143,6 +38146,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		constructor(e, t) {
 			super(), this.elem = e, this.text = t || `Create ${e.tagName}`, this.parent = e.parentNode, this.nextSibling = this.elem.nextSibling;
 		}
+		type() {
+			return "InsertElementCommand";
+		}
 		apply(e) {
 			super.apply(e, () => {
 				let e = this.nextSibling && this.nextSibling.parentNode === this.parent ? this.nextSibling : null;
@@ -38157,6 +38163,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 	}, Gg = class extends Hg {
 		constructor(e, t, n, r) {
 			super(), this.elem = e, this.text = r || `Delete ${e.tagName}`, this.nextSibling = t, this.parent = n;
+		}
+		type() {
+			return "RemoveElementCommand";
 		}
 		apply(e) {
 			super.apply(e, () => {
@@ -38173,6 +38182,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		constructor(e, t, n) {
 			super(), this.elem = e, this.text = n ? `Change ${e.tagName} ${n}` : `Change ${e.tagName}`, this.newValues = {}, this.oldValues = t;
 			for (let n in t) n === "#text" ? this.newValues[n] = e ? e.textContent : "" : n === "#href" ? this.newValues[n] = lg(e) : this.newValues[n] = e.getAttribute(n);
+		}
+		type() {
+			return "ChangeElementCommand";
 		}
 		apply(e) {
 			super.apply(e, () => {
@@ -38195,6 +38207,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 	}, qg = class extends Hg {
 		constructor(e) {
 			super(), this.text = e || "Batch Command", this.stack = [];
+		}
+		type() {
+			return "BatchCommand";
 		}
 		apply(e) {
 			super.apply(e, () => {
@@ -38832,7 +38847,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}), this;
 		}
 		endChanges(e) {
+			let curD = this.elem.getAttribute("d");
+			if (this.last_d === curD) return;
 			let t = new Kg(this.elem, { d: this.last_d }, e);
+			this.last_d = curD;
 			Qg.endChanges({
 				cmd: t,
 				elem: this.elem
@@ -39301,16 +39319,17 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		opencloseSubPath() {
 			let e = K.selected_pts;
 			if (e.length !== 1) return;
+			K.storeD();
 			let { elem: t } = K, n = t.pathSegList, r = e[0], i = null, a = null;
 			if (K.eachSeg(function(e) {
 				return this.type === 2 && e <= r && (a = this.item), e <= r ? !0 : this.type === 2 ? (i = e, !1) : this.type === 1 ? (i = !1, !1) : !0;
 			}), i ||= K.segs.length - 1, i !== !1) {
 				let e = t.createSVGPathSegLinetoAbs(a.x, a.y), r = t.createSVGPathSegClosePath();
-				i === K.segs.length - 1 ? (n.appendItem(e), n.appendItem(r)) : (n.insertItemBefore(r, i), n.insertItemBefore(e, i)), K.init().selectPt(i + 1);
+				i === K.segs.length - 1 ? (n.appendItem(e), n.appendItem(r)) : (n.insertItemBefore(r, i), n.insertItemBefore(e, i)), K.init().selectPt(i + 1), K.endChanges("Open/close sub-path");
 				return;
 			}
 			if (K.segs[r].mate) {
-				n.removeItem(r), n.removeItem(r), K.init().selectPt(r - 1);
+				n.removeItem(r), n.removeItem(r), K.init().selectPt(r - 1), K.endChanges("Open/close sub-path");
 				return;
 			}
 			let o, s;
@@ -39326,7 +39345,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let c = r - o - 1;
 			for (; c--;) n.insertItemBefore(n.getItem(o), s);
 			let l = n.getItem(o);
-			p_.replacePathSeg(2, o, [l.x, l.y]), K.init().selectPt(0);
+			p_.replacePathSeg(2, o, [l.x, l.y]), K.init().selectPt(0), K.endChanges("Open/close sub-path");
 		}
 		deletePathNode() {
 			if (!__.canDeleteNodes) return;
@@ -40215,8 +40234,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		Yv = e, e.undoMgr = Zv();
 	}, Zv = () => new qv({ handleHistoryEvent(e, t) {
 		let n = Jv;
-		if (e === n.BEFORE_UNAPPLY || e === n.BEFORE_APPLY) Yv.clearSelection();
-		else if (e === n.AFTER_APPLY || e === n.AFTER_UNAPPLY) {
+		if (e === n.BEFORE_UNAPPLY || e === n.BEFORE_APPLY) {
+			if (Yv.getCurrentMode() !== "pathedit") Yv.clearSelection();
+		} else if (e === n.AFTER_APPLY || e === n.AFTER_UNAPPLY) {
 			let r = t.type(), i = e === n.AFTER_APPLY;
 			if (r === "ChangeElementCommand" && t.elem === Yv.getSvgContent()) {
 				let e = i ? t.newValues : t.oldValues;
@@ -40230,7 +40250,16 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				}
 			}
 			let a = t.elements();
-			if (Yv.pathActions.clear(), Yv.call("changed", a), r === "MoveElementCommand") (i ? t.newParent : t.oldParent) === Yv.getSvgContent() && yv();
+			let pathObj = Yv.getPathObj ? Yv.getPathObj() : null;
+			let isPathEdit = Yv.getCurrentMode() === "pathedit" && pathObj && a.includes(pathObj.elem);
+			if (isPathEdit) {
+				pathObj.init().show(!0).update();
+				pathObj.storeD();
+			} else {
+				Yv.pathActions.clear();
+			}
+			Yv.call("changed", a);
+			if (r === "MoveElementCommand") (i ? t.newParent : t.oldParent) === Yv.getSvgContent() && yv();
 			else if (r === "InsertElementCommand" || r === "RemoveElementCommand") t.parent === Yv.getSvgContent() && yv(), r === "InsertElementCommand" ? i && Yv.restoreRefElements(t.elem) : i || Yv.restoreRefElements(t.elem), t.elem?.tagName === "use" && Yv.setUseData(t.elem);
 			else if (r === "ChangeElementCommand") {
 				t.elem.tagName === "title" && t.elem.parentNode.parentNode === Yv.getSvgContent() && yv();
@@ -70089,6 +70118,18 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 				e *= n, t *= n;
 			}
 			this.svgCanvas.moveSelectedElements(e, t);
+		} else if (this.svgCanvas.getMode() === "pathedit") {
+			let K = this.svgCanvas.getPathObj?.();
+			if (K && K.selected_pts && K.selected_pts.length) {
+				if (this.configObj.curConfig.gridSnapping) {
+					let n = this.svgCanvas.getZoom() * this.configObj.curConfig.snappingStep;
+					e *= n, t *= n;
+				}
+				K.storeD();
+				K.movePts(e, t);
+				K.update();
+				K.endChanges("Move path point(s)");
+			}
 		}
 	}
 	selectNext() {
