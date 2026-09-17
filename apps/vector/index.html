@@ -827,7 +827,7 @@
       propPanel.innerHTML = `
         <div class="sidebar_block_header" id="properties_panel_header" title="Toggle Properties Panel">
           <span class="sidebar_block_title">Properties</span>
-          <span class="sidebar_block_arrow">▾</span>
+          <span class="sidebar_block_arrow"></span>
         </div>
         <div class="sidebar_block_content" id="properties_content">
           
@@ -844,7 +844,7 @@
             <!-- 1. Transform Section (X, Y, W, H, Angle, Flip) -->
             <div class="prop_section" id="sec_transform">
               <div class="prop_section_header" data-target="sec_transform_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Transform</span>
               </div>
               <div class="prop_section_body" id="sec_transform_body">
@@ -879,6 +879,11 @@
                   <div class="prop_field_pair" id="slot_image_wh"></div>
                 </div>
 
+                <!-- Text Dimensions -->
+                <div class="prop_group text_panel" id="prop_text_dim_group" style="display:none;">
+                  <div class="prop_field_pair" id="slot_text_wh"></div>
+                </div>
+
                 <!-- Circle Radius -->
                 <div class="prop_group circle_panel" id="prop_circle_r_group" style="display:none;">
                   <div class="prop_field_pair" id="slot_circle_r"></div>
@@ -889,8 +894,8 @@
                   <div class="prop_field_pair" id="slot_ellipse_r"></div>
                 </div>
 
-                <!-- Rotation & Flip Row -->
-                <div class="prop_row" id="prop_rotate_flip_row">
+                <!-- Rotation & Flip -->
+                <div class="prop_row" id="prop_row_rotate_flip">
                   <div id="slot_angle" style="flex:1;"></div>
                   <div class="prop_btn_pair" id="slot_flip"></div>
                 </div>
@@ -900,7 +905,7 @@
             <!-- 2. Appearance Section (Opacity, Blur, Corner Radius) -->
             <div class="prop_section" id="sec_appearance">
               <div class="prop_section_header" data-target="sec_appearance_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Appearance</span>
               </div>
               <div class="prop_section_body" id="sec_appearance_body">
@@ -917,7 +922,7 @@
             <!-- 3. Align & Distribute Section -->
             <div class="prop_section" id="sec_align">
               <div class="prop_section_header" data-target="sec_align_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Align & Distribute</span>
               </div>
               <div class="prop_section_body" id="sec_align_body">
@@ -932,7 +937,7 @@
             <!-- 3b. Pathfinder Section (shown when 2 objects are selected) -->
             <div class="prop_section" id="sec_pathfinder" style="display: none;">
               <div class="prop_section_header" data-target="sec_pathfinder_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Pathfinder</span>
               </div>
               <div class="prop_section_body" id="sec_pathfinder_body">
@@ -975,7 +980,7 @@
             <!-- 4. Typography Section (shown for text) -->
             <div class="prop_section text_panel" id="sec_typography" style="display:none;">
               <div class="prop_section_header" data-target="sec_typography_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Typography</span>
               </div>
               <div class="prop_section_body" id="sec_typography_body">
@@ -994,7 +999,7 @@
             <!-- 4b. Type on Path Section (shown when type-on-path text is selected) -->
             <div class="prop_section" id="sec_type_on_path" style="display:none;">
               <div class="prop_section_header" data-target="sec_type_on_path_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Type on Path</span>
               </div>
               <div class="prop_section_body" id="sec_type_on_path_body">
@@ -1022,7 +1027,7 @@
             <!-- 5. Path & Nodes Section (shown in pathedit) -->
             <div class="prop_section path_node_panel" id="sec_path_node" style="display:none;">
               <div class="prop_section_header" data-target="sec_path_node_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Path & Nodes</span>
               </div>
               <div class="prop_section_body" id="sec_path_node_body">
@@ -1038,7 +1043,7 @@
             <!-- 6. Object Actions Section -->
             <div class="prop_section" id="sec_actions">
               <div class="prop_section_header" data-target="sec_actions_body">
-                <span class="prop_section_arrow">▾</span>
+                <span class="prop_section_arrow"></span>
                 <span class="prop_section_title">Actions</span>
               </div>
               <div class="prop_section_body" id="sec_actions_body">
