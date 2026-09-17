@@ -215,20 +215,22 @@ function isNearWhiteFill(hex, threshold = 245) {
  * Build path `d` from an ImageTracer path sample (incl. holes, reversed).
  * Mirrors ImageTracer.svgpathstring hole handling so fill-rule evenodd works.
  */
-function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1, mapCoord = null) {
+function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1, transformPoint = null) {
   if (!smp || !smp.segments || !smp.segments.length) return '';
   const rnd = (v) => (roundcoords === -1 ? v : +Number(v).toFixed(roundcoords));
-  const tx = (x) => (mapCoord ? rnd(mapCoord.renderX + x * mapCoord.sx) : rnd(x));
-  const ty = (y) => (mapCoord ? rnd(mapCoord.renderY + y * mapCoord.sy) : rnd(y));
+  const tf = transformPoint || ((x, y) => ({ x: rnd(x), y: rnd(y) }));
 
   let d = '';
   const segs = smp.segments;
-  d += `M ${tx(segs[0].x1)} ${ty(segs[0].y1)} `;
+  const p0 = tf(segs[0].x1, segs[0].y1);
+  d += `M ${p0.x} ${p0.y} `;
   for (let i = 0; i < segs.length; i++) {
     const s = segs[i];
-    d += `${s.type} ${tx(s.x2)} ${ty(s.y2)} `;
+    const p2 = tf(s.x2, s.y2);
+    d += `${s.type} ${p2.x} ${p2.y} `;
     if (Object.prototype.hasOwnProperty.call(s, 'x3')) {
-      d += `${tx(s.x3)} ${ty(s.y3)} `;
+      const p3 = tf(s.x3, s.y3);
+      d += `${p3.x} ${p3.y} `;
     }
   }
   d += 'Z ';
@@ -240,17 +242,21 @@ function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1, mapCoord = nul
     const hsegs = hsmp.segments;
     const last = hsegs[hsegs.length - 1];
     if (Object.prototype.hasOwnProperty.call(last, 'x3')) {
-      d += `M ${tx(last.x3)} ${ty(last.y3)} `;
+      const plast = tf(last.x3, last.y3);
+      d += `M ${plast.x} ${plast.y} `;
     } else {
-      d += `M ${tx(last.x2)} ${ty(last.y2)} `;
+      const plast = tf(last.x2, last.y2);
+      d += `M ${plast.x} ${plast.y} `;
     }
     for (let pcnt = hsegs.length - 1; pcnt >= 0; pcnt--) {
       const s = hsegs[pcnt];
       d += `${s.type} `;
       if (Object.prototype.hasOwnProperty.call(s, 'x3')) {
-        d += `${tx(s.x2)} ${ty(s.y2)} `;
+        const p2 = tf(s.x2, s.y2);
+        d += `${p2.x} ${p2.y} `;
       }
-      d += `${tx(s.x1)} ${ty(s.y1)} `;
+      const p1 = tf(s.x1, s.y1);
+      d += `${p1.x} ${p1.y} `;
     }
     d += 'Z ';
   }
@@ -260,7 +266,7 @@ function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1, mapCoord = nul
 /**
  * Convert tracedata → nested groups: outer traced group, subgroup per palette color.
  */
-function tracedataToColorGroups(tracedata, options, ui, mapCoord = null) {
+function tracedataToColorGroups(tracedata, options, ui, transformPoint = null) {
   const layers = tracedata.layers || [];
   const palette = tracedata.palette || [];
   const colorGroups = [];
@@ -278,7 +284,7 @@ function tracedataToColorGroups(tracedata, options, ui, mapCoord = null) {
       if (options.linefilter && smp.segments && smp.segments.length < 3) continue;
       const holeIdxs = smp.holechildren || [];
       const holeSamples = holeIdxs.map((idx) => layer[idx]).filter(Boolean);
-      const d = pathSampleToD(smp, holeSamples, options.roundcoords, mapCoord);
+      const d = pathSampleToD(smp, holeSamples, options.roundcoords, transformPoint);
       if (!d) continue;
       paths.push({ d, fill });
     }
@@ -289,15 +295,18 @@ function tracedataToColorGroups(tracedata, options, ui, mapCoord = null) {
   return colorGroups;
 }
 
-function getImagePlacement(imageEl, srcW, srcH) {
-  const x = parseFloat(imageEl.getAttribute('x')) || 0;
-  const y = parseFloat(imageEl.getAttribute('y')) || 0;
-  const destW = parseFloat(imageEl.getAttribute('width')) || srcW;
-  const destH = parseFloat(imageEl.getAttribute('height')) || srcH;
-  const existing = imageEl.getAttribute('transform') || '';
+function makePointTransformer(imageEl, srcW, srcH, roundcoords = 1) {
+  let bbox = null;
+  try {
+    if (typeof imageEl.getBBox === 'function') bbox = imageEl.getBBox();
+  } catch (_) { /* ignore */ }
 
-  // Account for SVG <image> preserveAspectRatio (e.g. xMidYMid meet)
+  const x = (bbox && Number.isFinite(bbox.x)) ? bbox.x : (parseFloat(imageEl.getAttribute('x')) || 0);
+  const y = (bbox && Number.isFinite(bbox.y)) ? bbox.y : (parseFloat(imageEl.getAttribute('y')) || 0);
+  const destW = (bbox && bbox.width > 0) ? bbox.width : (parseFloat(imageEl.getAttribute('width')) || srcW);
+  const destH = (bbox && bbox.height > 0) ? bbox.height : (parseFloat(imageEl.getAttribute('height')) || srcH);
   const par = (imageEl.getAttribute('preserveAspectRatio') || 'xMidYMid meet').trim();
+
   let renderX = x;
   let renderY = y;
   let renderW = destW;
@@ -321,7 +330,31 @@ function getImagePlacement(imageEl, srcW, srcH) {
 
   const sx = renderW / srcW;
   const sy = renderH / srcH;
-  return { x: renderX, y: renderY, renderX, renderY, destW: renderW, destH: renderH, sx, sy, existing };
+
+  let matrix = null;
+  try {
+    const tfList = imageEl.transform?.baseVal;
+    if (tfList && tfList.numberOfItems > 0) {
+      matrix = tfList.consolidate().matrix;
+    }
+  } catch (_) { /* ignore */ }
+
+  const rnd = (v) => (roundcoords === -1 ? v : +Number(v).toFixed(roundcoords));
+
+  return function transformPoint(px, py) {
+    const lx = renderX + px * sx;
+    const ly = renderY + py * sy;
+    if (matrix) {
+      return {
+        x: rnd(matrix.a * lx + matrix.c * ly + matrix.e),
+        y: rnd(matrix.b * lx + matrix.d * ly + matrix.f),
+      };
+    }
+    return {
+      x: rnd(lx),
+      y: rnd(ly),
+    };
+  };
 }
 
 function ensureTraceDialog() {
@@ -568,10 +601,11 @@ function schedulePreview(dlg) {
 function insertTracedGroups(svgEditor, imageEl, payload, ui = null) {
   const sc = svgEditor.svgCanvas;
   const { tracedata, width: srcW, height: srcH, options } = payload;
-  const placement = getImagePlacement(imageEl, srcW, srcH);
+  const pointTransformer = makePointTransformer(imageEl, srcW, srcH, options.roundcoords);
   const activeUi = ui || (document.getElementById('visteras_trace_dialog') ? readUiFromDialog(document.getElementById('visteras_trace_dialog')) : {});
-  // Bake translation and scale directly into path d coordinates so pathedit anchor points line up 1:1 on canvas
-  const colorGroups = tracedataToColorGroups(tracedata, options, activeUi, placement);
+  // Bake translation, scale, and image transforms directly into path d coordinates
+  // so pathedit anchor points line up 1:1 with 0 offset on canvas
+  const colorGroups = tracedataToColorGroups(tracedata, options, activeUi, pointTransformer);
 
   const g = document.createElementNS(SVG_NS, 'g');
   g.setAttribute('id', sc.getNextId());
@@ -580,9 +614,6 @@ function insertTracedGroups(svgEditor, imageEl, payload, ui = null) {
   g.setAttribute('data-name', 'Traced');
   // inkscape-style label for layers panel if present
   try { g.setAttributeNS('http://www.inkscape.org/namespaces/inkscape', 'inkscape:label', 'Traced'); } catch (_) { /* ignore */ }
-  if (placement.existing && placement.existing.trim()) {
-    g.setAttribute('transform', placement.existing);
-  }
 
   colorGroups.forEach((cg) => {
     const cgEl = document.createElementNS(SVG_NS, 'g');
