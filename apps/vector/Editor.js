@@ -41271,6 +41271,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			e?.started && q.setStarted(!0);
 		});
 	}, Ay = (e) => {
+		return;
 		let t = q.getZoom(), { $id: n } = q;
 		if (!e.shiftKey) return;
 		e.preventDefault();
@@ -68615,16 +68616,67 @@ var fz = () => {
 		});
 		let o = null, s = null, c = !1, l = !1, u = "select";
 		pz("svgcanvas").addEventListener("mouseup", (e) => c === !1 ? !0 : (this.workarea.scrollLeft -= e.clientX - o, this.workarea.scrollTop -= e.clientY - s, o = e.clientX, s = e.clientY, e.type === "mouseup" && (c = !1), !1)), pz("svgcanvas").addEventListener("mousemove", (e) => c === !1 ? !0 : (this.workarea.scrollLeft -= e.clientX - o, this.workarea.scrollTop -= e.clientY - s, o = e.clientX, s = e.clientY, e.type === "mouseup" && (c = !1), !1)), pz("svgcanvas").addEventListener("mousedown", (e) => (this.enableToolCancel = !1, e.button === 1 || l === !0 ? (e.preventDefault(), c = !0, u = this.svgCanvas.getMode(), this.svgCanvas.setMode("ext-panning"), this.workarea.style.cursor = "grab", o = e.clientX, s = e.clientY, !1) : !0)), this.$container.addEventListener("wheel", (e) => {
-			e.ctrlKey && e.preventDefault();
-		}), window.addEventListener("mouseup", (e) => {
+			(e.ctrlKey || e.metaKey || e.altKey) && e.preventDefault();
+		}, { passive: false }), window.addEventListener("mouseup", (e) => {
 			this.enableToolCancel = !0, e.button === 1 && this.svgCanvas.setMode(u ?? "select"), c = !1;
 		}), this.workarea.addEventListener("dblclick", (e) => {
 			this.svgCanvas.getMode() === "ext-panning" && this.leftPanel.clickSelect();
 		}), document.addEventListener("keydown", (e) => {
 			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (this.svgCanvas.spaceKey = l = !0, e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
 		}), this.workarea.addEventListener("wheel", (e) => {
-			e.altKey && (e.preventDefault(), this.svgCanvas.setZoom(e.deltaY > 0 ? this.svgCanvas.getZoom() * .9 : this.svgCanvas.getZoom() * 1.1, !0), this.updateCanvas(!0), pz("zoom").value = (this.svgCanvas.getZoom() * 100).toFixed(1));
-		}), document.addEventListener("keyup", (e) => {
+			if (e.altKey) {
+				e.preventDefault();
+				let oldZoom = this.svgCanvas.getZoom();
+				let factor = e.deltaY < 0 ? 1.1 : 0.9;
+				if (Math.abs(e.deltaY) < 40) {
+					factor = Math.min(1.15, Math.max(0.85, 1 - e.deltaY * 0.003));
+				}
+				let newZoom = Math.min(30, Math.max(0.02, oldZoom * factor));
+				if (Math.abs(newZoom - oldZoom) >= 0.0001) {
+					let workareaRect = this.workarea.getBoundingClientRect();
+					let mx = e.clientX - workareaRect.left;
+					let my = e.clientY - workareaRect.top;
+					let svgcanvas = pz("svgcanvas");
+					let oldW = parseFloat(getComputedStyle(svgcanvas, null).width.replace("px", "")) || workareaRect.width;
+					let oldH = parseFloat(getComputedStyle(svgcanvas, null).height.replace("px", "")) || workareaRect.height;
+					let oldCanvasX = this.workarea.scrollLeft + mx;
+					let oldCanvasY = this.workarea.scrollTop + my;
+					let relX = oldCanvasX - oldW / 2;
+					let relY = oldCanvasY - oldH / 2;
+					let zoomRatio = newZoom / oldZoom;
+
+					this.svgCanvas.setZoom(newZoom);
+					pz("zoom").value = (newZoom * 100).toFixed(1);
+
+					let s = workareaRect.width;
+					let cv = workareaRect.height;
+					let exp = this.configObj.curConfig.canvas_expansion || 3;
+					let newW = Math.max(s, this.svgCanvas.contentW * newZoom * exp);
+					let newH = Math.max(cv, this.svgCanvas.contentH * newZoom * exp);
+
+					svgcanvas.style.width = newW + "px";
+					svgcanvas.style.height = newH + "px";
+
+					this.svgCanvas.updateCanvas(newW, newH);
+
+					let newCanvasX = newW / 2 + relX * zoomRatio;
+					let newCanvasY = newH / 2 + relY * zoomRatio;
+
+					this.workarea.scrollLeft = newCanvasX - mx;
+					this.workarea.scrollTop = newCanvasY - my;
+
+					if (this.configObj.curConfig.showRulers) {
+						this.rulers.updateRulers(svgcanvas, newZoom);
+					}
+					this.zoomDone();
+					this.svgCanvas.runExtensions("zoomChanged", newZoom);
+				}
+			} else if (e.ctrlKey || e.metaKey) {
+				e.preventDefault();
+				let delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+				this.workarea.scrollLeft += delta;
+			}
+		}, { passive: false }), document.addEventListener("keyup", (e) => {
 			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (this.svgCanvas.spaceKey = l = !1, this.svgCanvas.setMode(u === "ext-panning" ? "select" : u ?? "select"), e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
 		}), this.setPanning = (e) => {
 			this.svgCanvas.spaceKey = l = e;
