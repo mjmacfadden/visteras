@@ -1004,7 +1004,7 @@ elix-dialog {
    Studio-Parity Transform Controls & Selection Styling
    ========================================================================== */
 
-/* Main bounding box outline: solid thin #3f8ff7 line (matching Studio's 1px border) */
+/* Main bounding box outline: single solid 1px #3f8ff7 hairline line (matching Studio's 1px border) */
 #selectorParentGroup [id^="selectedBox"],
 #selectorGroup0 [id^="selectedBox"],
 [id^="selectedBox"] {
@@ -1015,32 +1015,26 @@ elix-dialog {
   vector-effect: non-scaling-stroke !important;
 }
 
-/* Transform resize handles: white fill with #3f8ff7 border (Studio parity) */
+/* Transform resize handles: square corner & midpoint handles (Studio parity) */
 #selectorParentGroup [id^="selectorGrip_resize_"],
 #selectorGripsGroup [id^="selectorGrip_resize_"],
 [id^="selectorGrip_resize_"] {
   fill: #ffffff !important;
   stroke: #3f8ff7 !important;
-  stroke-width: 1.5px !important;
-  r: 4px !important;
-}
-
-/* Rotate grip connector stem: solid thin #3f8ff7 */
-#selectorParentGroup #selectorGrip_rotateconnector,
-#selectorGrip_rotateconnector {
-  stroke: #3f8ff7 !important;
   stroke-width: 1px !important;
-  stroke-dasharray: none !important;
   vector-effect: non-scaling-stroke !important;
+  width: 7px !important;
+  height: 7px !important;
+  rx: 0px !important;
+  ry: 0px !important;
 }
 
-/* Rotate handle: white fill with #3f8ff7 border */
+/* Rotate handle and stem hidden to match Studio's clean 8-handle transform box */
+#selectorParentGroup #selectorGrip_rotateconnector,
+#selectorGrip_rotateconnector,
 #selectorParentGroup #selectorGrip_rotate,
 #selectorGrip_rotate {
-  fill: #ffffff !important;
-  stroke: #3f8ff7 !important;
-  stroke-width: 1.5px !important;
-  r: 4px !important;
+  display: none !important;
 }
 
 /* Rubberband drag selection box: #3f8ff7 with translucent blue tint */
@@ -1049,6 +1043,7 @@ elix-dialog {
   stroke-width: 1px !important;
   stroke-dasharray: none !important;
   fill: rgba(63, 143, 247, 0.15) !important;
+  vector-effect: non-scaling-stroke !important;
 }
 
 /* Type on Path attached source path styling & hover state */
@@ -1057,12 +1052,18 @@ elix-dialog {
   vector-effect: non-scaling-stroke !important;
 }
 
-.visteras-type-on-path-source.visteras-top-hovered,
-.visteras-type-on-path-source:hover {
+/* Only show hover outline when NOT currently selected to ensure single bounding box line */
+.visteras-type-on-path-source.visteras-top-hovered:not(.visteras-top-selected),
+.visteras-type-on-path-source:hover:not(.visteras-top-selected) {
   stroke: #3f8ff7 !important;
   stroke-width: 1px !important;
   fill: none !important;
   vector-effect: non-scaling-stroke !important;
+}
+
+.visteras-type-on-path-source.visteras-top-selected {
+  stroke: transparent !important;
+  fill: none !important;
 }
 
 /* Type on Path in-place blinking caret on curve */

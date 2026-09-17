@@ -277,6 +277,7 @@ function attachPathBBoxProxy(textEl, pathEl) {
  * Sets up hover styling on the path:
  * Path loses stroke and fill; when hovered (directly or via text hover),
  * it displays a thin 1px blue line (#3f8ff7 with vector-effect: non-scaling-stroke).
+ * When selected, the hover outline is suppressed so there is ONLY a single bounding box line.
  */
 function setupPathHoverEffects(pathEl, textEl) {
   if (!pathEl) return;
@@ -291,6 +292,7 @@ function setupPathHoverEffects(pathEl, textEl) {
   pathEl.setAttribute('data-visteras-top-source', '1');
 
   const onEnter = () => {
+    if (pathEl.classList.contains('visteras-top-selected')) return;
     pathEl.classList.add('visteras-top-hovered');
     pathEl.style.stroke = STUDIO_BLUE;
     pathEl.style.strokeWidth = '1px';
@@ -300,9 +302,11 @@ function setupPathHoverEffects(pathEl, textEl) {
 
   const onLeave = () => {
     pathEl.classList.remove('visteras-top-hovered');
-    pathEl.style.stroke = 'transparent';
-    pathEl.style.strokeWidth = '10px';
-    pathEl.style.fill = 'none';
+    if (!pathEl.classList.contains('visteras-top-selected')) {
+      pathEl.style.stroke = 'transparent';
+      pathEl.style.strokeWidth = '10px';
+      pathEl.style.fill = 'none';
+    }
   };
 
   pathEl.removeEventListener('pointerenter', pathEl._topEnter || onEnter);
@@ -887,17 +891,89 @@ function injectToolbarButton(svgEditor) {
 
 /**
  * Global hooks into SVG-Edit selectorManager and bounding box calculations
- * to enforce Studio-parity bounding box size matching the path itself.
+ * to enforce Studio-parity bounding box size matching the path itself,
+ * single-line outline, and 8 square corner & midpoint handles.
  */
 function hookSelectorManager(svgEditor) {
   const sc = svgEditor.svgCanvas;
   if (!sc) return;
 
   const sm = sc.selectorManager;
+  const HANDLE_SIZE = 7; // Studio handle size in screen px
+
+  const transformGripsToSquares = () => {
+    if (!sm || !sm.selectorGripsGroup) return;
+    const gripKeys = ['nw', 'ne', 'se', 'sw', 'n', 's', 'e', 'w'];
+    const dataStorage = (typeof sc.getDataStorage === 'function') ? sc.getDataStorage() : null;
+
+    gripKeys.forEach((k) => {
+      let existingGrip = sm.selectorGrips[k];
+      if (!existingGrip) return;
+
+      let rect = existingGrip;
+      if (existingGrip.nodeName.toLowerCase() !== 'rect') {
+        rect = document.createElementNS(SVG_NS, 'rect');
+        rect.id = existingGrip.id;
+        rect.setAttribute('width', String(HANDLE_SIZE));
+        rect.setAttribute('height', String(HANDLE_SIZE));
+        rect.setAttribute('fill', '#ffffff');
+        rect.setAttribute('stroke', '#3f8ff7');
+        rect.setAttribute('stroke-width', '1');
+        rect.setAttribute('vector-effect', 'non-scaling-stroke');
+        rect.setAttribute('style', `cursor:${k}-resize; pointer-events:all;`);
+
+        if (dataStorage) {
+          dataStorage.put(rect, 'dir', k);
+          dataStorage.put(rect, 'type', 'resize');
+        }
+
+        existingGrip.replaceWith(rect);
+        sm.selectorGrips[k] = rect;
+      }
+
+      if (!rect._visterasCenterHooked) {
+        rect._visterasCenterHooked = true;
+        const origSetAttr = rect.setAttribute.bind(rect);
+        rect.setAttribute = function(name, val) {
+          if (name === 'cx') {
+            const num = parseFloat(val);
+            origSetAttr('x', isNaN(num) ? val : String(num - HANDLE_SIZE / 2));
+          } else if (name === 'cy') {
+            const num = parseFloat(val);
+            origSetAttr('y', isNaN(num) ? val : String(num - HANDLE_SIZE / 2));
+          } else {
+            origSetAttr(name, val);
+          }
+        };
+      }
+    });
+
+    // Hide rotate connector stem and rotate circle grip (Studio parity: square handles only)
+    if (sm.rotateGripConnector) {
+      sm.rotateGripConnector.style.display = 'none';
+      sm.rotateGripConnector.setAttribute('display', 'none');
+    }
+    if (sm.rotateGrip) {
+      sm.rotateGrip.style.display = 'none';
+      sm.rotateGrip.setAttribute('display', 'none');
+    }
+  };
+
   if (sm && typeof sm.requestSelector === 'function' && !sm._visterasHooked) {
     sm._visterasHooked = true;
+    transformGripsToSquares();
+
+    const origInitGroup = sm.initGroup ? sm.initGroup.bind(sm) : null;
+    if (origInitGroup) {
+      sm.initGroup = function() {
+        origInitGroup();
+        transformGripsToSquares();
+      };
+    }
+
     const origRequestSelector = sm.requestSelector.bind(sm);
     sm.requestSelector = function(elem, bbox) {
+      transformGripsToSquares();
       if (elem && elem.nodeName === 'text' && (elem.hasAttribute(TOP_ATTR) || elem.querySelector('textPath'))) {
         const tp = elem.querySelector('textPath');
         if (tp) {
@@ -930,6 +1006,37 @@ function hookSelectorManager(svgEditor) {
 }
 
 /**
+ * Syncs selection state between textPath and attached source paths
+ * so that when selected, hover outlines are suppressed (single-line bounding box).
+ */
+function syncSelectionState(svgEditor) {
+  const sc = svgEditor.svgCanvas;
+  if (!sc) return;
+  const selectedElems = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements() : [];
+  const allSourcePaths = document.querySelectorAll('.visteras-type-on-path-source');
+  allSourcePaths.forEach((path) => {
+    path.classList.remove('visteras-top-selected', 'visteras-top-hovered');
+    path.style.stroke = 'transparent';
+    path.style.strokeWidth = '10px';
+  });
+
+  selectedElems.forEach((el) => {
+    if (!el) return;
+    const tp = el.querySelector ? el.querySelector('textPath') : null;
+    if (tp) {
+      const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+      const baseId = href.replace(/_rev$/, '');
+      const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
+      if (pathEl) {
+        pathEl.classList.add('visteras-top-selected');
+        pathEl.classList.remove('visteras-top-hovered');
+        pathEl.style.stroke = 'transparent';
+      }
+    }
+  });
+}
+
+/**
  * @param {{ svgEditor: any }} opts
  */
 export function mountVisterasTypeOnPath(opts = {}) {
@@ -959,6 +1066,7 @@ export function mountVisterasTypeOnPath(opts = {}) {
   const sc = svgEditor.svgCanvas;
   if (sc && typeof sc.bind === 'function') {
     sc.bind('selectedChanged', () => {
+      syncSelectionState(svgEditor);
       if (svgEditor._waitingForTypeOnPath) {
         const sel = getSelected(svgEditor);
         if (sel && isPathLike(sel)) {
@@ -969,7 +1077,10 @@ export function mountVisterasTypeOnPath(opts = {}) {
       }
       syncOptionsPanel(svgEditor);
     });
-    sc.bind('elementChanged', () => syncOptionsPanel(svgEditor));
+    sc.bind('elementChanged', () => {
+      syncSelectionState(svgEditor);
+      syncOptionsPanel(svgEditor);
+    });
   }
 
   if (svgEditor.topPanel && typeof svgEditor.topPanel.updateContextPanel === 'function') {
