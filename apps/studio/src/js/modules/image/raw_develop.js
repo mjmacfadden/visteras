@@ -1,16 +1,51 @@
 /**
- * Visteras Studio — Raw Develop (Camera Raw–style tone / white-balance panel).
+ * Visteras Studio — Raw Develop (Camera Raw–style modal).
  *
- * Not a RAW file decoder: develops the active raster layer with ACR-like
- * Temperature/Tint, Exposure, Contrast, Highlights/Shadows, Whites/Blacks,
- * Clarity, Vibrance, and Saturation. Client-side only with live preview.
+ * Develops the active raster layer (JPEG/PNG / any image layer) with ACR-like
+ * Basic + Presence controls in a large preview modal. Not a camera-file
+ * decoder; decode goes through libs/raw-source.js so LibRaw (etc.) can plug in later.
+ *
+ * UX inspired by Photoshop Camera Raw and pg0/raw-viewer — no code copied
+ * from raw-viewer (upstream has no LICENSE file as of this work).
  */
 import app from './../../app.js';
 import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import Dialog_class from './../../libs/popup.js';
 import ImageFilters_class from './../../libs/imagefilters.js';
+import Raw_source_registry from './../../libs/raw-source.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+
+var DEFAULTS = {
+	temperature: 0,
+	tint: 0,
+	exposure: 0,
+	contrast: 0,
+	highlights: 0,
+	shadows: 0,
+	whites: 0,
+	blacks: 0,
+	clarity: 0,
+	vibrance: 0,
+	saturation: 0,
+};
+
+var BASIC_SLIDERS = [
+	{ name: 'temperature', title: 'Temperature', min: -100, max: 100, step: 1 },
+	{ name: 'tint', title: 'Tint', min: -100, max: 100, step: 1 },
+	{ name: 'exposure', title: 'Exposure', min: -2, max: 2, step: 0.01 },
+	{ name: 'contrast', title: 'Contrast', min: -100, max: 100, step: 1 },
+	{ name: 'highlights', title: 'Highlights', min: -100, max: 100, step: 1 },
+	{ name: 'shadows', title: 'Shadows', min: -100, max: 100, step: 1 },
+	{ name: 'whites', title: 'Whites', min: -100, max: 100, step: 1 },
+	{ name: 'blacks', title: 'Blacks', min: -100, max: 100, step: 1 },
+];
+
+var PRESENCE_SLIDERS = [
+	{ name: 'clarity', title: 'Clarity', min: -100, max: 100, step: 1 },
+	{ name: 'vibrance', title: 'Vibrance', min: -100, max: 100, step: 1 },
+	{ name: 'saturation', title: 'Saturation', min: -100, max: 100, step: 1 },
+];
 
 class Image_rawDevelop_class {
 
@@ -18,60 +53,243 @@ class Image_rawDevelop_class {
 		this.POP = new Dialog_class();
 		this.Base_layers = new Base_layers_class();
 		this.ImageFilters = ImageFilters_class;
+		this._params = Object.assign({}, DEFAULTS);
+		this._source = null;
+		this._previewCanvas = null;
+		this._previewCtx = null;
+		this._previewBuffer = null;
+		this._previewSizeKey = '';
+		this._raf = 0;
+		this._root = null;
 	}
 
-	raw_develop() {
-		var _this = this;
-
+	async raw_develop() {
 		if (config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Convert it to raster to use Raw Develop.');
 			return;
 		}
 
-		var settings = {
+		try {
+			this._source = await Raw_source_registry.decode(config.layer, {
+				Base_layers: this.Base_layers,
+			});
+		}
+		catch (err) {
+			alertify.error((err && err.message) ? err.message : 'Could not load layer for Raw Develop.');
+			return;
+		}
+
+		this._params = Object.assign({}, DEFAULTS);
+		var _this = this;
+
+		this.POP.show({
 			title: 'Raw Develop',
-			preview: true,
-			on_change: function (params, canvas_preview, w, h, canvas) {
-				var img = this.layer_active_small_ctx.getImageData(0, 0, w, h);
-				var data = _this.develop(img, params);
-				canvas_preview.putImageData(data, 0, 0);
-			},
+			className: 'raw_develop_popup',
 			params: [
-				{ name: 'temperature', title: 'Temperature:', value: '0', range: [-100, 100] },
-				{ name: 'tint', title: 'Tint:', value: '0', range: [-100, 100] },
-				{},
-				{ name: 'exposure', title: 'Exposure:', value: '0', range: [-2, 2], step: 0.01 },
-				{ name: 'contrast', title: 'Contrast:', value: '0', range: [-100, 100] },
-				{ name: 'highlights', title: 'Highlights:', value: '0', range: [-100, 100] },
-				{ name: 'shadows', title: 'Shadows:', value: '0', range: [-100, 100] },
-				{ name: 'whites', title: 'Whites:', value: '0', range: [-100, 100] },
-				{ name: 'blacks', title: 'Blacks:', value: '0', range: [-100, 100] },
-				{},
-				{ name: 'clarity', title: 'Clarity:', value: '0', range: [-100, 100] },
-				{ name: 'vibrance', title: 'Vibrance:', value: '0', range: [-100, 100] },
-				{ name: 'saturation', title: 'Saturation:', value: '0', range: [-100, 100] },
+				{ html: this._build_html() },
 			],
-			on_finish: function (params) {
-				_this.save(params);
+			on_load: function () {
+				_this._bind_ui();
+				_this._schedule_preview();
 			},
-		};
-		this.POP.show(settings);
+			on_cancel: function () {
+				_this._teardown();
+			},
+		});
 	}
 
-	save(params) {
-		var canvas = this.Base_layers.convert_layer_to_canvas(null, true);
-		var ctx = canvas.getContext('2d');
-		var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-		var data = this.develop(img, params);
-		ctx.putImageData(data, 0, 0);
+	_build_html() {
+		var label = (this._source && this._source.label) ? this._source.label : 'Layer';
+		var dims = this._source
+			? (this._source.width + ' \u00d7 ' + this._source.height)
+			: '';
+
+		return '' +
+			'<div class="raw-develop" id="raw_develop_root">' +
+			'  <div class="raw-develop__header">' +
+			'    <div><span class="raw-develop__title">Raw Develop</span>' +
+			'      <span class="raw-develop__subtitle">' + escapeHtml(label) +
+			(dims ? ' \u00b7 ' + dims : '') + ' \u00b7 JPEG/PNG raster</span></div>' +
+			'    <div class="raw-develop__header-actions">' +
+			'      <button type="button" class="raw-develop__btn raw-develop__btn--ghost" data-raw-action="reset">Reset</button>' +
+			'      <button type="button" class="raw-develop__btn" data-raw-action="cancel">Cancel</button>' +
+			'      <button type="button" class="raw-develop__btn raw-develop__btn--primary" data-raw-action="apply">Apply</button>' +
+			'    </div>' +
+			'  </div>' +
+			'  <div class="raw-develop__body">' +
+			'    <div class="raw-develop__viewer"><canvas id="raw_develop_canvas"></canvas></div>' +
+			'    <aside class="raw-develop__sidebar">' +
+			'      <p class="raw-develop__hint">Double-click a slider to reset it. Camera RAW decode (LibRaw) can plug in later via the source adapter.</p>' +
+			this._panel_html('basic', 'Basic', BASIC_SLIDERS) +
+			this._panel_html('presence', 'Presence', PRESENCE_SLIDERS) +
+			'    </aside>' +
+			'  </div>' +
+			'</div>';
+	}
+
+	_panel_html(id, title, sliders) {
+		var body = sliders.map((s) => {
+			var val = this._params[s.name];
+			return '' +
+				'<div class="raw-develop__control" data-raw-control="' + s.name + '">' +
+				'  <label for="raw_' + s.name + '">' + s.title + '</label>' +
+				'  <input id="raw_' + s.name + '" type="range" name="' + s.name + '"' +
+				'    min="' + s.min + '" max="' + s.max + '" step="' + s.step + '" value="' + val + '"' +
+				'    data-default="' + DEFAULTS[s.name] + '" />' +
+				'  <output data-raw-output="' + s.name + '">' + formatVal(s.name, val) + '</output>' +
+				'</div>';
+		}).join('');
+
+		return '' +
+			'<section class="raw-develop__panel" data-raw-panel="' + id + '">' +
+			'  <button type="button" class="raw-develop__panel-toggle" data-raw-toggle="' + id + '">' + title + '</button>' +
+			'  <div class="raw-develop__panel-body">' + body + '</div>' +
+			'</section>';
+	}
+
+	_bind_ui() {
+		this._root = document.getElementById('raw_develop_root');
+		if (!this._root) return;
+
+		this._previewCanvas = document.getElementById('raw_develop_canvas');
+		this._previewCtx = this._previewCanvas.getContext('2d', { willReadFrequently: true });
+
+		this._root.querySelectorAll('input[type="range"]').forEach((input) => {
+			input.addEventListener('input', () => {
+				var name = input.name;
+				var value = parseFloat(input.value);
+				this._params[name] = value;
+				var out = this._root.querySelector('[data-raw-output="' + name + '"]');
+				if (out) out.textContent = formatVal(name, value);
+				this._schedule_preview();
+			});
+			input.addEventListener('dblclick', (e) => {
+				e.preventDefault();
+				var name = input.name;
+				var def = DEFAULTS[name];
+				input.value = String(def);
+				this._params[name] = def;
+				var out = this._root.querySelector('[data-raw-output="' + name + '"]');
+				if (out) out.textContent = formatVal(name, def);
+				this._schedule_preview();
+			});
+		});
+
+		this._root.querySelectorAll('[data-raw-toggle]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				var panel = btn.closest('.raw-develop__panel');
+				if (panel) panel.classList.toggle('is-collapsed');
+			});
+		});
+
+		this._root.querySelectorAll('[data-raw-action]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				var action = btn.getAttribute('data-raw-action');
+				if (action === 'apply') this._apply();
+				else if (action === 'cancel') this._cancel();
+				else if (action === 'reset') this._reset_all();
+			});
+		});
+	}
+
+	_reset_all() {
+		this._params = Object.assign({}, DEFAULTS);
+		if (!this._root) return;
+		this._root.querySelectorAll('input[type="range"]').forEach((input) => {
+			var def = DEFAULTS[input.name];
+			input.value = String(def);
+			var out = this._root.querySelector('[data-raw-output="' + input.name + '"]');
+			if (out) out.textContent = formatVal(input.name, def);
+		});
+		this._schedule_preview();
+	}
+
+	_schedule_preview() {
+		if (this._raf) cancelAnimationFrame(this._raf);
+		this._raf = requestAnimationFrame(() => {
+			this._raf = 0;
+			this._render_preview();
+		});
+	}
+
+	_render_preview() {
+		if (!this._source || !this._previewCanvas || !this._previewCtx) return;
+
+		var viewer = this._previewCanvas.parentElement;
+		var maxW = Math.max(320, (viewer && viewer.clientWidth) ? viewer.clientWidth - 24 : 800);
+		var maxH = Math.max(240, (viewer && viewer.clientHeight) ? viewer.clientHeight - 24 : 560);
+		var scale = Math.min(1, maxW / this._source.width, maxH / this._source.height);
+		var pw = Math.max(1, Math.round(this._source.width * scale));
+		var ph = Math.max(1, Math.round(this._source.height * scale));
+		var sizeKey = pw + 'x' + ph;
+
+		if (this._previewSizeKey !== sizeKey) {
+			this._previewCanvas.width = pw;
+			this._previewCanvas.height = ph;
+			var tmp = document.createElement('canvas');
+			tmp.width = pw;
+			tmp.height = ph;
+			var tctx = tmp.getContext('2d');
+			var full = document.createElement('canvas');
+			full.width = this._source.width;
+			full.height = this._source.height;
+			full.getContext('2d').putImageData(this._source.imageData, 0, 0);
+			tctx.drawImage(full, 0, 0, pw, ph);
+			this._previewBuffer = tctx.getImageData(0, 0, pw, ph);
+			this._previewSizeKey = sizeKey;
+		}
+
+		var working = cloneImageData(this._previewBuffer);
+		var developed = this.develop(working, this._params);
+		if (!(developed instanceof ImageData)) {
+			console.error('Raw Develop preview: develop() must return ImageData');
+			return;
+		}
+		this._previewCtx.putImageData(developed, 0, 0);
+	}
+
+	_apply() {
+		if (!this._source) return;
+
+		var working = cloneImageData(this._source.imageData);
+		var developed = this.develop(working, this._params);
+		if (!(developed instanceof ImageData)) {
+			alertify.error('Raw Develop failed to produce image data.');
+			return;
+		}
+
+		// Preserve exact layer pixel dimensions (fixes prior resize-on-apply bug).
+		var canvas = document.createElement('canvas');
+		canvas.width = this._source.width;
+		canvas.height = this._source.height;
+		canvas.getContext('2d').putImageData(developed, 0, 0);
 
 		app.State.do_action(
 			new app.Actions.Update_layer_image_action(canvas)
 		);
+
+		this._teardown();
+		try { this.POP.hide(true); } catch (e) { /* ignore */ }
+	}
+
+	_cancel() {
+		this._teardown();
+		try { this.POP.hide(false); } catch (e) { /* ignore */ }
+	}
+
+	_teardown() {
+		if (this._raf) cancelAnimationFrame(this._raf);
+		this._raf = 0;
+		this._source = null;
+		this._previewBuffer = null;
+		this._previewSizeKey = '';
+		this._previewCanvas = null;
+		this._previewCtx = null;
+		this._root = null;
 	}
 
 	/**
-	 * ACR-inspired develop on ImageData. Returns the same buffer.
+	 * ACR-inspired develop. Always returns ImageData.
 	 */
 	develop(imageData, params) {
 		var temperature = parseFloat(params.temperature) || 0;
@@ -108,17 +326,14 @@ class Image_rawDevelop_class {
 			var g = d[i + 1] / 255;
 			var b = d[i + 2] / 255;
 
-			// White balance
 			r = clamp01(r * gainR);
 			g = clamp01(g * gainG);
 			b = clamp01(b * gainB);
 
-			// Exposure
 			r = clamp01(r * expMul);
 			g = clamp01(g * expMul);
 			b = clamp01(b * expMul);
 
-			// Contrast
 			if (contrast !== 0) {
 				r = clamp01(contrastFactor * (r - 0.5) + 0.5);
 				g = clamp01(contrastFactor * (g - 0.5) + 0.5);
@@ -127,7 +342,6 @@ class Image_rawDevelop_class {
 
 			var y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-			// Highlights / Shadows
 			if (hiAmt !== 0 || shAmt !== 0) {
 				var hiW = smoothstep(0.45, 1.0, y);
 				var shW = 1 - smoothstep(0.0, 0.55, y);
@@ -138,7 +352,6 @@ class Image_rawDevelop_class {
 				y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 			}
 
-			// Whites / Blacks
 			if (whAmt !== 0 || blAmt !== 0) {
 				var whitePivot = 1 - whAmt * 0.25;
 				var blackPivot = blAmt * 0.25;
@@ -149,7 +362,6 @@ class Image_rawDevelop_class {
 				y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 			}
 
-			// Vibrance + Saturation
 			if (vibrance !== 0 || saturation !== 0) {
 				var maxc = Math.max(r, g, b);
 				var minc = Math.min(r, g, b);
@@ -167,29 +379,78 @@ class Image_rawDevelop_class {
 			d[i + 2] = Math.round(b * 255);
 		}
 
-		// Clarity ≈ unsharp (positive) or slight blur (negative)
 		if (clarity !== 0) {
-			var amount = Math.abs(clarity) / 100 * 1.2;
-			if (clarity > 0) {
-				return this.ImageFilters.UnsharpMask(imageData, amount);
-			}
-			if (typeof this.ImageFilters.GaussianBlur === 'function') {
-				return this.ImageFilters.GaussianBlur(imageData, Math.max(0.5, amount * 1.5));
-			}
+			return applyClarity(imageData, clarity, this.ImageFilters);
 		}
 
 		return imageData;
 	}
+}
 
+/**
+ * Clarity without depending on the empty UnsharpMask stub in imagefilters.js.
+ * Positive: unsharp via (original + amount * (original - blur)).
+ * Negative: light Gaussian blur when available.
+ */
+function applyClarity(imageData, clarity, ImageFilters) {
+	var amount = Math.abs(clarity) / 100;
+	if (clarity < 0) {
+		if (ImageFilters && typeof ImageFilters.GaussianBlur === 'function') {
+			var strength = amount > 0.66 ? 3 : (amount > 0.33 ? 2 : 1);
+			var blurred = ImageFilters.GaussianBlur(imageData, strength);
+			if (blurred instanceof ImageData) return blurred;
+		}
+		return imageData;
+	}
+
+	if (!ImageFilters || typeof ImageFilters.GaussianBlur !== 'function') {
+		return imageData;
+	}
+	var soft = ImageFilters.GaussianBlur(cloneImageData(imageData), 2);
+	if (!(soft instanceof ImageData)) return imageData;
+
+	var src = imageData.data;
+	var blur = soft.data;
+	var out = cloneImageData(imageData);
+	var dst = out.data;
+	var amp = amount * 1.35;
+	for (var i = 0; i < src.length; i += 4) {
+		if (src[i + 3] === 0) continue;
+		dst[i] = clampByte(src[i] + amp * (src[i] - blur[i]));
+		dst[i + 1] = clampByte(src[i + 1] + amp * (src[i + 1] - blur[i + 1]));
+		dst[i + 2] = clampByte(src[i + 2] + amp * (src[i + 2] - blur[i + 2]));
+	}
+	return out;
+}
+
+function cloneImageData(src) {
+	return new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
 }
 
 function clamp01(v) {
 	return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
+function clampByte(v) {
+	return v < 0 ? 0 : v > 255 ? 255 : Math.round(v);
+}
+
 function smoothstep(edge0, edge1, x) {
 	var t = clamp01((x - edge0) / (edge1 - edge0));
 	return t * t * (3 - 2 * t);
+}
+
+function formatVal(name, value) {
+	if (name === 'exposure') return (Math.round(value * 100) / 100).toFixed(2);
+	return String(Math.round(value * 100) / 100);
+}
+
+function escapeHtml(str) {
+	return String(str)
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
 }
 
 export default Image_rawDevelop_class;
