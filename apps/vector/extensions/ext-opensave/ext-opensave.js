@@ -103,13 +103,22 @@ var ext_opensave_default = {
 								width: imageWidth,
 								height: imageHeight,
 								id: this.svgCanvas.getNextId(),
-								style: "pointer-events:inherit"
+								style: "pointer-events:inherit",
+								preserveAspectRatio: "xMidYMid meet"
 							}
 						});
 						this.svgCanvas.setHref(newImage, result);
 						this.svgCanvas.selectOnly([newImage]);
 						this.svgCanvas.alignSelectedElements("m", "page");
 						this.svgCanvas.alignSelectedElements("c", "page");
+						// Visteras: treat dropped/imported rasters as reference images
+						if (typeof window.__visterasAfterPlaceReference === "function") {
+							window.__visterasAfterPlaceReference(newImage);
+						} else {
+							newImage.classList.add("visteras-reference");
+							newImage.setAttribute("data-visteras-reference", "1");
+							newImage.setAttribute("opacity", "0.5");
+						}
 						this.topPanel.updateContextPanel();
 						$id("se-prompt-dialog").setAttribute("close", true);
 						resetFileInput();

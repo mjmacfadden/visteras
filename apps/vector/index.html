@@ -43,6 +43,7 @@
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_new">New Document <span class="menu_dropdown_shortcut">⌘N</span></div>
             <div class="menu_dropdown_item" id="action_open">Open SVG... <span class="menu_dropdown_shortcut">⌘O</span></div>
+            <div class="menu_dropdown_item" id="action_place_reference">Place Reference Image…</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_save">Save SVG <span class="menu_dropdown_shortcut">⌘S</span></div>
             <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
@@ -85,6 +86,8 @@
             <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R</span></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">⌘Y</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_source">View SVG Source... <span class="menu_dropdown_shortcut">⌘U</span></div>
           </div>
@@ -160,6 +163,7 @@
     import Editor from './Editor.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
+    import { mountVisterasReferenceImages } from './js/visteras-reference-images.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1512,6 +1516,9 @@
     // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
     mountVisterasFontPicker({ svgEditor });
     mountVisterasTypeOnPath({ svgEditor });
+
+    // Reference raster images (place / move / scale — no pixel editing)
+    mountVisterasReferenceImages({ svgEditor });
   </script>
 </body>
 </html>
