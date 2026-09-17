@@ -6,16 +6,17 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const TOP_ATTR = 'data-visteras-type-on-path';
 const TOP_CLASS = 'visteras-type-on-path';
+const STUDIO_BLUE = '#3f8ff7';
 
-function showToast(message, ms = 3500) {
+function showToast(message, ms = 3000) {
   let el = document.getElementById('visteras_top_toast');
   if (!el) {
     el = document.createElement('div');
     el.id = 'visteras_top_toast';
     el.style.cssText = [
       'position:fixed', 'bottom:48px', 'left:50%', 'transform:translateX(-50%)',
-      'z-index:99999', 'max-width:min(440px,90vw)', 'padding:10px 14px',
-      'background:#1e1e1e', 'color:#eee', 'border:1px solid #fa7c1b',
+      'z-index:99999', 'max-width:min(440px,90vw)', 'padding:9px 14px',
+      'background:#1e1e1e', 'color:#eee', 'border:1px solid #3f8ff7',
       'border-radius:6px', 'font-size:12px', 'line-height:1.4',
       'box-shadow:0 8px 24px rgba(0,0,0,0.45)', 'pointer-events:none',
     ].join(';');
@@ -90,8 +91,6 @@ function getDefs(sc) {
 
 /**
  * Convert any SVG geometry element to a standard path "d" attribute.
- * Required because browser <textPath> implementations (WebKit/Blink)
- * strictly require <path> elements as targets.
  */
 function shapeToPathD(el) {
   if (!el) return null;
@@ -118,7 +117,6 @@ function shapeToPathD(el) {
     const rx = tag === 'circle' ? (parseFloat(el.getAttribute('r')) || 0) : (parseFloat(el.getAttribute('rx')) || 0);
     const ry = tag === 'circle' ? rx : (parseFloat(el.getAttribute('ry')) || 0);
     if (rx <= 0 || ry <= 0) return null;
-    // Clockwise circle/ellipse starting from top (12 o'clock)
     return `M ${cx} ${cy - ry} A ${rx} ${ry} 0 1 1 ${cx} ${cy + ry} A ${rx} ${ry} 0 1 1 ${cx} ${cy - ry}`;
   }
   if (tag === 'rect') {
@@ -205,10 +203,6 @@ function setTextPathHref(tp, id) {
   tp.setAttributeNS(XLINK_NS, 'xlink:href', `#${id}`);
 }
 
-/**
- * Ensures the target element is a genuine <path> element, converting or cloning
- * basic shapes into <path> elements so SVG browsers render textPath visibly.
- */
 function ensurePathElement(svgEditor, shapeEl) {
   const sc = svgEditor.svgCanvas;
   if (shapeEl.nodeName.toLowerCase() === 'path') {
@@ -244,6 +238,182 @@ function ensurePathElement(svgEditor, shapeEl) {
   }
 
   return shapeEl;
+}
+
+/**
+ * Attaches a getBBox proxy to the text element so its bounding box
+ * matches the exact bounding box of the underlying path (never larger).
+ */
+function attachPathBBoxProxy(textEl, pathEl) {
+  if (!textEl || !pathEl) return;
+  const origGetBBox = textEl.getBBox.bind(textEl);
+  textEl._origGetBBox = origGetBBox;
+  textEl.getBBox = function() {
+    try {
+      if (pathEl && typeof pathEl.getBBox === 'function') {
+        const pb = pathEl.getBBox();
+        if (pb && pb.width > 0 && pb.height > 0) {
+          return {
+            x: pb.x,
+            y: pb.y,
+            width: pb.width,
+            height: pb.height,
+            top: pb.y,
+            bottom: pb.y + pb.height,
+            left: pb.x,
+            right: pb.x + pb.width,
+          };
+        }
+      }
+    } catch (_) {}
+    return origGetBBox();
+  };
+}
+
+/**
+ * Sets up hover styling on the path:
+ * Path loses stroke and fill; when hovered (directly or via text hover),
+ * it displays a thin 1px blue line (#3f8ff7, matching Studio's transform line).
+ */
+function setupPathHoverEffects(pathEl, textEl) {
+  if (!pathEl) return;
+
+  // Make the path unfilled and unstroked (transparent with 10px hit area for easy hover)
+  pathEl.setAttribute('fill', 'none');
+  pathEl.setAttribute('stroke', 'transparent');
+  pathEl.setAttribute('stroke-width', '10');
+  pathEl.setAttribute('pointer-events', 'stroke');
+  pathEl.classList.add('visteras-type-on-path-source');
+  pathEl.setAttribute('data-visteras-top-source', '1');
+
+  const onEnter = () => {
+    pathEl.classList.add('visteras-top-hovered');
+    pathEl.setAttribute('stroke', STUDIO_BLUE);
+    pathEl.setAttribute('stroke-width', '1');
+  };
+
+  const onLeave = () => {
+    pathEl.classList.remove('visteras-top-hovered');
+    pathEl.setAttribute('stroke', 'transparent');
+    pathEl.setAttribute('stroke-width', '10');
+  };
+
+  pathEl.removeEventListener('pointerenter', pathEl._topEnter || onEnter);
+  pathEl.removeEventListener('pointerleave', pathEl._topLeave || onLeave);
+  pathEl._topEnter = onEnter;
+  pathEl._topLeave = onLeave;
+  pathEl.addEventListener('pointerenter', onEnter);
+  pathEl.addEventListener('pointerleave', onLeave);
+
+  if (textEl) {
+    textEl.removeEventListener('pointerenter', textEl._topEnter || onEnter);
+    textEl.removeEventListener('pointerleave', textEl._topLeave || onLeave);
+    textEl._topEnter = onEnter;
+    textEl._topLeave = onLeave;
+    textEl.addEventListener('pointerenter', onEnter);
+    textEl.addEventListener('pointerleave', onLeave);
+  }
+}
+
+/**
+ * Interactive Artboard Text Editor:
+ * Allows inline editing directly on the artboard without properties panel inputs.
+ */
+export function openArtboardTextEditor(svgEditor, textEl) {
+  const tp = textEl.querySelector('textPath');
+  if (!tp) return;
+
+  // Remove existing active editor if any
+  let editor = document.getElementById('visteras_artboard_text_editor');
+  if (editor) editor.remove();
+
+  const workarea = svgEditor.workarea || document.getElementById('workarea');
+  if (!workarea) return;
+
+  const sc = svgEditor.svgCanvas;
+  const zoom = (typeof sc.getZoom === 'function') ? sc.getZoom() : 1;
+  const fontFam = textEl.getAttribute('font-family') || 'sans-serif';
+  const fontSize = (parseFloat(textEl.getAttribute('font-size')) || 24) * zoom;
+  const fillColor = textEl.getAttribute('fill') || '#ffffff';
+
+  editor = document.createElement('input');
+  editor.id = 'visteras_artboard_text_editor';
+  editor.type = 'text';
+  editor.value = tp.textContent || '';
+  editor.placeholder = 'Type text…';
+  editor.spellcheck = false;
+
+  // Compute position on canvas
+  const bbox = textEl.getBBox();
+  const root = sc.getContentElem() || document.getElementById('svgcontent');
+  const ctm = textEl.getScreenCTM ? textEl.getScreenCTM() : root.getScreenCTM();
+  const workareaRect = workarea.getBoundingClientRect();
+
+  let left = 60;
+  let top = 60;
+  if (ctm && bbox) {
+    const pt = root.createSVGPoint ? root.createSVGPoint() : document.createElementNS(SVG_NS, 'svg').createSVGPoint();
+    pt.x = bbox.x;
+    pt.y = bbox.y;
+    const screenPt = pt.matrixTransform(ctm);
+    left = screenPt.x - workareaRect.left + workarea.scrollLeft;
+    top = screenPt.y - workareaRect.top + workarea.scrollTop - fontSize - 14;
+  }
+
+  left = Math.max(12, left);
+  top = Math.max(12, top);
+
+  editor.style.cssText = [
+    'position:absolute',
+    `left:${Math.round(left)}px`,
+    `top:${Math.round(top)}px`,
+    'z-index:99999',
+    'min-width:160px',
+    'max-width:550px',
+    `height:${Math.max(30, Math.round(fontSize + 10))}px`,
+    `font-family:${fontFam}`,
+    `font-size:${Math.round(fontSize)}px`,
+    `color:${fillColor === '#000000' || fillColor === '#000' ? '#ffffff' : fillColor}`,
+    'background:rgba(26, 26, 26, 0.94)',
+    `border:1.5px solid ${STUDIO_BLUE}`,
+    'border-radius:5px',
+    'padding:2px 10px',
+    'box-shadow:0 4px 20px rgba(0, 0, 0, 0.65)',
+    'outline:none',
+    'box-sizing:border-box',
+  ].join(';');
+
+  const commitAndClose = () => {
+    if (!editor.parentNode) return;
+    const finalVal = editor.value.trim() || 'Type on path';
+    tp.textContent = finalVal;
+    editor.remove();
+    sc.call?.('changed', [textEl]);
+    sc.clearSelection();
+    sc.addToSelection([textEl], true);
+    sc.call?.('selected', [textEl]);
+  };
+
+  editor.addEventListener('input', () => {
+    tp.textContent = editor.value;
+    editor.style.width = Math.max(160, Math.min(650, editor.value.length * (fontSize * 0.65) + 36)) + 'px';
+  });
+
+  editor.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      commitAndClose();
+    }
+  });
+
+  editor.addEventListener('blur', () => {
+    setTimeout(commitAndClose, 120);
+  });
+
+  workarea.appendChild(editor);
+  editor.select();
+  editor.focus();
 }
 
 function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
@@ -291,11 +461,17 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   if (shapeEl.nextSibling) parent.insertBefore(text, shapeEl.nextSibling);
   else parent.appendChild(text);
 
+  // Requirement: The path loses its stroke and fill, and displays a thin blue line on hover
+  setupPathHoverEffects(pathEl, text);
+
+  // Requirement: Bounding box around text should be as large as the path itself, not larger
+  attachPathBBoxProxy(text, pathEl);
+
   if (sc.history?.InsertElementCommand && typeof sc.addCommandToHistory === 'function') {
     try { sc.addCommandToHistory(new sc.history.InsertElementCommand(text)); } catch (_) {}
   }
 
-  // Register selection and trigger SVG-Edit selection events
+  // Register selection in SVG-Edit
   sc.clearSelection();
   sc.addToSelection([text], true);
   if (typeof sc.call === 'function') {
@@ -306,6 +482,12 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
     window.__updatePropertiesVisibility();
   }
   syncOptionsPanel(svgEditor);
+
+  // Requirement: Editable directly on the artboard right after creation
+  setTimeout(() => {
+    openArtboardTextEditor(svgEditor, text);
+  }, 50);
+
   return text;
 }
 
@@ -322,60 +504,18 @@ function isTypeOnPathText(el) {
 }
 
 function ensureOptionsPanel() {
-  let panel = document.getElementById('sec_type_on_path');
-  if (panel) return panel;
-
-  panel = document.getElementById('visteras_top_options');
-  if (panel) return panel;
-
-  panel = document.createElement('div');
-  panel.id = 'visteras_top_options';
-  panel.style.cssText = [
-    'display:none', 'padding:8px 10px', 'border-top:1px solid #333',
-    'background:#2a2a2a', 'font-size:11px', 'color:#ccc',
-  ].join(';');
-  panel.innerHTML = `
-    <div style="font-size:11px;font-weight:600;color:#fa7c1b;margin-bottom:6px;">Type on Path</div>
-    <label style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
-      <span>Text</span>
-      <input id="top_text_content" type="text" style="height:26px;background:#1e1e1e;border:1px solid #555;color:#eee;border-radius:4px;padding:0 8px;" />
-    </label>
-    <label style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
-      <span>Start offset <span id="top_offset_val">0%</span></span>
-      <input id="top_offset" type="range" min="0" max="100" value="0" style="width:100%;accent-color:#fa7c1b;" />
-    </label>
-    <label style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px;">
-      <span>Align</span>
-      <select id="top_align" style="height:26px;background:#1e1e1e;border:1px solid #555;color:#eee;border-radius:4px;">
-        <option value="start">Start</option>
-        <option value="middle">Center</option>
-        <option value="end">End</option>
-      </select>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer;">
-      <input type="checkbox" id="top_reverse" style="accent-color:#fa7c1b;" /> Reverse path direction
-    </label>
-  `;
-  const props = document.getElementById('prop_active_container')
-    || document.querySelector('#properties_panel, .properties_panel, #panels');
-  if (props) props.appendChild(panel);
-  else document.body.appendChild(panel);
-  return panel;
+  return document.getElementById('sec_type_on_path');
 }
 
 function syncOptionsPanel(svgEditor) {
   const panel = ensureOptionsPanel();
+  if (!panel) return;
   const el = getSelected(svgEditor);
   const tp = findTextPath(el);
   const on = !!(tp && isTypeOnPathText(tp.parentElement || el));
 
   panel.style.display = on ? 'block' : 'none';
   if (!on || !tp) return;
-
-  const textInput = panel.querySelector('#top_text_content');
-  if (textInput && document.activeElement !== textInput) {
-    textInput.value = tp.textContent || '';
-  }
 
   const so = tp.getAttribute('startOffset') || '0%';
   const pct = Math.max(0, Math.min(100, parseFloat(String(so).replace('%', '')) || 0));
@@ -399,31 +539,13 @@ function syncOptionsPanel(svgEditor) {
 
 function wireOptionsPanel(svgEditor) {
   const panel = ensureOptionsPanel();
-  if (panel.dataset.wired === '1') return;
+  if (!panel || panel.dataset.wired === '1') return;
   panel.dataset.wired = '1';
 
-  const textInput = panel.querySelector('#top_text_content');
   const offsetSlider = panel.querySelector('#top_offset');
   const offsetVal = panel.querySelector('#top_offset_val');
   const alignSelect = panel.querySelector('#top_align');
   const reverseCheck = panel.querySelector('#top_reverse');
-
-  const applyText = () => {
-    const tp = findTextPath(getSelected(svgEditor));
-    if (!tp || !textInput) return;
-    tp.textContent = textInput.value;
-    svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
-  };
-
-  textInput?.addEventListener('input', () => {
-    const tp = findTextPath(getSelected(svgEditor));
-    if (!tp) return;
-    tp.textContent = textInput.value;
-  });
-  textInput?.addEventListener('change', applyText);
-  textInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') applyText();
-  });
 
   offsetSlider?.addEventListener('input', (e) => {
     const tp = findTextPath(getSelected(svgEditor));
@@ -490,7 +612,6 @@ function disarmTypeOnPathMode(svgEditor) {
 }
 
 function armTypeOnPathMode(svgEditor) {
-  // If already waiting, toggle off
   if (svgEditor._waitingForTypeOnPath) {
     disarmTypeOnPathMode(svgEditor);
     showToast('Type on Path cancelled.');
@@ -500,31 +621,26 @@ function armTypeOnPathMode(svgEditor) {
   const selected = getSelected(svgEditor);
   if (selected && isPathLike(selected) && !svgEditor.multiselected) {
     createTypeOnPath(svgEditor, selected);
-    showToast('Text on path created. Edit content in Properties.');
     return;
   }
 
   if (selected && isTypeOnPathText(selected)) {
-    showToast('Type on Path is selected. Edit content in Properties.');
-    syncOptionsPanel(svgEditor);
+    openArtboardTextEditor(svgEditor, selected);
     return;
   }
 
   svgEditor._waitingForTypeOnPath = true;
   const btn = document.getElementById('tool_type_on_path');
   if (btn) btn.setAttribute('pressed', 'true');
-  showToast('Click a path or shape to place text on it.');
+  showToast('Click a path or shape to place type on it.');
 
-  const sc = svgEditor.svgCanvas;
   const onPointerDown = (evt) => {
     if (!svgEditor._waitingForTypeOnPath) return;
 
-    // Ignore clicks on UI chrome
     if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) {
       return;
     }
 
-    // Inspect elements under pointer
     let target = null;
     const elements = document.elementsFromPoint(evt.clientX, evt.clientY);
     for (const el of elements) {
@@ -546,14 +662,12 @@ function armTypeOnPathMode(svgEditor) {
       evt.stopPropagation();
       disarmTypeOnPathMode(svgEditor);
       createTypeOnPath(svgEditor, target);
-      showToast('Text on path created. Edit content in Properties.');
     }
   };
 
   svgEditor._topPointerDownHandler = onPointerDown;
   window.addEventListener('pointerdown', onPointerDown, true);
 
-  // Fallback: If user hits Escape, cancel
   const onKeyDown = (e) => {
     if (e.key === 'Escape' && svgEditor._waitingForTypeOnPath) {
       disarmTypeOnPathMode(svgEditor);
@@ -562,38 +676,6 @@ function armTypeOnPathMode(svgEditor) {
     }
   };
   window.addEventListener('keydown', onKeyDown);
-}
-
-function injectTextMenu() {
-  if (document.getElementById('menu_text')) return;
-  const help = document.getElementById('menu_help');
-  const entry = document.createElement('div');
-  entry.className = 'menu_entry';
-  entry.id = 'menu_text';
-  entry.innerHTML = `
-    <div class="menu_entry_title">Text</div>
-    <div class="menu_dropdown_list">
-      <div class="menu_dropdown_item" id="action_type_on_path" title="Place editable text along a path">Type on Path…</div>
-    </div>
-  `;
-  if (help?.parentNode) help.parentNode.insertBefore(entry, help);
-  else document.querySelector('.menu_bar, .menu_left, nav')?.appendChild(entry);
-}
-
-function injectObjectMenuItem(svgEditor) {
-  if (document.getElementById('action_type_on_path_object')) return;
-  const flip = document.getElementById('action_flip_v');
-  if (!flip?.parentNode) return;
-  const sep = document.createElement('div');
-  sep.className = 'menu_dropdown_separator';
-  const item = document.createElement('div');
-  item.className = 'menu_dropdown_item';
-  item.id = 'action_type_on_path_object';
-  item.title = 'Place editable text along a path';
-  item.textContent = 'Type on Path…';
-  flip.parentNode.insertBefore(sep, flip.nextSibling);
-  flip.parentNode.insertBefore(item, sep.nextSibling);
-  item.addEventListener('click', () => armTypeOnPathMode(svgEditor));
 }
 
 function injectToolbarButton(svgEditor) {
@@ -616,22 +698,64 @@ function injectToolbarButton(svgEditor) {
 }
 
 /**
+ * Global hooks into SVG-Edit selectorManager and bounding box calculations
+ * to enforce Studio-parity bounding box size matching the path itself.
+ */
+function hookSelectorManager(svgEditor) {
+  const sc = svgEditor.svgCanvas;
+  if (!sc) return;
+
+  const sm = sc.selectorManager;
+  if (sm && typeof sm.requestSelector === 'function' && !sm._visterasHooked) {
+    sm._visterasHooked = true;
+    const origRequestSelector = sm.requestSelector.bind(sm);
+    sm.requestSelector = function(elem, bbox) {
+      if (elem && elem.nodeName === 'text' && (elem.hasAttribute(TOP_ATTR) || elem.querySelector('textPath'))) {
+        const tp = elem.querySelector('textPath');
+        if (tp) {
+          const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+          const baseId = href.replace(/_rev$/, '');
+          const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
+          if (pathEl && typeof pathEl.getBBox === 'function') {
+            const pb = pathEl.getBBox();
+            if (pb && pb.width > 0 && pb.height > 0) {
+              bbox = { x: pb.x, y: pb.y, width: pb.width, height: pb.height };
+              attachPathBBoxProxy(elem, pathEl);
+            }
+          }
+        }
+      }
+      return origRequestSelector(elem, bbox);
+    };
+  }
+
+  // Intercept double-click on artboard to open on-artboard text editor
+  window.addEventListener('dblclick', (evt) => {
+    const target = evt.target;
+    const textEl = target?.closest?.(`text.${TOP_CLASS}, text[${TOP_ATTR}]`);
+    if (textEl) {
+      evt.preventDefault();
+      evt.stopPropagation();
+      openArtboardTextEditor(svgEditor, textEl);
+    }
+  }, true);
+}
+
+/**
  * @param {{ svgEditor: any }} opts
  */
 export function mountVisterasTypeOnPath(opts = {}) {
   const svgEditor = opts.svgEditor;
   if (!svgEditor) return;
 
-  injectTextMenu();
-  injectObjectMenuItem(svgEditor);
-
-  // SVG-Edit populates tools asynchronously
+  // Toolbar button insertion
   const tryToolbar = () => injectToolbarButton(svgEditor);
   tryToolbar();
   setTimeout(tryToolbar, 100);
   setTimeout(tryToolbar, 500);
 
   wireOptionsPanel(svgEditor);
+  hookSelectorManager(svgEditor);
 
   document.getElementById('action_type_on_path')?.addEventListener('click', () => {
     armTypeOnPathMode(svgEditor);
@@ -652,7 +776,6 @@ export function mountVisterasTypeOnPath(opts = {}) {
         if (sel && isPathLike(sel)) {
           disarmTypeOnPathMode(svgEditor);
           createTypeOnPath(svgEditor, sel);
-          showToast('Text on path created. Edit content in Properties.');
           return;
         }
       }

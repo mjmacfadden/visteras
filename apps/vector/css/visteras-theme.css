@@ -999,3 +999,68 @@ elix-dialog {
 #tools_top .text_panel se-button {
   color: #cccccc;
 }
+
+/* ==========================================================================
+   Studio-Parity Transform Controls & Selection Styling
+   ========================================================================== */
+
+/* Main bounding box outline: solid thin #3f8ff7 line (matching Studio's 1px border) */
+#selectorParentGroup [id^="selectedBox"],
+#selectorGroup0 [id^="selectedBox"],
+[id^="selectedBox"] {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  stroke-dasharray: none !important;
+  fill: none !important;
+  vector-effect: non-scaling-stroke !important;
+}
+
+/* Transform resize handles: white fill with #3f8ff7 border (Studio parity) */
+#selectorParentGroup [id^="selectorGrip_resize_"],
+#selectorGripsGroup [id^="selectorGrip_resize_"],
+[id^="selectorGrip_resize_"] {
+  fill: #ffffff !important;
+  stroke: #3f8ff7 !important;
+  stroke-width: 1.5px !important;
+  r: 4px !important;
+}
+
+/* Rotate grip connector stem: solid thin #3f8ff7 */
+#selectorParentGroup #selectorGrip_rotateconnector,
+#selectorGrip_rotateconnector {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  stroke-dasharray: none !important;
+  vector-effect: non-scaling-stroke !important;
+}
+
+/* Rotate handle: white fill with #3f8ff7 border */
+#selectorParentGroup #selectorGrip_rotate,
+#selectorGrip_rotate {
+  fill: #ffffff !important;
+  stroke: #3f8ff7 !important;
+  stroke-width: 1.5px !important;
+  r: 4px !important;
+}
+
+/* Rubberband drag selection box: #3f8ff7 with translucent blue tint */
+#selectorRubberBand {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  stroke-dasharray: none !important;
+  fill: rgba(63, 143, 247, 0.15) !important;
+}
+
+/* Type on Path attached source path styling & hover state */
+.visteras-type-on-path-source {
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.visteras-type-on-path-source.visteras-top-hovered,
+.visteras-type-on-path-source:hover {
+  stroke: #3f8ff7 !important;
+  stroke-width: 1px !important;
+  fill: none !important;
+  vector-effect: non-scaling-stroke !important;
+}
+
