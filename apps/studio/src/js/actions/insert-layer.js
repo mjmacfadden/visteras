@@ -76,6 +76,7 @@ export class Insert_layer_action extends Base_action {
 			opacity: 100,
 			order: target_order,
 			composition: 'source-over',
+			clipped: false,
 			rotate: 0,
 			data: null,
 			params: {},

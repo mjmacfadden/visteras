@@ -37,6 +37,7 @@
  */
 
 import { is_group, is_effectively_visible } from "./../../libs/layer-tree.js";
+import { is_layer_clipped, get_render_composition } from "./../../libs/layer-clip.js";
 
 import config from './../../config.js';
 import zoomView from './../../libs/zoomView.js';
@@ -499,7 +500,11 @@ class WebGL_renderer_class {
 				return false;
 			}
 
-			var composition = layer.composition == null ? 'source-over' : layer.composition;
+			var composition = get_render_composition(layer);
+			// Clipped + non-normal blend needs Canvas2D isolation for correct clip groups
+			if (is_layer_clipped(layer) && composition !== 'source-atop') {
+				return false;
+			}
 			if (!Object.prototype.hasOwnProperty.call(GPU_BLEND_MODES, composition)) {
 				return false;
 			}
@@ -507,7 +512,7 @@ class WebGL_renderer_class {
 			// source-atop clips to FB alpha. If the clip base has baked
 			// alpha-expanding filters (shadow/glow/blur/stroke), fall back so
 			// we do not clip to the expanded silhouette.
-			if (composition === 'source-atop') {
+			if (composition === 'source-atop' || is_layer_clipped(layer)) {
 				if (!this._source_atop_gpu_ok(layers, i, disabled_filter_id)) {
 					return false;
 				}
@@ -536,8 +541,7 @@ class WebGL_renderer_class {
 			var cand = layers[j];
 			if (cand == null || cand.type == null || is_group(cand) || !is_effectively_visible(cand))
 				continue;
-			var comp = cand.composition == null ? 'source-over' : cand.composition;
-			if (comp === 'source-atop') {
+			if (is_layer_clipped(cand)) {
 				continue;
 			}
 			base = cand;
@@ -752,7 +756,7 @@ class WebGL_renderer_class {
 	}
 
 	_gpu_supports_adjustment(layer) {
-		var composition = layer.composition == null ? 'source-over' : layer.composition;
+		var composition = get_render_composition(layer);
 		if (composition !== 'source-over') {
 			return false;
 		}
@@ -1240,7 +1244,7 @@ class WebGL_renderer_class {
 				var texInfo = this._get_or_create_texture(layer);
 				if (!texInfo) continue;
 
-				var composition = layer.composition == null ? 'source-over' : layer.composition;
+				var composition = get_render_composition(layer);
 				var blendId = this._blend_mode_id(composition);
 				var needsDst = blendId !== BLEND_NORMAL;
 

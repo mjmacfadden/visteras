@@ -11,6 +11,7 @@ import config from './../config.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 import filesaver from './../../../node_modules/file-saver/dist/FileSaver.min.js';
 import { is_group, get_children, get_parent_id, is_psd_group } from './layer-tree.js';
+import { is_layer_clipped } from './layer-clip.js';
 
 // Lazy-load ag-psd on first open/save so the editor shell does not pay for it at boot.
 let agPsdModulePromise = null;
@@ -172,7 +173,8 @@ export async function load_psd(buffer, filename, options = {}) {
 						opened: node.opened !== false,
 						opacity: opacity,
 						visible: visible,
-						composition: isClipping ? 'source-atop' : composition,
+						composition: composition,
+						clipped: isClipping,
 						order: orderCounter++,
 						x: 0,
 						y: 0,
@@ -287,7 +289,8 @@ function convert_psd_layer(psdLayer, id, docWidth, docHeight) {
 	const visible = psdLayer.hidden !== true;
 	const isClipping = Boolean(psdLayer.clipping);
 	const blendMode = psdLayer.blendMode ? (PSD_TO_COMPOSITION[psdLayer.blendMode] || 'source-over') : 'source-over';
-	const composition = isClipping ? 'source-atop' : blendMode;
+	// Clip is independent of blend — keep the real blend mode
+	const composition = blendMode;
 
 	const left = Math.round(psdLayer.left || 0);
 	const top = Math.round(psdLayer.top || 0);
@@ -317,6 +320,7 @@ function convert_psd_layer(psdLayer, id, docWidth, docHeight) {
 	if (psdLayer.adjustment) {
 		const adjModel = convert_psd_adjustment(psdLayer, id, name, opacity, visible, composition, mask, docWidth, docHeight);
 		if (adjModel) {
+			adjModel.clipped = isClipping;
 			return adjModel;
 		}
 	}
@@ -325,6 +329,7 @@ function convert_psd_layer(psdLayer, id, docWidth, docHeight) {
 	if (psdLayer.text && psdLayer.text.text) {
 		const textModel = convert_psd_text(psdLayer, id, name, opacity, visible, composition, mask, filters);
 		if (textModel) {
+			textModel.clipped = isClipping;
 			return textModel;
 		}
 	}
@@ -360,6 +365,7 @@ function convert_psd_layer(psdLayer, id, docWidth, docHeight) {
 		opacity: opacity,
 		visible: visible,
 		composition: composition,
+		clipped: isClipping,
 		rotate: 0,
 		filters: filters,
 		mask: mask,
@@ -1036,13 +1042,14 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
 	for (let i = 0; i < kids.length; i++) {
 		const layer = kids[i];
 		if (is_group(layer)) {
-			const isClipping = layer.composition === 'source-atop';
+			const isClipping = is_layer_clipped(layer);
+			const comp = (layer.composition === 'source-atop') ? 'source-over' : layer.composition;
 			let blendMode = 'pass through';
-			if (layer.composition === 'pass-through') {
+			if (comp === 'pass-through') {
 				blendMode = 'pass through';
-			} else if (layer.composition && layer.composition !== 'source-over') {
-				blendMode = COMPOSITION_TO_PSD[layer.composition] || 'pass through';
-			} else if (layer.composition === 'source-over') {
+			} else if (comp && comp !== 'source-over') {
+				blendMode = COMPOSITION_TO_PSD[comp] || 'pass through';
+			} else if (comp === 'source-over') {
 				blendMode = 'normal';
 			}
 			const opacity = (layer.opacity != null ? layer.opacity : 100) / 100;
@@ -1067,8 +1074,9 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
  * Translates a Vantage Point layer into an ag-psd layer object.
  */
 function export_layer_to_psd(layer, docWidth, docHeight) {
-	const isClipping = layer.composition === 'source-atop';
-	const blendMode = COMPOSITION_TO_PSD[layer.composition] || 'normal';
+	const isClipping = is_layer_clipped(layer);
+	const comp = (layer.composition === 'source-atop') ? 'source-over' : (layer.composition || 'source-over');
+	const blendMode = COMPOSITION_TO_PSD[comp] || 'normal';
 	const opacity = (layer.opacity != null ? layer.opacity : 100) / 100;
 
 	// 1. Adjustment Layer Export

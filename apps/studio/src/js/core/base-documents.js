@@ -12,6 +12,7 @@ import Mask_class from '../modules/mask/mask.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 import semver_compare from './../../../node_modules/semver-compare/';
 import { get_renderer } from './renderer/index.js';
+import { migrate_layer_clipping } from './../libs/layer-clip.js';
 
 var instance = null;
 
@@ -267,6 +268,11 @@ class Base_documents_class {
 		config.WIDTH = doc.width;
 		config.HEIGHT = doc.height;
 		config.layers = (doc.layers && Array.isArray(doc.layers) && doc.layers.length > 0) ? doc.layers : (config.layers || []);
+		if (config.layers) {
+			for (let mi = 0; mi < config.layers.length; mi++) {
+				migrate_layer_clipping(config.layers[mi]);
+			}
+		}
 		config.layer = doc.layer || (config.layers ? config.layers[0] : null);
 		config.vectors = (doc.vectors && Array.isArray(doc.vectors)) ? doc.vectors : [];
 		config.active_vector_id = doc.active_vector_id || (config.vectors[0] ? config.vectors[0].id : null);
@@ -641,6 +647,13 @@ class Base_documents_class {
 					json.layers[i].params.inner_radius = 80;
 					json.layers[i].render_function = ["star", "render"];
 				}
+			}
+		}
+
+		// Migrate legacy clipping-as-blend (composition source-atop) → layer.clipped
+		if (json.layers) {
+			for (let mi = 0; mi < json.layers.length; mi++) {
+				migrate_layer_clipping(json.layers[mi]);
 			}
 		}
 

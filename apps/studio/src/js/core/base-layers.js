@@ -17,6 +17,7 @@ import alertify from "./../../../node_modules/alertifyjs/build/alertify.min.js";
 import { create_renderer, get_renderer, switch_renderer } from "./renderer/index.js";
 import Composite_cache_class from "./renderer/composite-cache.js";
 import { is_group, is_effectively_visible } from "./../libs/layer-tree.js";
+import { is_layer_clipped, get_render_composition } from './../libs/layer-clip.js';
 import Vector_renderer from "./vector/vector-renderer.js";
 
 var instance = null;
@@ -230,11 +231,11 @@ class Base_layers_class {
 		// The initial fast path intentionally handles only an independent,
 		// top-most normal layer. Masks, filters, clipping and blend modes keep
 		// using the exact legacy compositor.
-		if (layer.composition !== 'source-over' || (layer.filters && layer.filters.length)
+		if (is_layer_clipped(layer) || layer.composition !== 'source-over' || (layer.filters && layer.filters.length)
 			|| (layer.mask && layer.mask.enabled !== false))
 			return false;
 		return layers[0] && layers[0].id === layer.id
-			&& (!layers[1] || layers[1].composition !== 'source-atop');
+			&& (!layers[1] || !is_layer_clipped(layers[1]));
 	}
 
 	render_document_cache(layers) {
@@ -283,7 +284,7 @@ class Base_layers_class {
 		documentCtx.clearRect(0, 0, config.WIDTH, config.HEIGHT);
 		documentCtx.drawImage(cache.prefixCanvas, 0, 0);
 		documentCtx.globalAlpha = layer.opacity / 100;
-		documentCtx.globalCompositeOperation = layer.composition;
+		documentCtx.globalCompositeOperation = get_render_composition(layer);
 		this.render_object(documentCtx, layer);
 		documentCtx.globalAlpha = 1;
 		documentCtx.globalCompositeOperation = 'source-over';
@@ -633,10 +634,10 @@ class Base_layers_class {
 			// If this is an adjustment layer
 			if (layer.type === 'adjustment') {
 				if (
-					layer.composition === "source-atop" ||
-					(nextLayer && nextLayer.composition === "source-atop")
+					is_layer_clipped(layer) ||
+					(nextLayer && is_layer_clipped(nextLayer))
 				) {
-					if (nextLayer?.composition === "source-atop") {
+					if (nextLayer && is_layer_clipped(nextLayer)) {
 						this.render_adjustment(ctx, layer);
 						this.render_adjustment(tempCtx, layer);
 					} else {
@@ -653,20 +654,19 @@ class Base_layers_class {
 				continue;
 			}
 
-			// If the layer or next layer has clip masking effect (source-atop).
-			// If there are such layers, this will make sure that layers will be rendered
-			// in an isolated temporary canvas
+			// If the layer or next layer is clipped (clipping mask).
+			// Isolated temporary canvas keeps the clip group correct.
 			if (
-				layer.composition === "source-atop" ||
-				(nextLayer && nextLayer.composition === "source-atop")
+				is_layer_clipped(layer) ||
+				(nextLayer && is_layer_clipped(nextLayer))
 			) {
 				// Apply the effect in a isolated temporary canvas
 				tempCtx.globalAlpha = layer.opacity / 100;
-				tempCtx.globalCompositeOperation = layer.composition;
+				tempCtx.globalCompositeOperation = get_render_composition(layer);
 
-				// If the next layer has the clip masking effect then
-				// isolated the shadow filter from temporary canvas and keep that in the original canvas
-				if (nextLayer?.composition === "source-atop") {
+				// If the next layer is clipped then isolate the shadow filter
+				// from temporary canvas and keep that in the original canvas
+				if (nextLayer && is_layer_clipped(nextLayer)) {
 					// Render the layer
 					this.render_object(ctx, layer);
 					// Then remove the shadow (if it exists) from the render process in the temporary canvas
@@ -678,7 +678,7 @@ class Base_layers_class {
 						filters,
 					});
 				} else {
-					// If we are in this condition, then it means this is the last layer of clipped layers pair.
+					// Last layer of clipped layers pair / the clipped layer itself.
 					// Render clipped layers on the temporary canvas
 					this.render_object(tempCtx, layer);
 					
@@ -695,7 +695,7 @@ class Base_layers_class {
 				}
 			} else {
 				ctx.globalAlpha = layer.opacity / 100;
-				ctx.globalCompositeOperation = layer.composition;
+				ctx.globalCompositeOperation = get_render_composition(layer);
 				this.render_object(ctx, layer);
 			}
 		}
@@ -972,7 +972,7 @@ class Base_layers_class {
 
 		const hasMask = layer.mask != null && layer.mask.enabled !== false;
 		const opacity = (layer.opacity ?? 100) / 100;
-		const comp = layer.composition || 'source-over';
+		const comp = get_render_composition(layer);
 
 		if (hasMask) {
 			if (!this.Mask) {
