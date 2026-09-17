@@ -41070,7 +41070,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let h = f;
 		q.setStartX(f), q.setRStartX(f);
 		let g = p;
-		if (q.setStartY(p), q.setRStartY(p), q.getCurConfig().gridSnapping && (f = jg(f), p = jg(p), q.setStartX(jg(q.getStartX())), q.setStartY(jg(q.getStartY()))), m === q.selectorManager.selectorParentGroup && n[0]) {
+		if (q.setStartY(p), q.setRStartY(p), q.getCurConfig().gridSnapping && (f = jg(f), p = jg(p), q.setStartX(jg(q.getStartX())), q.setStartY(jg(q.getStartY()))), m === q.selectorManager.selectorParentGroup && n[0] && q.getCurrentMode() !== "pathedit") {
 			let r = e.target, i = t.get(r, "type");
 			if (i === "rotate") {
 				q.setCurrentMode("rotate");
