@@ -170,6 +170,7 @@
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
+    import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -521,10 +522,18 @@
       });
 
       async function handleMenuPaste() {
-        const clipboardText = sessionStorage.getItem('svgedit_clipboard');
-        if (clipboardText && clipboardText !== '[]') {
+        const clipId = (typeof sc.getClipboardID === 'function') ? sc.getClipboardID() : 'svgedit_clipboard';
+        const raw = sessionStorage.getItem(clipId);
+        const hasInternal = raw && (() => { try { const p = JSON.parse(raw); return Array.isArray(p) && p.length; } catch { return false; } })();
+        if (hasInternal) {
           sc.pasteElements('in_place');
           return;
+        }
+        if (typeof window.__visterasPasteSvgFromSystem === 'function') {
+          try {
+            const ok = await window.__visterasPasteSvgFromSystem();
+            if (ok) return;
+          } catch (e) { /* fall through */ }
         }
         if (navigator.clipboard && navigator.clipboard.read) {
           try {
@@ -1563,6 +1572,7 @@
     // Reference raster images (place / move / scale — no pixel editing)
     mountVisterasReferenceImages({ svgEditor });
     mountVisterasImageTrace({ svgEditor });
+    installVisterasClipboardBridge({ svgEditor });
   </script>
 </body>
 </html>

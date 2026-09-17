@@ -1,6 +1,12 @@
 import app from './../../app.js';
 import config from './../../config.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { Insert_vector_action } from './../../actions/vector/insert-vector.js';
+import {
+	svg_to_vectors,
+	read_svg_from_clipboard_event,
+	looks_like_svg
+} from './../../core/vector/vector-svg.js';
 
 class Edit_paste_class {
 
@@ -12,9 +18,48 @@ class Edit_paste_class {
 		alertify.error('Use Ctrl+V to paste from the clipboard.');
 	}
 
+	paste_svg_text(svgText) {
+		if (!svgText || !looks_like_svg(svgText)) {
+			return false;
+		}
+		var vectors = svg_to_vectors(svgText);
+		if (!vectors.length) {
+			alertify.error('Could not parse SVG from clipboard.');
+			return false;
+		}
+		var actions = vectors.map(function (vec) {
+			return new Insert_vector_action(vec);
+		});
+		if (actions.length === 1) {
+			app.State.do_action(actions[0]);
+		} else {
+			app.State.do_action(
+				new app.Actions.Bundle_action('paste_vectors', 'Paste Vectors', actions)
+			);
+		}
+		return true;
+	}
+
+	async paste_from_system_svg(clipboardEvent) {
+		var svgText = await read_svg_from_clipboard_event(clipboardEvent || null);
+		if (!svgText) return false;
+		return this.paste_svg_text(svgText);
+	}
+
 	paste_internal() {
 		var clip = config._internal_clipboard;
-		if (clip == null || clip.data_url == null) {
+		if (clip == null) {
+			alertify.error('Nothing to paste.');
+			return;
+		}
+
+		// Vector / SVG clipboard (from Studio or Vector app)
+		if (clip.type === 'svg' && clip.svg) {
+			this.paste_svg_text(clip.svg);
+			return;
+		}
+
+		if (clip.data_url == null) {
 			alertify.error('Nothing to paste.');
 			return;
 		}

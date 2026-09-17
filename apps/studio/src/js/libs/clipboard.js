@@ -86,7 +86,7 @@ class Clipboard_class {
 		}
 
 		// If we have an in-app copy, prefer the internal clipboard so
-		// non-rectangular shapes, positions, and transparent alphas are 100% preserved
+		// non-rectangular shapes, positions, transparent alphas, and vectors are preserved
 		if (config._internal_clipboard != null && config._internal_clipboard_fresh) {
 			config._internal_clipboard_fresh = false;
 			new Edit_paste_class().paste_internal();
@@ -94,13 +94,74 @@ class Clipboard_class {
 			return;
 		}
 
+		// Cross-app / system SVG (Vector -> Studio) — check before raster image/*
+		var paste_instance = new Edit_paste_class();
+		var handled_svg = false;
+		var maybe_handle_svg = function () {
+			return paste_instance.paste_from_system_svg(e).then(function (ok) {
+				if (ok) {
+					handled_svg = true;
+					if (e.preventDefault) e.preventDefault();
+				}
+				return ok;
+			}).catch(function () { return false; });
+		};
+
+		if (e.clipboardData) {
+			var items = e.clipboardData.items;
+			var types = e.clipboardData.types ? Array.prototype.slice.call(e.clipboardData.types) : [];
+			var has_svg_hint = false;
+			if (items) {
+				for (var si = 0; si < items.length; si++) {
+					var t = items[si].type || '';
+					if (t === 'image/svg+xml' || t === 'text/plain' || t === 'text/html' || t.indexOf('visteras-vector') !== -1) {
+						has_svg_hint = true;
+						break;
+					}
+				}
+			}
+			if (!has_svg_hint && types) {
+				has_svg_hint = types.indexOf('image/svg+xml') !== -1 || types.indexOf('text/plain') !== -1;
+			}
+
+			if (has_svg_hint) {
+				// Async SVG attempt; if it fails, fall through to image handling below via then()
+				var _this = this;
+				maybe_handle_svg().then(function (ok) {
+					if (ok) return;
+					_this._paste_raster_from_event(e);
+				});
+				// Prevent default eagerly when svg+xml is explicitly present
+				for (var j = 0; j < (items ? items.length : 0); j++) {
+					if ((items[j].type || '') === 'image/svg+xml') {
+						if (e.preventDefault) e.preventDefault();
+						return;
+					}
+				}
+				// For text/plain we still prevent default after kicking off async parse
+				if (e.preventDefault) e.preventDefault();
+				return;
+			}
+
+			this._paste_raster_from_event(e);
+		}
+		else if (config._internal_clipboard != null) {
+			new Edit_paste_class().paste_internal();
+			if (e.preventDefault) e.preventDefault();
+		}
+	}
+
+	_paste_raster_from_event(e) {
 		if (e.clipboardData) {
 			var items = e.clipboardData.items;
 			if (items) {
 				this.paste_mode = 'auto';
 				var found_image = false;
 				for (var i = 0; i < items.length; i++) {
-					if (items[i].type.indexOf("image") !== -1) {
+					var type = items[i].type || '';
+					// Skip SVG — handled by paste_from_system_svg
+					if (type === 'image/svg+xml') continue;
+					if (type.indexOf("image") !== -1) {
 						found_image = true;
 						var blob = items[i].getAsFile();
 						var URLObj = window.URL || window.webkitURL;
@@ -108,19 +169,11 @@ class Clipboard_class {
 						this.paste_createImage(source);
 					}
 				}
-				e.preventDefault();
+				if (e.preventDefault) e.preventDefault();
 				if (!found_image && config._internal_clipboard != null) {
 					new Edit_paste_class().paste_internal();
 				}
 			}
-			else {
-				//wait for DOMSubtreeModified event
-				//https://bugzilla.mozilla.org/show_bug.cgi?id=891247
-			}
-		}
-		else if (config._internal_clipboard != null) {
-			new Edit_paste_class().paste_internal();
-			if (e.preventDefault) e.preventDefault();
 		}
 	}
 

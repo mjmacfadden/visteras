@@ -5,6 +5,13 @@ import Base_selection_class from './../../core/base-selection.js';
 import File_save_class from './../file/save.js';
 import Helper_class from './../../libs/helpers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import Vector_manager from './../../core/vector/vector-manager.js';
+import {
+	vectors_to_svg,
+	write_svg_clipboard,
+	publish_vector_clip,
+	VISTERAS_VECTOR_MIME
+} from './../../core/vector/vector-svg.js';
 
 var instance = null;
 
@@ -87,7 +94,63 @@ class Copy_class {
 		config._internal_clipboard_fresh = true;
 	}
 
+	get_vectors_for_clipboard() {
+		var vectors = [];
+		var layer = config.layer;
+		if (layer && layer.type === 'vector') {
+			var vid = layer.vector_id || (layer.params && layer.params.vector_id);
+			var vec = null;
+			if (vid) {
+				vec = Vector_manager.get_vector_by_id(vid);
+			}
+			if (!vec && layer.vector) {
+				vec = layer.vector;
+			}
+			if (!vec) {
+				vec = Vector_manager.get_active_vector();
+			}
+			if (vec && vec.paths && vec.paths.length) {
+				vectors.push(vec);
+			}
+		}
+		return vectors;
+	}
+
+	async copy_vectors_to_clipboard(vectors) {
+		var svgText = vectors_to_svg(vectors);
+		if (!svgText) {
+			alertify.error('Nothing to copy.');
+			return false;
+		}
+		var jsonText = JSON.stringify({
+			format: 'visteras-vector',
+			version: 1,
+			vectors: vectors.map(v => v.toJSON())
+		});
+		config._internal_clipboard = {
+			type: 'svg',
+			svg: svgText,
+			json: jsonText,
+			data_url: null,
+			x: 0,
+			y: 0,
+			width: 0,
+			height: 0
+		};
+		config._internal_clipboard_fresh = true;
+		config._clipboard_position = null;
+		publish_vector_clip(svgText, { source: 'studio' });
+		await write_svg_clipboard(svgText, { jsonText });
+		return true;
+	}
+
 	copy_to_clipboard() {
+		var vectors = this.get_vectors_for_clipboard();
+		if (vectors.length > 0) {
+			this.copy_vectors_to_clipboard(vectors);
+			return;
+		}
+
 		var extracted = this.extract_clipboard_canvas();
 		if (extracted == null) {
 			alertify.error('Nothing to copy.');
