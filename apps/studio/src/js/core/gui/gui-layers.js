@@ -17,6 +17,7 @@ import Layer_delete_class from './../../modules/layer/delete.js';
 import Tools_translate_class from './../../modules/tools/translate.js';
 import { get_adjustment_icon } from './adjustment-icons.js';
 import { is_group, get_tree_rows, get_parent_id, would_cycle } from './../../libs/layer-tree.js';
+import { is_layer_clipped, clipping_toggle_updates } from './../../libs/layer-clip.js';
 
 var template = `
 	<div class="layers_header" id="layers_header">
@@ -50,8 +51,7 @@ var template = `
 					<option value="color">Color</option>
 					<option value="luminosity">Luminosity</option>
 				</optgroup>
-				<optgroup label="Masking / Other">
-					<option value="source-atop">Clipping Mask (source-atop)</option>
+				<optgroup label="Other">
 					<option value="destination-over">Destination Over</option>
 					<option value="destination-out">Destination Out</option>
 					<option value="xor">XOR</option>
@@ -220,11 +220,8 @@ class GUI_layers_class {
 				var layer_id = parseInt(arrowBtn.dataset.id);
 				var arrow_layer = app.Layers.get_layer(layer_id);
 				if (arrow_layer) {
-					var newComp = (arrow_layer.composition === 'source-atop') ? 'source-over' : 'source-atop';
 					return app.State.do_action(
-						new app.Actions.Update_layer_action(layer_id, {
-							composition: newComp
-						})
+						new app.Actions.Update_layer_action(layer_id, clipping_toggle_updates(arrow_layer))
 					);
 				}
 			}
@@ -260,7 +257,15 @@ class GUI_layers_class {
 			blendSelect.addEventListener('change', function () {
 				if (!config.layer || config.layer.id == null) return;
 				var val = this.value;
+				// Clipping is not a blend mode — ignore if somehow selected
+				if (val === 'source-atop') {
+					this.value = config.layer.composition === 'source-atop'
+						? 'source-over'
+						: (config.layer.composition || 'source-over');
+					return;
+				}
 				var prev = config.layer.composition || 'source-over';
+				if (prev === 'source-atop') prev = 'source-over';
 				if (val !== prev) {
 					app.State.do_action(
 						new app.Actions.Update_layer_action(config.layer.id, {
@@ -615,21 +620,17 @@ class GUI_layers_class {
 			menu.appendChild(hr);
 		};
 
-		// 1. Clipping Mask
-		if (layer.composition === 'source-atop') {
+		// 1. Clipping Mask (independent of blend mode)
+		if (is_layer_clipped(layer)) {
 			button('Release Clipping Mask', () => {
 				app.State.do_action(
-					new app.Actions.Update_layer_action(layer_id, {
-						composition: 'source-over'
-					})
+					new app.Actions.Update_layer_action(layer_id, clipping_toggle_updates(layer))
 				);
 			});
 		} else {
 			button('Create Clipping Mask', () => {
 				app.State.do_action(
-					new app.Actions.Update_layer_action(layer_id, {
-						composition: 'source-atop'
-					})
+					new app.Actions.Update_layer_action(layer_id, { clipped: true })
 				);
 			});
 		}
@@ -1169,10 +1170,10 @@ class GUI_layers_class {
 			var base_ids = new Set();
 
 			for (var k = 0; k < layers_top_first.length; k++) {
-				if (layers_top_first[k].composition === 'source-atop') {
+				if (is_layer_clipped(layers_top_first[k])) {
 					clipped_ids.add(layers_top_first[k].id);
 					for (var m = k + 1; m < layers_top_first.length; m++) {
-						if (layers_top_first[m].composition !== 'source-atop') {
+						if (!is_layer_clipped(layers_top_first[m])) {
 							base_ids.add(layers_top_first[m].id);
 							break;
 						}
@@ -1314,10 +1315,19 @@ class GUI_layers_class {
 
 		if (config.layer && config.layer.id != null) {
 			var comp = config.layer.composition || 'source-over';
+			// Never show legacy source-atop as the blend — clip is separate (context menu / list arrow)
+			if (comp === 'source-atop') {
+				comp = 'source-over';
+			}
 			var opacity = (config.layer.opacity != null) ? Math.round(config.layer.opacity) : 100;
 
 			if (blendSelect) {
-				blendSelect.value = comp;
+				// If value is missing from the select (e.g. exotic Porter-Duff), fall back visually
+				var hasOption = false;
+				for (var oi = 0; oi < blendSelect.options.length; oi++) {
+					if (blendSelect.options[oi].value === comp) { hasOption = true; break; }
+				}
+				blendSelect.value = hasOption ? comp : 'source-over';
 				blendSelect.disabled = false;
 			}
 			if (opNumber) {

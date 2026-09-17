@@ -31,12 +31,17 @@
  * Still Canvas2D-only (can_render_layers returns false):
  *   - Unsupported adjustment types / non-source-over adjustments
  *   - Blend modes other than the GPU set below
+ *   - Any clipping mask (layer.clipped / legacy source-atop): GPU source-atop
+ *     clips to full framebuffer alpha, so an opaque Background under the
+ *     clip base makes the clipped layer look unclipped. Canvas2D isolates
+ *     the clip group to the layer directly beneath (Photoshop-style).
  *   - source-atop when the clip base has alpha-expanding filters
  *     (shadow / outer_glow / blur / stroke) — falls back for correctness
  *   - Other Porter-Duff modes beyond source-over / source-atop / GPU blends
  */
 
 import { is_group, is_effectively_visible } from "./../../libs/layer-tree.js";
+import { is_layer_clipped, get_render_composition } from "./../../libs/layer-clip.js";
 
 import config from './../../config.js';
 import zoomView from './../../libs/zoomView.js';
@@ -470,12 +475,14 @@ class WebGL_renderer_class {
 	 *
 	 * GPU-supported: source-over / multiply / screen / overlay / darken /
 	 * lighten / difference / hard-light / color-dodge / soft-light /
-	 * color-burn / exclusion / source-atop (simple clipping), optional layer
-	 * masks, and a subset of adjustment layers (brightness/contrast, hue-sat,
-	 * exposure, grayscale, invert, sepia, threshold) at source-over, plus
-	 * CSS-like layer.filters (blur/shadow/outer_glow) and stroke/inner_glow
-	 * baked on upload with padding. Still deferred to Canvas 2D: unsupported
-	 * adjustments/blends, source-atop when the clip base expands alpha.
+	 * color-burn / exclusion / source-atop (simple clipping; clip forces
+	 * source-atop even if the layer's blend dropdown shows another mode),
+	 * optional layer masks, and a subset of adjustment layers
+	 * (brightness/contrast, hue-sat, exposure, grayscale, invert, sepia,
+	 * threshold) at source-over, plus CSS-like layer.filters
+	 * (blur/shadow/outer_glow) and stroke/inner_glow baked on upload with
+	 * padding. Still deferred to Canvas 2D: unsupported adjustments/blends,
+	 * source-atop when the clip base expands alpha.
 	 *
 	 * @param {Object[]} layers - sorted top-first (index 0 = top)
 	 * @param {number|null} disabled_filter_id - id of the currently disabled
@@ -499,14 +506,22 @@ class WebGL_renderer_class {
 				return false;
 			}
 
-			var composition = layer.composition == null ? 'source-over' : layer.composition;
+			// Clipping masks must use Canvas2D isolation. GPU source-atop
+			// composites against the full framebuffer, so content under the
+			// clip base (e.g. white Background) makes a clipped fill look
+			// completely unclipped. Canvas2D paints the base alone into a
+			// temp canvas, then source-atops the clipped layer onto that.
+			if (is_layer_clipped(layer)) {
+				return false;
+			}
+
+			var composition = get_render_composition(layer);
 			if (!Object.prototype.hasOwnProperty.call(GPU_BLEND_MODES, composition)) {
 				return false;
 			}
 
-			// source-atop clips to FB alpha. If the clip base has baked
-			// alpha-expanding filters (shadow/glow/blur/stroke), fall back so
-			// we do not clip to the expanded silhouette.
+			// Legacy / direct source-atop blend (no clipped flag): still reject
+			// when the destination base would expand alpha via baked filters.
 			if (composition === 'source-atop') {
 				if (!this._source_atop_gpu_ok(layers, i, disabled_filter_id)) {
 					return false;
@@ -536,8 +551,7 @@ class WebGL_renderer_class {
 			var cand = layers[j];
 			if (cand == null || cand.type == null || is_group(cand) || !is_effectively_visible(cand))
 				continue;
-			var comp = cand.composition == null ? 'source-over' : cand.composition;
-			if (comp === 'source-atop') {
+			if (is_layer_clipped(cand)) {
 				continue;
 			}
 			base = cand;
@@ -752,7 +766,7 @@ class WebGL_renderer_class {
 	}
 
 	_gpu_supports_adjustment(layer) {
-		var composition = layer.composition == null ? 'source-over' : layer.composition;
+		var composition = get_render_composition(layer);
 		if (composition !== 'source-over') {
 			return false;
 		}
@@ -1240,7 +1254,11 @@ class WebGL_renderer_class {
 				var texInfo = this._get_or_create_texture(layer);
 				if (!texInfo) continue;
 
-				var composition = layer.composition == null ? 'source-over' : layer.composition;
+				var composition = get_render_composition(layer);
+				// Clip wins over blend for GPU draw (matches Canvas2D source-atop).
+				if (is_layer_clipped(layer)) {
+					composition = 'source-atop';
+				}
 				var blendId = this._blend_mode_id(composition);
 				var needsDst = blendId !== BLEND_NORMAL;
 

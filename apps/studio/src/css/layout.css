@@ -899,6 +899,7 @@ button.ui_icon_button img[src*="align-"]{
 	color: #e0e0e0;
 	padding: 2px 6px;
 }
+
 .layer_opacity_group {
 	position: relative;
 	display: flex;

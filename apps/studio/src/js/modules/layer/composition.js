@@ -2,6 +2,7 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
 import Base_gui_class from "../../core/base-gui.js";
+import { is_layer_clipped, clipping_toggle_updates } from './../../libs/layer-clip.js';
 
 class Layer_composition_class {
 
@@ -84,12 +85,14 @@ class Layer_composition_class {
 
 	toggle_clipping_mask() {
 		if (!config.layer || config.layer.id == null) return;
-		var newComp = (config.layer.composition === 'source-atop') ? 'source-over' : 'source-atop';
+		var updates = clipping_toggle_updates(config.layer);
 		app.State.do_action(
-			new app.Actions.Update_layer_action(config.layer.id, {
-				composition: newComp
-			})
+			new app.Actions.Update_layer_action(config.layer.id, updates)
 		);
+	}
+
+	is_clipped(layer) {
+		return is_layer_clipped(layer || config.layer);
 	}
 
 }
