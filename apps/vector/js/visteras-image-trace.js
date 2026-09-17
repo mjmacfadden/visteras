@@ -650,9 +650,43 @@ function wireDialogControls(dlg) {
   });
 }
 
+function getSelectedImage(svgEditor) {
+  const sc = svgEditor?.svgCanvas;
+  const sel = (sc && typeof sc.getSelectedElements === 'function')
+    ? sc.getSelectedElements().filter(Boolean)
+    : [];
+
+  let el = svgEditor?.selectedElement || (sel.length === 1 ? sel[0] : null);
+  if (!el && sel.length > 0) {
+    el = sel[0];
+  }
+  if (!el && svgEditor?.selectedElements?.length > 0) {
+    el = svgEditor.selectedElements[0];
+  }
+
+  if (sel.length > 1) {
+    const images = sel.filter((item) => (item?.nodeName || item?.tagName || '').toLowerCase() === 'image');
+    if (images.length === 1) {
+      el = images[0];
+    } else {
+      return null;
+    }
+  }
+
+  if (!el) return null;
+
+  const tag = (el.nodeName || el.tagName || '').toLowerCase();
+  if (tag === 'image') return el;
+  if (el.querySelector) {
+    const childImg = el.querySelector('image');
+    if (childImg) return childImg;
+  }
+  return null;
+}
+
 async function openTraceDialog(svgEditor) {
-  const el = svgEditor.selectedElement;
-  if (!el || el.nodeName !== 'image' || svgEditor.multiselected) {
+  const el = getSelectedImage(svgEditor);
+  if (!el) {
     alert('Select a single raster image to trace.');
     return;
   }

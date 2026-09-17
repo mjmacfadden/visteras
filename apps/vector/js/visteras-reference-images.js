@@ -289,30 +289,48 @@ function wireImageTool(svgEditor) {
   );
 }
 
+function getActiveImage(svgEditor) {
+  const sc = svgEditor?.svgCanvas;
+  const sel = (sc && typeof sc.getSelectedElements === 'function')
+    ? sc.getSelectedElements().filter(Boolean)
+    : [];
+  let el = svgEditor?.selectedElement || (sel.length === 1 ? sel[0] : null);
+  if (!el && sel.length > 0) el = sel[0];
+  if (!el && svgEditor?.selectedElements?.length > 0) el = svgEditor.selectedElements[0];
+  if (el && (el.nodeName || el.tagName || '').toLowerCase() === 'image') return el;
+  if (el?.querySelector) {
+    const child = el.querySelector('image');
+    if (child) return child;
+  }
+  return null;
+}
+
 function syncRefControls(svgEditor) {
   const sc = svgEditor.svgCanvas;
-  const el = svgEditor.selectedElement;
+  const sel = (sc && typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements().filter(Boolean) : [];
+  const el = svgEditor.selectedElement || (sel.length === 1 ? sel[0] : null);
   const typeEl = document.getElementById('prop_selection_type');
   const refGroup = document.getElementById('prop_image_ref_group');
   const refCb = document.getElementById('ref_as_reference');
   const lockCb = document.getElementById('ref_lock');
-  const isImg = el && el.nodeName === 'image' && !svgEditor.multiselected;
+  const imgEl = getActiveImage(svgEditor);
+  const isImg = !!imgEl && (sel.length <= 1);
 
   if (typeEl) {
     if (isImg) typeEl.textContent = 'Image';
-    else if (el) typeEl.textContent = el.nodeName;
+    else if (el) typeEl.textContent = el.nodeName || el.tagName || '';
     else typeEl.textContent = '';
     typeEl.style.display = el ? 'block' : 'none';
   }
   if (refGroup) refGroup.style.display = isImg ? 'block' : 'none';
-  if (!isImg || !refCb || !lockCb) return;
+  if (!isImg || !refCb || !lockCb || !imgEl) return;
 
   // All Visteras-placed rasters are references; also treat unmarked images as candidates
-  refCb.checked = isReference(el);
-  lockCb.checked = isLocked(el);
+  refCb.checked = isReference(imgEl);
+  lockCb.checked = isLocked(imgEl);
   const dimCb = document.getElementById('ref_dim_50_cb');
   if (dimCb) {
-    const op = parseFloat(el.getAttribute('opacity') || '1');
+    const op = parseFloat(imgEl.getAttribute('opacity') || '1');
     dimCb.checked = Number.isFinite(op) && op <= 0.55;
   }
 }
@@ -323,8 +341,8 @@ function wireRefControls(svgEditor) {
   const dimBtn = document.getElementById('ref_dim_50');
 
   refCb?.addEventListener('change', () => {
-    const el = svgEditor.selectedElement;
-    if (!el || el.nodeName !== 'image') return;
+    const el = getActiveImage(svgEditor);
+    if (!el) return;
     const sc = svgEditor.svgCanvas;
     if (refCb.checked) {
       // Keep current opacity — Dim to 50% is optional via the button below
@@ -342,8 +360,8 @@ function wireRefControls(svgEditor) {
   });
 
   lockCb?.addEventListener('change', () => {
-    const el = svgEditor.selectedElement;
-    if (!el || el.nodeName !== 'image') return;
+    const el = getActiveImage(svgEditor);
+    if (!el) return;
     setLocked(el, lockCb.checked);
     svgEditor.topPanel?.updateContextPanel?.();
   });
@@ -371,15 +389,15 @@ function wireRefControls(svgEditor) {
   }
 
   dimBtn?.addEventListener('click', () => {
-    const el = svgEditor.selectedElement;
-    if (!el || el.nodeName !== 'image') return;
+    const el = getActiveImage(svgEditor);
+    if (!el) return;
     applyDim50(el);
   });
 
   const dimCb = document.getElementById('ref_dim_50_cb');
   dimCb?.addEventListener('change', () => {
-    const el = svgEditor.selectedElement;
-    if (!el || el.nodeName !== 'image') return;
+    const el = getActiveImage(svgEditor);
+    if (!el) return;
     if (dimCb.checked) applyDim50(el);
     else clearDim(el);
   });
@@ -398,8 +416,8 @@ function wireRefControls(svgEditor) {
     if (!input || input.dataset.visterasAspectWired) return;
     input.dataset.visterasAspectWired = '1';
     input.addEventListener('change', () => {
-      const el = svgEditor.selectedElement;
-      if (!el || el.nodeName !== 'image') return;
+      const el = getActiveImage(svgEditor);
+      if (!el) return;
       if (el.getAttribute(ASPECT_ATTR) !== '1') return;
       const aspect = parseFloat(el.getAttribute('data-visteras-aspect'));
       if (!aspect || !isFinite(aspect)) return;
