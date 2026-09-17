@@ -173,11 +173,6 @@ function updateDateDisplays(isoDate: string, dateDisplay: string) {
     el.textContent = dateDisplay;
   });
 
-  const paperUpper =
-    document.querySelector('[data-masthead-title]')?.textContent?.trim() ||
-    document.getElementById('chrome-paper-name')?.textContent?.trim() ||
-    'THE DAILY MIKE';
-  document.title = `${paperUpper} — ${dateDisplay}`;
 }
 
 function updatePuzzles(isoDate: string) {

@@ -436,10 +436,6 @@ const hasWireStories =
           el.textContent = upper;
         });
 
-        const dateStr = document.querySelector('.masthead-date-line span:first-child')?.textContent || '';
-        if (dateStr) {
-          document.title = `${upper} — ${dateStr}`;
-        }
       }
 
       async function runPaginate() {
