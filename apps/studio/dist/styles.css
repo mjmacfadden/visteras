@@ -2147,6 +2147,7 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .magic_erase:after{ background-image: url('../images/icons/magic_erase.svg'); }
 .sidebar_left .fill:after{ background-image: url('../images/icons/fill.svg'); }
 .sidebar_left .media:after{ background-image: url('../images/icons/media.svg'); }
+.sidebar_left .camera:after{ background-image: url('../images/icons/camera.svg'); }
 .sidebar_left .shape:after{ background-image: url('../images/icons/rectangle.svg'); }
 .sidebar_left .rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
 .sidebar_left .ellipse:after{ background-image: url('../images/icons/ellipse.svg'); }

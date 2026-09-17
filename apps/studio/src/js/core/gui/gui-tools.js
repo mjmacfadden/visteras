@@ -104,7 +104,7 @@ class GUI_tools_class {
 		var target_id = "tools_container";
 		var _this = this;
 		var saved_tool = this.Helper.getCookie('active_tool');
-		if(saved_tool == 'media' || saved_tool == 'shape') {
+		if(saved_tool == 'media' || saved_tool == 'camera' || saved_tool == 'shape') {
 			//bringing this back by default gives bad UX
 			saved_tool = null
 		}

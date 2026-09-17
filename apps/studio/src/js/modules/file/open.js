@@ -232,80 +232,241 @@ class File_open_class {
 		document.querySelector('#file_open').click();
 	}
 	
-	open_webcam(){
+	/**
+	 * Stop all MediaStream tracks and tear down a preview <video>.
+	 * @param {MediaStream|null} stream
+	 * @param {HTMLVideoElement|null} video
+	 */
+	_stop_webcam(stream, video) {
+		if (stream) {
+			try {
+				stream.getTracks().forEach(function (t) { t.stop(); });
+			} catch (e) { /* ignore */ }
+		}
+		if (video) {
+			try {
+				video.pause();
+				video.srcObject = null;
+				video.removeAttribute('src');
+				video.load();
+			} catch (e) { /* ignore */ }
+		}
+	}
+
+	/**
+	 * Friendly message for getUserMedia failures.
+	 * @param {Error|DOMException|string} error
+	 * @returns {string}
+	 */
+	_webcam_error_message(error) {
+		var name = (error && error.name) ? error.name : '';
+		var raw = (error && error.message) ? error.message : String(error || '');
+		if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+			return 'Camera permission denied. Allow camera access in the browser and try again.';
+		}
+		if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+			return 'No camera found. Connect a webcam and try again.';
+		}
+		if (name === 'NotReadableError' || name === 'TrackStartError') {
+			return 'Camera is already in use by another application.';
+		}
+		if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+			return 'Camera is not supported in this browser (requires HTTPS or localhost).';
+		}
+		return 'Could not open camera: ' + (raw || name || 'unknown error');
+	}
+
+	/**
+	 * Open live webcam preview dialog and capture one frame.
+	 * Preview is mirrored horizontally (selfie UX); captured pixels are NOT
+	 * mirrored so editing matches the real scene / "how others see you".
+	 *
+	 * @param {object} [options]
+	 * @param {boolean} [options.mirrorPreview=true]
+	 * @param {string} [options.title='Webcam']
+	 * @returns {Promise<{dataURL:string,width:number,height:number}|null>}
+	 *   Resolves with frame data, or null if the user cancelled.
+	 *   Rejects with Error on permission / device failure.
+	 */
+	capture_webcam_frame(options = {}) {
 		var _this = this;
-		var video = document.createElement('video');
-		video.autoplay = true;
-		video.style.maxWidth = '100%';
-		var track = null;
-		
-		function handleSuccess(stream) {	
-			track = stream.getTracks()[0];
-			video.srcObject = stream;	
+		var mirrorPreview = options.mirrorPreview !== false;
+		var title = options.title || 'Webcam';
+
+		return new Promise(function (resolve, reject) {
+			if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+				reject(new Error(_this._webcam_error_message({ name: 'NotSupportedError' })));
+				return;
+			}
+
+			var video = document.createElement('video');
+			video.autoplay = true;
+			video.playsInline = true;
+			video.muted = true;
+			video.style.maxWidth = '100%';
+			video.style.display = 'block';
+			if (mirrorPreview) {
+				video.style.transform = 'scaleX(-1)';
+			}
+
+			var stream = null;
+			var settled = false;
+
+			function cleanup() {
+				_this._stop_webcam(stream, video);
+				stream = null;
+			}
+
+			function handleSuccess(mediaStream) {
+				stream = mediaStream;
+				video.srcObject = mediaStream;
+				video.play().catch(function () { /* autoplay may need mute — already muted */ });
+			}
+
+			function handleError(error) {
+				cleanup();
+				if (settled) return;
+				settled = true;
+				try { _this.POP.hide(); } catch (e) { /* ignore */ }
+				reject(new Error(_this._webcam_error_message(error)));
+			}
+
+			var settings = {
+				title: title,
+				params: [
+					{ title: 'Preview:', html: '<div id="webcam_container"></div>' },
+				],
+				on_load: function () {
+					var container = document.getElementById('webcam_container');
+					if (container) {
+						container.appendChild(video);
+					}
+					var okBtn = _this.POP.el && _this.POP.el.querySelector('[data-id="popup_ok"]');
+					if (okBtn) {
+						okBtn.textContent = 'Capture';
+					}
+				},
+				on_finish: function () {
+					if (settled) return;
+					var width = video.videoWidth;
+					var height = video.videoHeight;
+					if (!width || !height) {
+						cleanup();
+						settled = true;
+						reject(new Error('Camera stream had no frames yet. Wait for the preview and try again.'));
+						return;
+					}
+					// Capture un-mirrored (natural camera orientation) for editing.
+					var tmpCanvas = document.createElement('canvas');
+					tmpCanvas.width = width;
+					tmpCanvas.height = height;
+					var ctx = tmpCanvas.getContext('2d');
+					ctx.drawImage(video, 0, 0);
+					var dataURL = tmpCanvas.toDataURL('image/png');
+					cleanup();
+					settled = true;
+					resolve({ dataURL: dataURL, width: width, height: height });
+				},
+				on_cancel: function () {
+					cleanup();
+					if (settled) return;
+					settled = true;
+					resolve(null);
+				},
+			};
+
+			_this.POP.show(settings);
+
+			navigator.mediaDevices.getUserMedia({ audio: false, video: true })
+				.then(handleSuccess)
+				.catch(handleError);
+		});
+	}
+
+	/**
+	 * Insert a raster image as a new layer on the current document.
+	 * Does not resize the canvas (Place / Open-as-layer behavior).
+	 * If fitIfHuge and the image is larger than the canvas, scales the layer
+	 * display size to fit while preserving capture originals.
+	 *
+	 * @param {object} opts
+	 * @param {string} opts.data - data URL or image source
+	 * @param {number} [opts.width]
+	 * @param {number} [opts.height]
+	 * @param {string} [opts.name='Photo']
+	 * @param {boolean} [opts.fitIfHuge=false]
+	 */
+	async insert_image_as_layer(opts) {
+		var width = opts.width || 0;
+		var height = opts.height || 0;
+		var name = opts.name || 'Photo';
+		var data = opts.data;
+		var displayW = width;
+		var displayH = height;
+
+		if (opts.fitIfHuge && width > 0 && height > 0 && config.WIDTH > 0 && config.HEIGHT > 0) {
+			if (width > config.WIDTH || height > config.HEIGHT) {
+				var scale = Math.min(config.WIDTH / width, config.HEIGHT / height);
+				displayW = Math.max(1, Math.round(width * scale));
+				displayH = Math.max(1, Math.round(height * scale));
+			}
 		}
 
-		function handleError(error) {
-			alertify.error('Sorry, cold not load getUserMedia() data: ' + error);
-		}
-		
-		var settings = {
-			title: 'Webcam',
-			params: [
-				{title: "Stream:", html: '<div id="webcam_container"></div>'},
-			],
-			on_load: function(params){
-				document.getElementById('webcam_container').appendChild(video);
-			},
-			on_finish: function(params){
-				//capture data
-				var width = video.videoWidth;
-				var height = video.videoHeight;
-				
-				var tmpCanvas = document.createElement('canvas');
-				var tmpCanvasCtx = tmpCanvas.getContext("2d");
-				tmpCanvas.width = width;
-				tmpCanvas.height = height;
-				tmpCanvasCtx.drawImage(video, 0, 0);
-				
-				//create requested layer
-				var new_layer = {
-					name: "Webcam #" + _this.Base_layers.auto_increment,
-					type: 'image',
-					data: tmpCanvas.toDataURL("image/png"),
-					width: width,
-					height: height,
-					width_original: width,
-					height_original: height,
-				};
-				app.State.do_action(
-					new app.Actions.Bundle_action('open_file_webcam', 'Open File Webcam', [
-						new app.Actions.Insert_layer_action(new_layer),
-						new app.Actions.Autoresize_canvas_action(width, height, null, true, true)
-					])
-				);
-				
-				//destroy
-				if(track != null){
-					track.stop();
-				}
-				video.pause();
-				video.src = "";
-				video.load();
-			},
-			on_cancel: function(params){
-				if(track != null){
-					track.stop();
-				}
-				video.pause();
-				video.src = "";
-				video.load();
-			},
+		var new_layer = {
+			name: name,
+			type: 'image',
+			data: data,
+			x: 0,
+			y: 0,
 		};
-		this.POP.show(settings);
-		
-		navigator.mediaDevices.getUserMedia({audio: false, video: true})
-			.then(handleSuccess)
-			.catch(handleError);
+		if (displayW > 0) {
+			new_layer.width = displayW;
+			new_layer.width_original = width || displayW;
+		}
+		if (displayH > 0) {
+			new_layer.height = displayH;
+			new_layer.height_original = height || displayH;
+		}
+
+		await app.State.do_action(
+			new app.Actions.Insert_layer_action(new_layer, false)
+		);
+		return new_layer;
+	}
+
+	/**
+	 * File → Open from Webcam: capture a frame and open it as the document
+	 * content (insert layer + autoresize canvas to the capture size).
+	 * Toolbar Camera tool uses capture_webcam_frame + insert_image_as_layer instead.
+	 */
+	async open_webcam() {
+		try {
+			var frame = await this.capture_webcam_frame({
+				mirrorPreview: true,
+				title: 'Webcam',
+			});
+			if (!frame) {
+				return;
+			}
+			var new_layer = {
+				name: 'Webcam #' + this.Base_layers.auto_increment,
+				type: 'image',
+				data: frame.dataURL,
+				width: frame.width,
+				height: frame.height,
+				width_original: frame.width,
+				height_original: frame.height,
+			};
+			app.State.do_action(
+				new app.Actions.Bundle_action('open_file_webcam', 'Open File Webcam', [
+					new app.Actions.Insert_layer_action(new_layer),
+					new app.Actions.Autoresize_canvas_action(frame.width, frame.height, null, true, true)
+				])
+			);
+		}
+		catch (err) {
+			alertify.error((err && err.message) ? err.message : String(err));
+		}
 	}
 
 	open_dir() {
