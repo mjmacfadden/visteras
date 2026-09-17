@@ -215,17 +215,20 @@ function isNearWhiteFill(hex, threshold = 245) {
  * Build path `d` from an ImageTracer path sample (incl. holes, reversed).
  * Mirrors ImageTracer.svgpathstring hole handling so fill-rule evenodd works.
  */
-function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1) {
+function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1, mapCoord = null) {
   if (!smp || !smp.segments || !smp.segments.length) return '';
   const rnd = (v) => (roundcoords === -1 ? v : +Number(v).toFixed(roundcoords));
+  const tx = (x) => (mapCoord ? rnd(mapCoord.renderX + x * mapCoord.sx) : rnd(x));
+  const ty = (y) => (mapCoord ? rnd(mapCoord.renderY + y * mapCoord.sy) : rnd(y));
+
   let d = '';
   const segs = smp.segments;
-  d += `M ${rnd(segs[0].x1)} ${rnd(segs[0].y1)} `;
+  d += `M ${tx(segs[0].x1)} ${ty(segs[0].y1)} `;
   for (let i = 0; i < segs.length; i++) {
     const s = segs[i];
-    d += `${s.type} ${rnd(s.x2)} ${rnd(s.y2)} `;
+    d += `${s.type} ${tx(s.x2)} ${ty(s.y2)} `;
     if (Object.prototype.hasOwnProperty.call(s, 'x3')) {
-      d += `${rnd(s.x3)} ${rnd(s.y3)} `;
+      d += `${tx(s.x3)} ${ty(s.y3)} `;
     }
   }
   d += 'Z ';
@@ -237,17 +240,17 @@ function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1) {
     const hsegs = hsmp.segments;
     const last = hsegs[hsegs.length - 1];
     if (Object.prototype.hasOwnProperty.call(last, 'x3')) {
-      d += `M ${rnd(last.x3)} ${rnd(last.y3)} `;
+      d += `M ${tx(last.x3)} ${ty(last.y3)} `;
     } else {
-      d += `M ${rnd(last.x2)} ${rnd(last.y2)} `;
+      d += `M ${tx(last.x2)} ${ty(last.y2)} `;
     }
     for (let pcnt = hsegs.length - 1; pcnt >= 0; pcnt--) {
       const s = hsegs[pcnt];
       d += `${s.type} `;
       if (Object.prototype.hasOwnProperty.call(s, 'x3')) {
-        d += `${rnd(s.x2)} ${rnd(s.y2)} `;
+        d += `${tx(s.x2)} ${ty(s.y2)} `;
       }
-      d += `${rnd(s.x1)} ${rnd(s.y1)} `;
+      d += `${tx(s.x1)} ${ty(s.y1)} `;
     }
     d += 'Z ';
   }
@@ -257,7 +260,7 @@ function pathSampleToD(smp, holeChildrenSamples, roundcoords = 1) {
 /**
  * Convert tracedata → nested groups: outer traced group, subgroup per palette color.
  */
-function tracedataToColorGroups(tracedata, options, ui) {
+function tracedataToColorGroups(tracedata, options, ui, mapCoord = null) {
   const layers = tracedata.layers || [];
   const palette = tracedata.palette || [];
   const colorGroups = [];
@@ -275,7 +278,7 @@ function tracedataToColorGroups(tracedata, options, ui) {
       if (options.linefilter && smp.segments && smp.segments.length < 3) continue;
       const holeIdxs = smp.holechildren || [];
       const holeSamples = holeIdxs.map((idx) => layer[idx]).filter(Boolean);
-      const d = pathSampleToD(smp, holeSamples, options.roundcoords);
+      const d = pathSampleToD(smp, holeSamples, options.roundcoords, mapCoord);
       if (!d) continue;
       paths.push({ d, fill });
     }
@@ -292,15 +295,33 @@ function getImagePlacement(imageEl, srcW, srcH) {
   const destW = parseFloat(imageEl.getAttribute('width')) || srcW;
   const destH = parseFloat(imageEl.getAttribute('height')) || srcH;
   const existing = imageEl.getAttribute('transform') || '';
-  const sx = destW / srcW;
-  const sy = destH / srcH;
-  // Map traced coords (image pixel space after downscale) onto placed <image>
-  let transform = `translate(${x},${y}) scale(${sx},${sy})`;
-  if (existing.trim()) {
-    // Apply image's own transform after placement so they stay aligned
-    transform = `${existing} ${transform}`;
+
+  // Account for SVG <image> preserveAspectRatio (e.g. xMidYMid meet)
+  const par = (imageEl.getAttribute('preserveAspectRatio') || 'xMidYMid meet').trim();
+  let renderX = x;
+  let renderY = y;
+  let renderW = destW;
+  let renderH = destH;
+
+  if (par !== 'none' && srcW > 0 && srcH > 0) {
+    const scale = Math.min(destW / srcW, destH / srcH);
+    renderW = srcW * scale;
+    renderH = srcH * scale;
+    if (par.includes('xMid')) {
+      renderX = x + (destW - renderW) / 2;
+    } else if (par.includes('xMax')) {
+      renderX = x + (destW - renderW);
+    }
+    if (par.includes('YMid')) {
+      renderY = y + (destH - renderH) / 2;
+    } else if (par.includes('YMax')) {
+      renderY = y + (destH - renderH);
+    }
   }
-  return { x, y, destW, destH, sx, sy, transform };
+
+  const sx = renderW / srcW;
+  const sy = renderH / srcH;
+  return { x: renderX, y: renderY, renderX, renderY, destW: renderW, destH: renderH, sx, sy, existing };
 }
 
 function ensureTraceDialog() {
@@ -544,10 +565,13 @@ function schedulePreview(dlg) {
   }, 280);
 }
 
-function insertTracedGroups(svgEditor, imageEl, payload) {
+function insertTracedGroups(svgEditor, imageEl, payload, ui = null) {
   const sc = svgEditor.svgCanvas;
-  const { colorGroups, width: srcW, height: srcH } = payload;
-  const { transform } = getImagePlacement(imageEl, srcW, srcH);
+  const { tracedata, width: srcW, height: srcH, options } = payload;
+  const placement = getImagePlacement(imageEl, srcW, srcH);
+  const activeUi = ui || (document.getElementById('visteras_trace_dialog') ? readUiFromDialog(document.getElementById('visteras_trace_dialog')) : {});
+  // Bake translation and scale directly into path d coordinates so pathedit anchor points line up 1:1 on canvas
+  const colorGroups = tracedataToColorGroups(tracedata, options, activeUi, placement);
 
   const g = document.createElementNS(SVG_NS, 'g');
   g.setAttribute('id', sc.getNextId());
@@ -556,7 +580,9 @@ function insertTracedGroups(svgEditor, imageEl, payload) {
   g.setAttribute('data-name', 'Traced');
   // inkscape-style label for layers panel if present
   try { g.setAttributeNS('http://www.inkscape.org/namespaces/inkscape', 'inkscape:label', 'Traced'); } catch (_) { /* ignore */ }
-  g.setAttribute('transform', transform);
+  if (placement.existing && placement.existing.trim()) {
+    g.setAttribute('transform', placement.existing);
+  }
 
   colorGroups.forEach((cg) => {
     const cgEl = document.createElementNS(SVG_NS, 'g');
@@ -637,7 +663,7 @@ function wireDialogControls(dlg) {
       if (!payload || JSON.stringify(session.lastUi) !== JSON.stringify(ui)) {
         payload = await computeTracePayload(session.img, ui);
       }
-      insertTracedGroups(session.svgEditor, session.imageEl, payload);
+      insertTracedGroups(session.svgEditor, session.imageEl, payload, ui);
       closeTraceDialog();
       showToast('Traced paths inserted above the original (grouped by color). Flat logos/icons only — not photos.');
     } catch (err) {
