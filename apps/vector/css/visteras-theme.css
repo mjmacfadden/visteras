@@ -1165,9 +1165,47 @@ elix-dialog {
   cursor: inherit;
 }
 
+/* Direct Selection Base Cursor (Canvas & Empty Space) */
 .mode-pathedit #workarea,
-[data-mode="pathedit"] #workarea {
+[data-mode="pathedit"] #workarea,
+.mode-pathedit #svgcanvas,
+[data-mode="pathedit"] #svgcanvas {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, default !important;
+}
+
+/* Direct Selection Object Body Hover (Shows object move cursor when hovering over path/shape body) */
+.mode-pathedit #svgcontent path,
+.mode-pathedit #svgcontent rect,
+.mode-pathedit #svgcontent circle,
+.mode-pathedit #svgcontent ellipse,
+.mode-pathedit #svgcontent polygon,
+.mode-pathedit #svgcontent polyline,
+.mode-pathedit #svgcontent line,
+[data-mode="pathedit"] #svgcontent path,
+[data-mode="pathedit"] #svgcontent rect,
+[data-mode="pathedit"] #svgcontent circle,
+[data-mode="pathedit"] #svgcontent ellipse,
+[data-mode="pathedit"] #svgcontent polygon,
+[data-mode="pathedit"] #svgcontent polyline,
+[data-mode="pathedit"] #svgcontent line {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M16 11 L16 17 M13 14 L19 14 M16 11 L14.5 12.5 M16 11 L17.5 12.5 M16 17 L14.5 15.5 M16 17 L17.5 15.5 M13 14 L14.5 12.5 M13 14 L14.5 15.5 M19 14 L17.5 12.5 M19 14 L17.5 15.5' fill='none' stroke='%23000000' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 4 4, move !important;
+}
+
+/* Direct Selection Anchor Point & Control Point Hover (Shows single anchor manipulation cursor) */
+#pathpointgrip_container circle,
+[id^="pathpointgrip_"],
+[id^="ctrlpointgrip_"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3Crect x='13' y='13' width='6.5' height='6.5' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' rx='0.5'/%3E%3C/svg%3E") 4 4, pointer !important;
+  transition: r 0.1s ease, stroke-width 0.1s ease;
+}
+
+#pathpointgrip_container circle:hover,
+[id^="pathpointgrip_"]:hover,
+[id^="ctrlpointgrip_"]:hover {
+  r: 5px !important;
+  stroke: #3f8ff7 !important;
+  stroke-width: 2px !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23000000' stroke='%23000000' stroke-width='3.5' stroke-linejoin='round'/%3E%3Cpath d='M4 4 L21 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3Crect x='13' y='13' width='6.5' height='6.5' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' rx='0.5'/%3E%3C/svg%3E") 4 4, pointer !important;
 }
 
 /* ==========================================================================

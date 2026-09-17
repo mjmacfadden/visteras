@@ -38459,10 +38459,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				id: `pathpointgrip_${e}`,
 				display: "none",
 				r: 4,
-				fill: "#0FF",
-				stroke: "#00F",
-				"stroke-width": 2,
-				cursor: "move",
+				fill: "#FFFFFF",
+				stroke: "#3f8ff7",
+				"stroke-width": 1.5,
 				style: "pointer-events:all"
 			}, n = Qg.getUIStrings();
 			"pathNodeTooltip" in n && (t["xlink:title"] = n.pathNodeTooltip), kg(i, t), r.append(i), document.getElementById("pathpointgrip_" + e)?.addEventListener("dblclick", () => {
@@ -38482,11 +38481,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let n = {
 			id: "ctrlpointgrip_" + e,
 			display: "none",
-			r: 4,
-			fill: "#0FF",
-			stroke: "#55F",
-			"stroke-width": 1,
-			cursor: "move",
+			r: 3.5,
+			fill: "#FFFFFF",
+			stroke: "#3f8ff7",
+			"stroke-width": 1.5,
 			style: "pointer-events:all"
 		}, r = Qg.getUIStrings();
 		return "pathCtrlPtTooltip" in r && (n["xlink:title"] = r.pathCtrlPtTooltip), kg(t, n), r_().append(t), t;
@@ -38591,13 +38589,13 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			for (let t in this.ctrlpts) ({}).hasOwnProperty.call(this.ctrlpts, t) && this.ctrlpts[t].setAttribute("display", e ? "inline" : "none");
 		}
 		selectCtrls(e) {
-			document.getElementById(`ctrlpointgrip_${this.index}c1`)?.setAttribute("fill", e ? "#0FF" : "#EEE"), document.getElementById(`ctrlpointgrip_${this.index}c2`)?.setAttribute("fill", e ? "#0FF" : "#EEE");
+			document.getElementById(`ctrlpointgrip_${this.index}c1`)?.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF"), document.getElementById(`ctrlpointgrip_${this.index}c2`)?.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF");
 		}
 		show(e) {
 			this.ptgrip && (this.ptgrip.setAttribute("display", e ? "inline" : "none"), this.segsel.setAttribute("display", e ? "inline" : "none"), this.showCtrlPts(e));
 		}
 		select(e) {
-			this.ptgrip && (this.ptgrip.setAttribute("stroke", e ? "#0FF" : "#00F"), this.segsel.setAttribute("display", e ? "inline" : "none"), this.ctrlpts && this.selectCtrls(e), this.selected = e);
+			this.ptgrip && (this.ptgrip.setAttribute("fill", e ? "#3f8ff7" : "#FFFFFF"), this.ptgrip.setAttribute("stroke", "#3f8ff7"), this.ptgrip.setAttribute("stroke-width", "1.5"), this.segsel.setAttribute("display", e ? "inline" : "none"), this.ctrlpts && this.selectCtrls(e), this.selected = e);
 		}
 		addGrip() {
 			this.ptgrip = s_(this, !0), this.ctrlpts = c_(this), this.segsel = u_(this, !0);
@@ -68832,6 +68830,8 @@ var fz = () => {
 		this.setCursorStyle(t);
 	}
 	setCursorStyle(e) {
+		document.body?.setAttribute("data-mode", e);
+		this.workarea?.setAttribute("data-mode", e);
 		let t = "auto";
 		switch (e) {
 			case "select":
@@ -68864,7 +68864,7 @@ var fz = () => {
 			default:
 				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M4 4 L21 12 L12 12 L12 21 Z\' fill=\'%23ffffff\' stroke=\'%23ffffff\' stroke-width=\'3.5\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M4 4 L21 12 L12 12 L12 21 Z\' fill=\'%23000000\' stroke=\'%23000000\' stroke-width=\'1.5\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 4 4, default';
 		}
-		this.workarea.style.cursor = t;
+		if (this.workarea) this.workarea.style.cursor = t;
 		let el = pz("svgcanvas");
 		if (el) el.style.cursor = t;
 	}
