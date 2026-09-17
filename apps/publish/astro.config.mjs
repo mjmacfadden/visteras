@@ -8,7 +8,7 @@ import { defineConfig } from 'astro/config';
  */
 export default defineConfig({
   output: 'static',
-  base: process.env.ASTRO_BASE || '/news/',
+  base: process.env.ASTRO_BASE || '/publish/',
   site: process.env.ASTRO_SITE || undefined,
   // Dev-only floating toolbar (audits / x-ray) — off for a clean newspaper preview
   devToolbar: { enabled: false },

@@ -388,7 +388,7 @@ function dedupe(stories: RssStory[]): RssStory[] {
 }
 
 export interface FetchFeedsOptions {
-  /** If set, only these built-in feed ids run. */
+  /** null/undefined = all built-ins; [] = none; non-empty = those ids. */
   enabledFeedIds?: string[] | null;
   /** Extra custom feeds. */
   customFeeds?: { id: string; name: string; url: string }[];
@@ -410,9 +410,15 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
     failedFeeds: [],
   };
 
-  const enabled = opts.enabledFeedIds
-    ? new Set(opts.enabledFeedIds)
-    : null;
+  // null/undefined → all built-ins.
+  // [] → no built-ins (custom-only / RSS master off).
+  // Non-empty → those ids only.
+  // (Previously `opts.enabledFeedIds ? new Set(...)` treated [] as truthy,
+  //  yielding an empty Set and filtering NEWS_FEEDS to zero feeds.)
+  const enabled =
+    opts.enabledFeedIds == null
+      ? null
+      : new Set(opts.enabledFeedIds);
 
   const builtIns = NEWS_FEEDS.filter((f) => !enabled || enabled.has(f.id));
   const customMap = new Map<string, CustomFeedResult>();

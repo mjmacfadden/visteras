@@ -21,7 +21,7 @@ import TodayInHistory from '../components/TodayInHistory.astro';
 import Birthdays from '../components/Birthdays.astro';
 import AnswersQr from '../components/AnswersQr.astro';
 import RightSidebarPanels from '../components/RightSidebarPanels.astro';
-import '../styles/visteras-news-theme.css';
+import '../styles/visteras-publish-theme.css';
 
 const { edition, feedStatus, comicsLive, comicsPool, rssEnabled } = await buildLiveEdition(latestEdition);
 const editionDate = new Date(`${edition.date}T12:00:00`);
@@ -29,7 +29,7 @@ const puzzles = puzzlesForDate(editionDate);
 const feedCatalog = NEWS_FEEDS.map((f) => ({ id: f.id, name: f.name, section: f.section }));
 const comicCatalog = COMIC_FEEDS.map((c) => ({ id: c.id, title: c.title }));
 
-const newsLogo = `${Astro.base || '/news/'}images/visteras_news_logo.png`;
+const publishLogo = `${Astro.base || '/publish/'}images/visteras_publish_logo.png`;
 
 const hasWireStories =
   Boolean(edition.leadStory?.title) ||
@@ -43,13 +43,13 @@ const hasWireStories =
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/png" href={newsLogo} />
-    <link rel="apple-touch-icon" href={newsLogo} />
+    <link rel="icon" type="image/png" href={publishLogo} />
+    <link rel="apple-touch-icon" href={publishLogo} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="THE DAILY MIKE — personal morning newspaper" />
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#14b8a6" />
-    <title>Visteras - Publish</title>
+    <title>Visteras Publish — {edition.dateDisplay}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -119,7 +119,7 @@ const hasWireStories =
           <div class="menu_entry" id="menu_help">
             <div class="menu_entry_title">Help</div>
             <div class="menu_dropdown_list">
-              <div class="menu_dropdown_item" id="action_about">About Visteras News...</div>
+              <div class="menu_dropdown_item" id="action_about">About Visteras Publish...</div>
               <div class="menu_dropdown_item" id="action_guide">Markdown Format Guide</div>
               <div class="menu_dropdown_separator"></div>
               <a href="../studio/" class="menu_dropdown_item">Open Visteras Studio...</a>
@@ -141,9 +141,9 @@ const hasWireStories =
 
       <!-- 2. Top Options Bar -->
       <header id="tools_top">
-        <a href="#" class="visteras_news_logo_wrap" title="Visteras News">
-          <img src={newsLogo} alt="Visteras News" />
-          <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">NEWS</span></span>
+        <a href="#" class="visteras_publish_logo_wrap" title="Visteras Publish">
+          <img src={publishLogo} alt="Visteras Publish" />
+          <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">PUBLISH</span></span>
         </a>
 
         <div class="visteras_top_divider"></div>
@@ -436,6 +436,9 @@ const hasWireStories =
           el.textContent = upper;
         });
 
+        // Browser title stays product chrome ("Visteras Publish"), not the paper masthead.
+        const dateStr = document.querySelector('.masthead-date-line span:first-child')?.textContent || '';
+        document.title = dateStr ? `Visteras Publish — ${dateStr}` : 'Visteras Publish';
       }
 
       async function runPaginate() {
@@ -1063,12 +1066,31 @@ const hasWireStories =
         if (status) status.textContent = 'Refreshing feeds…';
         const editionDate = document.body.dataset.editionDate || '';
         try {
-          const data = await fetchAllFeeds({
-            enabledFeedIds: s.rssEnabled ? s.enabledFeedIds : [],
+          // When RSS master is on but no checkboxes saved yet, pass null (= all built-ins).
+          const enabledFeedIds =
+            s.rssEnabled
+              ? (s.enabledFeedIds?.length ? s.enabledFeedIds : null)
+              : [];
+          let data = await fetchAllFeeds({
+            enabledFeedIds,
             customFeeds: s.customFeeds,
             editionDate,
             todayOnlyBuiltIn: true,
           });
+          const emptyBuiltIn =
+            !data.news?.length &&
+            !data.businessTech?.length &&
+            !data.sports?.length &&
+            !data.lead?.length;
+          // Mirror SSR buildLiveEdition: if today-only yields nothing, retry without the filter.
+          if (emptyBuiltIn && s.rssEnabled) {
+            data = await fetchAllFeeds({
+              enabledFeedIds,
+              customFeeds: s.customFeeds,
+              editionDate,
+              todayOnlyBuiltIn: false,
+            });
+          }
           lastRss = {
             news: data.news?.length ? data.news.slice(0, 5) : [],
             businessTech: data.businessTech?.length ? data.businessTech.slice(0, 5) : [],
@@ -1246,8 +1268,11 @@ const hasWireStories =
         if (zipInput) zipInput.value = s.zip;
         const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
         if (rssMaster) rssMaster.checked = s.rssEnabled === true;
-        document.querySelectorAll<HTMLInputElement>('input[name="feed"]').forEach((cb) => {
-          cb.checked = s.enabledFeedIds.includes(cb.value);
+        const feedBoxes = document.querySelectorAll<HTMLInputElement>('input[name="feed"]');
+        // Master on + empty enabledFeedIds → treat as all built-ins (matches fetchAllFeeds).
+        const defaultAllFeeds = s.rssEnabled && (!s.enabledFeedIds || s.enabledFeedIds.length === 0);
+        feedBoxes.forEach((cb) => {
+          cb.checked = defaultAllFeeds || s.enabledFeedIds.includes(cb.value);
         });
         document.querySelectorAll<HTMLInputElement>('input[name="comic"]').forEach((cb) => {
           cb.checked = s.enabledComicIds.includes(cb.value);
@@ -1270,9 +1295,15 @@ const hasWireStories =
         const zipInput = document.getElementById('settings-zip') as HTMLInputElement | null;
         const zip = (zipInput?.value || '60062').trim();
         const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        const enabledFeedIds = Array.from(
+        let enabledFeedIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="feed"]:checked'),
         ).map((cb) => cb.value);
+        // Master on with nothing checked → default to all built-in feed ids.
+        if (rssMaster?.checked && enabledFeedIds.length === 0) {
+          enabledFeedIds = Array.from(
+            document.querySelectorAll<HTMLInputElement>('input[name="feed"]'),
+          ).map((cb) => cb.value);
+        }
         const rssEnabled = Boolean(rssMaster?.checked) || customFeeds.length > 0 || enabledFeedIds.length > 0;
         const enabledComicIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="comic"]:checked'),
@@ -1298,7 +1329,15 @@ const hasWireStories =
         dialog?.showModal();
       });
 
-      document.getElementById('settings-rss-enabled')?.addEventListener('change', syncRssGroupsDisabled);
+      document.getElementById('settings-rss-enabled')?.addEventListener('change', () => {
+        const master = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
+        if (master?.checked) {
+          const boxes = document.querySelectorAll<HTMLInputElement>('input[name="feed"]');
+          const anyChecked = Array.from(boxes).some((cb) => cb.checked);
+          if (!anyChecked) boxes.forEach((cb) => { cb.checked = true; });
+        }
+        syncRssGroupsDisabled();
+      });
 
       document.getElementById('custom-feed-add-btn')?.addEventListener('click', () => {
         const name = (document.getElementById('custom-feed-name') as HTMLInputElement)?.value.trim() || 'Custom';

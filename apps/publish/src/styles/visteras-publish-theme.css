@@ -1,5 +1,5 @@
 /**
- * Visteras News - Studio Companion Theme & Layout
+ * Visteras Publish - Studio Companion Theme & Layout
  * Tailored to match Visteras Studio and Vector layout and UX pixel-perfect
  */
 
@@ -20,7 +20,7 @@
   --studio-text: #cccccc;
   --studio-text-muted: #888888;
 
-  /* Teal Accent for Visteras News */
+  /* Teal Accent for Visteras Publish */
   --news-teal: #14b8a6;
   --news-teal-light: #2dd4bf;
   --news-teal-dark: #0f766e;
@@ -227,7 +227,7 @@ html {
   user-select: none;
 }
 
-.visteras_news_logo_wrap {
+.visteras_publish_logo_wrap {
   display: inline-flex;
   align-items: center;
   height: 36px;
@@ -243,15 +243,15 @@ html {
   cursor: pointer;
 }
 
-.visteras_news_logo_wrap img,
-.visteras_news_logo_wrap svg {
+.visteras_publish_logo_wrap img,
+.visteras_publish_logo_wrap svg {
   height: 28px;
   width: auto;
   vertical-align: middle;
   flex-shrink: 0;
 }
 
-.visteras_news_logo_wrap .logo_text {
+.visteras_publish_logo_wrap .logo_text {
   color: #ffffff;
   font-size: 14px;
   letter-spacing: 1px;
@@ -260,11 +260,11 @@ html {
   line-height: 1;
 }
 
-.visteras_news_logo_wrap .logo_bold {
+.visteras_publish_logo_wrap .logo_bold {
   font-weight: 700;
 }
 
-.visteras_news_logo_wrap .logo_light {
+.visteras_publish_logo_wrap .logo_light {
   font-weight: 100;
   opacity: 0.7;
 }

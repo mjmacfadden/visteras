@@ -7,6 +7,7 @@ This repository is a **monorepo**:
 ```
 apps/studio/   # Visteras Studio — raster image editor (PSD-capable)
 apps/vector/   # Visteras Vector — SVG-Edit companion
+apps/publish/  # Visteras Publish — personal morning newspaper
 packages/      # Future shared libraries (placeholder)
 docs/          # Product / engineering notes
 scripts/       # build-site.sh — assemble publish tree
@@ -17,6 +18,7 @@ site/          # GENERATED (gitignored) — GitHub Pages publish root
 |-----------------|------------------------------------|
 | `apps/studio/`  | https://visteras.com/studio/       |
 | `apps/vector/`  | https://visteras.com/vector/       |
+| `apps/publish/` | https://visteras.com/publish/      |
 
 Architecture only for now — **no Studio ↔ Vector document compatibility**.
 
@@ -48,6 +50,11 @@ npm run build:studio    # production -> apps/studio/dist/
 # Vector (static SVG-Edit; no compile step)
 npm run dev:vector      # static server on :5173
 npm run build:vector    # no-op (already static)
+
+# Publish (Astro newspaper)
+npm install --prefix apps/publish
+npm run dev:publish     # http://localhost:4321/publish/
+npm run build:publish
 ```
 
 Local `npm run dev:studio` mirrors production paths: Studio at `/studio/`, Vector at `/vector/` (static mounts). Root `/` redirects to `/studio/`.
@@ -56,7 +63,7 @@ You can also `cd apps/studio` and use `npm run server` / `npm run build` directl
 
 ## Publish site (`site/`)
 
-Production should serve **`/studio/`** and **`/vector/`** on `visteras.com` — **not** `/apps/studio`.
+Production should serve **`/studio/`**, **`/vector/`**, and **`/publish/`** on `visteras.com` — **not** `/apps/studio`.
 
 ```bash
 npm run build:site    # builds Studio, then writes site/
@@ -70,6 +77,7 @@ site/
   index.html            # hub + redirect to /studio/
   studio/               # Studio static tree (index, dist, images, SW, …)
   vector/               # Vector static tree (Editor.js kept; *.map excluded)
+  publish/              # Publish Astro dist
 ```
 
 `site/` is **gitignored**. Commit the build script + docs; generate `site/` when publishing.

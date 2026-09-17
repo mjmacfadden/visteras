@@ -25,9 +25,9 @@ jobs:
           cache: npm
           cache-dependency-path: |
             apps/studio/package-lock.json
-            apps/news/package-lock.json
+            apps/publish/package-lock.json
       - run: npm ci --prefix apps/studio
-      - run: npm ci --prefix apps/news
+      - run: npm ci --prefix apps/publish
       - run: npm run build:site
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -7,11 +7,11 @@ import { PAPER_NAME_UPPER, PAPER_TAGLINE } from '../../lib/site';
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/png" href={`${import.meta.env.BASE_URL || '/news/'}images/visteras_news_logo.png`} />
-    <link rel="apple-touch-icon" href={`${import.meta.env.BASE_URL || '/news/'}images/visteras_news_logo.png`} />
+    <link rel="icon" type="image/png" href={`${import.meta.env.BASE_URL || '/publish/'}images/visteras_publish_logo.png`} />
+    <link rel="apple-touch-icon" href={`${import.meta.env.BASE_URL || '/publish/'}images/visteras_publish_logo.png`} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>Puzzle answers · {PAPER_NAME_UPPER}</title>
+    <title>Puzzle answers · Visteras Publish</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -66,7 +66,7 @@ import { PAPER_NAME_UPPER, PAPER_TAGLINE } from '../../lib/site';
         const nameUpper = (settings.paperName || 'The Daily Mike').trim().toUpperCase();
         const tagline = (settings.paperTagline || 'NOTEWORTHY EVENTS WEATHER AND SPORTS').trim();
 
-        document.title = `Puzzle answers — ${isoDate} · ${nameUpper}`;
+        document.title = `Puzzle answers · Visteras Publish`;
 
         const kicker = document.querySelector('.answers-kicker');
         if (kicker) kicker.textContent = nameUpper;

@@ -1,5 +1,5 @@
 {
-  "name": "visteras-news",
+  "name": "visteras-publish",
   "type": "module",
   "version": "1.0.0",
   "engines": {
@@ -21,7 +21,7 @@
   "allowScripts": {
     "esbuild": true
   },
-  "description": "Visteras News — Client-side morning newspaper",
+  "description": "Visteras Publish \u2014 Client-side morning newspaper",
   "devDependencies": {
     "@types/qrcode": "^1.5.6"
   }

@@ -93,8 +93,8 @@ const menuDefinition = [
 				href: '../vector/'
 			},
 			{
-				name: 'Visteras News',
-				href: '../news/'
+				name: 'Visteras Publish',
+				href: '../publish/'
 			},
 			{
 				divider: true
@@ -994,8 +994,8 @@ const menuDefinition = [
 				href: '../vector/'
 			},
 			{
-				name: 'Visteras News (Morning Newspaper)',
-				href: '../news/'
+				name: 'Visteras Publish (Morning Newspaper)',
+				href: '../publish/'
 			}
 		]
 	}

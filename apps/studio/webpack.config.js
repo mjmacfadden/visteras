@@ -86,8 +86,8 @@ module.exports = function (env, argv) {
 				publicPath: "/vector",
 			},
 			{
-				directory: path.resolve(__dirname, "../news/dist"),
-				publicPath: "/news",
+				directory: path.resolve(__dirname, "../publish/dist"),
+				publicPath: "/publish",
 			},
 		],
 		setupMiddlewares: function (middlewares, devServer) {
@@ -103,9 +103,9 @@ module.exports = function (env, argv) {
 				}
 				next();
 			});
-			devServer.app.get("/news", function (req, res, next) {
-				if (req.path === "/news") {
-					return res.redirect("/news/");
+			devServer.app.get("/publish", function (req, res, next) {
+				if (req.path === "/publish") {
+					return res.redirect("/publish/");
 				}
 				next();
 			});
