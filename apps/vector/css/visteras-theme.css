@@ -490,6 +490,19 @@ html, body {
   filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5)) !important;
 }
 
+/* Outline / Wireframe Mode (Illustrator Parity: White Workspace Background) */
+#workarea.wireframe,
+#workarea.wireframe #svgcanvas {
+  background-color: #ffffff !important;
+}
+
+#workarea.wireframe #canvasBackground rect {
+  fill: #ffffff !important;
+  filter: none !important;
+  stroke: #d0d0d0 !important;
+  stroke-width: 1px !important;
+}
+
 #ruler_corner {
   grid-area: corner !important;
   background: #2b2b2b !important;

@@ -398,6 +398,11 @@ hr {
   fill: #FFF !important;
 }
 
+#workarea.wireframe,
+#workarea.wireframe #svgcanvas {
+  background-color: #FFF !important;
+}
+
 #cur_context_panel {
   grid-area: rulerX;
   line-height: 22px;
