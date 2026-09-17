@@ -40897,8 +40897,19 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 							a ? e.addSubCommand(a) : n.numberOfItems > 1 && i ? e.addSubCommand(wy(q.getSvgRoot(), t, n, r)) : (t.getAttribute("transform") || "") !== r && e.addSubCommand(new yy(t, { transform: r }));
 						}), e.isEmpty() || q.addCommandToHistory(e), q.dragStartTransforms = null, q.hasDragStartTransform = !1;
 						let n = t.length;
-						for (let e = 0; e < n && t[e]; ++e) q.selectorManager.requestSelector(t[e]).resize();
+						for (let e = 0; e < n && t[e]; ++e) {
+							let sel = q.selectorManager.requestSelector(t[e]);
+							sel && sel.resize();
+						}
+						requestAnimationFrame(() => {
+							for (let e = 0; e < n && t[e]; ++e) {
+								if (t[e] && q.selectorManager?.selectorMap?.[t[e].id]) {
+									q.selectorManager.requestSelector(t[e])?.resize();
+								}
+							}
+						});
 					} else p = e.target, t[0].nodeName === "path" && !t[1] ? q.pathActions.select(t[0]) : e.shiftKey && r !== p && q.removeFromSelection([p]);
+					q.dragStartTransforms = null, q.hasDragStartTransform = !1;
 					let n = t[0];
 					n && (n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
 						e.style.removeProperty("pointer-events");
@@ -64056,7 +64067,12 @@ ${y}`), [3, 7];
 		requestSelector(e, t) {
 			if (!e) return null;
 			let n = this.selectors.length;
-			if (typeof this.selectorMap[e.id] == "object") return this.selectorMap[e.id].locked = !0, this.selectorMap[e.id];
+			if (typeof this.selectorMap[e.id] == "object") {
+				let r = this.selectorMap[e.id];
+				r.locked = !0;
+				if (t) r.resize(t);
+				return r;
+			}
 			for (let r = 0; r < n; ++r) if (!this.selectors[r]?.locked) return this.selectors[r].locked = !0, this.selectors[r].reset(e, t), this.selectorMap[e.id] = this.selectors[r], this.selectors[r];
 			return this.selectors[n] = new FI(n, e, t), this.selectorParentGroup.append(this.selectors[n].selectorGroup), this.selectorMap[e.id] = this.selectors[n], this.selectors[n];
 		}

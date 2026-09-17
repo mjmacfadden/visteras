@@ -1116,7 +1116,11 @@ function hookSelectorManager(svgEditor) {
           }
         }
       }
-      return origRequestSelector(elem, bbox);
+      const sel = origRequestSelector(elem, bbox);
+      if (sel && bbox) {
+        sel.resize(bbox);
+      }
+      return sel;
     };
   }
 
