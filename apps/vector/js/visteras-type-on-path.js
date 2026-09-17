@@ -282,10 +282,10 @@ function attachPathBBoxProxy(textEl, pathEl) {
 function setupPathHoverEffects(pathEl, textEl) {
   if (!pathEl) return;
 
-  // Path loses stroke and fill; 10px transparent hit zone for easy hovering
+  // Path loses stroke and fill; thin 1px line for clean hover outline
   pathEl.setAttribute('fill', 'none');
   pathEl.setAttribute('stroke', 'transparent');
-  pathEl.setAttribute('stroke-width', '10');
+  pathEl.setAttribute('stroke-width', '1');
   pathEl.setAttribute('vector-effect', 'non-scaling-stroke');
   pathEl.setAttribute('pointer-events', 'stroke');
   pathEl.classList.add('visteras-type-on-path-source');
@@ -304,7 +304,7 @@ function setupPathHoverEffects(pathEl, textEl) {
     pathEl.classList.remove('visteras-top-hovered');
     if (!pathEl.classList.contains('visteras-top-selected')) {
       pathEl.style.stroke = 'transparent';
-      pathEl.style.strokeWidth = '10px';
+      pathEl.style.strokeWidth = '1px';
       pathEl.style.fill = 'none';
     }
   };
@@ -807,7 +807,10 @@ function disarmTypeOnPathMode(svgEditor) {
     el.classList.remove('visteras-top-mode-hover-target');
     if (!el.classList.contains('visteras-top-selected')) {
       el.classList.remove('visteras-top-hovered');
-      el.style.stroke = 'transparent';
+      if (el.classList.contains('visteras-type-on-path-source')) {
+        el.style.stroke = 'transparent';
+        el.style.strokeWidth = '1px';
+      }
     }
   });
 
@@ -855,7 +858,10 @@ function armTypeOnPathMode(svgEditor) {
         lastHovered.classList.remove('visteras-top-mode-hover-target');
         if (!lastHovered.classList.contains('visteras-top-selected')) {
           lastHovered.classList.remove('visteras-top-hovered');
-          lastHovered.style.stroke = 'transparent';
+          if (lastHovered.classList.contains('visteras-type-on-path-source')) {
+            lastHovered.style.stroke = 'transparent';
+            lastHovered.style.strokeWidth = '1px';
+          }
         }
         lastHovered = null;
       }
@@ -880,7 +886,10 @@ function armTypeOnPathMode(svgEditor) {
         lastHovered.classList.remove('visteras-top-mode-hover-target');
         if (!lastHovered.classList.contains('visteras-top-selected')) {
           lastHovered.classList.remove('visteras-top-hovered');
-          lastHovered.style.stroke = 'transparent';
+          if (lastHovered.classList.contains('visteras-type-on-path-source')) {
+            lastHovered.style.stroke = 'transparent';
+            lastHovered.style.strokeWidth = '1px';
+          }
         }
       }
       lastHovered = target;
@@ -1231,7 +1240,7 @@ function syncSelectionState(svgEditor) {
   allSourcePaths.forEach((path) => {
     path.classList.remove('visteras-top-selected', 'visteras-top-hovered');
     path.style.stroke = 'transparent';
-    path.style.strokeWidth = '10px';
+    path.style.strokeWidth = '1px';
   });
 
   selectedElems.forEach((el) => {
@@ -1245,6 +1254,7 @@ function syncSelectionState(svgEditor) {
         pathEl.classList.add('visteras-top-selected');
         pathEl.classList.remove('visteras-top-hovered');
         pathEl.style.stroke = 'transparent';
+        pathEl.style.strokeWidth = '1px';
       }
     }
   });

@@ -1072,7 +1072,7 @@ elix-dialog {
 
 /* Type on Path attached source path styling & hover state */
 .visteras-type-on-path-source {
-  transition: stroke 0.1s ease;
+  stroke-width: 1px !important;
   vector-effect: non-scaling-stroke !important;
 }
 
@@ -1087,6 +1087,7 @@ elix-dialog {
 
 .visteras-type-on-path-source.visteras-top-selected {
   stroke: transparent !important;
+  stroke-width: 1px !important;
   fill: none !important;
 }
 
