@@ -17,19 +17,20 @@ export function is_layer_clipped(layer) {
 }
 
 /**
- * Composition used when painting a layer (canvas GCO / GPU blend).
- * Clip wins: whenever the layer is clipped, paint with source-atop
- * (matching prior working behavior). Non-clipped layers use their blend.
+ * Blend / Porter-Duff mode used when compositing a layer onto the backdrop.
+ * Clipping is applied separately as an alpha mask — never override the blend
+ * with source-atop here. Legacy source-atop meant "clipped", not a blend.
  *
  * @param {object|null|undefined} layer
  * @returns {string}
  */
 export function get_render_composition(layer) {
 	if (!layer) return 'source-over';
-	if (is_layer_clipped(layer)) {
-		return 'source-atop';
+	var composition = layer.composition == null ? 'source-over' : layer.composition;
+	if (composition === 'source-atop') {
+		return 'source-over';
 	}
-	return layer.composition == null ? 'source-over' : layer.composition;
+	return composition;
 }
 
 /**

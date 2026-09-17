@@ -654,50 +654,62 @@ class Base_layers_class {
 				continue;
 			}
 
-			// If the layer or next layer is clipped (clipping mask).
-			// Isolated temporary canvas keeps the clip group correct.
-			if (
-				is_layer_clipped(layer) ||
-				(nextLayer && is_layer_clipped(nextLayer))
-			) {
-				tempCtx.globalAlpha = layer.opacity / 100;
+			// Clipping masks: tempCanvas holds the clip-base alpha. Clipped
+			// layers are masked to that alpha, then composited with their real
+			// blend mode (clip and blend are independent — Photoshop-style).
+			if (is_layer_clipped(layer)) {
+				var blend = get_render_composition(layer);
+				if (!this._clip_layer_canvas) {
+					this._clip_layer_canvas = document.createElement('canvas');
+				}
+				var layerCanvas = this._clip_layer_canvas;
+				if (layerCanvas.width !== tempCanvas.width || layerCanvas.height !== tempCanvas.height) {
+					layerCanvas.width = tempCanvas.width;
+					layerCanvas.height = tempCanvas.height;
+				}
+				var layerCtx = layerCanvas.getContext('2d');
+				layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+				layerCtx.globalAlpha = 1;
+				layerCtx.globalCompositeOperation = 'source-over';
+				layerCtx.clearRect(0, 0, layerCanvas.width, layerCanvas.height);
+				layerCtx.globalAlpha = layer.opacity / 100;
+				this.render_object(layerCtx, layer);
 
-				// If the next layer is clipped then isolate the shadow filter
-				// from temporary canvas and keep that in the original canvas
-				if (nextLayer && is_layer_clipped(nextLayer)) {
-					// Painting the clip BASE — use its real blend, not source-atop.
-					var baseComp = layer.composition || 'source-over';
-					ctx.globalAlpha = layer.opacity / 100;
-					ctx.globalCompositeOperation = baseComp;
-					tempCtx.globalCompositeOperation = baseComp;
-					this.render_object(ctx, layer);
-					// Then remove the shadow (if it exists) from the render process in the temporary canvas
-					const filters = (layer.filters || []).filter((filter) => {
-						return filter.name !== "shadow";
-					});
-					this.render_object(tempCtx, {
-						...layer,
-						filters,
-					});
-				} else {
-					// Clipped layer itself — always source-atop onto the isolated base.
-					tempCtx.globalCompositeOperation = 'source-atop';
-					this.render_object(tempCtx, layer);
-					
-					// Render the clipped layers on top of the current canvas
+				// Keep only pixels that overlap the clip-base alpha.
+				layerCtx.globalAlpha = 1;
+				layerCtx.globalCompositeOperation = 'destination-in';
+				layerCtx.drawImage(tempCanvas, 0, 0);
+
+				// Composite masked pixels with the layer's real blend mode.
+				ctx.globalAlpha = 1;
+				ctx.globalCompositeOperation = blend;
+				ctx.drawImage(layerCanvas, 0, 0);
+
+				// End of clip group when the next (above) layer is not clipped.
+				if (!nextLayer || !is_layer_clipped(nextLayer)) {
 					ctx.restore();
-					ctx.drawImage(tempCanvas, 0, 0);
-
-					
-					// Prepare canvas to since we called restore
 					prepare && prepare();
-					// Clear temporary canvas 
 					tempCtx.globalCompositeOperation = null;
 					tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
 				}
+			} else if (nextLayer && is_layer_clipped(nextLayer)) {
+				// Clip BASE — paint with its real blend; copy alpha into temp
+				// (without drop-shadow) so clipped siblings can mask to it.
+				var baseComp = get_render_composition(layer);
+				ctx.globalAlpha = layer.opacity / 100;
+				ctx.globalCompositeOperation = baseComp;
+				tempCtx.globalAlpha = layer.opacity / 100;
+				tempCtx.globalCompositeOperation = 'source-over';
+				this.render_object(ctx, layer);
+				const filters = (layer.filters || []).filter((filter) => {
+					return filter.name !== "shadow";
+				});
+				this.render_object(tempCtx, {
+					...layer,
+					filters,
+				});
 			} else {
 				ctx.globalAlpha = layer.opacity / 100;
-				// Clipped → source-atop; otherwise the layer's blend mode
 				ctx.globalCompositeOperation = get_render_composition(layer);
 				this.render_object(ctx, layer);
 			}
