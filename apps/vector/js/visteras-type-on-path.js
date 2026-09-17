@@ -973,10 +973,50 @@ function hookSelectorManager(svgEditor) {
   const sm = sc.selectorManager;
   const HANDLE_SIZE = 7; // Studio handle size in screen px
 
+  const ROTATE_CURSOR_CSS = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' d='M 17 5.9 A 8 8 0 1 0 18.9 17.1'/%3E%3Cpath fill='%23ffffff' stroke='%23ffffff' stroke-width='2.8' stroke-linejoin='round' d='M 19 18.5 L 21.6 13.6 L 16 16.1 Z'/%3E%3Cpath fill='none' stroke='%23000000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M 17 5.9 A 8 8 0 1 0 18.9 17.1'/%3E%3Cpath fill='%23000000' stroke='%23000000' stroke-width='0.9' stroke-linejoin='round' d='M 19 18.5 L 21.6 13.6 L 16 16.1 Z'/%3E%3C/svg%3E") 12 12, auto`;
+
   const transformGripsToSquares = () => {
     if (!sm || !sm.selectorGripsGroup) return;
     const gripKeys = ['nw', 'ne', 'se', 'sw', 'n', 's', 'e', 'w'];
+    const cornerKeys = ['nw', 'ne', 'se', 'sw'];
     const dataStorage = (typeof sc.getDataStorage === 'function') ? sc.getDataStorage() : null;
+
+    if (!sm.rotateCornerGrips) {
+      sm.rotateCornerGrips = {};
+    }
+
+    const ROT_ZONE_SIZE = 26;
+
+    cornerKeys.forEach((k) => {
+      let rotGrip = sm.rotateCornerGrips[k];
+      if (!rotGrip || !rotGrip.parentNode) {
+        rotGrip = document.createElementNS(SVG_NS, 'rect');
+        rotGrip.id = 'selectorGrip_rotate_corner_' + k;
+        rotGrip.setAttribute('width', String(ROT_ZONE_SIZE));
+        rotGrip.setAttribute('height', String(ROT_ZONE_SIZE));
+        rotGrip.setAttribute('fill', 'transparent');
+        rotGrip.setAttribute('stroke', 'none');
+        rotGrip.setAttribute('style', `cursor:${ROTATE_CURSOR_CSS} !important; pointer-events:all;`);
+
+        if (dataStorage) {
+          dataStorage.put(rotGrip, 'dir', k);
+          dataStorage.put(rotGrip, 'type', 'rotate');
+        }
+
+        // Insert before resize handles so direct corner square handles sit on top
+        sm.selectorGripsGroup.insertBefore(rotGrip, sm.selectorGripsGroup.firstChild);
+        sm.rotateCornerGrips[k] = rotGrip;
+      }
+    });
+
+    const updateCornerRotatePos = (k, cx, cy) => {
+      const rotGrip = sm.rotateCornerGrips && sm.rotateCornerGrips[k];
+      if (!rotGrip) return;
+      const offX = k.includes('w') ? -4 : 4;
+      const offY = k.includes('n') ? -4 : 4;
+      rotGrip.setAttribute('x', String(cx - ROT_ZONE_SIZE / 2 + offX));
+      rotGrip.setAttribute('y', String(cy - ROT_ZONE_SIZE / 2 + offY));
+    };
 
     gripKeys.forEach((k) => {
       let existingGrip = sm.selectorGrips[k];
@@ -1010,9 +1050,15 @@ function hookSelectorManager(svgEditor) {
           if (name === 'cx') {
             const num = parseFloat(val);
             origSetAttr('x', isNaN(num) ? val : String(num - HANDLE_SIZE / 2));
+            if (cornerKeys.includes(k) && !isNaN(num)) {
+              updateCornerRotatePos(k, num, parseFloat(rect.getAttribute('y') || 0) + HANDLE_SIZE / 2);
+            }
           } else if (name === 'cy') {
             const num = parseFloat(val);
             origSetAttr('y', isNaN(num) ? val : String(num - HANDLE_SIZE / 2));
+            if (cornerKeys.includes(k) && !isNaN(num)) {
+              updateCornerRotatePos(k, parseFloat(rect.getAttribute('x') || 0) + HANDLE_SIZE / 2, num);
+            }
           } else {
             origSetAttr(name, val);
           }
@@ -1020,7 +1066,7 @@ function hookSelectorManager(svgEditor) {
       }
     });
 
-    // Hide rotate connector stem and rotate circle grip (Studio parity: square handles only)
+    // Hide old rotate connector stem and rotate circle grip (Studio parity: square handles with corner hover rotation)
     if (sm.rotateGripConnector) {
       sm.rotateGripConnector.style.display = 'none';
       sm.rotateGripConnector.setAttribute('display', 'none');

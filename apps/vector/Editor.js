@@ -40586,9 +40586,17 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				y *= n, x *= n, q.textActions.mouseMove(h, g);
 				break;
 			case "rotate": {
-				p = fg(i), s = p.x + p.width / 2, c = p.y + p.height / 2;
-				let n = Rh(i), r = jh(s, c, n);
-				s = r.x, c = r.y, f = (Math.atan2(c - x, s - y) * (180 / Math.PI) - 90) % 360, q.getCurConfig().gridSnapping && (f = jg(f)), e.shiftKey && (f = Math.round(f / 45) * 45), q.setRotationAngle(f < -180 ? 360 + f : f, !0), q.call("transition", t);
+				if (q.rotateDrag) {
+					let cx = q.rotateDrag.cx, cy = q.rotateDrag.cy;
+					let curAngle = Math.atan2(x - cy, y - cx) * (180 / Math.PI);
+					let delta = curAngle - q.rotateDrag.startAngle;
+					f = (q.rotateDrag.initialAngle + delta) % 360;
+				} else {
+					p = fg(i), s = p.x + p.width / 2, c = p.y + p.height / 2;
+					let n = Rh(i), r = jh(s, c, n);
+					s = r.x, c = r.y, f = (Math.atan2(c - x, s - y) * (180 / Math.PI) - 90) % 360;
+				}
+				q.getCurConfig().gridSnapping && (f = jg(f)), e.shiftKey && (f = Math.round(f / 45) * 45), q.setRotationAngle(f < -180 ? 360 + f : f, !0), q.call("transition", t);
 				break;
 			}
 			default: break;
@@ -40753,7 +40761,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				u = !1, l = null, q.textActions.mouseUp(e, a, o);
 				break;
 			case "rotate": {
-				q.hasDragStartTransform = !1, q.dragStartTransforms = null, u = !0, l = null, q.setCurrentMode("select");
+				q.rotateDrag = null, q.hasDragStartTransform = !1, q.dragStartTransforms = null, u = !0, l = null, q.setCurrentMode("select");
 				let e = q.undoMgr.finishUndoableChange();
 				e.isEmpty() || q.addCommandToHistory(e), q.recalculateAllSelectedDimensions(), q.call("changed", t);
 				break;
@@ -40824,7 +40832,23 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let g = p;
 		if (q.setStartY(p), q.setRStartY(p), q.getCurConfig().gridSnapping && (f = jg(f), p = jg(p), q.setStartX(jg(q.getStartX())), q.setStartY(jg(q.getStartY()))), m === q.selectorManager.selectorParentGroup && n[0]) {
 			let r = e.target, i = t.get(r, "type");
-			i === "rotate" ? q.setCurrentMode("rotate") : i === "resize" && (q.setCurrentMode("resize"), q.setCurrentResizeMode(t.get(r, "dir"))), m = n[0];
+			if (i === "rotate") {
+				q.setCurrentMode("rotate");
+				let bbox = fg(n[0]);
+				let cx = bbox.x + bbox.width / 2, cy = bbox.y + bbox.height / 2;
+				let rotMat = Rh(n[0]);
+				if (rotMat) {
+					let centerPt = jh(cx, cy, rotMat);
+					cx = centerPt.x, cy = centerPt.y;
+				}
+				q.rotateDrag = {
+					cx,
+					cy,
+					startAngle: Math.atan2(p - cy, f - cx) * (180 / Math.PI),
+					initialAngle: Tg(n[0]) || 0
+				};
+			} else i === "resize" && (q.setCurrentMode("resize"), q.setCurrentResizeMode(t.get(r, "dir")));
+			m = n[0];
 		}
 		q.setStartTransform(m.getAttribute("transform"));
 		let _ = Mh(m);
