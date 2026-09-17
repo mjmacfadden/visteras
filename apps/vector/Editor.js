@@ -19949,6 +19949,10 @@ var kr, Ar, jr, Mr = t((() => {
 		constructor() {
 			super(), this.imgPath = svgEditor.configObj.curConfig.imgPath, this.template = this.createTemplate(this.imgPath), this._shadowRoot = this.attachShadow({ mode: "open" }), this._shadowRoot.append(this.template.content.cloneNode(!0)), this.$button = this._shadowRoot.querySelector(".menu-button"), this.$handle = this._shadowRoot.querySelector(".handle"), this.$overall = this._shadowRoot.querySelector(".overall"), this.$img = this._shadowRoot.querySelector("img"), this.$menu = this._shadowRoot.querySelector(".menu"), this.$elements = this.$menu.lastElementChild.assignedElements(), document.addEventListener("click", (e) => {
 				this.opened &&= !1;
+			}), document.addEventListener("contextmenu", (e) => {
+				if (!this.contains(e.target) && !this._shadowRoot?.contains(e.target)) {
+					this.opened &&= !1;
+				}
 			});
 		}
 		createTemplate(e) {
@@ -20095,25 +20099,65 @@ var kr, Ar, jr, Mr = t((() => {
 		connectedCallback() {
 			this.activeSlot = this.shadowRoot.querySelector("slot").assignedElements()[0], this.$img.setAttribute("src", this.imgPath + "/" + this.activeSlot.getAttribute("src"));
 			let e = (e) => {
-				switch (e.stopPropagation(), e.target.nodeName) {
+				e.stopPropagation();
+				switch (e.target.nodeName) {
 					case "SE-FLYINGBUTTON":
-						this.pressed ? this.setAttribute("opened", "opened") : (this.activeSlot.click(), this.setAttribute("pressed", "pressed"));
+						this.removeAttribute("opened");
+						this.$menu.classList.remove("open");
+						this.activeSlot?.click();
+						this.setAttribute("pressed", "pressed");
 						break;
 					case "SE-BUTTON":
-						this.$img.setAttribute("src", this.imgPath + "/" + e.target.getAttribute("src")), this.activeSlot = e.target, this.setAttribute("pressed", "pressed"), this.$menu.classList.remove("open");
+						this.$img.setAttribute("src", this.imgPath + "/" + e.target.getAttribute("src"));
+						this.activeSlot = e.target;
+						this.setAttribute("pressed", "pressed");
+						this.removeAttribute("opened");
+						this.$menu.classList.remove("open");
 						break;
 					case "DIV":
-						if (this.opened) this.removeAttribute("opened");
-						else {
+						if (this.opened) {
+							this.removeAttribute("opened");
+						} else {
+							document.querySelectorAll("se-flyingbutton").forEach((fb) => {
+								if (fb !== this) {
+									fb.removeAttribute("opened");
+									fb.shadowRoot?.querySelector?.(".menu")?.classList.remove("open");
+								}
+							});
 							this.setAttribute("opened", "opened");
-							let e = this.getBoundingClientRect();
-							this.$menu.style.top = e.top + "px";
+							let rect = this.getBoundingClientRect();
+							this.$menu.style.top = rect.top + "px";
 						}
 						break;
-					default: console.error("unkonw nodeName for:", e.target, e.target.className);
+					default:
+						this.removeAttribute("opened");
+						this.$menu.classList.remove("open");
+						this.activeSlot?.click();
+						this.setAttribute("pressed", "pressed");
+						break;
 				}
 			};
 			svgEditor.$click(this, e), svgEditor.$click(this.$handle, e);
+			const onContext = (evt) => {
+				evt.preventDefault();
+				evt.stopPropagation();
+				if (this.opened) {
+					this.removeAttribute("opened");
+				} else {
+					document.querySelectorAll("se-flyingbutton").forEach((fb) => {
+						if (fb !== this) {
+							fb.removeAttribute("opened");
+							fb.shadowRoot?.querySelector?.(".menu")?.classList.remove("open");
+						}
+					});
+					this.setAttribute("opened", "opened");
+					let rect = this.getBoundingClientRect();
+					this.$menu.style.top = rect.top + "px";
+				}
+			};
+			this.addEventListener("contextmenu", onContext);
+			this.$button?.addEventListener("contextmenu", onContext);
+			this.$handle?.addEventListener("contextmenu", onContext);
 		}
 	}, customElements.define("se-flyingbutton", Ir);
 })), Rr, zr = t((() => {
