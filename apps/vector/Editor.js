@@ -19863,7 +19863,116 @@ var kr, Ar, jr, Mr = t((() => {
 		return pe.t(e);
 	};
 })), Nr, Pr, Fr = t((() => {
-	Mr(), Nr = document.createElement("template"), Nr.innerHTML = "\n  <style>\n  @keyframes btnHover {\n    from {\n      background-color: var(--main-bg-color);\n    }\n\n    to {\n      background-color: var(--icon-bg-color-hover);\n    }\n  }\n  :host(:hover) :not(.disabled)\n  {\n    animation: btnHover 0.2s forwards;\n  }\n  div\n  {\n    height: 24px;\n    width: 24px;\n    margin: 4px 1px 4px;\n    padding: 3px;\n    background-color: var(--icon-bg-color);\n    cursor: pointer;\n    border-radius: 3px;\n  }\n  .small {\n    width: 14px;\n    height: 14px;\n    padding: 1px;\n    border-radius: 1px;\n  }\n  img {\n    border: none;\n    width: 100%;\n    height: 100%;\n  }\n  .pressed {\n    background-color: var(--icon-bg-color-hover);\n  }\n  .disabled {\n    opacity: 0.3;\n    cursor: default;\n  }\n  </style>\n  <div title=\"title\">\n    <img alt=\"icon\">\n  </div>\n", Pr = class extends HTMLElement {
+	Mr(), Nr = document.createElement("template"), Nr.innerHTML = `
+  <style>
+  :host {
+    display: inline-block;
+  }
+  :host([in-flyout]) {
+    display: block;
+    width: 100%;
+  }
+  @keyframes btnHover {
+    from {
+      background-color: transparent;
+    }
+    to {
+      background-color: var(--icon-bg-color-hover, #3f8ff7);
+    }
+  }
+  :host(:hover) :not(.disabled)
+  {
+    animation: btnHover 0.2s forwards;
+  }
+  .btn-box
+  {
+    height: 24px;
+    width: 24px;
+    margin: 4px 1px 4px;
+    padding: 3px;
+    background-color: var(--icon-bg-color);
+    cursor: pointer;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    transition: background-color 0.12s;
+  }
+  .small {
+    width: 14px;
+    height: 14px;
+    padding: 1px;
+    border-radius: 1px;
+  }
+  img {
+    border: none;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    display: block;
+  }
+  .label-container {
+    display: none;
+    margin-left: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    color: #e0e0e0;
+    white-space: nowrap;
+    user-select: none;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    overflow: hidden;
+  }
+  .label-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shortcut-text {
+    margin-left: 16px;
+    margin-right: 4px;
+    font-size: 11px;
+    color: #888888;
+    font-weight: 500;
+  }
+  :host([in-flyout]) .btn-box,
+  .btn-box.in-flyout {
+    width: 100%;
+    height: 28px;
+    margin: 1px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background-color: transparent;
+  }
+  :host([in-flyout]:hover) .btn-box,
+  .btn-box.in-flyout:hover {
+    background-color: #3f8ff7 !important;
+  }
+  :host([in-flyout]:hover) .label-text,
+  .btn-box.in-flyout:hover .label-text {
+    color: #ffffff !important;
+  }
+  :host([in-flyout]:hover) .shortcut-text,
+  .btn-box.in-flyout:hover .shortcut-text {
+    color: rgba(255, 255, 255, 0.8) !important;
+  }
+  :host([in-flyout]) .label-container,
+  .btn-box.in-flyout .label-container {
+    display: flex;
+  }
+  .pressed {
+    background-color: var(--icon-bg-color-hover);
+  }
+  .disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  </style>
+  <div class="btn-box" title="title">
+    <img alt="icon">
+    <span class="label-container"><span class="label-text"></span><span class="shortcut-text"></span></span>
+  </div>
+`, Pr = class extends HTMLElement {
 		constructor() {
 			super(), this._shadowRoot = this.attachShadow({ mode: "open" }), this._shadowRoot.append(Nr.content.cloneNode(!0)), this.$div = this._shadowRoot.querySelector("div"), this.$img = this._shadowRoot.querySelector("img"), this.imgPath = svgEditor.configObj.curConfig.imgPath;
 		}
@@ -19881,8 +19990,15 @@ var kr, Ar, jr, Mr = t((() => {
 			if (t !== n) switch (e) {
 				case "title":
 					{
-						let e = this.getAttribute("shortcut");
-						this.$div.setAttribute("title", `${jr(n)} ${e ? `[${jr(e)}]` : ""}`);
+						let sc = this.getAttribute("shortcut");
+						let trans = (typeof jr === "function" ? jr(n) : n) || n;
+						if (trans === n && n.startsWith("tools.mode_")) {
+							let raw = n.replace("tools.mode_", "");
+							trans = raw.charAt(0).toUpperCase() + raw.slice(1) + " Tool";
+						}
+						this.$div.setAttribute("title", `${trans} ${sc ? `[${sc.toUpperCase()}]` : ""}`);
+						let labelEl = this._shadowRoot.querySelector(".label-text");
+						if (labelEl) labelEl.textContent = trans;
 					}
 					break;
 				case "style":
@@ -19936,8 +20052,25 @@ var kr, Ar, jr, Mr = t((() => {
 			this.setAttribute("size", e);
 		}
 		connectedCallback() {
-			let e = this.getAttribute("shortcut");
-			if (e) {
+			if (this.closest("se-flyingbutton") || this.parentElement?.tagName === "SE-FLYINGBUTTON") {
+				this.setAttribute("in-flyout", "true");
+				this.$div.classList.add("in-flyout");
+			}
+			let titleAttr = this.getAttribute("title");
+			if (titleAttr) {
+				let trans = (typeof jr === "function" ? jr(titleAttr) : titleAttr) || titleAttr;
+				if (trans === titleAttr && titleAttr.startsWith("tools.mode_")) {
+					let raw = titleAttr.replace("tools.mode_", "");
+					trans = raw.charAt(0).toUpperCase() + raw.slice(1) + " Tool";
+				}
+				let labelEl = this._shadowRoot.querySelector(".label-text");
+				if (labelEl) labelEl.textContent = trans;
+			}
+			let sc = this.getAttribute("shortcut");
+			let scEl = this._shadowRoot.querySelector(".shortcut-text");
+			if (scEl && sc) scEl.textContent = sc.toUpperCase();
+
+			if (sc) {
 				document.addEventListener("keydown", (t) => {
 					if (t.target && ["INPUT", "TEXTAREA", "SELECT"].includes(t.target.nodeName)) return;
 					if (t.target?.isContentEditable) return;
@@ -19948,7 +20081,7 @@ var kr, Ar, jr, Mr = t((() => {
 					let n = `${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.shiftKey ? "shift+" : ""}${t.key.toUpperCase()}`;
 					let simpleKey = t.key.toUpperCase();
 
-					if (e.toUpperCase() === n || (e.toUpperCase() === simpleKey && !isCmdOrCtrl && !t.altKey)) {
+					if (sc.toUpperCase() === n || (sc.toUpperCase() === simpleKey && !isCmdOrCtrl && !t.altKey)) {
 						this.click();
 						t.preventDefault();
 					}
@@ -20025,19 +20158,20 @@ var kr, Ar, jr, Mr = t((() => {
         }
         .menu {
           position: fixed;
-          background: none !important;
-          display:none;
-          margin-left: 34px;
+          background: #23232b !important;
+          display: none;
+          flex-direction: column;
+          margin-left: 36px;
+          padding: 4px;
+          border: 1px solid #3c3c46;
+          border-radius: 6px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+          z-index: 99999;
+          min-width: 170px;
+          box-sizing: border-box;
         }
         .open {
           display: flex;
-        }
-        .menu-item {
-          align-content: flex-start;
-          height: 24px;
-          width: 24px;
-          top:0px;
-          left:0px;
         }
         .overall {
           background: none !important;
@@ -20109,7 +20243,19 @@ var kr, Ar, jr, Mr = t((() => {
 			e ? this.setAttribute("disabled", "true") : this.removeAttribute("disabled", "");
 		}
 		connectedCallback() {
-			this.activeSlot = this.shadowRoot.querySelector("slot").assignedElements()[0], this.$img.setAttribute("src", this.imgPath + "/" + this.activeSlot.getAttribute("src"));
+			let slot = this.shadowRoot.querySelector("slot");
+			let assigned = slot.assignedElements();
+			this.activeSlot = assigned[0];
+			if (this.activeSlot) {
+				this.$img.setAttribute("src", this.imgPath + "/" + this.activeSlot.getAttribute("src"));
+			}
+			assigned.forEach((el) => {
+				el.setAttribute("in-flyout", "true");
+			});
+			slot.addEventListener("slotchange", () => {
+				let els = slot.assignedElements();
+				els.forEach((el) => el.setAttribute("in-flyout", "true"));
+			});
 			let e = (e) => {
 				e.stopPropagation();
 				switch (e.target.nodeName) {
@@ -68676,7 +68822,7 @@ var fz = () => {
 			"pathedit"
 		].includes(e) && this.leftPanel.clickSelect();
 	}
-}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"tools.mode_select\" src=\"select.svg\" shortcut=\"V\"></se-button><se-button id=\"tool_direct_select\" title=\"Direct Selection\" src=\"direct_select.svg\" shortcut=\"A\"></se-button><se-button id=\"tool_zoom\" title=\"tools.mode_zoom\" src=\"zoom.svg\" shortcut=\"Z\"></se-button><se-button id=\"tool_fhpath\" title=\"tools.mode_fhpath\" src=\"pencil.svg\" shortcut=\"N\"></se-button><se-button id=\"tool_line\" title=\"tools.mode_line\" src=\"pen.svg\" shortcut=\"\\\"></se-button><se-button id=\"tool_path\" title=\"tools.mode_path\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"tools.square_rect_tool\"><se-button id=\"tool_rect\" title=\"tools.mode_rect\" src=\"rect.svg\" shortcut=\"M\"></se-button><se-button id=\"tool_square\" title=\"tools.mode_square\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"tools.mode_fhrect\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"tools.ellipse_circle_tool\"><se-button id=\"tool_ellipse\" title=\"tools.mode_ellipse\" src=\"ellipse.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_circle\" title=\"tools.mode_circle\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"tools.mode_fhellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Text\"><se-button id=\"tool_text\" title=\"tools.mode_text\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"tools.mode_image\" src=\"image.svg\"></se-button></div>";
+}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"Selection Tool\" src=\"select.svg\" shortcut=\"V\"></se-button><se-button id=\"tool_direct_select\" title=\"Direct Selection Tool\" src=\"direct_select.svg\" shortcut=\"A\"></se-button><se-button id=\"tool_zoom\" title=\"Zoom Tool\" src=\"zoom.svg\" shortcut=\"Z\"></se-button><se-button id=\"tool_fhpath\" title=\"Pencil Tool\" src=\"pencil.svg\" shortcut=\"N\"></se-button><se-button id=\"tool_line\" title=\"Line Tool\" src=\"pen.svg\" shortcut=\"\\\"></se-button><se-button id=\"tool_path\" title=\"Pen Tool\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"Rectangle Tool\"><se-button id=\"tool_rect\" title=\"Rectangle Tool\" src=\"rect.svg\" shortcut=\"M\"></se-button><se-button id=\"tool_square\" title=\"Square Tool\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"Freehand Rectangle\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"Ellipse Tool\"><se-button id=\"tool_ellipse\" title=\"Ellipse Tool\" src=\"ellipse.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_circle\" title=\"Circle Tool\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"Freehand Ellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Type Tool\"><se-button id=\"tool_text\" title=\"Type Tool\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"Image Tool\" src=\"image.svg\"></se-button></div>";
 //#endregion
 //#region src/editor/panels/LeftPanel.js
 YI();
