@@ -98,7 +98,7 @@ var ext_eyedropper_default = {
 			name: svgEditor.i18next.t(`${name}:name`),
 			callback() {
 				const buttonTemplate = `
-        <se-button id="tool_eyedropper" title="${`${name}:buttons.0.title`}" src="eye_dropper.svg" shortcut=ctrl+I></se-button>
+        <se-button id="tool_eyedropper" title="${`${name}:buttons.0.title`}" src="eye_dropper.svg" shortcut="I"></se-button>
         `;
 				svgCanvas.insertChildAtIndex($id("tools_left"), buttonTemplate, 12);
 				$click($id("tool_eyedropper"), () => {

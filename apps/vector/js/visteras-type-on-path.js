@@ -397,9 +397,11 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
   };
 
   let isCommitted = false;
+  window.__visterasIsTypingDirectly = true;
   const commit = () => {
     if (isCommitted) return;
     isCommitted = true;
+    window.__visterasIsTypingDirectly = false;
     activeEditingContext = null;
 
     removeCaret();

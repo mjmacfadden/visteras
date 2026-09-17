@@ -19937,11 +19937,23 @@ var kr, Ar, jr, Mr = t((() => {
 		}
 		connectedCallback() {
 			let e = this.getAttribute("shortcut");
-			e && document.addEventListener("keydown", (t) => {
-				if (t.target.nodeName !== "BODY") return;
-				let n = `${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.key.toUpperCase()}`;
-				e === n && (this.click(), t.preventDefault());
-			});
+			if (e) {
+				document.addEventListener("keydown", (t) => {
+					if (t.target && ["INPUT", "TEXTAREA", "SELECT"].includes(t.target.nodeName)) return;
+					if (t.target?.isContentEditable) return;
+					if (t.target?.shadowRoot?.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(t.target.shadowRoot.activeElement.nodeName)) return;
+					if (window.__visterasIsTypingDirectly) return;
+
+					let isCmdOrCtrl = t.metaKey || t.ctrlKey;
+					let n = `${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.shiftKey ? "shift+" : ""}${t.key.toUpperCase()}`;
+					let simpleKey = t.key.toUpperCase();
+
+					if (e.toUpperCase() === n || (e.toUpperCase() === simpleKey && !isCmdOrCtrl && !t.altKey)) {
+						this.click();
+						t.preventDefault();
+					}
+				});
+			}
 		}
 	}, customElements.define("se-button", Pr);
 })), Ir, Lr = t((() => {
@@ -68531,7 +68543,7 @@ var fz = () => {
 			"image"
 		].includes(e) && this.leftPanel.clickSelect();
 	}
-}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"tools.mode_select\" src=\"select.svg\"></se-button><se-button id=\"tool_zoom\" title=\"tools.mode_zoom\" src=\"zoom.svg\" shortcut=\"Z/Alt+wheels\"></se-button><se-button id=\"tool_fhpath\" title=\"tools.mode_fhpath\" src=\"pencil.svg\" shortcut=\"Q\"></se-button><se-button id=\"tool_line\" title=\"tools.mode_line\" src=\"pen.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_path\" title=\"tools.mode_path\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"tools.square_rect_tool\"><se-button id=\"tool_rect\" title=\"tools.mode_rect\" src=\"rect.svg\" shortcut=\"R\"></se-button><se-button id=\"tool_square\" title=\"tools.mode_square\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"tools.mode_fhrect\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"tools.ellipse_circle_tool\"><se-button id=\"tool_ellipse\" title=\"tools.mode_ellipse\" src=\"ellipse.svg\" shortcut=\"E\"></se-button><se-button id=\"tool_circle\" title=\"tools.mode_circle\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"tools.mode_fhellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Text\"><se-button id=\"tool_text\" title=\"tools.mode_text\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"tools.mode_image\" src=\"image.svg\"></se-button></div>";
+}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"tools.mode_select\" src=\"select.svg\" shortcut=\"V\"></se-button><se-button id=\"tool_zoom\" title=\"tools.mode_zoom\" src=\"zoom.svg\" shortcut=\"Z\"></se-button><se-button id=\"tool_fhpath\" title=\"tools.mode_fhpath\" src=\"pencil.svg\" shortcut=\"N\"></se-button><se-button id=\"tool_line\" title=\"tools.mode_line\" src=\"pen.svg\" shortcut=\"\\\"></se-button><se-button id=\"tool_path\" title=\"tools.mode_path\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"tools.square_rect_tool\"><se-button id=\"tool_rect\" title=\"tools.mode_rect\" src=\"rect.svg\" shortcut=\"M\"></se-button><se-button id=\"tool_square\" title=\"tools.mode_square\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"tools.mode_fhrect\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"tools.ellipse_circle_tool\"><se-button id=\"tool_ellipse\" title=\"tools.mode_ellipse\" src=\"ellipse.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_circle\" title=\"tools.mode_circle\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"tools.mode_fhellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Text\"><se-button id=\"tool_text\" title=\"tools.mode_text\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"tools.mode_image\" src=\"image.svg\"></se-button></div>";
 //#endregion
 //#region src/editor/panels/LeftPanel.js
 YI();

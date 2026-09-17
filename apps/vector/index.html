@@ -57,12 +57,17 @@
           <div class="menu_entry_title">Edit</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_undo">Undo <span class="menu_dropdown_shortcut">⌘Z</span></div>
-            <div class="menu_dropdown_item" id="action_redo">Redo <span class="menu_dropdown_shortcut">⌘Y</span></div>
+            <div class="menu_dropdown_item" id="action_redo">Redo <span class="menu_dropdown_shortcut">⌘⇧Z</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_cut">Cut <span class="menu_dropdown_shortcut">⌘X</span></div>
             <div class="menu_dropdown_item" id="action_copy">Copy <span class="menu_dropdown_shortcut">⌘C</span></div>
             <div class="menu_dropdown_item" id="action_paste">Paste <span class="menu_dropdown_shortcut">⌘V</span></div>
+            <div class="menu_dropdown_item" id="action_paste_in_place">Paste in Place <span class="menu_dropdown_shortcut">⌘⇧V</span></div>
             <div class="menu_dropdown_item" id="action_clone">Duplicate <span class="menu_dropdown_shortcut">⌘D</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_select_all">Select All <span class="menu_dropdown_shortcut">⌘A</span></div>
+            <div class="menu_dropdown_item" id="action_deselect_all">Deselect All <span class="menu_dropdown_shortcut">⌘⇧A</span></div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_delete">Delete <span class="menu_dropdown_shortcut">⌫</span></div>
           </div>
         </div>
@@ -77,9 +82,9 @@
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
             <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⇧R</span></div>
-            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⇧G</span></div>
-            <div class="menu_dropdown_item" id="action_toggle_wireframe">Wireframe Mode <span class="menu_dropdown_shortcut">⇧F</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">⌘Y</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_source">View SVG Source... <span class="menu_dropdown_shortcut">⌘U</span></div>
           </div>
@@ -92,10 +97,10 @@
             <div class="menu_dropdown_item" id="action_group">Group Elements <span class="menu_dropdown_shortcut">⌘G</span></div>
             <div class="menu_dropdown_item" id="action_ungroup">Ungroup Elements <span class="menu_dropdown_shortcut">⌘⇧G</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_bring_front">Bring to Front <span class="menu_dropdown_shortcut">⌘⇧↑</span></div>
-            <div class="menu_dropdown_item" id="action_bring_forward">Bring Forward <span class="menu_dropdown_shortcut">⌘↑</span></div>
-            <div class="menu_dropdown_item" id="action_send_backward">Send Backward <span class="menu_dropdown_shortcut">⌘↓</span></div>
-            <div class="menu_dropdown_item" id="action_send_back">Send to Back <span class="menu_dropdown_shortcut">⌘⇧↓</span></div>
+            <div class="menu_dropdown_item" id="action_bring_front">Bring to Front <span class="menu_dropdown_shortcut">⌘⇧]</span></div>
+            <div class="menu_dropdown_item" id="action_bring_forward">Bring Forward <span class="menu_dropdown_shortcut">⌘]</span></div>
+            <div class="menu_dropdown_item" id="action_send_backward">Send Backward <span class="menu_dropdown_shortcut">⌘[</span></div>
+            <div class="menu_dropdown_item" id="action_send_back">Send to Back <span class="menu_dropdown_shortcut">⌘⇧[</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_flip_h">Flip Horizontal</div>
             <div class="menu_dropdown_item" id="action_flip_v">Flip Vertical</div>
@@ -505,8 +510,20 @@
         sc.pasteElements('in_place');
       });
 
+      document.getElementById('action_paste_in_place')?.addEventListener('click', () => {
+        sc.pasteElements('in_place');
+      });
+
       document.getElementById('action_clone')?.addEventListener('click', () => {
         sc.cloneSelectedElements(20, 20);
+      });
+
+      document.getElementById('action_select_all')?.addEventListener('click', () => {
+        sc.selectAllElements?.();
+      });
+
+      document.getElementById('action_deselect_all')?.addEventListener('click', () => {
+        sc.clearSelection?.();
       });
 
       document.getElementById('action_delete')?.addEventListener('click', () => {
@@ -569,12 +586,16 @@
         document.getElementById('view_grid')?.click();
       });
 
+      document.getElementById('action_toggle_rulers')?.addEventListener('click', () => {
+        document.getElementById('view_rulers')?.click();
+      });
+
       document.getElementById('action_source')?.addEventListener('click', () => {
         document.getElementById('tool_source')?.click();
       });
 
       document.getElementById('action_about')?.addEventListener('click', () => {
-        alert('Visteras Vector v1.0\\nBuilt on SVG-Edit 7.4.2 Engine\\nCompanion vector editor to Visteras Studio');
+        alert('Visteras Vector v1.0\nBuilt on SVG-Edit 7.4.2 Engine\nCompanion vector editor to Visteras Studio');
       });
 
       document.getElementById('action_prefs')?.addEventListener('click', () => {
@@ -641,41 +662,153 @@
       document.getElementById('action_zoom_in')?.addEventListener('click', zoomIn);
       document.getElementById('action_zoom_out')?.addEventListener('click', zoomOut);
 
-      // Keyboard Shortcuts (Cmd/Ctrl + 0, 1, +, -)
+      // Industry-standard Adobe Illustrator Keyboard Shortcuts
       window.addEventListener('keydown', (e) => {
+        const target = e.target;
+        if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.nodeName)) return;
+        if (target?.isContentEditable) return;
+        if (target?.shadowRoot?.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.shadowRoot.activeElement.nodeName)) return;
+        if (window.__visterasIsTypingDirectly) return;
+
         const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-        if (!isCmdOrCtrl || e.altKey) return;
 
-        // Command/Ctrl + 0: Fit artboard to workspace
-        if (e.code === 'Digit0' || e.code === 'Numpad0' || e.key === '0') {
-          e.preventDefault();
-          e.stopPropagation();
-          fitArtboardToWorkspace();
-          return;
-        }
+        // Command / Control shortcuts
+        if (isCmdOrCtrl && !e.altKey) {
+          // Command/Ctrl + 0: Fit artboard to workspace
+          if (e.code === 'Digit0' || e.code === 'Numpad0' || e.key === '0') {
+            e.preventDefault();
+            e.stopPropagation();
+            fitArtboardToWorkspace();
+            return;
+          }
 
-        // Command/Ctrl + 1: 100% Zoom (Actual Size)
-        if (!e.shiftKey && (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1')) {
-          e.preventDefault();
-          e.stopPropagation();
-          zoomTo100Percent();
-          return;
-        }
+          // Command/Ctrl + 1: 100% Zoom (Actual Size)
+          if (!e.shiftKey && (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1')) {
+            e.preventDefault();
+            e.stopPropagation();
+            zoomTo100Percent();
+            return;
+          }
 
-        // Command/Ctrl + + / = / NumpadAdd: Zoom In
-        if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+' || e.key === '=') {
-          e.preventDefault();
-          e.stopPropagation();
-          zoomIn();
-          return;
-        }
+          // Command/Ctrl + + / = / NumpadAdd: Zoom In
+          if (e.code === 'Equal' || e.code === 'NumpadAdd' || e.key === '+' || e.key === '=') {
+            e.preventDefault();
+            e.stopPropagation();
+            zoomIn();
+            return;
+          }
 
-        // Command/Ctrl + - / NumpadSubtract: Zoom Out
-        if (e.code === 'Minus' || e.code === 'NumpadSubtract' || e.key === '-') {
-          e.preventDefault();
-          e.stopPropagation();
-          zoomOut();
-          return;
+          // Command/Ctrl + - / NumpadSubtract: Zoom Out
+          if (e.code === 'Minus' || e.code === 'NumpadSubtract' || e.key === '-') {
+            e.preventDefault();
+            e.stopPropagation();
+            zoomOut();
+            return;
+          }
+
+          // Command/Ctrl + Shift + ]: Bring to Front
+          if (e.shiftKey && (e.key === ']' || e.code === 'BracketRight')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.moveToTopSelectedElement?.();
+            return;
+          }
+
+          // Command/Ctrl + ]: Bring Forward
+          if (!e.shiftKey && (e.key === ']' || e.code === 'BracketRight')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.moveUpDownSelected?.('Up');
+            return;
+          }
+
+          // Command/Ctrl + Shift + [: Send to Back
+          if (e.shiftKey && (e.key === '[' || e.code === 'BracketLeft')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.moveToBottomSelectedElement?.();
+            return;
+          }
+
+          // Command/Ctrl + [: Send Backward
+          if (!e.shiftKey && (e.key === '[' || e.code === 'BracketLeft')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.moveUpDownSelected?.('Down');
+            return;
+          }
+
+          // Command/Ctrl + Shift + G: Ungroup
+          if (e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.ungroupSelectedElement?.();
+            return;
+          }
+
+          // Command/Ctrl + G: Group
+          if (!e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.groupSelectedElements?.();
+            return;
+          }
+
+          // Command/Ctrl + Shift + A: Deselect All
+          if (e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.clearSelection?.();
+            return;
+          }
+
+          // Command/Ctrl + Shift + V or Command/Ctrl + F: Paste in Place
+          if ((e.shiftKey && (e.key === 'v' || e.key === 'V')) || (!e.shiftKey && (e.key === 'f' || e.key === 'F'))) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.pasteElements?.('in_place');
+            return;
+          }
+
+          // Command/Ctrl + Shift + Z: Redo
+          if (e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('tool_redo')?.click();
+            return;
+          }
+
+          // Command/Ctrl + D: Duplicate / Transform Again
+          if (!e.shiftKey && (e.key === 'd' || e.key === 'D')) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc.cloneSelectedElements?.(20, 20);
+            return;
+          }
+
+          // Command/Ctrl + R: Toggle Rulers
+          if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('view_rulers')?.click();
+            return;
+          }
+
+          // Command/Ctrl + Y: Toggle Wireframe / Outline Mode
+          if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('tool_wireframe')?.click();
+            return;
+          }
+
+          // Command/Ctrl + ': Toggle Grid
+          if (e.key === "'" || e.code === 'Quote') {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('view_grid')?.click();
+            return;
+          }
         }
       }, { capture: true });
     }
