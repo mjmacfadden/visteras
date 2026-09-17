@@ -68506,10 +68506,10 @@ var fz = () => {
 		let t = "auto";
 		switch (e) {
 			case "select":
-				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z\' fill=\'%23000000\' stroke=\'%23ffffff\' stroke-width=\'1.2\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 1 1, default';
+				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M20 4 L3 12 L12 12 L12 21 Z\' fill=\'none\' stroke=\'%23000000\' stroke-width=\'3\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M20 4 L3 12 L12 12 L12 21 Z\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'1.5\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 19 4, default';
 				break;
 			case "pathedit":
-				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z\' fill=\'%23ffffff\' stroke=\'%23000000\' stroke-width=\'1.2\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 1 1, default';
+				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M20 4 L3 12 L12 12 L12 21 Z\' fill=\'%23ffffff\' stroke=\'%23000000\' stroke-width=\'1.5\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 19 4, default';
 				break;
 			case "ext-panning":
 				t = "grab";
@@ -68533,7 +68533,7 @@ var fz = () => {
 				t = "text";
 				break;
 			default:
-				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z\' fill=\'%23000000\' stroke=\'%23ffffff\' stroke-width=\'1.2\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 1 1, default';
+				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M20 4 L3 12 L12 12 L12 21 Z\' fill=\'none\' stroke=\'%23000000\' stroke-width=\'3\' stroke-linejoin=\'round\'/%3E%3Cpath d=\'M20 4 L3 12 L12 12 L12 21 Z\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'1.5\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 19 4, default';
 		}
 		this.workarea.style.cursor = t;
 		let el = pz("svgcanvas");

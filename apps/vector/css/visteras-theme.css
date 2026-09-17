@@ -1096,9 +1096,9 @@ elix-dialog {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M3 18 C7 10 13 10 21 18' fill='none' stroke='%233f8ff7' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12 4 L12 14 M8 4 L16 4' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M12 4 L12 14 M8 4 L16 4' fill='none' stroke='%23000000' stroke-width='0.75' stroke-linecap='round'/%3E%3C/svg%3E") 12 14, crosshair !important;
 }
 
-/* Illustrator-style Selection and Direct Selection Cursors */
+/* Illustrator-style Flying V Selection and Direct Selection Cursors */
 #workarea {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z' fill='%23000000' stroke='%23ffffff' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") 1 1, default;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 4 L3 12 L12 12 L12 21 Z' fill='none' stroke='%23000000' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M20 4 L3 12 L12 12 L12 21 Z' fill='none' stroke='%23ffffff' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 19 4, default;
 }
 
 #svgcanvas {
@@ -1107,5 +1107,5 @@ elix-dialog {
 
 .mode-pathedit #workarea,
 [data-mode="pathedit"] #workarea {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z' fill='%23ffffff' stroke='%23000000' stroke-width='1.2' stroke-linejoin='round'/%3E%3C/svg%3E") 1 1, default !important;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M20 4 L3 12 L12 12 L12 21 Z' fill='%23ffffff' stroke='%23000000' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E") 19 4, default !important;
 }
