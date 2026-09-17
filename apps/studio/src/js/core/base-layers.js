@@ -660,14 +660,16 @@ class Base_layers_class {
 				is_layer_clipped(layer) ||
 				(nextLayer && is_layer_clipped(nextLayer))
 			) {
-				// Apply the effect in a isolated temporary canvas
 				tempCtx.globalAlpha = layer.opacity / 100;
-				tempCtx.globalCompositeOperation = get_render_composition(layer);
 
 				// If the next layer is clipped then isolate the shadow filter
 				// from temporary canvas and keep that in the original canvas
 				if (nextLayer && is_layer_clipped(nextLayer)) {
-					// Render the layer
+					// Painting the clip BASE — use its real blend, not source-atop.
+					var baseComp = layer.composition || 'source-over';
+					ctx.globalAlpha = layer.opacity / 100;
+					ctx.globalCompositeOperation = baseComp;
+					tempCtx.globalCompositeOperation = baseComp;
 					this.render_object(ctx, layer);
 					// Then remove the shadow (if it exists) from the render process in the temporary canvas
 					const filters = (layer.filters || []).filter((filter) => {
@@ -678,8 +680,8 @@ class Base_layers_class {
 						filters,
 					});
 				} else {
-					// Last layer of clipped layers pair / the clipped layer itself.
-					// Render clipped layers on the temporary canvas
+					// Clipped layer itself — always source-atop onto the isolated base.
+					tempCtx.globalCompositeOperation = 'source-atop';
 					this.render_object(tempCtx, layer);
 					
 					// Render the clipped layers on top of the current canvas
@@ -695,6 +697,7 @@ class Base_layers_class {
 				}
 			} else {
 				ctx.globalAlpha = layer.opacity / 100;
+				// Clipped → source-atop; otherwise the layer's blend mode
 				ctx.globalCompositeOperation = get_render_composition(layer);
 				this.render_object(ctx, layer);
 			}

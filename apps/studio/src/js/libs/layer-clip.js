@@ -18,22 +18,18 @@ export function is_layer_clipped(layer) {
 
 /**
  * Composition used when painting a layer (canvas GCO / GPU blend).
- * Clipped + Normal → source-atop (silhouette clip).
- * Clipped + other blend → that blend within the isolated clip group.
+ * Clip wins: whenever the layer is clipped, paint with source-atop
+ * (matching prior working behavior). Non-clipped layers use their blend.
  *
  * @param {object|null|undefined} layer
  * @returns {string}
  */
 export function get_render_composition(layer) {
 	if (!layer) return 'source-over';
-	var comp = layer.composition == null ? 'source-over' : layer.composition;
-	if (layer.clipped === true) {
-		if (comp === 'source-over' || comp === 'pass-through') {
-			return 'source-atop';
-		}
-		return comp;
+	if (is_layer_clipped(layer)) {
+		return 'source-atop';
 	}
-	return comp;
+	return layer.composition == null ? 'source-over' : layer.composition;
 }
 
 /**

@@ -57,7 +57,6 @@ var template = `
 					<option value="xor">XOR</option>
 				</optgroup>
 			</select>
-			<button type="button" class="layer_clip_btn" id="layer_clip_btn" title="Clip to layer below" aria-pressed="false">Clip</button>
 			<div class="layer_opacity_group" title="Layer Opacity">
 				<span class="layer_opacity_label">Opacity:</span>
 				<div class="layer_opacity_input_wrapper">
@@ -274,17 +273,6 @@ class GUI_layers_class {
 						})
 					);
 				}
-			});
-		}
-
-		// Header clipping toggle (independent of blend mode)
-		var clipBtn = document.getElementById('layer_clip_btn');
-		if (clipBtn) {
-			clipBtn.addEventListener('click', function () {
-				if (!config.layer || config.layer.id == null) return;
-				app.State.do_action(
-					new app.Actions.Update_layer_action(config.layer.id, clipping_toggle_updates(config.layer))
-				);
 			});
 		}
 
@@ -1322,18 +1310,16 @@ class GUI_layers_class {
 
 	update_header_controls() {
 		var blendSelect = document.getElementById('layer_blend_select');
-		var clipBtn = document.getElementById('layer_clip_btn');
 		var opNumber = document.getElementById('layer_opacity_number');
 		var opRange = document.getElementById('layer_opacity_range');
 
 		if (config.layer && config.layer.id != null) {
 			var comp = config.layer.composition || 'source-over';
-			// Never show legacy source-atop as the blend — clip is a separate control
+			// Never show legacy source-atop as the blend — clip is separate (context menu / list arrow)
 			if (comp === 'source-atop') {
 				comp = 'source-over';
 			}
 			var opacity = (config.layer.opacity != null) ? Math.round(config.layer.opacity) : 100;
-			var clipped = is_layer_clipped(config.layer);
 
 			if (blendSelect) {
 				// If value is missing from the select (e.g. exotic Porter-Duff), fall back visually
@@ -1343,12 +1329,6 @@ class GUI_layers_class {
 				}
 				blendSelect.value = hasOption ? comp : 'source-over';
 				blendSelect.disabled = false;
-			}
-			if (clipBtn) {
-				clipBtn.classList.toggle('active', clipped);
-				clipBtn.setAttribute('aria-pressed', clipped ? 'true' : 'false');
-				clipBtn.title = clipped ? 'Release clipping mask' : 'Clip to layer below';
-				clipBtn.disabled = false;
 			}
 			if (opNumber) {
 				opNumber.value = opacity;
@@ -1362,12 +1342,6 @@ class GUI_layers_class {
 			if (blendSelect) {
 				blendSelect.value = 'source-over';
 				blendSelect.disabled = true;
-			}
-			if (clipBtn) {
-				clipBtn.classList.remove('active');
-				clipBtn.setAttribute('aria-pressed', 'false');
-				clipBtn.title = 'Clip to layer below';
-				clipBtn.disabled = true;
 			}
 			if (opNumber) {
 				opNumber.value = 100;

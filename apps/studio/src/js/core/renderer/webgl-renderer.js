@@ -471,12 +471,14 @@ class WebGL_renderer_class {
 	 *
 	 * GPU-supported: source-over / multiply / screen / overlay / darken /
 	 * lighten / difference / hard-light / color-dodge / soft-light /
-	 * color-burn / exclusion / source-atop (simple clipping), optional layer
-	 * masks, and a subset of adjustment layers (brightness/contrast, hue-sat,
-	 * exposure, grayscale, invert, sepia, threshold) at source-over, plus
-	 * CSS-like layer.filters (blur/shadow/outer_glow) and stroke/inner_glow
-	 * baked on upload with padding. Still deferred to Canvas 2D: unsupported
-	 * adjustments/blends, source-atop when the clip base expands alpha.
+	 * color-burn / exclusion / source-atop (simple clipping; clip forces
+	 * source-atop even if the layer's blend dropdown shows another mode),
+	 * optional layer masks, and a subset of adjustment layers
+	 * (brightness/contrast, hue-sat, exposure, grayscale, invert, sepia,
+	 * threshold) at source-over, plus CSS-like layer.filters
+	 * (blur/shadow/outer_glow) and stroke/inner_glow baked on upload with
+	 * padding. Still deferred to Canvas 2D: unsupported adjustments/blends,
+	 * source-atop when the clip base expands alpha.
 	 *
 	 * @param {Object[]} layers - sorted top-first (index 0 = top)
 	 * @param {number|null} disabled_filter_id - id of the currently disabled
@@ -500,10 +502,10 @@ class WebGL_renderer_class {
 				return false;
 			}
 
+			// Clip wins: get_render_composition forces source-atop when clipped.
 			var composition = get_render_composition(layer);
-			// Clipped + non-normal blend needs Canvas2D isolation for correct clip groups
-			if (is_layer_clipped(layer) && composition !== 'source-atop') {
-				return false;
+			if (is_layer_clipped(layer)) {
+				composition = 'source-atop';
 			}
 			if (!Object.prototype.hasOwnProperty.call(GPU_BLEND_MODES, composition)) {
 				return false;
@@ -1245,6 +1247,10 @@ class WebGL_renderer_class {
 				if (!texInfo) continue;
 
 				var composition = get_render_composition(layer);
+				// Clip wins over blend for GPU draw (matches Canvas2D source-atop).
+				if (is_layer_clipped(layer)) {
+					composition = 'source-atop';
+				}
 				var blendId = this._blend_mode_id(composition);
 				var needsDst = blendId !== BLEND_NORMAL;
 

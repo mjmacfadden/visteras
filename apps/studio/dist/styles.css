@@ -2567,37 +2567,6 @@ button.ui_icon_button img[src*="align-"]{
 	padding: 2px 6px;
 }
 
-.layer_clip_btn {
-	flex-shrink: 0;
-	height: 22px;
-	min-width: 36px;
-	padding: 0 8px;
-	background-color: #2c2c2c;
-	color: #c8c8c8;
-	border: 1px solid #444444;
-	border-radius: 3px;
-	font-size: 11px;
-	font-weight: 600;
-	cursor: pointer;
-	outline: none;
-	user-select: none;
-}
-.layer_clip_btn:hover:not(:disabled) {
-	border-color: #5a5a5a;
-	color: #ffffff;
-}
-.layer_clip_btn:focus {
-	border-color: #4a9eff;
-}
-.layer_clip_btn.active {
-	background-color: #2f6fae;
-	border-color: #3d84c5;
-	color: #ffffff;
-}
-.layer_clip_btn:disabled {
-	opacity: 0.4;
-	cursor: default;
-}
 .layer_opacity_group {
 	position: relative;
 	display: flex;
