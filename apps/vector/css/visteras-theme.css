@@ -1053,7 +1053,8 @@ elix-dialog {
 
 /* Type on Path attached source path styling & hover state */
 .visteras-type-on-path-source {
-  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+  transition: stroke 0.1s ease;
+  vector-effect: non-scaling-stroke !important;
 }
 
 .visteras-type-on-path-source.visteras-top-hovered,
@@ -1063,4 +1064,17 @@ elix-dialog {
   fill: none !important;
   vector-effect: non-scaling-stroke !important;
 }
+
+/* Type on Path in-place blinking caret on curve */
+@keyframes visterasCaretBlink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.visteras-top-caret {
+  animation: visterasCaretBlink 0.85s infinite;
+  fill: #3f8ff7 !important;
+  font-weight: 300 !important;
+}
+
 

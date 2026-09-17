@@ -6,9 +6,12 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
 const TOP_ATTR = 'data-visteras-type-on-path';
 const TOP_CLASS = 'visteras-type-on-path';
+const CARET_CLASS = 'visteras-top-caret';
 const STUDIO_BLUE = '#3f8ff7';
 
-function showToast(message, ms = 3000) {
+let activeEditingContext = null;
+
+function showToast(message, ms = 2500) {
   let el = document.getElementById('visteras_top_toast');
   if (!el) {
     el = document.createElement('div');
@@ -273,29 +276,33 @@ function attachPathBBoxProxy(textEl, pathEl) {
 /**
  * Sets up hover styling on the path:
  * Path loses stroke and fill; when hovered (directly or via text hover),
- * it displays a thin 1px blue line (#3f8ff7, matching Studio's transform line).
+ * it displays a thin 1px blue line (#3f8ff7 with vector-effect: non-scaling-stroke).
  */
 function setupPathHoverEffects(pathEl, textEl) {
   if (!pathEl) return;
 
-  // Make the path unfilled and unstroked (transparent with 10px hit area for easy hover)
+  // Path loses stroke and fill; 10px transparent hit zone for easy hovering
   pathEl.setAttribute('fill', 'none');
   pathEl.setAttribute('stroke', 'transparent');
   pathEl.setAttribute('stroke-width', '10');
+  pathEl.setAttribute('vector-effect', 'non-scaling-stroke');
   pathEl.setAttribute('pointer-events', 'stroke');
   pathEl.classList.add('visteras-type-on-path-source');
   pathEl.setAttribute('data-visteras-top-source', '1');
 
   const onEnter = () => {
     pathEl.classList.add('visteras-top-hovered');
-    pathEl.setAttribute('stroke', STUDIO_BLUE);
-    pathEl.setAttribute('stroke-width', '1');
+    pathEl.style.stroke = STUDIO_BLUE;
+    pathEl.style.strokeWidth = '1px';
+    pathEl.style.vectorEffect = 'non-scaling-stroke';
+    pathEl.style.fill = 'none';
   };
 
   const onLeave = () => {
     pathEl.classList.remove('visteras-top-hovered');
-    pathEl.setAttribute('stroke', 'transparent');
-    pathEl.setAttribute('stroke-width', '10');
+    pathEl.style.stroke = 'transparent';
+    pathEl.style.strokeWidth = '10px';
+    pathEl.style.fill = 'none';
   };
 
   pathEl.removeEventListener('pointerenter', pathEl._topEnter || onEnter);
@@ -316,104 +323,105 @@ function setupPathHoverEffects(pathEl, textEl) {
 }
 
 /**
- * Interactive Artboard Text Editor:
- * Allows inline editing directly on the artboard without properties panel inputs.
+ * Direct In-Place Artboard Text Editing:
+ * Captures typing directly on the path with a live blinking caret on the curve.
  */
-export function openArtboardTextEditor(svgEditor, textEl) {
+export function startDirectInPlaceEdit(svgEditor, textEl) {
   const tp = textEl.querySelector('textPath');
   if (!tp) return;
 
-  // Remove existing active editor if any
-  let editor = document.getElementById('visteras_artboard_text_editor');
-  if (editor) editor.remove();
-
-  const workarea = svgEditor.workarea || document.getElementById('workarea');
-  if (!workarea) return;
-
-  const sc = svgEditor.svgCanvas;
-  const zoom = (typeof sc.getZoom === 'function') ? sc.getZoom() : 1;
-  const fontFam = textEl.getAttribute('font-family') || 'sans-serif';
-  const fontSize = (parseFloat(textEl.getAttribute('font-size')) || 24) * zoom;
-  const fillColor = textEl.getAttribute('fill') || '#ffffff';
-
-  editor = document.createElement('input');
-  editor.id = 'visteras_artboard_text_editor';
-  editor.type = 'text';
-  editor.value = tp.textContent || '';
-  editor.placeholder = 'Type text…';
-  editor.spellcheck = false;
-
-  // Compute position on canvas
-  const bbox = textEl.getBBox();
-  const root = sc.getContentElem() || document.getElementById('svgcontent');
-  const ctm = textEl.getScreenCTM ? textEl.getScreenCTM() : root.getScreenCTM();
-  const workareaRect = workarea.getBoundingClientRect();
-
-  let left = 60;
-  let top = 60;
-  if (ctm && bbox) {
-    const pt = root.createSVGPoint ? root.createSVGPoint() : document.createElementNS(SVG_NS, 'svg').createSVGPoint();
-    pt.x = bbox.x;
-    pt.y = bbox.y;
-    const screenPt = pt.matrixTransform(ctm);
-    left = screenPt.x - workareaRect.left + workarea.scrollLeft;
-    top = screenPt.y - workareaRect.top + workarea.scrollTop - fontSize - 14;
+  // End any currently running editor
+  if (activeEditingContext) {
+    activeEditingContext.commit();
   }
 
-  left = Math.max(12, left);
-  top = Math.max(12, top);
+  // Hide selector grips while actively typing
+  const sc = svgEditor.svgCanvas;
+  sc.selectorManager?.requestSelector(textEl)?.showGrips(false);
 
-  editor.style.cssText = [
-    'position:absolute',
-    `left:${Math.round(left)}px`,
-    `top:${Math.round(top)}px`,
-    'z-index:99999',
-    'min-width:160px',
-    'max-width:550px',
-    `height:${Math.max(30, Math.round(fontSize + 10))}px`,
-    `font-family:${fontFam}`,
-    `font-size:${Math.round(fontSize)}px`,
-    `color:${fillColor === '#000000' || fillColor === '#000' ? '#ffffff' : fillColor}`,
-    'background:rgba(26, 26, 26, 0.94)',
-    `border:1.5px solid ${STUDIO_BLUE}`,
-    'border-radius:5px',
-    'padding:2px 10px',
-    'box-shadow:0 4px 20px rgba(0, 0, 0, 0.65)',
-    'outline:none',
-    'box-sizing:border-box',
-  ].join(';');
+  // Strip existing caret if any
+  const removeCaret = () => {
+    const caret = tp.querySelector(`.${CARET_CLASS}`);
+    if (caret) caret.remove();
+  };
+  removeCaret();
 
-  const commitAndClose = () => {
-    if (!editor.parentNode) return;
-    const finalVal = editor.value.trim() || 'Type on path';
-    tp.textContent = finalVal;
-    editor.remove();
-    sc.call?.('changed', [textEl]);
-    sc.clearSelection();
-    sc.addToSelection([textEl], true);
-    sc.call?.('selected', [textEl]);
+  // Get or create offscreen input trap
+  let trap = document.getElementById('visteras_text_trap');
+  if (!trap) {
+    trap = document.createElement('input');
+    trap.id = 'visteras_text_trap';
+    trap.type = 'text';
+    trap.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+    document.body.appendChild(trap);
+  }
+
+  const rawText = tp.textContent || '';
+  trap.value = rawText;
+
+  // Render blinking caret on curve
+  const updateContentWithCaret = (val) => {
+    tp.textContent = val;
+    const caretSpan = document.createElementNS(SVG_NS, 'tspan');
+    caretSpan.className.baseVal = CARET_CLASS;
+    caretSpan.textContent = ' |';
+    tp.appendChild(caretSpan);
   };
 
-  editor.addEventListener('input', () => {
-    tp.textContent = editor.value;
-    editor.style.width = Math.max(160, Math.min(650, editor.value.length * (fontSize * 0.65) + 36)) + 'px';
-  });
+  updateContentWithCaret(rawText);
 
-  editor.addEventListener('keydown', (e) => {
+  let isCommitted = false;
+  const commit = () => {
+    if (isCommitted) return;
+    isCommitted = true;
+    activeEditingContext = null;
+
+    removeCaret();
+    const finalVal = trap.value.trim() || 'Type on path';
+    tp.textContent = finalVal;
+
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('pointerdown', onPointerDown, true);
+    trap.removeEventListener('input', onInput);
+
+    if (sc) {
+      sc.call?.('changed', [textEl]);
+      sc.clearSelection();
+      sc.addToSelection([textEl], true);
+      sc.call?.('selected', [textEl]);
+    }
+  };
+
+  const onInput = () => {
+    updateContentWithCaret(trap.value);
+  };
+
+  const onKeyDown = (e) => {
     if (e.key === 'Enter' || e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      commitAndClose();
+      commit();
     }
-  });
+  };
 
-  editor.addEventListener('blur', () => {
-    setTimeout(commitAndClose, 120);
-  });
+  const onPointerDown = (e) => {
+    if (e.target === textEl || textEl.contains(e.target)) return;
+    commit();
+  };
 
-  workarea.appendChild(editor);
-  editor.select();
-  editor.focus();
+  trap.addEventListener('input', onInput);
+  window.addEventListener('keydown', onKeyDown, true);
+  // Defer pointerdown listener so the initial click that opened edit doesn't immediately close it
+  setTimeout(() => {
+    if (!isCommitted) {
+      window.addEventListener('pointerdown', onPointerDown, true);
+    }
+  }, 100);
+
+  trap.focus();
+  trap.select();
+
+  activeEditingContext = { commit, textEl };
 }
 
 function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
@@ -461,10 +469,10 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   if (shapeEl.nextSibling) parent.insertBefore(text, shapeEl.nextSibling);
   else parent.appendChild(text);
 
-  // Requirement: The path loses its stroke and fill, and displays a thin blue line on hover
+  // Path loses stroke and fill; thin 1px blue line on hover
   setupPathHoverEffects(pathEl, text);
 
-  // Requirement: Bounding box around text should be as large as the path itself, not larger
+  // Bounding box matches the underlying path itself, not larger
   attachPathBBoxProxy(text, pathEl);
 
   if (sc.history?.InsertElementCommand && typeof sc.addCommandToHistory === 'function') {
@@ -483,10 +491,10 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   }
   syncOptionsPanel(svgEditor);
 
-  // Requirement: Editable directly on the artboard right after creation
+  // Directly start in-place text editing on the artboard
   setTimeout(() => {
-    openArtboardTextEditor(svgEditor, text);
-  }, 50);
+    startDirectInPlaceEdit(svgEditor, text);
+  }, 40);
 
   return text;
 }
@@ -625,7 +633,7 @@ function armTypeOnPathMode(svgEditor) {
   }
 
   if (selected && isTypeOnPathText(selected)) {
-    openArtboardTextEditor(svgEditor, selected);
+    startDirectInPlaceEdit(svgEditor, selected);
     return;
   }
 
@@ -729,14 +737,14 @@ function hookSelectorManager(svgEditor) {
     };
   }
 
-  // Intercept double-click on artboard to open on-artboard text editor
+  // Intercept double-click on artboard to open direct in-place text editing
   window.addEventListener('dblclick', (evt) => {
     const target = evt.target;
     const textEl = target?.closest?.(`text.${TOP_CLASS}, text[${TOP_ATTR}]`);
     if (textEl) {
       evt.preventDefault();
       evt.stopPropagation();
-      openArtboardTextEditor(svgEditor, textEl);
+      startDirectInPlaceEdit(svgEditor, textEl);
     }
   }, true);
 }
