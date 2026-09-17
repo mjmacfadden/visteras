@@ -68516,15 +68516,18 @@ var fz = () => {
 				break;
 			case "zoom":
 			case "shapelib":
-				t = "crosshair";
-				break;
 			case "circle":
 			case "ellipse":
+			case "fhellipse":
 			case "rect":
 			case "square":
+			case "fhrect":
 			case "star":
 			case "polygon":
-				t = `url("./images/cursors/${e}_cursor.svg"), crosshair`;
+			case "line":
+			case "path":
+			case "fhpath":
+				t = "crosshair";
 				break;
 			case "text":
 				t = "text";
@@ -68533,6 +68536,8 @@ var fz = () => {
 				t = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\' viewBox=\'0 0 24 24\'%3E%3Cpath d=\'M1 1 L1 18.5 L5.8 14.2 L10.2 22 L13.4 20.2 L9 12.5 L15.5 12.5 Z\' fill=\'%23000000\' stroke=\'%23ffffff\' stroke-width=\'1.2\' stroke-linejoin=\'round\'/%3E%3C/svg%3E") 1 1, default';
 		}
 		this.workarea.style.cursor = t;
+		let el = pz("svgcanvas");
+		if (el) el.style.cursor = t;
 	}
 	cancelTool() {
 		let e = this.svgCanvas.getMode();
