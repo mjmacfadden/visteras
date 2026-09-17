@@ -341,12 +341,38 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
 
   // Strip existing caret if any
   const removeCaret = () => {
-    const caret = tp.querySelector(`.${CARET_CLASS}`);
-    if (caret) caret.remove();
+    const carets = tp.querySelectorAll(`.${CARET_CLASS}`);
+    carets.forEach(c => c.remove());
   };
   removeCaret();
 
-  // Get or create offscreen input trap
+  let currentText = tp.textContent || '';
+  let cursorPos = currentText.length;
+  let isAllSelected = true; // Start with full selection like standard in-place editors
+
+  // Render currentText with live blinking caret at insertion point along curve
+  const render = () => {
+    tp.textContent = '';
+    const beforeText = currentText.slice(0, cursorPos);
+    const afterText = currentText.slice(cursorPos);
+
+    if (beforeText.length > 0) {
+      tp.appendChild(document.createTextNode(beforeText));
+    }
+
+    const caretSpan = document.createElementNS(SVG_NS, 'tspan');
+    caretSpan.className.baseVal = CARET_CLASS;
+    caretSpan.textContent = cursorPos === currentText.length ? ' |' : '|';
+    tp.appendChild(caretSpan);
+
+    if (afterText.length > 0) {
+      tp.appendChild(document.createTextNode(afterText));
+    }
+  };
+
+  render();
+
+  // Hidden input trap to support IME, mobile keyboards, paste, etc.
   let trap = document.getElementById('visteras_text_trap');
   if (!trap) {
     trap = document.createElement('input');
@@ -355,20 +381,16 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
     trap.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
     document.body.appendChild(trap);
   }
+  trap.value = currentText;
 
-  const rawText = tp.textContent || '';
-  trap.value = rawText;
-
-  // Render blinking caret on curve
-  const updateContentWithCaret = (val) => {
-    tp.textContent = val;
-    const caretSpan = document.createElementNS(SVG_NS, 'tspan');
-    caretSpan.className.baseVal = CARET_CLASS;
-    caretSpan.textContent = ' |';
-    tp.appendChild(caretSpan);
+  const syncTrap = () => {
+    if (trap) {
+      trap.value = currentText;
+      try {
+        trap.setSelectionRange(cursorPos, cursorPos);
+      } catch (_) {}
+    }
   };
-
-  updateContentWithCaret(rawText);
 
   let isCommitted = false;
   const commit = () => {
@@ -377,12 +399,16 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
     activeEditingContext = null;
 
     removeCaret();
-    const finalVal = trap.value.trim() || 'Type on path';
+    const finalVal = currentText.trim() || 'Type on path';
     tp.textContent = finalVal;
 
     window.removeEventListener('keydown', onKeyDown, true);
     window.removeEventListener('pointerdown', onPointerDown, true);
-    trap.removeEventListener('input', onInput);
+    window.removeEventListener('paste', onPaste, true);
+    if (trap) {
+      trap.removeEventListener('input', onTrapInput);
+      trap.removeEventListener('compositionend', onTrapCompositionEnd);
+    }
 
     if (sc) {
       sc.call?.('changed', [textEl]);
@@ -392,16 +418,165 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
     }
   };
 
-  const onInput = () => {
-    updateContentWithCaret(trap.value);
-  };
-
   const onKeyDown = (e) => {
+    // Commit on Enter or Escape
     if (e.key === 'Enter' || e.key === 'Escape') {
       e.preventDefault();
+      e.stopImmediatePropagation();
       e.stopPropagation();
       commit();
+      return;
     }
+
+    // Backspace: Delete previous character or clear selection
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      if (isAllSelected) {
+        currentText = '';
+        cursorPos = 0;
+        isAllSelected = false;
+      } else if (cursorPos > 0) {
+        currentText = currentText.slice(0, cursorPos - 1) + currentText.slice(cursorPos);
+        cursorPos--;
+      }
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Delete: Delete next character or clear selection
+    if (e.key === 'Delete') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      if (isAllSelected) {
+        currentText = '';
+        cursorPos = 0;
+        isAllSelected = false;
+      } else if (cursorPos < currentText.length) {
+        currentText = currentText.slice(0, cursorPos) + currentText.slice(cursorPos + 1);
+      }
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Cursor navigation: Left
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      isAllSelected = false;
+      cursorPos = Math.max(0, cursorPos - 1);
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Cursor navigation: Right
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      isAllSelected = false;
+      cursorPos = Math.min(currentText.length, cursorPos + 1);
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Cursor navigation: Home
+    if (e.key === 'Home') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      isAllSelected = false;
+      cursorPos = 0;
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Cursor navigation: End
+    if (e.key === 'End') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      isAllSelected = false;
+      cursorPos = currentText.length;
+      render();
+      syncTrap();
+      return;
+    }
+
+    // Select all: Cmd+A / Ctrl+A
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      isAllSelected = true;
+      return;
+    }
+
+    // Let system shortcuts through if Cmd/Ctrl/Alt are pressed
+    if (e.metaKey || e.ctrlKey || e.altKey) {
+      return;
+    }
+
+    // Regular typing keys
+    if (e.key && e.key.length === 1) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      if (isAllSelected) {
+        currentText = e.key;
+        cursorPos = 1;
+        isAllSelected = false;
+      } else {
+        currentText = currentText.slice(0, cursorPos) + e.key + currentText.slice(cursorPos);
+        cursorPos++;
+      }
+      render();
+      syncTrap();
+      return;
+    }
+  };
+
+  const onPaste = (e) => {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    e.stopPropagation();
+    const pasted = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+    if (pasted) {
+      if (isAllSelected) {
+        currentText = pasted;
+        cursorPos = pasted.length;
+        isAllSelected = false;
+      } else {
+        currentText = currentText.slice(0, cursorPos) + pasted + currentText.slice(cursorPos);
+        cursorPos += pasted.length;
+      }
+      render();
+      syncTrap();
+    }
+  };
+
+  const onTrapInput = () => {
+    if (trap.value !== currentText) {
+      currentText = trap.value;
+      cursorPos = trap.selectionStart || currentText.length;
+      isAllSelected = false;
+      render();
+    }
+  };
+
+  const onTrapCompositionEnd = () => {
+    currentText = trap.value;
+    cursorPos = trap.selectionStart || currentText.length;
+    isAllSelected = false;
+    render();
   };
 
   const onPointerDown = (e) => {
@@ -409,8 +584,11 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
     commit();
   };
 
-  trap.addEventListener('input', onInput);
+  trap.addEventListener('input', onTrapInput);
+  trap.addEventListener('compositionend', onTrapCompositionEnd);
   window.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('paste', onPaste, true);
+
   // Defer pointerdown listener so the initial click that opened edit doesn't immediately close it
   setTimeout(() => {
     if (!isCommitted) {
@@ -419,7 +597,9 @@ export function startDirectInPlaceEdit(svgEditor, textEl) {
   }, 100);
 
   trap.focus();
-  trap.select();
+  try {
+    trap.select();
+  } catch (_) {}
 
   activeEditingContext = { commit, textEl };
 }
