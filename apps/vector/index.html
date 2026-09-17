@@ -1257,12 +1257,132 @@
 
         const tagName = curElem ? curElem.nodeName : '';
 
-        // Transform Position visibility
-        const xyGroup = document.getElementById('prop_xy_group');
-        if (xyGroup) {
-          const hideXY = ['line', 'circle', 'ellipse', 'polygon'].includes(tagName);
-          xyGroup.style.display = (hideXY && !isMulti) ? 'none' : 'block';
+        // 1. Calculate Bounding Box and Transform coordinates
+        let bbox = null;
+        if (curElem) {
+          if (typeof sc.getStrokedBBox === 'function') {
+            try { bbox = sc.getStrokedBBox([curElem]); } catch(e) {}
+          }
+          if (!bbox && typeof sc.getBBox === 'function') {
+            try { bbox = sc.getBBox(curElem); } catch(e) {}
+          }
+          if (!bbox && typeof curElem.getBBox === 'function') {
+            try { bbox = curElem.getBBox(); } catch(e) {}
+          }
+        } else if (selElems.length > 0 && typeof sc.getStrokedBBox === 'function') {
+          try { bbox = sc.getStrokedBBox(selElems); } catch(e) {}
         }
+
+        let valX = null, valY = null, valW = null, valH = null;
+
+        if (curElem) {
+          if (tagName === 'rect' || tagName === 'image') {
+            valX = parseFloat(curElem.getAttribute('x'));
+            valY = parseFloat(curElem.getAttribute('y'));
+            valW = parseFloat(curElem.getAttribute('width'));
+            valH = parseFloat(curElem.getAttribute('height'));
+          } else if (tagName === 'circle') {
+            const cx = parseFloat(curElem.getAttribute('cx')) || 0;
+            const cy = parseFloat(curElem.getAttribute('cy')) || 0;
+            const r = parseFloat(curElem.getAttribute('r')) || 0;
+            valX = cx - r;
+            valY = cy - r;
+            valW = r * 2;
+            valH = r * 2;
+            const cCx = document.getElementById('circle_cx');
+            if (cCx) cCx.value = Math.round(cx * 10) / 10;
+            const cCy = document.getElementById('circle_cy');
+            if (cCy) cCy.value = Math.round(cy * 10) / 10;
+            const cR = document.getElementById('circle_r');
+            if (cR) cR.value = Math.round(r * 10) / 10;
+          } else if (tagName === 'ellipse') {
+            const cx = parseFloat(curElem.getAttribute('cx')) || 0;
+            const cy = parseFloat(curElem.getAttribute('cy')) || 0;
+            const rx = parseFloat(curElem.getAttribute('rx')) || 0;
+            const ry = parseFloat(curElem.getAttribute('ry')) || 0;
+            valX = cx - rx;
+            valY = cy - ry;
+            valW = rx * 2;
+            valH = ry * 2;
+            const eCx = document.getElementById('ellipse_cx');
+            if (eCx) eCx.value = Math.round(cx * 10) / 10;
+            const eCy = document.getElementById('ellipse_cy');
+            if (eCy) eCy.value = Math.round(cy * 10) / 10;
+            const eRx = document.getElementById('ellipse_rx');
+            if (eRx) eRx.value = Math.round(rx * 10) / 10;
+            const eRy = document.getElementById('ellipse_ry');
+            if (eRy) eRy.value = Math.round(ry * 10) / 10;
+          } else if (tagName === 'line') {
+            const x1 = parseFloat(curElem.getAttribute('x1')) || 0;
+            const y1 = parseFloat(curElem.getAttribute('y1')) || 0;
+            const x2 = parseFloat(curElem.getAttribute('x2')) || 0;
+            const y2 = parseFloat(curElem.getAttribute('y2')) || 0;
+            valX = Math.min(x1, x2);
+            valY = Math.min(y1, y2);
+            valW = Math.abs(x2 - x1);
+            valH = Math.abs(y2 - y1);
+            const lX1 = document.getElementById('line_x1');
+            if (lX1) lX1.value = Math.round(x1 * 10) / 10;
+            const lY1 = document.getElementById('line_y1');
+            if (lY1) lY1.value = Math.round(y1 * 10) / 10;
+            const lX2 = document.getElementById('line_x2');
+            if (lX2) lX2.value = Math.round(x2 * 10) / 10;
+            const lY2 = document.getElementById('line_y2');
+            if (lY2) lY2.value = Math.round(y2 * 10) / 10;
+          } else {
+            if (bbox) {
+              valX = bbox.x;
+              valY = bbox.y;
+              valW = bbox.width;
+              valH = bbox.height;
+            }
+          }
+        } else if (bbox) {
+          valX = bbox.x;
+          valY = bbox.y;
+          valW = bbox.width;
+          valH = bbox.height;
+        }
+
+        if (bbox) {
+          if (valX === null || isNaN(valX)) valX = bbox.x;
+          if (valY === null || isNaN(valY)) valY = bbox.y;
+          if (valW === null || isNaN(valW)) valW = bbox.width;
+          if (valH === null || isNaN(valH)) valH = bbox.height;
+        }
+
+        // Set inputs (X, Y, W, H)
+        const elX = document.getElementById('selected_x');
+        if (elX && valX !== null && !isNaN(valX)) {
+          elX.value = Math.round(valX * 10) / 10;
+        }
+        const elY = document.getElementById('selected_y');
+        if (elY && valY !== null && !isNaN(valY)) {
+          elY.value = Math.round(valY * 10) / 10;
+        }
+        const elW = document.getElementById('rect_width');
+        if (elW && valW !== null && !isNaN(valW)) {
+          elW.value = Math.round(valW * 10) / 10;
+        }
+        const elH = document.getElementById('rect_height');
+        if (elH && valH !== null && !isNaN(valH)) {
+          elH.value = Math.round(valH * 10) / 10;
+        }
+        const elImgW = document.getElementById('image_width');
+        if (elImgW && valW !== null && !isNaN(valW)) {
+          elImgW.value = Math.round(valW * 10) / 10;
+        }
+        const elImgH = document.getElementById('image_height');
+        if (elImgH && valH !== null && !isNaN(valH)) {
+          elImgH.value = Math.round(valH * 10) / 10;
+        }
+
+        // Transform Position & Dimension visibility: always visible for selected objects
+        const xyGroup = document.getElementById('prop_xy_group');
+        if (xyGroup) xyGroup.style.display = 'block';
+
+        const rectGroup = document.getElementById('prop_rect_group');
+        if (rectGroup) rectGroup.style.display = 'block';
 
         const circleXY = document.getElementById('prop_circle_xy_group');
         if (circleXY) circleXY.style.display = (tagName === 'circle') ? 'block' : 'none';
@@ -1272,10 +1392,6 @@
 
         const lineGroup = document.getElementById('prop_line_group');
         if (lineGroup) lineGroup.style.display = (tagName === 'line') ? 'block' : 'none';
-
-        // Dimensions visibility
-        const rectGroup = document.getElementById('prop_rect_group');
-        if (rectGroup) rectGroup.style.display = (tagName === 'rect') ? 'block' : 'none';
 
         const imgGroup = document.getElementById('prop_image_group');
         if (imgGroup) imgGroup.style.display = (tagName === 'image') ? 'block' : 'none';
@@ -1316,7 +1432,6 @@
         // Pathfinder section (strictly visible when 2 objects are selected)
         const pathfinderSec = document.getElementById('sec_pathfinder');
         if (pathfinderSec) {
-          const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
           pathfinderSec.style.display = (selElems.length === 2 && !isPathEdit) ? 'block' : 'none';
         }
 
@@ -1336,7 +1451,7 @@
         if (curElem) {
           const angleInput = document.getElementById('angle');
           if (angleInput && sc.getRotationAngle) {
-            angleInput.value = sc.getRotationAngle(curElem) || 0;
+            angleInput.value = Math.round(sc.getRotationAngle(curElem) || 0);
           }
           const blurInput = document.getElementById('blur');
           if (blurInput && sc.getBlur) {
@@ -1361,13 +1476,25 @@
         };
       }
 
-      // Canvas event listeners
+      // Canvas event listeners for real-time live synchronization
       if (svgEditor.svgCanvas) {
         svgEditor.svgCanvas.bind('selectedChanged', updatePropertiesVisibility);
         svgEditor.svgCanvas.bind('elementChanged', updatePropertiesVisibility);
         svgEditor.svgCanvas.bind('selected', updatePropertiesVisibility);
         svgEditor.svgCanvas.bind('changed', updatePropertiesVisibility);
+        svgEditor.svgCanvas.bind('transition', updatePropertiesVisibility);
+        svgEditor.svgCanvas.bind('pointsAdded', updatePropertiesVisibility);
       }
+
+      // Live updates during canvas mouse drag
+      document.getElementById('svgcanvas')?.addEventListener('mousemove', () => {
+        if (svgEditor.svgCanvas?.getStarted?.()) {
+          updatePropertiesVisibility();
+        }
+      });
+      window.addEventListener('keydown', () => {
+        setTimeout(updatePropertiesVisibility, 10);
+      });
 
       // Initial visibility sync
       updatePropertiesVisibility();
