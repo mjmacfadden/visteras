@@ -31,6 +31,10 @@
  * Still Canvas2D-only (can_render_layers returns false):
  *   - Unsupported adjustment types / non-source-over adjustments
  *   - Blend modes other than the GPU set below
+ *   - Any clipping mask (layer.clipped / legacy source-atop): GPU source-atop
+ *     clips to full framebuffer alpha, so an opaque Background under the
+ *     clip base makes the clipped layer look unclipped. Canvas2D isolates
+ *     the clip group to the layer directly beneath (Photoshop-style).
  *   - source-atop when the clip base has alpha-expanding filters
  *     (shadow / outer_glow / blur / stroke) — falls back for correctness
  *   - Other Porter-Duff modes beyond source-over / source-atop / GPU blends
@@ -502,19 +506,23 @@ class WebGL_renderer_class {
 				return false;
 			}
 
-			// Clip wins: get_render_composition forces source-atop when clipped.
-			var composition = get_render_composition(layer);
+			// Clipping masks must use Canvas2D isolation. GPU source-atop
+			// composites against the full framebuffer, so content under the
+			// clip base (e.g. white Background) makes a clipped fill look
+			// completely unclipped. Canvas2D paints the base alone into a
+			// temp canvas, then source-atops the clipped layer onto that.
 			if (is_layer_clipped(layer)) {
-				composition = 'source-atop';
+				return false;
 			}
+
+			var composition = get_render_composition(layer);
 			if (!Object.prototype.hasOwnProperty.call(GPU_BLEND_MODES, composition)) {
 				return false;
 			}
 
-			// source-atop clips to FB alpha. If the clip base has baked
-			// alpha-expanding filters (shadow/glow/blur/stroke), fall back so
-			// we do not clip to the expanded silhouette.
-			if (composition === 'source-atop' || is_layer_clipped(layer)) {
+			// Legacy / direct source-atop blend (no clipped flag): still reject
+			// when the destination base would expand alpha via baked filters.
+			if (composition === 'source-atop') {
 				if (!this._source_atop_gpu_ok(layers, i, disabled_filter_id)) {
 					return false;
 				}
