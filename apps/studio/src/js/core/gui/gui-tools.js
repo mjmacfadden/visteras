@@ -164,7 +164,7 @@ class GUI_tools_class {
 
 			//events
 			itemDom.addEventListener('click', function (event) {
-				_this.activate_tool(this.id);
+				_this.activate_tool(_this.get_active_tool_for_group(this.id));
 			});
 
 			if (item.tool_group) {
@@ -325,14 +325,35 @@ class GUI_tools_class {
 	}
 
 	/**
+	 * returns the active tool name for a toolbar button that may represent a tool group.
+	 */
+	get_active_tool_for_group(ownerName) {
+		for (var i in config.TOOLS) {
+			var item = config.TOOLS[i];
+			if (item.name === ownerName) {
+				if (item.tool_group && item.tool_group.items && item.tool_group.items.length) {
+					var active_shape = item.tool_group.active_shape
+						|| this.Helper.getCookie(this.group_cookie_key(ownerName))
+						|| item.tool_group.items[0].shape;
+					for (var j in item.tool_group.items) {
+						if (item.tool_group.items[j].shape === active_shape) {
+							return item.tool_group.items[j].tool || item.name;
+						}
+					}
+				}
+				return item.name;
+			}
+		}
+		return ownerName;
+	}
+
+	/**
 	 * when the given tool key is a member of a tool group, sync the group's
 	 * active shape, cookie, button icon and title to it (e.g. activating the
 	 * pencil tool makes the brush button show the pencil icon).
 	 */
 	sync_group_button_for_tool(key) {
 		var owner = this.get_button_id_for_tool(key);
-		if (owner == key)
-			return;
 		var itemDef = null;
 		for (var j in config.TOOLS) {
 			if (config.TOOLS[j].name == owner) {

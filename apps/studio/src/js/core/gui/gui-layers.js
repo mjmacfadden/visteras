@@ -1042,6 +1042,17 @@ class GUI_layers_class {
 			return;
 		}
 
+		var textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
+			? app.GUI.GUI_tools.tools_modules['text'].object
+			: null;
+		var targetLayer = app.Layers.find_layer(id);
+		if (textTool && (!targetLayer || targetLayer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text'))) {
+			textTool.focused = false;
+			textTool.selecting = false;
+			textTool.creating = false;
+			if (textTool.textarea) textTool.textarea.blur();
+		}
+
 		var is_shift = !!(event && event.shiftKey);
 		var is_ctrl = !!(event && (event.ctrlKey || event.metaKey));
 

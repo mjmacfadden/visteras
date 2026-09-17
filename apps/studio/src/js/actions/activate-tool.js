@@ -2,6 +2,7 @@ import app from './../app.js';
 import config from './../config.js';
 import { Base_action } from './base.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
+import Vector_manager from './../core/vector/vector-manager.js';
 
 export class Activate_tool_action extends Base_action {
 	/**
@@ -58,6 +59,18 @@ export class Activate_tool_action extends Base_action {
 			}
 			//sync the toolbar group button when a member tool (e.g. pencil) activates
 			app.GUI.GUI_tools.sync_group_button_for_tool(key);
+
+			if (key !== 'text') {
+				const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
+					? app.GUI.GUI_tools.tools_modules['text'].object
+					: null;
+				if (textTool) {
+					textTool.focused = false;
+					textTool.selecting = false;
+					textTool.creating = false;
+					if (textTool.textarea) textTool.textarea.blur();
+				}
+			}
 
 			//check module
 			if (app.GUI.GUI_tools.tools_modules[key] == undefined) {
@@ -117,6 +130,22 @@ export class Activate_tool_action extends Base_action {
 				}
 				if (config.layer && config.layer.type === 'text' && typeof textToolEarly.sync_size_from_layer === 'function') {
 					textToolEarly.sync_size_from_layer(config.layer);
+				}
+			}
+
+			const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+			if (vectorTools.includes(key)) {
+				if (config.layer && config.layer.type === 'vector') {
+					const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+					if (vecId) {
+						Vector_manager.set_active_vector(vecId);
+					}
+				}
+				const toolObj = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules[key])
+					? app.GUI.GUI_tools.tools_modules[key].object
+					: null;
+				if (toolObj && typeof toolObj.sync_vector_options_bar === 'function') {
+					toolObj.sync_vector_options_bar();
 				}
 			}
 
@@ -193,7 +222,22 @@ export class Activate_tool_action extends Base_action {
 				config.TOOL = config.TOOLS[i];
 			}
 		}
-		//sync the toolbar group button when returning to a member tool
+		const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+		if (vectorTools.includes(this.old_key)) {
+			if (config.layer && config.layer.type === 'vector') {
+				const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+				if (vecId) {
+					Vector_manager.set_active_vector(vecId);
+				}
+			}
+			const toolObj = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules[this.old_key])
+				? app.GUI.GUI_tools.tools_modules[this.old_key].object
+				: null;
+			if (toolObj && typeof toolObj.sync_vector_options_bar === 'function') {
+				toolObj.sync_vector_options_bar();
+			}
+		}
+
 		app.GUI.GUI_tools.sync_group_button_for_tool(app.GUI.GUI_tools.active_tool);
 
 		app.GUI.GUI_tools.show_action_attributes();

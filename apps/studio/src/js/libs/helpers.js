@@ -553,11 +553,17 @@ class Helper_class {
 		if (!element) {
 			return false;
 		}
+		if (element.id === 'text_tool_keyboard_input') {
+			if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				return false;
+			}
+		}
 		if (element.type == 'text' || element.tagName == 'INPUT' || element.type == 'textarea') {
 			return true;
-		} else {
+		} else if (typeof element.closest === 'function') {
 			return element.closest('.ui_color_picker_gradient, .ui_number_input, .ui_range, .ui_swatches') != null;
 		}
+		return false;
 	}
 
 	//if IE 11 or Edge

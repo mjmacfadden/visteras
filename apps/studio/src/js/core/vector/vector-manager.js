@@ -6,9 +6,18 @@
  */
 
 import config from '../../config.js';
-import app from '../../app.js';
 import { Vector, Subpath, Anchor } from './vector-model.js';
 import Vector_renderer from './vector-renderer.js';
+
+function getApp() {
+	if (typeof window !== 'undefined' && window.app) return window.app;
+	try {
+		const appModule = require('../../app.js');
+		return appModule.default || appModule;
+	} catch (e) {
+		return null;
+	}
+}
 
 class Vector_manager_class {
 	constructor() {
@@ -66,11 +75,12 @@ class Vector_manager_class {
 		this.selected_anchors = [];
 		this.hover_state = null;
 
-		if (app.GUI && app.GUI.GUI_vectors) {
-			app.GUI.GUI_vectors.render_vectors();
+		const appInstance = getApp();
+		if (appInstance && appInstance.GUI && appInstance.GUI.GUI_vectors) {
+			appInstance.GUI.GUI_vectors.render_vectors();
 		}
-		if (app.GUI && app.GUI.GUI_properties) {
-			app.GUI.GUI_properties.render_properties();
+		if (appInstance && appInstance.GUI && appInstance.GUI.GUI_properties) {
+			appInstance.GUI.GUI_properties.render_properties();
 		}
 		config.need_render = true;
 	}
@@ -175,8 +185,9 @@ class Vector_manager_class {
 				const nextVec = vectors[Math.max(0, idx - 1)] || null;
 				this.set_active_vector(nextVec ? nextVec.id : null);
 			} else {
-				if (app.GUI && app.GUI.GUI_vectors) {
-					app.GUI.GUI_vectors.render_vectors();
+				const appInstance = getApp();
+				if (appInstance && appInstance.GUI && appInstance.GUI.GUI_vectors) {
+					appInstance.GUI.GUI_vectors.render_vectors();
 				}
 				config.need_render = true;
 			}

@@ -50,24 +50,81 @@ var Helper = new Helper_class();
         $el.trigger('change', event);
     };
 
+    const calculate_stepped_value = (currentVal, stepAmount, increasing) => {
+        let val = isNaN(currentVal) ? 0 : Number(currentVal);
+        const step = (stepAmount == null || isNaN(stepAmount) || stepAmount <= 0) ? 1 : Number(stepAmount);
+        const eps = 1e-7;
+        const ratio = val / step;
+        const remainder = Math.abs(ratio % 1);
+        const isMultiple = remainder < eps || Math.abs(remainder - 1) < eps;
+
+        let nextVal;
+        if (increasing) {
+            if (isMultiple) {
+                nextVal = (Math.round(ratio) + 1) * step;
+            } else {
+                nextVal = (Math.floor(ratio) + 1) * step;
+            }
+        } else {
+            if (isMultiple) {
+                nextVal = (Math.round(ratio) - 1) * step;
+            } else {
+                nextVal = (Math.ceil(ratio) - 1) * step;
+            }
+        }
+        return parseFloat(nextVal.toFixed(6));
+    };
+
+    const get_current_input_value = ($el) => {
+        const { input, value } = $el.data() || {};
+        if (input && input.value !== '') {
+            const parsed = parseFloat(input.value);
+            if (!isNaN(parsed)) return parsed;
+        }
+        return isNaN(value) ? 0 : value;
+    };
+
     const on_wheel_number_input = (event) => {
         const $el = $(event.target.closest('.ui_number_input'));
-        const { value, step, disabled } = $el.data();
+        const { disabled } = $el.data();
         event.preventDefault();
         const delta = (event.originalEvent.deltaY > 0 ? -1 : (event.originalEvent.deltaY < 0 ? 1 : 0));
         if (!disabled && delta !== 0) {
-            set_value($el, (isNaN(value) ? 0 : value) + (step * delta)); // Intentionally not using get_step_amount
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, delta > 0);
+            const nextVal = calculate_stepped_value(cur, step, delta > 0);
+            set_value($el, nextVal);
             $el.trigger('input');
+            $el.trigger('change');
         }
-    }
+    };
+
+    const on_keydown_number_input = (event) => {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            const $el = $(event.target.closest('.ui_number_input'));
+            const { disabled } = $el.data();
+            if (disabled) return;
+            event.preventDefault();
+            const increasing = event.key === 'ArrowUp';
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, increasing);
+            const nextVal = calculate_stepped_value(cur, step, increasing);
+            set_value($el, nextVal);
+            $el.trigger('input');
+            $el.trigger('change');
+        }
+    };
 
     const on_touch_start_increase_button = (event) => {
         const $el = $(event.target.closest('.ui_number_input'));
-        const { value, buttonRepeatTimeout, buttonRepeatInterval, disabled } = $el.data();
+        const { buttonRepeatTimeout, buttonRepeatInterval, disabled } = $el.data();
         if (!disabled) {
             clearTimeout(buttonRepeatTimeout);
             clearInterval(buttonRepeatInterval);
-            set_value($el, (isNaN(value) ? 0 : value) + get_step_amount($el, true));
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, true);
+            const nextVal = calculate_stepped_value(cur, step, true);
+            set_value($el, nextVal);
             $el.trigger('input');
         }
     };
@@ -83,10 +140,13 @@ var Helper = new Helper_class();
 
     const on_mouse_down_increase_button = (event) => {
         const $el = $(event.target.closest('.ui_number_input'));
-        const { value, disabled } = $el.data();
+        const { disabled } = $el.data();
         if (!disabled) {
             stop_repeat($el);
-            set_value($el, (isNaN(value) ? 0 : value) + get_step_amount($el, true));
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, true);
+            const nextVal = calculate_stepped_value(cur, step, true);
+            set_value($el, nextVal);
             $el.trigger('input');
 
             $(window).off('.uiNumberInputRepeat').on('mouseup.uiNumberInputRepeat touchend.uiNumberInputRepeat', () => {
@@ -103,8 +163,10 @@ var Helper = new Helper_class();
                         stop_repeat($el);
                         return;
                     }
-                    const { value } = $el.data();
-                    set_value($el, value + get_step_amount($el, true));
+                    const curRepeat = get_current_input_value($el);
+                    const stepRepeat = get_step_amount($el, true);
+                    const nextRepeatVal = calculate_stepped_value(curRepeat, stepRepeat, true);
+                    set_value($el, nextRepeatVal);
                     $el.trigger('input');
                 }, 50));
             }, 400));
@@ -118,21 +180,27 @@ var Helper = new Helper_class();
 
     const on_touch_start_decrease_button = (event) => {
         const $el = $(event.target.closest('.ui_number_input'));
-        const { value, buttonRepeatTimeout, buttonRepeatInterval, disabled } = $el.data();
+        const { buttonRepeatTimeout, buttonRepeatInterval, disabled } = $el.data();
         if (!disabled) {
             clearTimeout(buttonRepeatTimeout);
             clearInterval(buttonRepeatInterval);
-            set_value($el, (isNaN(value) ? 0 : value) - get_step_amount($el, false));
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, false);
+            const nextVal = calculate_stepped_value(cur, step, false);
+            set_value($el, nextVal);
             $el.trigger('input');
         }
     };
 
     const on_mouse_down_decrease_button = (event) => {
         const $el = $(event.target.closest('.ui_number_input'));
-        const { value, disabled } = $el.data();
+        const { disabled } = $el.data();
         if (!disabled) {
             stop_repeat($el);
-            set_value($el, (isNaN(value) ? 0 : value) - get_step_amount($el, false));
+            const cur = get_current_input_value($el);
+            const step = get_step_amount($el, false);
+            const nextVal = calculate_stepped_value(cur, step, false);
+            set_value($el, nextVal);
             $el.trigger('input');
 
             $(window).off('.uiNumberInputRepeat').on('mouseup.uiNumberInputRepeat touchend.uiNumberInputRepeat', () => {
@@ -149,8 +217,10 @@ var Helper = new Helper_class();
                         stop_repeat($el);
                         return;
                     }
-                    const { value } = $el.data();
-                    set_value($el, value - get_step_amount($el, false));
+                    const curRepeat = get_current_input_value($el);
+                    const stepRepeat = get_step_amount($el, false);
+                    const nextRepeatVal = calculate_stepped_value(curRepeat, stepRepeat, false);
+                    set_value($el, nextRepeatVal);
                     $el.trigger('input');
                 }, 50));
             }, 400));
@@ -163,14 +233,19 @@ var Helper = new Helper_class();
     };
 
     const set_value = ($el, value) => {
-        const { min, max, inputStep, inputStepDecimalPlaces, input } = $el.data();
+        const { min, max, input } = $el.data();
         if (typeof value === 'string') {
             value = parseFloat(value);
         }
         if (!isNaN(value)) {
-            value = parseFloat((inputStep * Math.round(value / inputStep)).toFixed(inputStepDecimalPlaces));
-            value = Math.max(min, Math.min(max, value));
-            if (value + '.' !== input.value) {
+            value = parseFloat(Number(value).toFixed(4));
+            if (min != null && !isNaN(min)) {
+                value = Math.max(min, value);
+            }
+            if (max != null && !isNaN(max)) {
+                value = Math.min(max, value);
+            }
+            if (String(value) !== input.value && (value + '.' !== input.value)) {
                 input.value = value;
             }
         } else {
@@ -191,9 +266,10 @@ var Helper = new Helper_class();
     };
 
     const get_step_amount = ($el, increasing) => {
-        const { value, step, exponentialStepButtons } = $el.data();
+        const { exponentialStepButtons } = $el.data();
+        const value = get_current_input_value($el);
         if (exponentialStepButtons) {
-            let amount = step;
+            let amount = 1;
             let absValue = Math.abs((isNaN(value) ? 0 : value));
             if (absValue >= (increasing ? 500 : 501))
                 amount = 100;
@@ -207,7 +283,8 @@ var Helper = new Helper_class();
                 amount = 1;
             return amount;
         } else {
-            return step;
+            const { step } = $el.data();
+            return step || 1;
         }
     };
 
@@ -274,11 +351,7 @@ var Helper = new Helper_class();
                 if (max != null) {
                     input.setAttribute('max', max);
                 }
-                if (Math.floor(inputStep) === inputStep) {
-                    input.setAttribute('step', inputStep);
-                } else {
-                    input.setAttribute('step', 'any');
-                }
+                input.setAttribute('step', 'any');
 
                 let inputStepDecimalPlaces = 0;
                 if ((inputStep % 1) != 0)
@@ -305,6 +378,7 @@ var Helper = new Helper_class();
                     .on('blur', on_blur_number_input)
                     .on('input', on_input_number_input)
                     .on('change', on_change_number_input)
+                    .on('keydown', on_keydown_number_input)
                     .on('wheel', on_wheel_number_input);
                 $(increaseButton)
                     .on('touchstart', on_touch_start_increase_button)

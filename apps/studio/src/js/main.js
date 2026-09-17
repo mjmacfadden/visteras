@@ -56,6 +56,7 @@ window.addEventListener('load', function (e) {
 	app.FontManager = FontManager;
 
 	// Register as global for quick or external access
+	window.app = app;
 	window.Layers = Layers;
 	window.AppConfig = config;
 	window.State = Base_state;

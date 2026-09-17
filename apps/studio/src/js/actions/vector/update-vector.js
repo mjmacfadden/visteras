@@ -60,6 +60,14 @@ export class Update_vector_action extends Base_action {
 		if (app.GUI && app.GUI.GUI_properties) {
 			app.GUI.GUI_properties.render_properties();
 		}
+		const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+		if (config.TOOL && vectorTools.includes(config.TOOL.name) && app.GUI && app.GUI.GUI_tools) {
+			const activeToolObj = app.GUI.GUI_tools.tools_modules[config.TOOL.name]?.object;
+			if (activeToolObj && typeof activeToolObj.sync_vector_options_bar === 'function') {
+				activeToolObj.sync_vector_options_bar();
+				app.GUI.GUI_tools.show_action_attributes();
+			}
+		}
 		config.need_render = true;
 	}
 
@@ -103,6 +111,14 @@ export class Update_vector_action extends Base_action {
 		}
 		if (app.GUI && app.GUI.GUI_properties) {
 			app.GUI.GUI_properties.render_properties();
+		}
+		const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+		if (config.TOOL && vectorTools.includes(config.TOOL.name) && app.GUI && app.GUI.GUI_tools) {
+			const activeToolObj = app.GUI.GUI_tools.tools_modules[config.TOOL.name]?.object;
+			if (activeToolObj && typeof activeToolObj.sync_vector_options_bar === 'function') {
+				activeToolObj.sync_vector_options_bar();
+				app.GUI.GUI_tools.show_action_attributes();
+			}
 		}
 		config.need_render = true;
 	}

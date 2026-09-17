@@ -275,9 +275,33 @@ class GUI_properties_class {
 			});
 		}
 		if (strokeWidthInput) {
+			strokeWidthInput.setAttribute('step', 'any');
 			strokeWidthInput.addEventListener('change', () => {
-				const stroke_width = Math.max(1, parseInt(strokeWidthInput.value, 10) || 1);
+				const stroke_width = Math.max(1, parseFloat(strokeWidthInput.value) || 1);
 				app.State.do_action(new Update_vector_action(vector.id, { stroke_width }));
+			});
+			strokeWidthInput.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+					e.preventDefault();
+					let val = parseFloat(strokeWidthInput.value) || 1;
+					const increasing = e.key === 'ArrowUp';
+					val = Math.max(1, this.get_stepped_value(val, 1, increasing));
+					strokeWidthInput.value = val;
+					app.State.do_action(new Update_vector_action(vector.id, { stroke_width: val }));
+				}
+			});
+			strokeWidthInput.addEventListener('wheel', (e) => {
+				if (document.activeElement === strokeWidthInput) {
+					e.preventDefault();
+					const delta = e.deltaY < 0 ? 1 : (e.deltaY > 0 ? -1 : 0);
+					if (delta !== 0) {
+						let val = parseFloat(strokeWidthInput.value) || 1;
+						const increasing = delta > 0;
+						val = Math.max(1, this.get_stepped_value(val, 1, increasing));
+						strokeWidthInput.value = val;
+						app.State.do_action(new Update_vector_action(vector.id, { stroke_width: val }));
+					}
+				}
 			});
 		}
 		if (strokeAlignSel) {
@@ -455,11 +479,85 @@ class GUI_properties_class {
 				this.apply_live(layer_id, name, val);
 				this.commit_params(layer_id);
 			});
+			number.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+					e.preventDefault();
+					const name = number.name;
+					let val = this.parse_input_value(number);
+					if (val === null) {
+						const layer = this.Base_layers.get_layer(layer_id);
+						val = layer && layer.params ? layer.params[name] : 0;
+					}
+					const step = parseFloat(number.step) || 1;
+					const increasing = e.key === 'ArrowUp';
+					val = this.get_stepped_value(val, step, increasing);
+					const min = parseFloat(number.min);
+					const max = parseFloat(number.max);
+					if (!isNaN(min)) val = Math.max(min, val);
+					if (!isNaN(max)) val = Math.min(max, val);
+					number.value = this.format_value(val, step);
+					const range = target.querySelector(`#prop_range_${name}`);
+					if (range) range.value = val;
+					this.apply_live(layer_id, name, val);
+					this.commit_params(layer_id);
+				}
+			});
+			number.addEventListener('wheel', (e) => {
+				if (document.activeElement === number) {
+					e.preventDefault();
+					const delta = e.deltaY < 0 ? 1 : (e.deltaY > 0 ? -1 : 0);
+					if (delta !== 0) {
+						const name = number.name;
+						let val = this.parse_input_value(number);
+						if (val === null) {
+							const layer = this.Base_layers.get_layer(layer_id);
+							val = layer && layer.params ? layer.params[name] : 0;
+						}
+						const step = parseFloat(number.step) || 1;
+						const increasing = delta > 0;
+						val = this.get_stepped_value(val, step, increasing);
+						const min = parseFloat(number.min);
+						const max = parseFloat(number.max);
+						if (!isNaN(min)) val = Math.max(min, val);
+						if (!isNaN(max)) val = Math.min(max, val);
+						number.value = this.format_value(val, step);
+						const range = target.querySelector(`#prop_range_${name}`);
+						if (range) range.value = val;
+						this.apply_live(layer_id, name, val);
+						this.commit_params(layer_id);
+					}
+				}
+			});
 			number.addEventListener('dblclick', (e) => {
 				e.preventDefault();
 				reset_to_default(number);
 			});
 		});
+	}
+
+	get_stepped_value(currentVal, stepAmount = 1, increasing = true) {
+		let val = isNaN(currentVal) ? 0 : Number(currentVal);
+		const step = (stepAmount == null || isNaN(stepAmount) || stepAmount <= 0) ? 1 : Number(stepAmount);
+		const eps = 1e-7;
+		const ratio = val / step;
+		const remainder = Math.abs(ratio % 1);
+		const isMultiple = remainder < eps || Math.abs(remainder - 1) < eps;
+
+		let nextVal;
+		if (increasing) {
+			if (isMultiple) {
+				nextVal = (Math.round(ratio) + 1) * step;
+			} else {
+				nextVal = (Math.floor(ratio) + 1) * step;
+			}
+		} else {
+			if (isMultiple) {
+				nextVal = (Math.round(ratio) - 1) * step;
+			} else {
+				nextVal = (Math.ceil(ratio) - 1) * step;
+			}
+		}
+		return parseFloat(nextVal.toFixed(6));
 	}
 
 	parse_input_value(el) {
@@ -621,7 +719,7 @@ class GUI_properties_class {
 		html += `<div class="properties_row" data-prop="size">
 			<label class="trn properties_label" for="prop_text_size">Size</label>
 			<input type="number" class="properties_number" id="prop_text_size" data-text-key="size"
-				min="${sizeMin}" max="${sizeMax}" step="${sizeStep}"
+				min="${sizeMin}" max="${sizeMax}" step="any"
 				value="${sizeVal != null && sizeVal !== '' && !Number.isNaN(Number(sizeVal)) ? sizeVal : ''}" />
 		</div>`;
 
@@ -678,7 +776,7 @@ class GUI_properties_class {
 		html += `<div class="properties_row" data-prop="kerning">
 			<label class="trn properties_label" for="prop_text_kerning">Kerning</label>
 			<input type="number" class="properties_number" id="prop_text_kerning" data-text-key="kerning"
-				min="${kernMin}" max="${kernMax}" step="1"
+				min="${kernMin}" max="${kernMax}" step="any"
 				value="${kerningVal != null && kerningVal !== '' && !Number.isNaN(Number(kerningVal)) ? kerningVal : 0}" />
 		</div>`;
 
@@ -686,7 +784,7 @@ class GUI_properties_class {
 		html += `<div class="properties_row" data-prop="leading">
 			<label class="trn properties_label" for="prop_text_leading">Leading</label>
 			<input type="number" class="properties_number" id="prop_text_leading" data-text-key="leading"
-				min="${leadMin}" max="${leadMax}" step="1"
+				min="${leadMin}" max="${leadMax}" step="any"
 				value="${leadingVal != null && leadingVal !== '' && !Number.isNaN(Number(leadingVal)) ? leadingVal : 0}" />
 		</div>`;
 
@@ -827,6 +925,41 @@ class GUI_properties_class {
 				const val = this.parse_input_value(input);
 				if (val === null) return;
 				this.apply_text_attr(key, val, { skipBarRebuild: true });
+			});
+			input.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+					e.preventDefault();
+					const key = input.getAttribute('data-text-key');
+					let val = this.parse_input_value(input);
+					if (val === null) val = 0;
+					const increasing = e.key === 'ArrowUp';
+					val = this.get_stepped_value(val, 1, increasing);
+					const min = parseFloat(input.min);
+					const max = parseFloat(input.max);
+					if (!isNaN(min)) val = Math.max(min, val);
+					if (!isNaN(max)) val = Math.min(max, val);
+					input.value = val;
+					this.apply_text_attr(key, val);
+				}
+			});
+			input.addEventListener('wheel', (e) => {
+				if (document.activeElement === input) {
+					e.preventDefault();
+					const delta = e.deltaY < 0 ? 1 : (e.deltaY > 0 ? -1 : 0);
+					if (delta !== 0) {
+						const key = input.getAttribute('data-text-key');
+						let val = this.parse_input_value(input);
+						if (val === null) val = 0;
+						const increasing = delta > 0;
+						val = this.get_stepped_value(val, 1, increasing);
+						const min = parseFloat(input.min);
+						const max = parseFloat(input.max);
+						if (!isNaN(min)) val = Math.max(min, val);
+						if (!isNaN(max)) val = Math.min(max, val);
+						input.value = val;
+						this.apply_text_attr(key, val);
+					}
+				}
 			});
 		});
 
