@@ -409,19 +409,20 @@ html, body {
   transition: all 0.12s !important;
 }
 
-/* Tool button states */
-#tools_left > se-button:hover,
-#tools_left > se-flyingbutton:hover,
-#tools_left > div > se-button:hover,
-#tools_left > div > se-flyingbutton:hover {
+/* Tool button states — hover stays subtle; only pressed/active gets accent */
+#tools_left se-button:hover,
+#tools_left se-flyingbutton:hover {
   background-color: #505050 !important;
 }
 
-#tools_left > se-button[pressed],
-#tools_left > se-flyingbutton[pressed],
-#tools_left > div > se-button[pressed],
-#tools_left > div > se-flyingbutton[pressed] {
+#tools_left se-button[pressed],
+#tools_left se-flyingbutton[pressed],
+#tools_left [pressed] {
+  /* Match News/Publish active tool: left accent stroke + orange icon (icon via shadow CSS) */
   background-color: #242424 !important;
+  border: 1px solid #1a1a1a !important;
+  border-left: 2px solid var(--studio-orange) !important; /* #fa7c1b */
+  box-sizing: border-box !important;
   box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05) !important;
   border-radius: 2px !important;
 }

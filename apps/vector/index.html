@@ -1175,6 +1175,44 @@
       moveEl('tool_text_decoration_overline', 'slot_text_styles');
       moveEl('tool_text_anchor', 'slot_text_styles');
 
+      // Left toolbar: orange icon tint when tool is pressed (shadow DOM <img>; mirrors News active stroke).
+      (function styleToolsLeftAccent() {
+        const orangeFilter =
+          'brightness(0) saturate(100%) invert(56%) sepia(95%) saturate(2500%) hue-rotate(359deg) brightness(102%) contrast(96%)';
+        const shadowCss = `
+          img { transition: filter 0.12s; }
+          div.pressed img,
+          :host([pressed]) img {
+            filter: ${orangeFilter} !important;
+          }
+        `;
+        const apply = () => {
+          const root = document.getElementById('tools_left');
+          if (!root) return;
+          root.querySelectorAll('se-button, se-flyingbutton').forEach((host) => {
+            if (!host.shadowRoot) return;
+            let style = host.shadowRoot.querySelector('style[data-visteras-tool-accent]');
+            if (!style) {
+              style = document.createElement('style');
+              style.setAttribute('data-visteras-tool-accent', '1');
+              host.shadowRoot.appendChild(style);
+            }
+            style.textContent = shadowCss;
+          });
+        };
+        apply();
+        setTimeout(apply, 0);
+        setTimeout(apply, 250);
+        setTimeout(apply, 1000);
+        // Re-apply when tools are rebuilt / attributes change
+        const root = document.getElementById('tools_left');
+        if (root && !root._visterasToolAccentObs) {
+          const obs = new MutationObserver(() => apply());
+          obs.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['pressed'] });
+          root._visterasToolAccentObs = obs;
+        }
+      })();
+
       // Match Studio adjustment icons (#cccccc); no hover effect on type-style buttons.
       (function styleTextStyleIcons() {
         const ids = [

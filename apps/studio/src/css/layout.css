@@ -457,7 +457,11 @@ body .sp-preview{
 	background-color: var(--button-background-color-hover);
 }
 .sidebar_left .item.active{
+	/* Match News/Publish active tool: left accent stroke + tinted icon */
 	background-color: #242424;
+	border: 1px solid #1a1a1a;
+	border-left: 2px solid #2f6fae; /* Studio chrome blue (document tabs) */
+	box-sizing: border-box;
 	box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05);
 	color: var(--text-color-active);
 }
@@ -465,7 +469,8 @@ body .sp-preview{
 	background-color: #1e1e1e;
 }
 .sidebar_left .item.active:after{
-	filter: var(--menu-icons-filter);
+	/* Tint background-image icons to Studio blue #2f6fae (black → blue) */
+	filter: brightness(0) saturate(100%) invert(39%) sepia(47%) saturate(1012%) hue-rotate(174deg) brightness(92%) contrast(88%);
 }
 
 /*
@@ -535,7 +540,7 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 	pointer-events: none;
 }
 .sidebar_left .item.active .corner_triangle{
-	border-color: transparent transparent #fff transparent;
+	border-color: transparent transparent #2f6fae transparent;
 }
 
 /* Photoshop-style tool group flyout */
