@@ -39076,11 +39076,11 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				let t = Number(parts[1]);
 				K.selectPt(a, t);
 			} else {
-				let zm = p_.getZoom(), closestPt = -1, minD = 10 * zm;
+				let closestPt = -1, minD = 12;
 				K.eachSeg(function(idx) {
 					if (this.ptgrip) {
 						let gripPt = p_.getGripPt(this);
-						let dist = Math.hypot(gripPt.x - (n * zm), gripPt.y - (r * zm));
+						let dist = Math.hypot(gripPt.x - n, gripPt.y - r);
 						if (dist < minD) {
 							minD = dist;
 							closestPt = idx;

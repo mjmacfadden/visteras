@@ -1096,17 +1096,22 @@ elix-dialog {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round' stroke-linejoin='round' d='M 17 5.9 A 8 8 0 1 0 18.9 17.1'/%3E%3Cpath fill='%23ffffff' stroke='%23ffffff' stroke-width='2.8' stroke-linejoin='round' d='M 19 18.5 L 21.6 13.6 L 16 16.1 Z'/%3E%3Cpath fill='none' stroke='%23000000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M 17 5.9 A 8 8 0 1 0 18.9 17.1'/%3E%3Cpath fill='%23000000' stroke='%23000000' stroke-width='0.9' stroke-linejoin='round' d='M 19 18.5 L 21.6 13.6 L 16 16.1 Z'/%3E%3C/svg%3E") 12 12, auto !important;
 }
 
-/* In Direct Selection (pathedit) mode: disable and hide all bounding boxes, scaling handles, and rotation grips */
+/* In Direct Selection (pathedit) mode: disable and hide bounding boxes, scaling handles, and rotation grips */
 .mode-pathedit #selectorGripsGroup,
 .mode-pathedit [id^="selectorGrip_"],
 .mode-pathedit [id^="selectedBox"],
-.mode-pathedit [id^="selectorGroup"],
+.mode-pathedit #selectorParentGroup > [id^="selectorGroup"],
 [data-mode="pathedit"] #selectorGripsGroup,
 [data-mode="pathedit"] [id^="selectorGrip_"],
 [data-mode="pathedit"] [id^="selectedBox"],
-[data-mode="pathedit"] [id^="selectorGroup"] {
+[data-mode="pathedit"] #selectorParentGroup > [id^="selectorGroup"] {
   display: none !important;
   pointer-events: none !important;
+}
+
+#pathpointgrip_container {
+  display: inline !important;
+  pointer-events: all !important;
 }
 
 /* Rubberband drag selection box: #3f8ff7 with translucent blue tint */
