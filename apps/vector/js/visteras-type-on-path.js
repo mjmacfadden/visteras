@@ -1261,6 +1261,222 @@ function syncSelectionState(svgEditor) {
 }
 
 /**
+ * Mounts and manages the Illustrator-style Fill & Stroke toolbar color swatches
+ */
+function mountToolbarColorSwatches(svgEditor) {
+  const toolsLeft = document.getElementById('tools_left');
+  if (!toolsLeft) return;
+
+  if (document.getElementById('tools_left_swatches')) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `
+    <div class="tool_sep" id="tools_swatch_sep"></div>
+    <div id="tools_left_swatches" class="tools-left-swatches" title="Fill & Stroke (X to toggle focus, Shift+X to swap, D for default)">
+      <button id="swatch_swap_btn" class="swatch-swap-btn" title="Swap Fill and Stroke (Shift+X)" type="button">
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8 C4 3.5 12 3.5 12 8 M9.5 5.5 L12 8 L9.5 10.5"/>
+          <path d="M12 8 C12 12.5 4 12.5 4 8 M6.5 10.5 L4 8 L6.5 5.5"/>
+        </svg>
+      </button>
+      <div class="swatches-cluster">
+        <div id="swatch_fill_box" class="swatch-box swatch-fill active" title="Fill Color (Click to focus / double-click for picker)">
+          <div id="swatch_fill_indicator" class="swatch-color-indicator"></div>
+        </div>
+        <div id="swatch_stroke_box" class="swatch-box swatch-stroke" title="Stroke Color (Click to focus / double-click for picker)">
+          <div id="swatch_stroke_indicator" class="swatch-color-indicator">
+            <div class="swatch-stroke-hole"></div>
+          </div>
+        </div>
+      </div>
+      <button id="swatch_default_btn" class="swatch-default-btn" title="Default Fill and Stroke (D)" type="button">
+        <svg viewBox="0 0 16 16" width="12" height="12">
+          <rect x="1" y="1" width="8" height="8" fill="#cccccc" stroke="#111111" stroke-width="1"/>
+          <rect x="6" y="6" width="8" height="8" fill="#2b2b36" stroke="#000000" stroke-width="1.8"/>
+        </svg>
+      </button>
+    </div>
+  `;
+
+  while (wrapper.firstChild) {
+    toolsLeft.appendChild(wrapper.firstChild);
+  }
+
+  let activeTarget = 'fill';
+
+  const updateSwatches = () => {
+    const sc = svgEditor.svgCanvas;
+    if (!sc) return;
+
+    let fill = (typeof sc.getColor === 'function') ? (sc.getColor('fill') || '#cccccc') : '#cccccc';
+    let stroke = (typeof sc.getColor === 'function') ? (sc.getColor('stroke') || '#000000') : '#000000';
+
+    const fillInd = document.getElementById('swatch_fill_indicator');
+    const strokeInd = document.getElementById('swatch_stroke_indicator');
+    const fillBox = document.getElementById('swatch_fill_box');
+    const strokeBox = document.getElementById('swatch_stroke_box');
+
+    if (fillInd) {
+      if (!fill || fill === 'none' || fill === 'transparent') {
+        fillInd.classList.add('is-none');
+        fillInd.style.backgroundColor = '';
+      } else {
+        fillInd.classList.remove('is-none');
+        fillInd.style.backgroundColor = fill;
+      }
+    }
+
+    if (strokeInd) {
+      if (!stroke || stroke === 'none' || stroke === 'transparent') {
+        strokeInd.classList.add('is-none');
+        strokeInd.style.backgroundColor = '';
+      } else {
+        strokeInd.classList.remove('is-none');
+        strokeInd.style.backgroundColor = stroke;
+      }
+    }
+
+    if (fillBox && strokeBox) {
+      if (activeTarget === 'fill') {
+        fillBox.classList.add('active');
+        strokeBox.classList.remove('active');
+      } else {
+        strokeBox.classList.add('active');
+        fillBox.classList.remove('active');
+      }
+    }
+  };
+
+  const openPicker = (type) => {
+    const cp = document.getElementById(type === 'fill' ? 'fill_color' : 'stroke_color');
+    if (cp) {
+      if (typeof cp.setJGraduateMethod === 'function') {
+        cp.setJGraduateMethod();
+      } else {
+        cp.shadowRoot?.querySelector('#picker')?.click();
+      }
+    }
+  };
+
+  const fillBox = document.getElementById('swatch_fill_box');
+  const strokeBox = document.getElementById('swatch_stroke_box');
+  const swapBtn = document.getElementById('swatch_swap_btn');
+  const defaultBtn = document.getElementById('swatch_default_btn');
+
+  fillBox?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTarget === 'fill') {
+      openPicker('fill');
+    } else {
+      activeTarget = 'fill';
+      updateSwatches();
+    }
+  });
+  fillBox?.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    openPicker('fill');
+  });
+
+  strokeBox?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeTarget === 'stroke') {
+      openPicker('stroke');
+    } else {
+      activeTarget = 'stroke';
+      updateSwatches();
+    }
+  });
+  strokeBox?.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    openPicker('stroke');
+  });
+
+  const doSwap = () => {
+    const sc = svgEditor.svgCanvas;
+    if (!sc) return;
+    const curFill = sc.getColor('fill') || '#cccccc';
+    const curStroke = sc.getColor('stroke') || '#000000';
+    sc.setColor('fill', curStroke);
+    sc.setColor('stroke', curFill);
+    svgEditor.bottomPanel?.updateColorpickers?.(true);
+    updateSwatches();
+  };
+
+  const doDefault = () => {
+    const sc = svgEditor.svgCanvas;
+    if (!sc) return;
+    sc.setColor('fill', '#cccccc');
+    sc.setColor('stroke', '#000000');
+    sc.setStrokeWidth(1);
+    const strokeWidthInput = document.getElementById('stroke_width');
+    if (strokeWidthInput) strokeWidthInput.value = '1';
+    svgEditor.bottomPanel?.updateColorpickers?.(true);
+    updateSwatches();
+  };
+
+  swapBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    doSwap();
+  });
+
+  defaultBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    doDefault();
+  });
+
+  // Illustrator Global Shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.nodeName)) return;
+    if (e.target?.isContentEditable) return;
+    if (e.target?.shadowRoot?.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.shadowRoot.activeElement.nodeName)) return;
+    if (window.__visterasIsTypingDirectly) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (e.key === 'x' || e.key === 'X') {
+      if (e.shiftKey) {
+        doSwap();
+      } else {
+        activeTarget = activeTarget === 'fill' ? 'stroke' : 'fill';
+        updateSwatches();
+      }
+      e.preventDefault();
+    } else if (e.key === 'd' || e.key === 'D') {
+      if (!e.shiftKey) {
+        doDefault();
+        e.preventDefault();
+      }
+    } else if (e.key === '/') {
+      const sc = svgEditor.svgCanvas;
+      if (sc) {
+        sc.setColor(activeTarget, 'none');
+        svgEditor.bottomPanel?.updateColorpickers?.(true);
+        updateSwatches();
+        e.preventDefault();
+      }
+    }
+  });
+
+  // Keep swatches in sync with SVG-Edit canvas & pickers
+  const sc = svgEditor.svgCanvas;
+  if (sc && typeof sc.bind === 'function') {
+    sc.bind('selectedChanged', updateSwatches);
+    sc.bind('elementChanged', updateSwatches);
+    sc.bind('changed', updateSwatches);
+    sc.bind('transition', updateSwatches);
+  }
+
+  document.getElementById('fill_color')?.addEventListener('change', updateSwatches);
+  document.getElementById('stroke_color')?.addEventListener('change', updateSwatches);
+  document.getElementById('palette')?.addEventListener('change', updateSwatches);
+
+  window.__visterasUpdateSwatches = updateSwatches;
+
+  updateSwatches();
+  setTimeout(updateSwatches, 200);
+  setTimeout(updateSwatches, 800);
+}
+
+/**
  * @param {{ svgEditor: any }} opts
  */
 export function mountVisterasTypeOnPath(opts = {}) {
@@ -1268,7 +1484,10 @@ export function mountVisterasTypeOnPath(opts = {}) {
   if (!svgEditor) return;
 
   // Toolbar button insertion
-  const tryToolbar = () => injectToolbarButton(svgEditor);
+  const tryToolbar = () => {
+    injectToolbarButton(svgEditor);
+    mountToolbarColorSwatches(svgEditor);
+  };
   tryToolbar();
   setTimeout(tryToolbar, 100);
   setTimeout(tryToolbar, 500);
@@ -1310,3 +1529,4 @@ export function mountVisterasTypeOnPath(opts = {}) {
 }
 
 export default mountVisterasTypeOnPath;
+
