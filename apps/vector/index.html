@@ -45,7 +45,7 @@
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_new">New Document <span class="menu_dropdown_shortcut">⌘N</span></div>
             <div class="menu_dropdown_item" id="action_open">Open SVG... <span class="menu_dropdown_shortcut">⌘O</span></div>
-            <div class="menu_dropdown_item" id="action_place_reference">Place Reference Image…</div>
+            <div class="menu_dropdown_item" id="action_place">Place... <span class="menu_dropdown_shortcut">⌘⇧P</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_save">Save SVG <span class="menu_dropdown_shortcut">⌘S</span></div>
             <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
@@ -166,7 +166,9 @@
     import Editor from './Editor.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
-    import { mountVisterasReferenceImages } from './js/visteras-reference-images.js';
+    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js';
+    window.placeReferenceImage = placeReferenceImage;
+    window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
 
     // Disable unwanted modal popups on initial load
@@ -480,6 +482,10 @@
         fileInput.click();
       });
 
+      document.getElementById('action_place')?.addEventListener('click', () => {
+        window.__visterasOpenImagePicker?.();
+      });
+
       document.getElementById('action_save')?.addEventListener('click', () => {
         const svgStr = sc.getSvgString();
         const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
@@ -514,12 +520,37 @@
         sc.copySelectedElements();
       });
 
-      document.getElementById('action_paste')?.addEventListener('click', () => {
+      async function handleMenuPaste() {
+        const clipboardText = sessionStorage.getItem('svgedit_clipboard');
+        if (clipboardText && clipboardText !== '[]') {
+          sc.pasteElements('in_place');
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.read) {
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                  const blob = await item.getType(type);
+                  if (blob && window.placeReferenceImage) {
+                    await window.placeReferenceImage(svgEditor, blob, { sendBack: false });
+                    return;
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
         sc.pasteElements('in_place');
+      }
+
+      document.getElementById('action_paste')?.addEventListener('click', () => {
+        handleMenuPaste();
       });
 
       document.getElementById('action_paste_in_place')?.addEventListener('click', () => {
-        sc.pasteElements('in_place');
+        handleMenuPaste();
       });
 
       document.getElementById('action_clone')?.addEventListener('click', () => {
@@ -775,6 +806,14 @@
             e.preventDefault();
             e.stopPropagation();
             sc.pasteElements?.('in_place');
+            return;
+          }
+
+          // Command/Ctrl + Shift + P: Place...
+          if (e.shiftKey && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.__visterasOpenImagePicker?.();
             return;
           }
 

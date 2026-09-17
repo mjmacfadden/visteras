@@ -1,19 +1,19 @@
 /**
- * Visteras Vector — reference raster images (place / move / scale only).
- * Embeds PNG/JPEG/WebP/GIF as SVG <image> data URLs. No pixel editing.
+ * Visteras Vector — reference raster and SVG images (place / move / scale only).
+ * Embeds PNG/JPEG/WebP/GIF/SVG as SVG <image> data URLs. No pixel editing.
  */
 const REF_CLASS = 'visteras-reference';
 const LOCK_CLASS = 'visteras-reference-locked';
 const ASPECT_ATTR = 'data-visteras-lock-aspect';
 const REF_ATTR = 'data-visteras-reference';
-const ACCEPT = 'image/png,image/jpeg,image/jpg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif';
+const ACCEPT = 'image/png,image/jpeg,image/jpg,image/webp,image/gif,image/svg+xml,.png,.jpg,.jpeg,.webp,.gif,.svg';
 
 function isRasterFile(file) {
   if (!file) return false;
   const t = (file.type || '').toLowerCase();
-  if (t.startsWith('image/') && !t.includes('svg')) return true;
+  if (t.startsWith('image/')) return true;
   const name = (file.name || '').toLowerCase();
-  return /\.(png|jpe?g|webp|gif)$/.test(name);
+  return /\.(png|jpe?g|webp|gif|svg)$/i.test(name);
 }
 
 function ensureStyles() {
@@ -60,7 +60,7 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-function markAsReference(el, { opacity = 1, sendBack = true } = {}) {
+function markAsReference(el, { opacity = 1, sendBack = false } = {}) {
   if (!el || el.nodeName !== 'image') return;
   el.classList.add(REF_CLASS);
   el.setAttribute(REF_ATTR, '1');
@@ -99,18 +99,18 @@ function isLocked(el) {
 }
 
 /**
- * Place a raster File as an embedded SVG <image> reference.
+ * Place an image File or Blob as an embedded SVG <image>.
  * @param {*} svgEditor
- * @param {File} file
+ * @param {File|Blob} file
  * @param {{ opacity?: number, sendBack?: boolean }} [opts]
  */
 export function placeReferenceImage(svgEditor, file, opts = {}) {
   const sc = svgEditor?.svgCanvas;
-  if (!sc || !file || !isRasterFile(file)) {
-    return Promise.reject(new Error('Expected a PNG, JPEG, WebP, or GIF file'));
+  if (!sc || !file) {
+    return Promise.reject(new Error('Expected an image file or blob'));
   }
   const opacity = opts.opacity ?? 1;
-  const sendBack = opts.sendBack !== false;
+  const sendBack = opts.sendBack === true;
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -126,13 +126,52 @@ export function placeReferenceImage(svgEditor, file, opts = {}) {
         try {
           const imageWidth = img.naturalWidth || img.width || 100;
           const imageHeight = img.naturalHeight || img.height || 100;
+
+          // Compute canvas and viewport placement coordinates
+          const contentW = sc.contentW || sc.getResolution?.()?.w || 640;
+          const contentH = sc.contentH || sc.getResolution?.()?.h || 480;
+          const workarea = svgEditor.workarea || document.getElementById('workarea');
+          const zoom = (typeof sc.getZoom === 'function' ? sc.getZoom() : 1) || 1;
+
+          let targetCenterX = contentW / 2;
+          let targetCenterY = contentH / 2;
+          let maxW = contentW * 0.85;
+          let maxH = contentH * 0.85;
+
+          if (workarea && workarea.clientWidth && workarea.clientHeight) {
+            const viewW = workarea.clientWidth / zoom;
+            const viewH = workarea.clientHeight / zoom;
+            const canvasBg = document.getElementById('canvasBackground') || document.getElementById('svgcontent');
+            if (canvasBg) {
+              const rect = canvasBg.getBoundingClientRect();
+              const workRect = workarea.getBoundingClientRect();
+              const cx = (workRect.left + workarea.clientWidth / 2 - rect.left) / zoom;
+              const cy = (workRect.top + workarea.clientHeight / 2 - rect.top) / zoom;
+              if (cx >= 0 && cx <= contentW && cy >= 0 && cy <= contentH) {
+                targetCenterX = cx;
+                targetCenterY = cy;
+              }
+            }
+            maxW = Math.min(contentW * 0.85, viewW * 0.85);
+            maxH = Math.min(contentH * 0.85, viewH * 0.85);
+          }
+
+          let scale = 1;
+          if (imageWidth > maxW || imageHeight > maxH) {
+            scale = Math.min(maxW / imageWidth, maxH / imageHeight);
+          }
+          const w = Math.max(1, Math.round(imageWidth * scale));
+          const h = Math.max(1, Math.round(imageHeight * scale));
+          const x = Math.round(targetCenterX - w / 2);
+          const y = Math.round(targetCenterY - h / 2);
+
           const newImage = sc.addSVGElementsFromJson({
             element: 'image',
             attr: {
-              x: 0,
-              y: 0,
-              width: imageWidth,
-              height: imageHeight,
+              x,
+              y,
+              width: w,
+              height: h,
               id: sc.getNextId(),
               style: 'pointer-events:inherit',
               preserveAspectRatio: 'xMidYMid meet',
@@ -140,18 +179,29 @@ export function placeReferenceImage(svgEditor, file, opts = {}) {
           });
           sc.setHref(newImage, result);
           markAsReference(newImage, { opacity, sendBack });
+
           if (typeof sc.setOpacity === 'function') {
-            sc.selectOnly([newImage]);
             sc.setOpacity(opacity);
           } else {
             newImage.setAttribute('opacity', String(opacity));
-            sc.selectOnly([newImage]);
           }
-          sc.alignSelectedElements('m', 'page');
-          sc.alignSelectedElements('c', 'page');
+
           if (sendBack && typeof sc.moveToBottomSelectedElement === 'function') {
             sc.moveToBottomSelectedElement();
-            sc.selectOnly([newImage]);
+          }
+
+          // Record creation in undo history
+          if (sc.history?.InsertElementCommand && typeof sc.addCommandToHistory === 'function') {
+            try {
+              sc.addCommandToHistory(new sc.history.InsertElementCommand(newImage));
+            } catch (err) {
+              console.warn('Could not add InsertElementCommand to history:', err);
+            }
+          }
+
+          sc.selectOnly([newImage]);
+          if (svgEditor.leftPanel?.clickSelect) {
+            svgEditor.leftPanel.clickSelect();
           }
           svgEditor.topPanel?.updateContextPanel?.();
           resolve(newImage);
@@ -166,7 +216,7 @@ export function placeReferenceImage(svgEditor, file, opts = {}) {
   });
 }
 
-function openFilePicker(svgEditor) {
+export function openFilePicker(svgEditor) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = ACCEPT;
@@ -177,10 +227,10 @@ function openFilePicker(svgEditor) {
     input.remove();
     if (!file) return;
     try {
-      await placeReferenceImage(svgEditor, file);
+      await placeReferenceImage(svgEditor, file, { sendBack: false });
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Could not place reference image');
+      alert(err.message || 'Could not place image');
     }
   });
   input.click();
@@ -191,16 +241,12 @@ function openFilePicker(svgEditor) {
  */
 export function afterPlaceRasterImage(svgEditor, el) {
   if (!el || el.nodeName !== 'image') return;
-  markAsReference(el, { opacity: 1, sendBack: true });
+  markAsReference(el, { opacity: 1, sendBack: false });
   const sc = svgEditor?.svgCanvas;
   if (sc) {
     sc.selectOnly([el]);
     if (typeof sc.setOpacity === 'function') sc.setOpacity(1);
     else el.setAttribute('opacity', '1');
-    if (typeof sc.moveToBottomSelectedElement === 'function') {
-      sc.moveToBottomSelectedElement();
-      sc.selectOnly([el]);
-    }
     svgEditor.topPanel?.updateContextPanel?.();
   }
 }
@@ -221,13 +267,13 @@ function wireImageTool(svgEditor) {
   const btn = document.getElementById('tool_image');
   if (!btn || btn.dataset.visterasRefWired) return;
   btn.dataset.visterasRefWired = '1';
-  btn.setAttribute('title', 'Place reference image');
+  btn.setAttribute('title', 'Place image (⌘⇧P)');
   // se-button may keep i18n label in shadow; also set aria-label
-  btn.setAttribute('aria-label', 'Place reference image');
+  btn.setAttribute('aria-label', 'Place image');
   try {
     if (btn.shadowRoot) {
       const tip = btn.shadowRoot.querySelector('[title], .title, div');
-      if (tip && tip.setAttribute) tip.setAttribute('title', 'Place reference image');
+      if (tip && tip.setAttribute) tip.setAttribute('title', 'Place image (⌘⇧P)');
     }
   } catch (_) { /* ignore */ }
 
@@ -237,12 +283,6 @@ function wireImageTool(svgEditor) {
     (e) => {
       e.stopImmediatePropagation();
       e.preventDefault();
-      // still mark tool pressed for visual feedback
-      if (svgEditor.leftPanel?.updateLeftPanel) {
-        svgEditor.leftPanel.updateLeftPanel('tool_image');
-      } else {
-        btn.pressed = true;
-      }
       openFilePicker(svgEditor);
     },
     true,
@@ -259,7 +299,7 @@ function syncRefControls(svgEditor) {
   const isImg = el && el.nodeName === 'image' && !svgEditor.multiselected;
 
   if (typeEl) {
-    if (isImg) typeEl.textContent = 'Reference image';
+    if (isImg) typeEl.textContent = 'Image';
     else if (el) typeEl.textContent = el.nodeName;
     else typeEl.textContent = '';
     typeEl.style.display = el ? 'block' : 'none';
@@ -292,10 +332,6 @@ function wireRefControls(svgEditor) {
       const opacity = curOp != null && curOp !== '' ? parseFloat(curOp) : 1;
       markAsReference(el, { opacity: Number.isFinite(opacity) ? opacity : 1, sendBack: false });
       sc.selectOnly([el]);
-      if (typeof sc.moveToBottomSelectedElement === 'function') {
-        sc.moveToBottomSelectedElement();
-        sc.selectOnly([el]);
-      }
     } else {
       el.classList.remove(REF_CLASS);
       el.removeAttribute(REF_ATTR);
@@ -405,9 +441,9 @@ function injectPropChrome() {
   refGroup.id = 'prop_image_ref_group';
   refGroup.style.display = 'none';
   refGroup.innerHTML = `
-    <label class="prop_check_row" title="Lock aspect ratio and send behind other artwork (opacity stays at 100% unless you Dim)">
+    <label class="prop_check_row" title="Lock aspect ratio (opacity stays at 100% unless you Dim)">
       <input type="checkbox" id="ref_as_reference" />
-      <span>Reference (aspect + back)</span>
+      <span>Constrain Aspect Ratio</span>
     </label>
     <label class="prop_check_row" title="Ignore pointer hits so you can draw on top">
       <input type="checkbox" id="ref_lock" />
@@ -429,6 +465,40 @@ function injectPropChrome() {
   }
 }
 
+function setupClipboardPaste(svgEditor) {
+  window.addEventListener(
+    'paste',
+    async (e) => {
+      const target = e.target;
+      if (target && ['INPUT', 'TEXTAREA'].includes(target.nodeName)) return;
+      if (target?.isContentEditable) return;
+      if (target?.shadowRoot?.activeElement && ['INPUT', 'TEXTAREA'].includes(target.shadowRoot.activeElement.nodeName)) return;
+      if (window.__visterasIsTypingDirectly) return;
+
+      const items = e.clipboardData?.items;
+      if (!items || !items.length) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && item.type.startsWith('image/')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          const blob = item.getAsFile();
+          if (blob) {
+            try {
+              await placeReferenceImage(svgEditor, blob, { sendBack: false });
+            } catch (err) {
+              console.error('Failed to paste image:', err);
+            }
+          }
+          return;
+        }
+      }
+    },
+    { capture: true }
+  );
+}
+
 /**
  * @param {{ svgEditor: any }} opts
  */
@@ -438,11 +508,18 @@ export function mountVisterasReferenceImages({ svgEditor }) {
   injectPropChrome();
   wireImageTool(svgEditor);
   wireRefControls(svgEditor);
+  setupClipboardPaste(svgEditor);
+
+  // Global helper for opening the file picker from menu / shortcuts / left toolbar
+  window.__visterasOpenImagePicker = () => openFilePicker(svgEditor);
 
   // Global hook for opensave drop / import
   window.__visterasAfterPlaceReference = (el) => afterPlaceRasterImage(svgEditor, el);
 
   // File menu
+  document.getElementById('action_place')?.addEventListener('click', () => {
+    openFilePicker(svgEditor);
+  });
   document.getElementById('action_place_reference')?.addEventListener('click', () => {
     openFilePicker(svgEditor);
   });
@@ -474,3 +551,4 @@ export function mountVisterasReferenceImages({ svgEditor }) {
 }
 
 export { isRasterFile, ACCEPT as REFERENCE_ACCEPT };
+

@@ -68998,7 +68998,7 @@ var { $id: vz, $qa: yz, $click: bz } = JI, xz = class {
 		this.updateLeftPanel("tool_fhellipse") && this.editor.svgCanvas.setMode("fhellipse");
 	}
 	clickImage() {
-		this.updateLeftPanel("tool_image") && this.editor.svgCanvas.setMode("image");
+		this.updateLeftPanel("tool_image") && (window.__visterasOpenImagePicker ? window.__visterasOpenImagePicker() : this.editor.svgCanvas.setMode("image"));
 	}
 	clickZoom() {
 		this.updateLeftPanel("tool_zoom") && (this.editor.svgCanvas.setMode("zoom"), this.editor.workarea.style.cursor = this.editor.zoomInIcon);
