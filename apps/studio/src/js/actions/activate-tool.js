@@ -60,6 +60,18 @@ export class Activate_tool_action extends Base_action {
 			//sync the toolbar group button when a member tool (e.g. pencil) activates
 			app.GUI.GUI_tools.sync_group_button_for_tool(key);
 
+			if (key !== 'text') {
+				const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
+					? app.GUI.GUI_tools.tools_modules['text'].object
+					: null;
+				if (textTool) {
+					textTool.focused = false;
+					textTool.selecting = false;
+					textTool.creating = false;
+					if (textTool.textarea) textTool.textarea.blur();
+				}
+			}
+
 			//check module
 			if (app.GUI.GUI_tools.tools_modules[key] == undefined) {
 				alertify.error('Tools class not found: ' + key);

@@ -2951,9 +2951,19 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('focus', () => {
+				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+					this.focused = false;
+					this.textarea.blur();
+					return;
+				}
 				this.focused = true;
 				let currentLayer = (config.layer && config.layer.type === 'text') ? config.layer : this.layer;
 				let editor = this.get_editor(currentLayer);
+				if (!editor) {
+					this.focused = false;
+					this.textarea.blur();
+					return;
+				}
 				if (editor && currentLayer) {
 					this.focusedValue = JSON.stringify(editor.document.lines);
 					this.focusedWidth = currentLayer.width;
@@ -2962,6 +2972,10 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('blur', (e) => {
+				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+					this.focused = false;
+					return;
+				}
 				const keepFocusSelector = '#main_wrapper, #action_attributes, #main_tools, .ui_swatches, .sp-container, .ui_color_picker_gradient, .ui_number_input, .ui_range';
 				const related = e.relatedTarget;
 				if (related && related.closest && related.closest('.ui_number_input input')) {
@@ -2976,6 +2990,10 @@ class Text_class extends Base_tools_class {
 					return;
 				}
 				setTimeout(() => {
+					if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+						this.focused = false;
+						return;
+					}
 					if (this._ignore_textarea_blur || this._params_ui_active) {
 						if (this.focused) this.focus_textarea();
 						return;
@@ -3005,16 +3023,23 @@ class Text_class extends Base_tools_class {
 			let beforeImeText = "";
 			this.textarea.addEventListener('compositionstart', () => {
 				beforeImeText = "";
-					isComposing = true;
-					if (config.layer) {
-						const editor = this.get_editor(config.layer);
-						beforeImeText = editor.get_complete_text();
-					}
+				if (!config.layer || config.layer.type !== 'text') return;
+				isComposing = true;
+				const editor = this.get_editor(config.layer);
+				if (editor) {
+					beforeImeText = editor.get_complete_text();
+				}
 			});
 
 			this.textarea.addEventListener('compositionend', (e) => {
+				if (!config.layer || config.layer.type !== 'text') {
+					isComposing = false;
+					return;
+				}
 				const editor = this.get_editor(config.layer);
-				editor.set_IME_position(e.target.value);
+				if (editor) {
+					editor.set_IME_position(e.target.value);
+				}
 				beforeImeText = "";
 				isComposing = false;
 				e.target.value = '';
@@ -3049,6 +3074,31 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('keydown', (e) => {
+				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+					this.focused = false;
+					this.textarea.blur();
+					if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace')) {
+						e.preventDefault();
+						e.stopImmediatePropagation();
+						if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
+							app.GUI.modules['layer/delete'].delete();
+						}
+					}
+					return;
+				}
+				const editor = this.get_editor(config.layer);
+				if (!editor) {
+					this.focused = false;
+					this.textarea.blur();
+					if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace')) {
+						e.preventDefault();
+						e.stopImmediatePropagation();
+						if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
+							app.GUI.modules['layer/delete'].delete();
+						}
+					}
+					return;
+				}
 				if (config.layer) {
 					// Undo / Redo shortcuts while focused in textarea
 					if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
@@ -3076,12 +3126,10 @@ class Text_class extends Base_tools_class {
 					if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A' || e.code === 'KeyA' || e.keyCode === 65)) {
 						e.preventDefault();
 						e.stopImmediatePropagation();
-						const editor = this.get_editor(config.layer);
 						this.select_all_text(editor);
 						return;
 					}
 					let handled = true;
-					const editor = this.get_editor(config.layer);
 					switch (e.key) {
 						case 'Escape':
 							e.preventDefault();
@@ -3385,6 +3433,11 @@ class Text_class extends Base_tools_class {
 
 	focus_textarea() {
 		if (!this.textarea) return;
+		if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+			this.focused = false;
+			this.textarea.blur();
+			return;
+		}
 		this.focused = true;
 		try {
 			this.textarea.focus({ preventScroll: true });
@@ -3392,6 +3445,11 @@ class Text_class extends Base_tools_class {
 			this.textarea.focus();
 		}
 		setTimeout(() => {
+			if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				this.focused = false;
+				this.textarea.blur();
+				return;
+			}
 			const activeNumberInput = document.activeElement && document.activeElement.closest
 				? document.activeElement.closest('.ui_number_input input')
 				: null;

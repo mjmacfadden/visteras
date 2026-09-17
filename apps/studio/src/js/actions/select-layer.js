@@ -38,10 +38,16 @@ export class Select_layer_action extends Base_action {
 			const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
 				? app.GUI.GUI_tools.tools_modules['text'].object
 				: null;
-			if (textTool && textTool.focused) {
-				await textTool.commit_text_changes();
-				textTool.focused = false;
-				if (textTool.textarea) textTool.textarea.blur();
+			if (textTool) {
+				if (textTool.focused) {
+					await textTool.commit_text_changes();
+				}
+				if (!new_layer || new_layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+					textTool.focused = false;
+					textTool.selecting = false;
+					textTool.creating = false;
+					if (textTool.textarea) textTool.textarea.blur();
+				}
 			}
 			config.layer = new_layer;
 			config.mask_active = false;
@@ -105,6 +111,15 @@ export class Select_layer_action extends Base_action {
 		}
 
 		config.layer = this.old_layer;
+		const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
+			? app.GUI.GUI_tools.tools_modules['text'].object
+			: null;
+		if (textTool && (!this.old_layer || this.old_layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text'))) {
+			textTool.focused = false;
+			textTool.selecting = false;
+			textTool.creating = false;
+			if (textTool.textarea) textTool.textarea.blur();
+		}
 		if (this.old_layer && this.old_layer.type === 'vector') {
 			const vecId = this.old_layer.vector_id || (this.old_layer.params && this.old_layer.params.vector_id);
 			if (vecId) {

@@ -553,6 +553,11 @@ class Helper_class {
 		if (!element) {
 			return false;
 		}
+		if (element.id === 'text_tool_keyboard_input') {
+			if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				return false;
+			}
+		}
 		if (element.type == 'text' || element.tagName == 'INPUT' || element.type == 'textarea') {
 			return true;
 		} else {
