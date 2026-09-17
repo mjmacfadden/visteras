@@ -38613,10 +38613,17 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		storeD() {
 			this.last_d = this.elem.getAttribute("d");
 		}
+		selectAllPts() {
+			this.clearSelection();
+			let t = [];
+			this.eachSeg(function(e) {
+				this.ptgrip && t.push(e);
+			}), this.addPtsToSelection(t);
+		}
 		show(e) {
 			return this.eachSeg(function() {
 				this.show(e);
-			}), e && this.selectPt(this.first_seg.index), this;
+			}), e && this.selectAllPts(), this;
 		}
 		movePts(e, t) {
 			let n = this.selected_pts.length;
@@ -38873,31 +38880,95 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				}
 				return;
 			}
-			if (!K) return;
-			K.storeD(), {id: i} = e.target;
-			let a;
-			if (i.startsWith("pathpointgrip_")) {
-				a = K.cur_pt = Number.parseInt(i.slice(14)), K.dragging = [n, r];
-				let t = K.segs[a];
-				e.shiftKey ? t.selected ? K.removePtFromSelection(a) : K.addPtsToSelection(a) : ((K.selected_pts.length <= 1 || !t.selected) && K.clearSelection(), K.addPtsToSelection(a));
-			} else if (i.startsWith("ctrlpointgrip_")) {
-				K.dragging = [n, r];
-				let e = i.split("_")[1].split("c");
-				a = Number(e[0]);
-				let t = Number(e[1]);
-				K.selectPt(a, t);
+			let mouseTarget = t || p_.getMouseTarget(e);
+			if (mouseTarget && (mouseTarget.id === "svgcanvas" || mouseTarget.id === "canvasBackground" || mouseTarget.id === "selectorParentGroup")) {
+				mouseTarget = null;
 			}
-			if (!K.dragging) {
-				let e = p_.getRubberBox();
-				e ||= p_.setRubberBox(p_.selectorManager.getRubberBandBox());
+			if (mouseTarget) {
+				while (mouseTarget && mouseTarget.parentNode && mouseTarget.parentNode.tagName === "g" && mouseTarget.parentNode.id !== "svgcontent" && mouseTarget.parentNode.id !== "canvasBackground") {
+					mouseTarget = mouseTarget.parentNode;
+				}
+				if (mouseTarget && mouseTarget.nodeName !== "path" && typeof p_.convertToPath === "function") {
+					let converted = p_.convertToPath(mouseTarget);
+					if (converted) mouseTarget = converted;
+				}
+			}
+			if (mouseTarget && mouseTarget.nodeName === "path" && (!K || K.elem !== mouseTarget)) {
+				__.toEditMode(mouseTarget);
+			}
+			if (!K) {
+				let a = p_.getRubberBox();
+				a ||= p_.setRubberBox(p_.selectorManager.getRubberBandBox());
 				let t = p_.getZoom();
-				kg(e, {
+				kg(a, {
 					x: n * t,
 					y: r * t,
 					width: 0,
 					height: 0,
 					display: "inline"
 				}, 100);
+				return;
+			}
+			K.storeD(), {id: i} = e.target;
+			let a;
+			if (i && i.startsWith("pathpointgrip_")) {
+				a = K.cur_pt = Number.parseInt(i.slice(14)), K.dragging = [n, r];
+				let t = K.segs[a];
+				if (e.shiftKey) {
+					t.selected ? K.removePtFromSelection(a) : K.addPtsToSelection(a);
+				} else {
+					if (!t.selected || K.selected_pts.length <= 1) {
+						K.clearSelection();
+						K.addPtsToSelection(a);
+					}
+				}
+			} else if (i && i.startsWith("ctrlpointgrip_")) {
+				K.dragging = [n, r];
+				let parts = i.split("_")[1].split("c");
+				a = Number(parts[0]);
+				let t = Number(parts[1]);
+				K.selectPt(a, t);
+			} else {
+				let zm = p_.getZoom(), closestPt = -1, minD = 10 * zm;
+				K.eachSeg(function(idx) {
+					if (this.ptgrip) {
+						let gripPt = p_.getGripPt(this);
+						let dist = Math.hypot(gripPt.x - (n * zm), gripPt.y - (r * zm));
+						if (dist < minD) {
+							minD = dist;
+							closestPt = idx;
+						}
+					}
+				});
+				if (closestPt >= 0) {
+					a = K.cur_pt = closestPt;
+					K.dragging = [n, r];
+					let t = K.segs[a];
+					if (e.shiftKey) {
+						t.selected ? K.removePtFromSelection(a) : K.addPtsToSelection(a);
+					} else {
+						if (!t.selected || K.selected_pts.length <= 1) {
+							K.clearSelection();
+							K.addPtsToSelection(a);
+						}
+					}
+				} else if (mouseTarget === K.elem || e.target === K.elem || K.elem.contains(e.target)) {
+					// Clicked on object body -> activate ALL anchor points and allow moving the whole object
+					K.selectAllPts();
+					K.cur_pt = null;
+					K.dragging = [n, r];
+				} else {
+					let a = p_.getRubberBox();
+					a ||= p_.setRubberBox(p_.selectorManager.getRubberBandBox());
+					let t = p_.getZoom();
+					kg(a, {
+						x: n * t,
+						y: r * t,
+						width: 0,
+						height: 0,
+						display: "inline"
+					}, 100);
+				}
 			}
 		}
 		mouseMove(e, t) {
@@ -38955,7 +39026,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				}
 				return;
 			}
-			if (K.dragging) {
+			if (K && K.dragging) {
 				let n = p_.getPointFromGrip({
 					x: K.dragging[0],
 					y: K.dragging[1]
@@ -38964,17 +39035,23 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					y: t
 				}, K), i = r.x - n.x, a = r.y - n.y;
 				K.dragging = [e, t], K.dragctrl ? K.moveCtrl(i, a) : K.movePts(i, a);
-			} else K.selected_pts = [], K.eachSeg(function(e) {
-				let t = this;
-				if (!t.next && !t.prev) return;
-				let n = fg(p_.getRubberBox()), r = p_.getGripPt(t), i = Bh(n, {
-					x: r.x,
-					y: r.y,
-					width: 0,
-					height: 0
-				});
-				this.select(i), i && K.selected_pts.push(t.index);
-			});
+			} else if (K) {
+				let rBox = p_.getRubberBox();
+				if (rBox && rBox.getAttribute("display") !== "none") {
+					K.selected_pts = [];
+					K.eachSeg(function(e) {
+						let t = this;
+						if (!t.next && !t.prev) return;
+						let n = fg(rBox), r = p_.getGripPt(t), i = Bh(n, {
+							x: r.x,
+							y: r.y,
+							width: 0,
+							height: 0
+						});
+						this.select(i), i && K.selected_pts.push(t.index);
+					});
+				}
+			}
 		}
 		mouseUp(e, t, n, r) {
 			let i = p_.getDrawnPath();
@@ -38983,18 +39060,23 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				element: t
 			};
 			let a = p_.getRubberBox();
-			if (K.dragging) {
+			if (K && K.dragging) {
 				let t = K.cur_pt;
-				K.dragging = !1, K.dragctrl = !1, K.update(), this.#i && K.endChanges("Move path point(s)"), !e.shiftKey && !this.#i && K.selectPt(t);
-			} else a?.getAttribute("display") === "none" ? __.toSelectMode(e.target) : (a.setAttribute("display", "none"), a.getAttribute("width") <= 2 && a.getAttribute("height") <= 2 && __.toSelectMode(e.target));
+				K.dragging = !1, K.dragctrl = !1, K.update(), this.#i && K.endChanges("Move path point(s)");
+				if (!e.shiftKey && !this.#i && t !== null && t !== undefined) {
+					K.selectPt(t);
+				}
+			} else if (a && a.getAttribute("display") !== "none") {
+				a.setAttribute("display", "none");
+			}
 			this.#i = !1;
 		}
 		toEditMode(e) {
 			K = p_.getPath_(e), p_.setCurrentMode("pathedit"), p_.clearSelection(), K.setPathContext(), K.show(!0).update(), K.oldbbox = fg(K.elem), this.#e = !1;
 		}
 		toSelectMode(e) {
-			let t = e === K.elem;
-			p_.setCurrentMode("select"), K.setPathContext(), K.show(!1), this.#r = !1, p_.clearSelection(), K.matrix && p_.recalcRotatedPath(), t && (p_.call("selected", [e]), p_.addToSelection([e], !0));
+			let t = e === K?.elem;
+			p_.setCurrentMode("select"), K && (K.setPathContext(), K.show(!1)), this.#r = !1, p_.clearSelection(), K?.matrix && p_.recalcRotatedPath(), t && (p_.call("selected", [e]), p_.addToSelection([e], !0));
 		}
 		addSubPath(e) {
 			e ? (p_.setCurrentMode("path"), this.#e = !0) : (__.clear(!0), __.toEditMode(K.elem));
@@ -39156,7 +39238,11 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				x: 0,
 				y: 0
 			};
-			i[e] = t - r.item[e], r.move(i.x, i.y), K.endChanges("Move path point");
+			i[e] = t - r.item[e];
+			for (let idx of n) {
+				K.segs[idx]?.move(i.x, i.y);
+			}
+			K.endChanges("Move path point(s)");
 		}
 		fixEnd(e) {
 			let t = e.pathSegList, n = t.numberOfItems, r;
@@ -40810,6 +40896,16 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		if (i === "text" && q.getCurrentMode() !== "textedit") {
 			let t = jh(e.clientX, e.clientY, q.getrootSctm());
 			q.textActions.select(r, t.x, t.y);
+		}
+		if ((i === "path" || i === "rect" || i === "circle" || i === "ellipse" || i === "line" || i === "polygon" || i === "polyline") && q.getCurrentMode() === "select") {
+			let elem = r;
+			if (elem.nodeName !== "path" && typeof q.convertToPath === "function") {
+				let conv = q.convertToPath(elem);
+				if (conv) elem = conv;
+			}
+			if (elem && elem.nodeName === "path") {
+				q.pathActions.toEditMode(elem);
+			}
 		}
 		n !== q.getCurrentGroup() && ((i === "g" || i === "a") && Tg(r) && (q.pushGroupProperties(r), r = t[0], q.clearSelection(!0)), q.getCurrentGroup() && jv(), !(n.tagName !== "g" && n.tagName !== "a" || n === q.getCurrentDrawing().getCurrentLayer() || r === q.selectorManager.selectorParentGroup) && Mv(r));
 	}, ky = (e) => {
@@ -68604,8 +68700,17 @@ var { $id: vz, $qa: yz, $click: bz } = JI, xz = class {
 	clickDirectSelect() {
 		if (this.updateLeftPanel("tool_direct_select")) {
 			let sel = this.editor.svgCanvas.getSelectedElements().filter(Boolean);
-			if (sel.length && sel[0].nodeName === "path") {
-				this.editor.svgCanvas.pathActions.toEditMode(sel[0]);
+			if (sel.length) {
+				let elem = sel[0];
+				if (elem.nodeName !== "path" && typeof this.editor.svgCanvas.convertToPath === "function") {
+					let converted = this.editor.svgCanvas.convertToPath(elem);
+					if (converted) elem = converted;
+				}
+				if (elem && elem.nodeName === "path") {
+					this.editor.svgCanvas.pathActions.toEditMode(elem);
+				} else {
+					this.editor.svgCanvas.setMode("pathedit");
+				}
 			} else {
 				this.editor.svgCanvas.setMode("pathedit");
 			}
