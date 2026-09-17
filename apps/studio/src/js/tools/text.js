@@ -2951,19 +2951,14 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('focus', () => {
-				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				if (config.TOOL && config.TOOL.name !== 'text') {
 					this.focused = false;
 					this.textarea.blur();
 					return;
 				}
 				this.focused = true;
 				let currentLayer = (config.layer && config.layer.type === 'text') ? config.layer : this.layer;
-				let editor = this.get_editor(currentLayer);
-				if (!editor) {
-					this.focused = false;
-					this.textarea.blur();
-					return;
-				}
+				let editor = currentLayer ? this.get_editor(currentLayer) : null;
 				if (editor && currentLayer) {
 					this.focusedValue = JSON.stringify(editor.document.lines);
 					this.focusedWidth = currentLayer.width;
@@ -2972,7 +2967,7 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('blur', (e) => {
-				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				if (config.TOOL && config.TOOL.name !== 'text') {
 					this.focused = false;
 					return;
 				}
@@ -2990,7 +2985,7 @@ class Text_class extends Base_tools_class {
 					return;
 				}
 				setTimeout(() => {
-					if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+					if (config.TOOL && config.TOOL.name !== 'text') {
 						this.focused = false;
 						return;
 					}
@@ -3074,7 +3069,7 @@ class Text_class extends Base_tools_class {
 			}, true);
 
 			this.textarea.addEventListener('keydown', (e) => {
-				if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+				if (config.TOOL && config.TOOL.name !== 'text') {
 					this.focused = false;
 					this.textarea.blur();
 					if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace')) {
@@ -3088,9 +3083,9 @@ class Text_class extends Base_tools_class {
 				}
 				const editor = this.get_editor(config.layer);
 				if (!editor) {
-					this.focused = false;
-					this.textarea.blur();
 					if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace' || e.code === 'Delete' || e.code === 'Backspace')) {
+						this.focused = false;
+						this.textarea.blur();
 						e.preventDefault();
 						e.stopImmediatePropagation();
 						if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
@@ -3155,10 +3150,14 @@ class Text_class extends Base_tools_class {
 							})();
 							return;
 						case 'Backspace':
-							editor.delete_character_at_current_position(false);
+							if (editor) {
+								editor.delete_character_at_current_position(false);
+							}
 							break;
 						case 'Delete':
-							editor.delete_character_at_current_position(true);
+							if (editor) {
+								editor.delete_character_at_current_position(true);
+							}
 							break;
 						case 'Home':
 							editor.selection.move_line_start(e.shiftKey);
@@ -3433,7 +3432,7 @@ class Text_class extends Base_tools_class {
 
 	focus_textarea() {
 		if (!this.textarea) return;
-		if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+		if (config.TOOL && config.TOOL.name !== 'text') {
 			this.focused = false;
 			this.textarea.blur();
 			return;
@@ -3445,7 +3444,7 @@ class Text_class extends Base_tools_class {
 			this.textarea.focus();
 		}
 		setTimeout(() => {
-			if (!config.layer || config.layer.type !== 'text' || (config.TOOL && config.TOOL.name !== 'text')) {
+			if (config.TOOL && config.TOOL.name !== 'text') {
 				this.focused = false;
 				this.textarea.blur();
 				return;

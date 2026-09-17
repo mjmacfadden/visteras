@@ -1881,7 +1881,7 @@ class WebGL_renderer_class {
 			var pad = Math.max(1, Math.ceil(brushSize / 2) + 1);
 
 			// Vector layers: calculate stroke bleed padding so centered or outside strokes are never clipped
-			if (layer.type === 'vector' || layer.is_vector || (layer.render_function && layer.render_function[0] === 'pen')) {
+			if (layer.type === 'vector' || (layer.render_function && layer.render_function[0] === 'pen')) {
 				var vecId = layer.vector_id || (layer.params && layer.params.vector_id);
 				var vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
 				if (vec) {

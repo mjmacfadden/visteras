@@ -560,9 +560,10 @@ class Helper_class {
 		}
 		if (element.type == 'text' || element.tagName == 'INPUT' || element.type == 'textarea') {
 			return true;
-		} else {
+		} else if (typeof element.closest === 'function') {
 			return element.closest('.ui_color_picker_gradient, .ui_number_input, .ui_range, .ui_swatches') != null;
 		}
+		return false;
 	}
 
 	//if IE 11 or Edge
