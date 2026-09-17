@@ -42603,18 +42603,29 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}
 		}), Y.setEmptySelectedElements(), t.isEmpty() || Y.addCommandToHistory(t), Y.call("changed", n), Y.clearSelection();
 	}, $b = (e, t) => {
-		let n = Y.getSelectedElements(), r = new Rb("Flip Elements"), i = Y.getSvgRoot();
+		if (typeof e === "string") {
+			if (e === "x" || e === "h" || e === "horizontal") {
+				e = -1; t = 1;
+			} else if (e === "y" || e === "v" || e === "vertical") {
+				e = 1; t = -1;
+			}
+		}
+		if (typeof e !== "number") e = -1;
+		if (typeof t !== "number") t = 1;
+		let n = Y.getSelectedElements().filter(Boolean), r = new Rb("Flip Elements"), i = Y.getSvgRoot();
+		if (!n.length) return;
+		let groupBBox = n.length > 1 ? Cg(n) : null;
 		n.forEach((n) => {
 			if (!n) return;
-			let a = Cg([n]);
+			let a = groupBBox || Cg([n]);
 			if (!a) return;
-			let o = a.x + a.width / 2, s = a.y + a.height / 2, c = n.getAttribute("transform") || "", l = i.createSVGMatrix().translate(o, s).scaleNonUniform(e, t).translate(-o, -s), u = Mh(n), d = Ph(Lh(u).matrix, l), f = i.createSVGTransform();
+			let o = a.x + a.width / 2, s = a.y + a.height / 2, c = n.getAttribute("transform") || "", l = i.createSVGMatrix().translate(o, s).scaleNonUniform(e, t).translate(-o, -s), u = Mh(n), d = Ph(l, Lh(u).matrix), f = i.createSVGTransform();
 			f.setMatrix(d), u.clear(), u.appendItem(f);
 			let p = Y.getStartTransform ? Y.getStartTransform() : null;
 			Y.setStartTransform && Y.setStartTransform(c);
 			let m = Ib(n);
 			Y.setStartTransform && Y.setStartTransform(p), m ? r.addSubCommand(m) : (n.getAttribute("transform") || "") !== c && r.addSubCommand(new Vb(n, { transform: c })), Y.gettingSelectorManager().requestSelector(n).resize();
-		}), r.isEmpty() || (Y.addCommandToHistory(r), Y.call("changed", n.filter(Boolean)));
+		}), r.isEmpty() || (Y.addCommandToHistory(r), Y.call("changed", n));
 	}, ex = () => {
 		let e = Y.getSelectedElements().filter(Boolean), t = JSON.stringify(e.map((e) => Y.getJsonFromSvgElements(e)));
 		sessionStorage.setItem(Y.getClipboardID(), t), Y.flashStorage(), document.getElementById("se-cmenu_canvas")?.setAttribute("enablemenuitems", "#paste,#paste_in_place");
@@ -69208,13 +69219,13 @@ var { $qa: Cz, $id: $, $click: wz, isValidUnit: Tz, getTypeMap: Ez, convertUnit:
 		this.editor.selectedElement && this.path.reorient();
 	}
 	clickFlipHorizontal() {
-		(this.editor.selectedElement || this.multiselected) && this.editor.svgCanvas.flipSelectedElements(-1, 1);
+		(this.editor.selectedElement || this.editor.multiselected) && this.editor.svgCanvas.flipSelectedElements(-1, 1);
 	}
 	clickFlipVertical() {
-		(this.editor.selectedElement || this.multiselected) && this.editor.svgCanvas.flipSelectedElements(1, -1);
+		(this.editor.selectedElement || this.editor.multiselected) && this.editor.svgCanvas.flipSelectedElements(1, -1);
 	}
 	makeHyperlink() {
-		if (this.editor.selectedElement || this.multiselected) {
+		if (this.editor.selectedElement || this.editor.multiselected) {
 			let e = prompt(this.editor.i18next.t("notification.enterNewLinkURL"), "http://");
 			e && this.editor.svgCanvas.makeHyperlink(e);
 		}

@@ -555,11 +555,11 @@
       });
 
       document.getElementById('action_flip_h')?.addEventListener('click', () => {
-        sc.flipSelectedElements('x');
+        sc.flipSelectedElements(-1, 1);
       });
 
       document.getElementById('action_flip_v')?.addEventListener('click', () => {
-        sc.flipSelectedElements('y');
+        sc.flipSelectedElements(1, -1);
       });
 
       // Type on Path Menu Actions
@@ -1224,10 +1224,10 @@
 
       // Wire flip buttons
       document.getElementById('tool_flip_h')?.addEventListener('click', () => {
-        svgEditor.svgCanvas.flipSelectedElements('x');
+        svgEditor.svgCanvas.flipSelectedElements(-1, 1);
       });
       document.getElementById('tool_flip_v')?.addEventListener('click', () => {
-        svgEditor.svgCanvas.flipSelectedElements('y');
+        svgEditor.svgCanvas.flipSelectedElements(1, -1);
       });
 
       // Wire Pathfinder buttons
