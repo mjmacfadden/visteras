@@ -117,7 +117,7 @@ var ext_opensave_default = {
 						} else {
 							newImage.classList.add("visteras-reference");
 							newImage.setAttribute("data-visteras-reference", "1");
-							newImage.setAttribute("opacity", "0.5");
+							newImage.setAttribute("opacity", "1");
 						}
 						this.topPanel.updateContextPanel();
 						$id("se-prompt-dialog").setAttribute("close", true);

@@ -60,7 +60,7 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-function markAsReference(el, { opacity = 0.5, sendBack = true } = {}) {
+function markAsReference(el, { opacity = 1, sendBack = true } = {}) {
   if (!el || el.nodeName !== 'image') return;
   el.classList.add(REF_CLASS);
   el.setAttribute(REF_ATTR, '1');
@@ -109,7 +109,7 @@ export function placeReferenceImage(svgEditor, file, opts = {}) {
   if (!sc || !file || !isRasterFile(file)) {
     return Promise.reject(new Error('Expected a PNG, JPEG, WebP, or GIF file'));
   }
-  const opacity = opts.opacity ?? 0.5;
+  const opacity = opts.opacity ?? 1;
   const sendBack = opts.sendBack !== false;
 
   return new Promise((resolve, reject) => {
@@ -191,12 +191,12 @@ function openFilePicker(svgEditor) {
  */
 export function afterPlaceRasterImage(svgEditor, el) {
   if (!el || el.nodeName !== 'image') return;
-  markAsReference(el, { opacity: 0.5, sendBack: true });
+  markAsReference(el, { opacity: 1, sendBack: true });
   const sc = svgEditor?.svgCanvas;
   if (sc) {
     sc.selectOnly([el]);
-    if (typeof sc.setOpacity === 'function') sc.setOpacity(0.5);
-    else el.setAttribute('opacity', '0.5');
+    if (typeof sc.setOpacity === 'function') sc.setOpacity(1);
+    else el.setAttribute('opacity', '1');
     if (typeof sc.moveToBottomSelectedElement === 'function') {
       sc.moveToBottomSelectedElement();
       sc.selectOnly([el]);
@@ -270,6 +270,11 @@ function syncRefControls(svgEditor) {
   // All Visteras-placed rasters are references; also treat unmarked images as candidates
   refCb.checked = isReference(el);
   lockCb.checked = isLocked(el);
+  const dimCb = document.getElementById('ref_dim_50_cb');
+  if (dimCb) {
+    const op = parseFloat(el.getAttribute('opacity') || '1');
+    dimCb.checked = Number.isFinite(op) && op <= 0.55;
+  }
 }
 
 function wireRefControls(svgEditor) {
@@ -282,10 +287,11 @@ function wireRefControls(svgEditor) {
     if (!el || el.nodeName !== 'image') return;
     const sc = svgEditor.svgCanvas;
     if (refCb.checked) {
-      markAsReference(el, { opacity: 0.5, sendBack: false });
+      // Keep current opacity — Dim to 50% is optional via the button below
+      const curOp = el.getAttribute('opacity');
+      const opacity = curOp != null && curOp !== '' ? parseFloat(curOp) : 1;
+      markAsReference(el, { opacity: Number.isFinite(opacity) ? opacity : 1, sendBack: false });
       sc.selectOnly([el]);
-      if (typeof sc.setOpacity === 'function') sc.setOpacity(0.5);
-      else el.setAttribute('opacity', '0.5');
       if (typeof sc.moveToBottomSelectedElement === 'function') {
         sc.moveToBottomSelectedElement();
         sc.selectOnly([el]);
@@ -306,16 +312,48 @@ function wireRefControls(svgEditor) {
     svgEditor.topPanel?.updateContextPanel?.();
   });
 
-  dimBtn?.addEventListener('click', () => {
-    const el = svgEditor.selectedElement;
-    if (!el || el.nodeName !== 'image') return;
+  function applyDim50(el) {
     const sc = svgEditor.svgCanvas;
     sc.selectOnly([el]);
     if (typeof sc.setOpacity === 'function') sc.setOpacity(0.5);
     else el.setAttribute('opacity', '0.5');
     const opacityInput = document.getElementById('opacity');
     if (opacityInput) opacityInput.value = 50;
+    const dimCb = document.getElementById('ref_dim_50_cb');
+    if (dimCb) dimCb.checked = true;
     svgEditor.topPanel?.updateContextPanel?.();
+  }
+
+  function clearDim(el) {
+    const sc = svgEditor.svgCanvas;
+    sc.selectOnly([el]);
+    if (typeof sc.setOpacity === 'function') sc.setOpacity(1);
+    else el.setAttribute('opacity', '1');
+    const opacityInput = document.getElementById('opacity');
+    if (opacityInput) opacityInput.value = 100;
+    svgEditor.topPanel?.updateContextPanel?.();
+  }
+
+  dimBtn?.addEventListener('click', () => {
+    const el = svgEditor.selectedElement;
+    if (!el || el.nodeName !== 'image') return;
+    applyDim50(el);
+  });
+
+  const dimCb = document.getElementById('ref_dim_50_cb');
+  dimCb?.addEventListener('change', () => {
+    const el = svgEditor.selectedElement;
+    if (!el || el.nodeName !== 'image') return;
+    if (dimCb.checked) applyDim50(el);
+    else clearDim(el);
+  });
+
+  document.getElementById('ref_trace_image')?.addEventListener('click', () => {
+    if (typeof window.__visterasTraceSelectedImage === 'function') {
+      window.__visterasTraceSelectedImage();
+    } else {
+      alert('Trace Image is not loaded yet.');
+    }
   });
 
   // Aspect-lock: when width/height spin inputs change on a locked-aspect reference
@@ -367,17 +405,22 @@ function injectPropChrome() {
   refGroup.id = 'prop_image_ref_group';
   refGroup.style.display = 'none';
   refGroup.innerHTML = `
-    <label class="prop_check_row" title="Dim to 50%, lock aspect ratio, and send behind other artwork">
+    <label class="prop_check_row" title="Lock aspect ratio and send behind other artwork (opacity stays at 100% unless you Dim)">
       <input type="checkbox" id="ref_as_reference" />
-      <span>Reference (dim + aspect + back)</span>
+      <span>Reference (aspect + back)</span>
     </label>
-    <label class="prop_check_row" title="Ignore pointer hits so you can trace paths on top">
+    <label class="prop_check_row" title="Ignore pointer hits so you can draw on top">
       <input type="checkbox" id="ref_lock" />
-      <span>Lock (don't steal clicks while tracing)</span>
+      <span>Lock (don't steal clicks)</span>
     </label>
-    <button type="button" id="ref_dim_50" class="prop_pathfinder_btn" style="width:100%;margin-top:4px;height:26px;font-size:11px;">
-      Dim to 50%
+    <label class="prop_check_row" title="Optional: set opacity to 50% so artwork shows through (off by default — new images place at 100%)">
+      <input type="checkbox" id="ref_dim_50_cb" />
+      <span>Dim to 50%</span>
+    </label>
+    <button type="button" id="ref_trace_image" class="prop_pathfinder_btn" style="width:100%;margin-top:4px;height:26px;font-size:11px;" title="Convert flat logo/icon to vector paths (not for photos)">
+      Trace to Paths…
     </button>
+    <p id="ref_trace_hint" style="font-size:10px;color:#999;margin:6px 0 0;line-height:1.35;">Trace is for flat logos/icons with few colors — not photos.</p>
   `;
   if (imgGroup && imgGroup.parentNode) {
     imgGroup.parentNode.insertBefore(refGroup, imgGroup.nextSibling);

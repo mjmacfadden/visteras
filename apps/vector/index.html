@@ -23,6 +23,8 @@
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
+  <!-- Client-side logo tracer (ImageTracer.js) -->
+  <script src="./lib/imagetracer_v1.2.6.js"></script>
 
   <!-- Browser Support Script -->
   <script type="module" src="./browser-not-supported.js"></script>
@@ -109,6 +111,7 @@
             <div class="menu_dropdown_item" id="action_flip_v">Flip Vertical</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
+            <div class="menu_dropdown_item" id="action_trace_image">Trace Image…</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_pathfinder_unite">Pathfinder: Unite</div>
             <div class="menu_dropdown_item" id="action_pathfinder_minus_front">Pathfinder: Minus Front</div>
@@ -164,6 +167,7 @@
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
     import { mountVisterasReferenceImages } from './js/visteras-reference-images.js';
+    import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1519,6 +1523,7 @@
 
     // Reference raster images (place / move / scale — no pixel editing)
     mountVisterasReferenceImages({ svgEditor });
+    mountVisterasImageTrace({ svgEditor });
   </script>
 </body>
 </html>
