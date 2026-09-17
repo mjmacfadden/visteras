@@ -636,7 +636,7 @@ html, body {
 .prop_section_header {
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  justify-content: space-between !important;
   padding: 4px 8px !important;
   background-color: #282828 !important;
   cursor: pointer !important;
@@ -653,23 +653,28 @@ html, body {
   color: #ffffff !important;
 }
 
+.prop_section_title {
+  order: 1 !important;
+}
+
 .prop_section_arrow {
+  order: 2 !important;
   display: inline-block !important;
   width: 0 !important;
   height: 0 !important;
   border-style: solid !important;
-  border-width: 5px 4px 0 4px !important;
-  border-color: #888888 transparent transparent transparent !important;
+  border-width: 0 4px 5px 4px !important;
+  border-color: transparent transparent #888888 transparent !important;
   font-size: 0 !important;
   line-height: 0 !important;
-  margin-right: 4px !important;
+  margin-left: auto !important;
   vertical-align: middle !important;
-  transition: transform 0.15s ease !important;
+  transition: border-color 0.15s ease !important;
 }
 
 .prop_section.collapsed .prop_section_arrow {
-  border-width: 4px 0 4px 5px !important;
-  border-color: transparent transparent transparent #888888 !important;
+  border-width: 5px 4px 0 4px !important;
+  border-color: #888888 transparent transparent transparent !important;
   transform: none !important;
 }
 
