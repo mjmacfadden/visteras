@@ -1019,6 +1019,7 @@ class Text_selection_class {
 		this.isActiveSideEnd = true;
 		this.isBlinkVisible = true;
 		this.blinkInterval = 500;
+		this.preferredX = null;
 
 		this.start = {
 			line: 0,
@@ -1072,6 +1073,7 @@ class Text_selection_class {
 	 * @param {boolean} [keepSelection] - If true, extends the current selection to the specified position. If false or undefined, sets an empty selection at that position. 
 	 */
 	set_position(line, character, keepSelection) {
+		this.preferredX = null;
 		if (line == null) {
 			line = this.end.line;
 		}
@@ -1246,8 +1248,66 @@ class Text_selection_class {
 	 */
 	move_line_previous(length, keepSelection) {
 		length = length == null ? 1 : length;
-		const position = this.get_position();
-		this.set_position(position.line - length, null, keepSelection);
+		const position = (!keepSelection && !this.is_empty()) ?
+			{ line: this.start.line, character: this.start.character } :
+			this.get_position();
+
+		const visualWraps = this.editor ? this.editor.get_visual_wraps() : null;
+		if (!visualWraps || visualWraps.length === 0) {
+			this.set_position(position.line - length, null, keepSelection);
+			return;
+		}
+
+		const currentItem = this.editor.get_visual_wrap_for_position(visualWraps, position.line, position.character);
+		if (!currentItem) {
+			this.set_position(position.line - length, null, keepSelection);
+			return;
+		}
+
+		const currentWrap = currentItem.wrapInfo;
+		if (this.preferredX == null) {
+			const offsets = currentWrap.characterOffsets;
+			const charOffsetInWrap = Math.max(0, Math.min(position.character - currentWrap.startChar, currentWrap.charCount));
+			this.preferredX = (offsets && offsets[charOffsetInWrap] != null) ? offsets[charOffsetInWrap] : 0;
+		}
+
+		const targetIndex = currentItem.index - length;
+		if (targetIndex < 0) {
+			const savedX = this.preferredX;
+			this.set_position(0, 0, keepSelection);
+			this.preferredX = savedX;
+			return;
+		}
+
+		const targetItem = visualWraps[targetIndex];
+		const targetOffsets = targetItem.characterOffsets;
+		const targetCharCount = targetItem.charCount;
+		const maxCharOffset = targetItem.isLastWrapOfLine ? targetCharCount : Math.max(0, targetCharCount - 1);
+
+		let targetCharOffset = 0;
+		if (targetCharCount > 0 && targetOffsets && targetOffsets.length > 1) {
+			targetCharOffset = -1;
+			for (let c = 0; c < targetCharCount; c++) {
+				const leftPos = targetOffsets[c];
+				const rightPos = targetOffsets[c + 1] != null ? targetOffsets[c + 1] : leftPos;
+				const mid = leftPos + (rightPos - leftPos) * 0.5;
+				if (this.preferredX <= mid) {
+					targetCharOffset = c;
+					break;
+				}
+			}
+			if (targetCharOffset === -1) {
+				targetCharOffset = targetCharCount;
+			}
+			targetCharOffset = Math.min(targetCharOffset, maxCharOffset);
+		}
+
+		const destLine = targetItem.lineIndex;
+		const destChar = targetItem.startChar + targetCharOffset;
+
+		const savedX = this.preferredX;
+		this.set_position(destLine, destChar, keepSelection);
+		this.preferredX = savedX;
 	}
 	
 	/**
@@ -1257,8 +1317,68 @@ class Text_selection_class {
 	 */
 	move_line_next(length, keepSelection) {
 		length = length == null ? 1 : length;
-		const position = this.get_position();
-		this.set_position(position.line + length, null, keepSelection);
+		const position = (!keepSelection && !this.is_empty()) ?
+			{ line: this.end.line, character: this.end.character } :
+			this.get_position();
+
+		const visualWraps = this.editor ? this.editor.get_visual_wraps() : null;
+		if (!visualWraps || visualWraps.length === 0) {
+			this.set_position(position.line + length, null, keepSelection);
+			return;
+		}
+
+		const currentItem = this.editor.get_visual_wrap_for_position(visualWraps, position.line, position.character);
+		if (!currentItem) {
+			this.set_position(position.line + length, null, keepSelection);
+			return;
+		}
+
+		const currentWrap = currentItem.wrapInfo;
+		if (this.preferredX == null) {
+			const offsets = currentWrap.characterOffsets;
+			const charOffsetInWrap = Math.max(0, Math.min(position.character - currentWrap.startChar, currentWrap.charCount));
+			this.preferredX = (offsets && offsets[charOffsetInWrap] != null) ? offsets[charOffsetInWrap] : 0;
+		}
+
+		const targetIndex = currentItem.index + length;
+		if (targetIndex >= visualWraps.length) {
+			const lastLine = this.editor.document.get_line_count() - 1;
+			const lastChar = this.editor.document.get_line_character_count(lastLine);
+			const savedX = this.preferredX;
+			this.set_position(lastLine, lastChar, keepSelection);
+			this.preferredX = savedX;
+			return;
+		}
+
+		const targetItem = visualWraps[targetIndex];
+		const targetOffsets = targetItem.characterOffsets;
+		const targetCharCount = targetItem.charCount;
+		const maxCharOffset = targetItem.isLastWrapOfLine ? targetCharCount : Math.max(0, targetCharCount - 1);
+
+		let targetCharOffset = 0;
+		if (targetCharCount > 0 && targetOffsets && targetOffsets.length > 1) {
+			targetCharOffset = -1;
+			for (let c = 0; c < targetCharCount; c++) {
+				const leftPos = targetOffsets[c];
+				const rightPos = targetOffsets[c + 1] != null ? targetOffsets[c + 1] : leftPos;
+				const mid = leftPos + (rightPos - leftPos) * 0.5;
+				if (this.preferredX <= mid) {
+					targetCharOffset = c;
+					break;
+				}
+			}
+			if (targetCharOffset === -1) {
+				targetCharOffset = targetCharCount;
+			}
+			targetCharOffset = Math.min(targetCharOffset, maxCharOffset);
+		}
+
+		const destLine = targetItem.lineIndex;
+		const destChar = targetItem.startChar + targetCharOffset;
+
+		const savedX = this.preferredX;
+		this.set_position(destLine, destChar, keepSelection);
+		this.preferredX = savedX;
 	}
 		
 	/**
@@ -1631,6 +1751,76 @@ class Text_editor_class {
 			}
 		}
 		return { line, character };
+	}
+
+	get_visual_wraps() {
+		const layer = this.layer || (typeof config !== 'undefined' ? config.layer : null);
+		if ((!this.lineRenderInfo || !this.lineRenderInfo.lines || this.lineRenderInfo.lines.length !== this.document.lines.length) && layer) {
+			this.calculate_text_placement(this.editingCtx, layer);
+		}
+		if (!this.lineRenderInfo || !this.lineRenderInfo.lines || !this.lineRenderInfo.lines.length) {
+			return null;
+		}
+		const visualWraps = [];
+		for (let lineIndex = 0; lineIndex < this.lineRenderInfo.lines.length; lineIndex++) {
+			const lineInfo = this.lineRenderInfo.lines[lineIndex];
+			let accum = 0;
+			const wraps = (lineInfo && lineInfo.wraps) || [];
+			if (wraps.length === 0) {
+				visualWraps.push({
+					lineIndex,
+					wrapIndex: 0,
+					isLastWrapOfLine: true,
+					startChar: 0,
+					charCount: 0,
+					endChar: 0,
+					characterOffsets: [0]
+				});
+			} else {
+				for (let wrapIndex = 0; wrapIndex < wraps.length; wrapIndex++) {
+					const wrap = wraps[wrapIndex];
+					const wrapText = this.get_wrap_text(wrap);
+					const charCount = wrapText.length;
+					const isLastWrapOfLine = (wrapIndex === wraps.length - 1);
+					visualWraps.push({
+						lineIndex,
+						wrapIndex,
+						isLastWrapOfLine,
+						startChar: accum,
+						charCount,
+						endChar: accum + charCount,
+						characterOffsets: wrap.characterOffsets || [0]
+					});
+					accum += charCount;
+				}
+			}
+		}
+		return visualWraps;
+	}
+
+	get_visual_wrap_for_position(visualWraps, line, character) {
+		if (!visualWraps || visualWraps.length === 0) return null;
+		const lineWraps = [];
+		for (let i = 0; i < visualWraps.length; i++) {
+			if (visualWraps[i].lineIndex === line) {
+				lineWraps.push({ index: i, wrapInfo: visualWraps[i] });
+			}
+		}
+		if (lineWraps.length === 0) {
+			if (line < visualWraps[0].lineIndex) {
+				return { index: 0, wrapInfo: visualWraps[0] };
+			}
+			const last = visualWraps.length - 1;
+			return { index: last, wrapInfo: visualWraps[last] };
+		}
+		for (let w = 0; w < lineWraps.length; w++) {
+			const item = lineWraps[w];
+			const isLastWrap = (w === lineWraps.length - 1);
+			if (isLastWrap || character < item.wrapInfo.endChar) {
+				return item;
+			}
+		}
+		return lineWraps[lineWraps.length - 1];
 	}
 
 	calculate_text_placement(ctx, layer) {
@@ -3184,10 +3374,20 @@ class Text_class extends Base_tools_class {
 							}
 							break;
 						case 'Up': case 'ArrowUp':
-							editor.selection.move_line_previous(1, e.shiftKey);
+							if (!e.shiftKey && !editor.selection.is_empty()) {
+								editor.selection.isActiveSideEnd = false;
+								editor.selection.set_position(editor.selection.start.line, editor.selection.start.character, false);
+							} else {
+								editor.selection.move_line_previous(1, e.shiftKey);
+							}
 							break;
 						case 'Down': case 'ArrowDown':
-							editor.selection.move_line_next(1, e.shiftKey);
+							if (!e.shiftKey && !editor.selection.is_empty()) {
+								editor.selection.isActiveSideEnd = true;
+								editor.selection.set_position(editor.selection.end.line, editor.selection.end.character, false);
+							} else {
+								editor.selection.move_line_next(1, e.shiftKey);
+							}
 							break;
 						case 'a':
 						case 'A':
