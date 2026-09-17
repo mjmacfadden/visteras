@@ -1377,3 +1377,38 @@ elix-dialog {
 }
 
 
+/* ==========================================================================
+   Reference image tool — keep visible in left toolbar (not clipped/hidden)
+   ========================================================================== */
+
+#tools_left #tool_image {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  flex-shrink: 0 !important;
+  order: 50;
+}
+
+#tools_left {
+  /* Allow scrolling if many tools so Image stays reachable */
+  scrollbar-width: thin;
+  scrollbar-color: #505050 transparent;
+}
+
+.prop_check_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #cccccc;
+  margin: 4px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+#prop_selection_type {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--studio-accent, #fa7c1b);
+  margin: 0 0 8px;
+}
