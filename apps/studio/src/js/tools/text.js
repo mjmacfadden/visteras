@@ -53,6 +53,24 @@ export function span_font_css(span, sizeOverride = null) {
 	return (italic ? 'italic' : 'normal') + ' ' + weightCss + ' ' + Math.round(size) + 'px ' + family;
 }
 
+export function is_external_input(element) {
+	if (!element) return false;
+	if (element.id === 'text_tool_keyboard_input') return false;
+	const tag = (element.tagName || '').toUpperCase();
+	if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+		return true;
+	}
+	if (element.isContentEditable) {
+		return true;
+	}
+	if (typeof element.closest === 'function') {
+		if (element.closest('.ui_number_input, .ui_range, .attribute_value, .slider_value, .sp-input, .sp-container, input, textarea, select')) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export function normalize_font_weight(weight) {
 	if (weight == null || weight === '') return null;
 	const raw = String(weight).trim();
@@ -3119,18 +3137,28 @@ class Text_class extends Base_tools_class {
 			const markParamsUi = (active) => { this._params_ui_active = !!active; };
 			document.addEventListener('pointerdown', (ev) => {
 				if (ev.target && ev.target.closest && ev.target.closest('#action_attributes')) {
+					if (is_external_input(ev.target)) {
+						markParamsUi(false);
+						this._ignore_textarea_blur = false;
+						return;
+					}
 					markParamsUi(true);
 					this._ignore_textarea_blur = true;
 				}
 			}, true);
 			document.addEventListener('pointerup', (ev) => {
 				if (this._params_ui_active) {
-					if (ev.target && ev.target.closest && ev.target.closest('.ui_number_input input')) {
+					if (is_external_input(ev.target) || is_external_input(document.activeElement)) {
 						this._params_ui_active = false;
 						this._ignore_textarea_blur = false;
 						return;
 					}
 					setTimeout(() => {
+						if (is_external_input(document.activeElement)) {
+							markParamsUi(false);
+							this._ignore_textarea_blur = false;
+							return;
+						}
 						markParamsUi(false);
 						this._ignore_textarea_blur = false;
 						this.focus_textarea();
@@ -3159,17 +3187,19 @@ class Text_class extends Base_tools_class {
 					this.focused = false;
 					return;
 				}
-				const keepFocusSelector = '#main_wrapper, #action_attributes, #main_tools, .ui_swatches, .sp-container, .ui_color_picker_gradient, .ui_number_input, .ui_range';
 				const related = e.relatedTarget;
-				if (related && related.closest && related.closest('.ui_number_input input')) {
+				if (is_external_input(related) || is_external_input(document.activeElement)) {
 					return;
 				}
-				if (related && related.closest && related.closest(keepFocusSelector)) {
+				const keepFocusSelector = '#main_wrapper, #main_tools, .ui_swatches';
+				if (related && related.closest && related.closest(keepFocusSelector) && !is_external_input(related)) {
 					if (this.focused) this.focus_textarea();
 					return;
 				}
 				if (this._ignore_textarea_blur || this._params_ui_active) {
-					if (this.focused) this.focus_textarea();
+					if (this.focused && !is_external_input(document.activeElement)) {
+						this.focus_textarea();
+					}
 					return;
 				}
 				setTimeout(() => {
@@ -3177,12 +3207,17 @@ class Text_class extends Base_tools_class {
 						this.focused = false;
 						return;
 					}
+					if (is_external_input(document.activeElement)) {
+						return;
+					}
 					if (this._ignore_textarea_blur || this._params_ui_active) {
-						if (this.focused) this.focus_textarea();
+						if (this.focused && !is_external_input(document.activeElement)) {
+							this.focus_textarea();
+						}
 						return;
 					}
 					const active = document.activeElement;
-					if (active && (active === document.body || active.id === 'canvas_minipaint' || (active.closest && active.closest(keepFocusSelector)))) {
+					if (active && !is_external_input(active) && (active === document.body || active.id === 'canvas_minipaint' || (active.closest && active.closest(keepFocusSelector)))) {
 						if (this.focused && config.TOOL && config.TOOL.name === 'text') {
 							this.focus_textarea();
 							return;
@@ -3635,6 +3670,9 @@ class Text_class extends Base_tools_class {
 			this.textarea.blur();
 			return;
 		}
+		if (is_external_input(document.activeElement)) {
+			return;
+		}
 		this.focused = true;
 		try {
 			this.textarea.focus({ preventScroll: true });
@@ -3647,10 +3685,9 @@ class Text_class extends Base_tools_class {
 				this.textarea.blur();
 				return;
 			}
-			const activeNumberInput = document.activeElement && document.activeElement.closest
-				? document.activeElement.closest('.ui_number_input input')
-				: null;
-			if (activeNumberInput) return;
+			if (is_external_input(document.activeElement)) {
+				return;
+			}
 			if (this.textarea && this.focused) {
 				try {
 					this.textarea.focus({ preventScroll: true });
@@ -4229,7 +4266,7 @@ class Text_class extends Base_tools_class {
 		this.resize_to_dynamic_bounds(layer, editorAfter || editor);
 		this.extend_fixed_bounds(layer, editorAfter || editor);
 		this.Base_layers.render();
-		if (this.focused && !activeNumberInput) {
+		if (this.focused && !is_external_input(document.activeElement)) {
 			this.focus_textarea();
 		}
 		setTimeout(() => {
@@ -4239,8 +4276,8 @@ class Text_class extends Base_tools_class {
 				const ed = this.get_editor(layer);
 				if (ed) this.restore_selection(ed, selectionSnap);
 			}
-			if (activeNumberInput && document.contains(activeNumberInput)) {
-				activeNumberInput.focus();
+			if (is_external_input(document.activeElement)) {
+				// Keep focus on external input
 			} else if (this.focused) {
 				this.focus_textarea();
 			}
@@ -4545,7 +4582,7 @@ class Text_class extends Base_tools_class {
 					}
 					this.sync_text_tool_attributes_from_layer(config.layer);
 					this.Base_layers.render();
-					if (this.focused) this.focus_textarea();
+					if (this.focused && !is_external_input(document.activeElement)) this.focus_textarea();
 				}
 				return returnValue;
 			}
@@ -4650,7 +4687,7 @@ class Text_class extends Base_tools_class {
 						new app.Actions.Update_layer_action(config.layer.id, updates)
 					);
 					this.Base_layers.render();
-					if (this.focused) this.focus_textarea();
+					if (this.focused && !is_external_input(document.activeElement)) this.focus_textarea();
 				}
 				return returnValue;
 			}
