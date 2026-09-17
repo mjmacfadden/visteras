@@ -19,11 +19,22 @@ export function get_layer_content_bounds(layer) {
 		if (vec && typeof vec.getBounds === 'function') {
 			const b = vec.getBounds();
 			if (b && b.width > 0 && b.height > 0) {
+				let strokeOffset = 0;
+				const strokeWidth = Number(vec.stroke_width || (layer.params && layer.params.stroke_width) || 0);
+				const strokeColor = vec.stroke || (layer.params && layer.params.stroke);
+				if (strokeWidth > 0 && strokeColor && strokeColor !== 'none') {
+					const strokeAlign = (vec.stroke_align || (layer.params && layer.params.stroke_align) || 'center').toLowerCase();
+					if (strokeAlign === 'outside') {
+						strokeOffset = strokeWidth;
+					} else if (strokeAlign === 'center') {
+						strokeOffset = strokeWidth / 2;
+					}
+				}
 				return {
-					x: b.minX,
-					y: b.minY,
-					width: b.width,
-					height: b.height,
+					x: b.minX - strokeOffset,
+					y: b.minY - strokeOffset,
+					width: b.width + strokeOffset * 2,
+					height: b.height + strokeOffset * 2,
 					rotate: layer.rotate || 0,
 				};
 			}

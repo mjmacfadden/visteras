@@ -1880,6 +1880,35 @@ class WebGL_renderer_class {
 			var brushSize = (!isNaN(rawBrushSize) && rawBrushSize > 0) ? rawBrushSize : 0;
 			var pad = Math.max(1, Math.ceil(brushSize / 2) + 1);
 
+			// Vector layers: calculate stroke bleed padding so centered or outside strokes are never clipped
+			if (layer.type === 'vector' || layer.is_vector || (layer.render_function && layer.render_function[0] === 'pen')) {
+				var vecId = layer.vector_id || (layer.params && layer.params.vector_id);
+				var vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
+				if (vec) {
+					var b = (typeof vec.getBounds === 'function') ? vec.getBounds() : null;
+					if (b && b.width > 0 && b.height > 0) {
+						layer.x = b.minX;
+						layer.y = b.minY;
+						layer.width = b.width;
+						layer.height = b.height;
+					}
+					var strokeWidth = Number(vec.stroke_width || (layer.params && layer.params.stroke_width) || 0);
+					var strokeColor = vec.stroke || (layer.params && layer.params.stroke);
+					if (strokeWidth > 0 && strokeColor && strokeColor !== 'none') {
+						var strokeAlign = (vec.stroke_align || (layer.params && layer.params.stroke_align) || 'center').toLowerCase();
+						var strokeJoin = (vec.stroke_join || (layer.params && layer.params.stroke_join) || 'miter').toLowerCase();
+						var miterFactor = strokeJoin === 'miter' ? 3 : 1.5;
+						if (strokeAlign === 'outside') {
+							pad = Math.max(pad, Math.ceil(strokeWidth * miterFactor) + 8);
+						} else if (strokeAlign === 'center') {
+							pad = Math.max(pad, Math.ceil((strokeWidth / 2) * miterFactor) + 8);
+						} else {
+							pad = Math.max(pad, 8);
+						}
+					}
+				}
+			}
+
 			var w = Math.max(1, Math.round(layer.width || 1));
 			var h = Math.max(1, Math.round(layer.height || 1));
 			if (isNaN(w) || w <= 0) w = 1;

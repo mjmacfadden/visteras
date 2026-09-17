@@ -235,6 +235,8 @@ config.TOOLS = [
 	{
 		name: 'rectangle',
 		title: 'Rectangle Tool [U]',
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
 		tool_group: {
 			label: 'Shape Tools',
 			hidden: false,
@@ -309,6 +311,8 @@ config.TOOLS = [
 		name: 'ellipse',
 		title: 'Ellipse Tool',
 		visible: false,
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
 		attributes: {
 			mode: {
 				title: 'Mode',
@@ -340,6 +344,8 @@ config.TOOLS = [
 		name: 'polygon',
 		title: 'Polygon Tool',
 		visible: false,
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
 		attributes: {
 			sides: {
 				title: 'Sides',
@@ -378,6 +384,8 @@ config.TOOLS = [
 		name: 'star',
 		title: 'Star Tool',
 		visible: false,
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
 		attributes: {
 			corners: {
 				title: 'Points',
@@ -423,6 +431,8 @@ config.TOOLS = [
 		name: 'custom_shape',
 		title: 'Custom Shape Tool',
 		visible: false,
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
 		attributes: {
 			shape: {
 				title: 'Shape',

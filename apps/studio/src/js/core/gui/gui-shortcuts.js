@@ -461,7 +461,10 @@ class GUI_shortcuts_class {
 						}
 					}
 				} else {
-					app.GUI.GUI_tools.activate_tool(targetTool);
+					var resolved = (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
+						? app.GUI.GUI_tools.get_active_tool_for_group(targetTool)
+						: targetTool;
+					app.GUI.GUI_tools.activate_tool(resolved);
 				}
 			}
 

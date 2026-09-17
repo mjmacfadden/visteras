@@ -57,6 +57,14 @@ export class Select_layer_action extends Base_action {
 				if (vecId) {
 					Vector_manager.set_active_vector(vecId);
 				}
+				const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+				if (config.TOOL && vectorTools.includes(config.TOOL.name) && app.GUI && app.GUI.GUI_tools) {
+					const activeToolObj = app.GUI.GUI_tools.tools_modules[config.TOOL.name]?.object;
+					if (activeToolObj && typeof activeToolObj.sync_vector_options_bar === 'function') {
+						activeToolObj.sync_vector_options_bar();
+						app.GUI.GUI_tools.show_action_attributes();
+					}
+				}
 			}
 		} else if (!this.ignore_same_selection) {
 			throw new Error('Aborted - Layer already selected');
@@ -101,6 +109,14 @@ export class Select_layer_action extends Base_action {
 			const vecId = this.old_layer.vector_id || (this.old_layer.params && this.old_layer.params.vector_id);
 			if (vecId) {
 				Vector_manager.set_active_vector(vecId);
+			}
+			const vectorTools = ['rectangle', 'ellipse', 'polygon', 'star', 'custom_shape', 'pen'];
+			if (config.TOOL && vectorTools.includes(config.TOOL.name) && app.GUI && app.GUI.GUI_tools) {
+				const activeToolObj = app.GUI.GUI_tools.tools_modules[config.TOOL.name]?.object;
+				if (activeToolObj && typeof activeToolObj.sync_vector_options_bar === 'function') {
+					activeToolObj.sync_vector_options_bar();
+					app.GUI.GUI_tools.show_action_attributes();
+				}
 			}
 		}
 		this.old_layer = null;

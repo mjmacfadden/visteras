@@ -9,6 +9,7 @@ import { Vector } from './vector/vector-model.js';
 import { create_coords_subpath, create_star_subpath } from './vector/vector-shapes.js';
 import { Insert_vector_action } from '../actions/vector/insert-vector.js';
 import { Modify_path_action } from '../actions/vector/modify-path.js';
+import { Update_vector_action } from '../actions/vector/update-vector.js';
 import { get_layer_content_bounds } from '../libs/layer-bounds.js';
 
 /**
@@ -738,6 +739,123 @@ class Base_tools_class {
 		Vector_manager.set_active_vector(vec.id);
 		Vector_manager.active_subpath_index = 0;
 		config.need_render = true;
+	}
+
+	on_activate() {
+		if (config.layer && config.layer.type === 'vector') {
+			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+			if (vecId) {
+				Vector_manager.set_active_vector(vecId);
+			}
+		}
+		this.sync_vector_options_bar();
+		config.need_render = true;
+	}
+
+	on_params_update(data) {
+		this.on_vector_params_update(data);
+	}
+
+	sync_vector_options_bar() {
+		let vec = Vector_manager.get_active_vector();
+		if (!vec && config.layer && config.layer.type === 'vector') {
+			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+			if (vecId) {
+				vec = Vector_manager.get_vector_by_id(vecId);
+			}
+		}
+		if (!vec) return;
+
+		const toolName = (config.TOOL ? config.TOOL.name : this.name);
+		const toolConfig = (config.TOOLS || []).find(t => t.name === toolName);
+		if (!toolConfig || !toolConfig.attributes) return;
+
+		if (toolConfig.attributes.mode) {
+			toolConfig.attributes.mode.value = (vec.mode === 'shape' ? 'Shape' : 'Path');
+		}
+		if (vec.fill !== undefined && vec.fill !== null) {
+			toolConfig.attributes.fill = vec.fill;
+		}
+		if (vec.stroke !== undefined && vec.stroke !== null) {
+			toolConfig.attributes.stroke = vec.stroke;
+		}
+		if (vec.stroke_width != null && toolConfig.attributes.stroke_width) {
+			toolConfig.attributes.stroke_width.value = Number(vec.stroke_width);
+		}
+		if (vec.stroke_align && toolConfig.attributes.stroke_align) {
+			const align = String(vec.stroke_align);
+			toolConfig.attributes.stroke_align.value = align.charAt(0).toUpperCase() + align.slice(1).toLowerCase();
+		}
+		if (toolConfig.attributes.stroke_corners) {
+			const join = (vec.stroke_join || 'miter').toLowerCase();
+			if (join === 'round') {
+				toolConfig.attributes.stroke_corners.value = 'Rounded';
+			} else if (join === 'bevel') {
+				toolConfig.attributes.stroke_corners.value = 'Capped';
+			} else {
+				toolConfig.attributes.stroke_corners.value = 'Right Angle';
+			}
+		}
+	}
+
+	on_vector_params_update(data = {}) {
+		let vec = Vector_manager.get_active_vector();
+		if (!vec && config.layer && config.layer.type === 'vector') {
+			const vecId = config.layer.vector_id || (config.layer.params && config.layer.params.vector_id);
+			if (vecId) {
+				vec = Vector_manager.get_vector_by_id(vecId);
+				if (vec) {
+					Vector_manager.active_vector_id = vec.id;
+				}
+			}
+		}
+		if (!vec) return;
+
+		const updates = {};
+		if (data && data.key) {
+			if (data.key === 'fill') updates.fill = data.value;
+			if (data.key === 'stroke') updates.stroke = data.value;
+			if (data.key === 'stroke_width') updates.stroke_width = Number(data.value);
+			if (data.key === 'stroke_align') updates.stroke_align = String(data.value).toLowerCase();
+			if (data.key === 'mode') updates.mode = String(data.value).toLowerCase();
+			if (data.key === 'stroke_corners') {
+				const cVal = String(data.value).toLowerCase();
+				if (cVal.includes('round')) {
+					updates.stroke_join = 'round';
+					updates.stroke_cap = 'round';
+				} else if (cVal.includes('cap') || cVal.includes('bevel')) {
+					updates.stroke_join = 'bevel';
+					updates.stroke_cap = 'square';
+				} else {
+					updates.stroke_join = 'miter';
+					updates.stroke_cap = 'butt';
+				}
+			}
+		} else {
+			const params = this.getParams();
+			if (params.mode) updates.mode = (params.mode.value || params.mode).toLowerCase();
+			if (params.fill !== undefined) updates.fill = params.fill;
+			if (params.stroke !== undefined) updates.stroke = params.stroke;
+			if (params.stroke_width !== undefined) updates.stroke_width = Number(params.stroke_width.value || params.stroke_width);
+			if (params.stroke_align) updates.stroke_align = (params.stroke_align.value || params.stroke_align).toLowerCase();
+			if (params.stroke_corners) {
+				const cVal = (params.stroke_corners?.value || params.stroke_corners).toLowerCase();
+				if (cVal.includes('round')) {
+					updates.stroke_join = 'round';
+					updates.stroke_cap = 'round';
+				} else if (cVal.includes('cap') || cVal.includes('bevel')) {
+					updates.stroke_join = 'bevel';
+					updates.stroke_cap = 'square';
+				} else {
+					updates.stroke_join = 'miter';
+					updates.stroke_cap = 'butt';
+				}
+			}
+		}
+
+		if (Object.keys(updates).length > 0) {
+			app.State.do_action(new Update_vector_action(vec.id, updates));
+		}
 	}
 
 	render_overlay_parent(ctx){

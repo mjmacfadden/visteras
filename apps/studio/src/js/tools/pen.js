@@ -73,73 +73,12 @@ class Pen_tool_class extends Base_tools_class {
 		config.need_render = true;
 	}
 
-	on_params_update() {
-		const vec = Vector_manager.get_active_vector();
-		if (!vec) return;
-
-		const params = this.getParams();
-		const updates = {};
-		if (params.mode) {
-			updates.mode = (params.mode.value || params.mode).toLowerCase();
-		}
-		if (params.fill) {
-			updates.fill = params.fill;
-		}
-		if (params.stroke) {
-			updates.stroke = params.stroke;
-		}
-		if (params.stroke_width) {
-			updates.stroke_width = Number(params.stroke_width.value || params.stroke_width);
-		}
-		if (params.stroke_align) {
-			updates.stroke_align = (params.stroke_align.value || params.stroke_align).toLowerCase();
-		}
-		if (params.stroke_corners || params.corners) {
-			const cVal = (params.stroke_corners?.value || params.stroke_corners || params.corners?.value || params.corners).toLowerCase();
-			if (cVal.includes('round')) {
-				updates.stroke_join = 'round';
-				updates.stroke_cap = 'round';
-			} else if (cVal.includes('cap') || cVal.includes('bevel')) {
-				updates.stroke_join = 'bevel';
-				updates.stroke_cap = 'square';
-			} else {
-				updates.stroke_join = 'miter';
-				updates.stroke_cap = 'butt';
-			}
-		}
-
-		if (Object.keys(updates).length > 0) {
-			app.State.do_action(new Update_vector_action(vec.id, updates));
-		}
+	on_params_update(data) {
+		this.on_vector_params_update(data);
 	}
 
 	_sync_options_bar() {
-		const vec = Vector_manager.get_active_vector();
-		if (!vec) return;
-		const toolConfig = (config.TOOLS || []).find(t => t.name === 'pen');
-		if (!toolConfig || !toolConfig.attributes) return;
-
-		if (toolConfig.attributes.mode) {
-			toolConfig.attributes.mode.value = vec.mode === 'shape' ? 'Shape' : 'Path';
-		}
-		if (vec.fill) toolConfig.attributes.fill = vec.fill;
-		if (vec.stroke) toolConfig.attributes.stroke = vec.stroke;
-		if (vec.stroke_width && toolConfig.attributes.stroke_width) {
-			toolConfig.attributes.stroke_width.value = vec.stroke_width;
-		}
-		if (vec.stroke_align && toolConfig.attributes.stroke_align) {
-			toolConfig.attributes.stroke_align.value = vec.stroke_align.charAt(0).toUpperCase() + vec.stroke_align.slice(1).toLowerCase();
-		}
-		if (toolConfig.attributes.stroke_corners) {
-			const join = vec.stroke_join || 'miter';
-			if (join === 'round') {
-				toolConfig.attributes.stroke_corners.value = 'Rounded';
-			} else if (join === 'bevel') {
-				toolConfig.attributes.stroke_corners.value = 'Capped';
-			} else {
-				toolConfig.attributes.stroke_corners.value = 'Right Angle';
-			}
-		}
+		this.sync_vector_options_bar();
 	}
 
 	keydown(e) {
