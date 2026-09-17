@@ -329,6 +329,11 @@ const menuDefinition = [
 				divider: true
 			},
 			{
+				name: 'Raw Develop',
+				ellipsis: true,
+				target: 'image/raw_develop.raw_develop'
+			},
+			{
 				name: 'Color Corrections',
 				ellipsis: true,
 				target: 'image/color_corrections.color_corrections'
