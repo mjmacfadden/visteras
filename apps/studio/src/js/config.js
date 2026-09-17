@@ -531,6 +531,12 @@ config.TOOLS = [
 		},
 	},
 	{
+		name: 'camera',
+		title: 'Camera',
+		on_activate: 'on_activate',
+		attributes: {},
+	},
+	{
 		name: 'triangle',
 		visible: false,
 		attributes: {
