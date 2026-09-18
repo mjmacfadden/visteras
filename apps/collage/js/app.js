@@ -139,7 +139,7 @@
     // Text Overlay
     textOverlay: {
       content: '',
-      fontFamily: 'Arial, sans-serif',
+      fontFamily: "'Roboto', sans-serif",
       fontSize: 28,
       fontColor: '#212529',
       bold: false,
