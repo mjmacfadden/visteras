@@ -41,6 +41,7 @@ html {
     color: var(--studio-text);
     color-scheme: dark;
     overflow: hidden;
+    font-family: var(--ui-font);
   }
 
   #visteras_app_container {
@@ -401,6 +402,7 @@ html {
   box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   box-sizing: border-box;
+  font-family: var(--ui-font);
 }
 
 .collage-container {
@@ -665,11 +667,18 @@ html {
   justify-content: center;
   background: #ffffff;
   color: #1e1e1e;
+  font-family: var(--ui-font);
   z-index: 300;
   gap: 14px;
   border-radius: 2px;
   box-sizing: border-box;
   padding: 32px;
+}
+
+.generate-overlay h3,
+.generate-overlay p,
+.generate-overlay button {
+  font-family: var(--ui-font);
 }
 
 .generate-overlay.hidden {
