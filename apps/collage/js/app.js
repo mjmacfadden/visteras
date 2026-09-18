@@ -142,7 +142,8 @@
       y: 0
     },
 
-    // Texture Overlay
+    // SVG and Texture Effects
+    selectedEffects: [],
     selectedOverlay: '',
     overlayOpacity: 100,
     overlayBlendMode: 'normal',
@@ -406,7 +407,8 @@
 
   // --- SVG Filter Effects ---
   function applySvgEffectsToItems() {
-    const filterString = state.selectedEffects.map(eff => `url(#svg-${eff})`).join(' ');
+    const effects = (state && Array.isArray(state.selectedEffects)) ? state.selectedEffects : [];
+    const filterString = effects.map(eff => `url(#svg-${eff})`).join(' ');
     document.querySelectorAll('.collage-item img').forEach(img => {
       img.style.filter = filterString || 'none';
     });
