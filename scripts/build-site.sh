@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Assemble the GitHub Pages / static publish tree under site/.
-# Repo layout stays apps/studio + apps/vector + apps/publish; public URLs are /studio/, /vector/, and /publish/.
+# Repo layout stays apps/studio + apps/vector + apps/publish + apps/collage; public URLs are /studio/, /vector/, /publish/, and /collage/.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SITE="$ROOT/site"
 STUDIO="$ROOT/apps/studio"
 VECTOR="$ROOT/apps/vector"
-
 PUBLISH="$ROOT/apps/publish"
+COLLAGE="$ROOT/apps/collage"
 
 copy_tree() {
   # copy_tree <src_dir> <dest_dir> [--exclude pattern ...]
@@ -53,7 +53,7 @@ ASTRO_BASE="/publish/" npm run build --prefix "$PUBLISH"
 
 echo "==> Preparing site/"
 rm -rf "$SITE"
-mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/publish"
+mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage"
 
 # Apex CNAME for visteras.com (GitHub Pages custom domain)
 printf '%s\n' 'visteras.com' > "$SITE/CNAME"
@@ -80,8 +80,9 @@ cat > "$SITE/index.html" << 'HTML'
     <li><a href="/studio/">Studio</a> — raster image editor</li>
     <li><a href="/vector/">Vector</a> — SVG editor</li>
     <li><a href="/publish/">Publish</a> — personal morning newspaper</li>
+    <li><a href="/collage/">Collage</a> — printable collage fodder generator</li>
   </ul>
-  <p><noscript>JavaScript is off — open <a href="/studio/">/studio/</a>, <a href="/vector/">/vector/</a>, or <a href="/publish/">/publish/</a>.</noscript></p>
+  <p><noscript>JavaScript is off — open <a href="/studio/">/studio/</a>, <a href="/vector/">/vector/</a>, <a href="/publish/">/publish/</a>, or <a href="/collage/">/collage/</a>.</noscript></p>
 </body>
 </html>
 HTML
@@ -111,7 +112,12 @@ copy_tree "$VECTOR" "$SITE/vector" \
 echo "==> Copying Publish dist tree → site/publish/"
 copy_tree "$PUBLISH/dist" "$SITE/publish"
 
+echo "==> Copying Collage static tree → site/collage/"
+copy_tree "$COLLAGE" "$SITE/collage" \
+  --exclude '.git' \
+  --exclude 'node_modules'
+
 echo "==> site/ ready"
 echo "    Publish this folder to GitHub Pages (Actions or manual gh-pages)."
-echo "    Public URLs: https://visteras.com/studio/ , https://visteras.com/vector/ , and https://visteras.com/publish/"
-du -sh "$SITE" "$SITE/studio" "$SITE/vector" "$SITE/publish"
+echo "    Public URLs: https://visteras.com/studio/ , https://visteras.com/vector/ , https://visteras.com/publish/ , and https://visteras.com/collage/"
+du -sh "$SITE" "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage"

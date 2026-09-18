@@ -2,7 +2,7 @@
   "name": "visteras",
   "version": "1.0.0",
   "private": true,
-  "description": "Visteras monorepo \u2014 Studio (raster) + Vector (SVG-Edit companion) + Publish (morning newspaper).",
+  "description": "Visteras monorepo — Studio (raster) + Vector (SVG-Edit companion) + Publish (morning newspaper) + Collage (printable fodder generator).",
   "license": "MIT",
   "scripts": {
     "dev:studio": "npm run server --prefix apps/studio",
@@ -11,6 +11,8 @@
     "build:vector": "node -e \"console.log('Vector is a static SVG-Edit build under apps/vector; nothing to compile.')\"",
     "dev:publish": "npm run dev --prefix apps/publish",
     "build:publish": "npm run build --prefix apps/publish",
+    "dev:collage": "npx --yes serve apps/collage -p 5174",
+    "build:collage": "node -e \"console.log('Collage is a static app under apps/collage; nothing to compile.')\"",
     "build:site": "bash scripts/build-site.sh",
     "build:fonts": "npm run build:vector --prefix packages/fonts"
   },

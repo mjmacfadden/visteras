@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <title>Visteras - Collage</title>
+  <meta name="description" content="Visteras Collage - Generate printable collage fodder sheets, textures, cutouts, and paper assets." />
+  
+  <!-- Visteras Collage Favicon & Theme -->
+  <link rel="icon" type="image/png" href="images/visteras_collage_logo.png">
+  <link rel="apple-touch-icon" href="images/visteras_collage_logo.png">
+  <meta name="theme-color" content="#e11d48">
+
+  <!-- Core Collage Stylesheet -->
+  <link rel="stylesheet" href="css/visteras-collage-theme.css">
+  
+  <!-- Vendored Libraries -->
+  <script src="lib/interact.min.js"></script>
+  <script src="lib/html2canvas.min.js"></script>
+</head>
+
+<body>
+  <div id="visteras_app_container">
+    
+    <!-- ==================================================================
+         1. Main Top Menu Bar
+         ================================================================== -->
+    <nav id="visteras_menu_bar" aria-label="Main Menu">
+      <div class="menu_group">
+        
+        <!-- File Menu -->
+        <div class="menu_entry" id="menu_file">
+          <div class="menu_entry_title">File</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_new" onclick="document.getElementById('action_generate_fodder').click()">Generate New Fodder <span class="menu_dropdown_shortcut">⌘N</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_print" onclick="window.print()">Print Sheet... <span class="menu_dropdown_shortcut">⌘P</span></div>
+            <div class="menu_dropdown_item" id="action_menu_download" onclick="document.getElementById('action_download_jpg').click()">Download JPG...</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_save_set">Save Collage Sheet <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <a href="../studio/" class="menu_dropdown_item">Open Visteras Studio...</a>
+            <a href="../vector/" class="menu_dropdown_item">Open Visteras Vector...</a>
+            <a href="../publish/" class="menu_dropdown_item">Open Visteras Publish...</a>
+          </div>
+        </div>
+
+        <!-- Edit Menu -->
+        <div class="menu_entry" id="menu_edit">
+          <div class="menu_entry_title">Edit</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" onclick="document.getElementById('action_generate_fodder').click()">Shuffle Images</div>
+            <div class="menu_dropdown_item" onclick="document.getElementById('textInput').value=''; document.getElementById('textInput').dispatchEvent(new Event('input'))">Clear Text Overlay</div>
+          </div>
+        </div>
+
+        <!-- View Menu -->
+        <div class="menu_entry" id="menu_view">
+          <div class="menu_entry_title">View</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item">Letter Sheet (8.5" × 11")</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" onclick="document.getElementById('workarea').scrollTop = 0">Fit to Workspace</div>
+          </div>
+        </div>
+
+        <!-- Help Menu -->
+        <div class="menu_entry" id="menu_help">
+          <div class="menu_entry_title">Help</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" onclick="alert('Visteras Collage: Generate high-resolution printable collage fodder sheets for physical crafting, journals, and mixed media.')">About Visteras Collage...</div>
+            <div class="menu_dropdown_separator"></div>
+            <a href="../studio/" class="menu_dropdown_item">Open Visteras Studio...</a>
+            <a href="../vector/" class="menu_dropdown_item">Open Visteras Vector...</a>
+            <a href="../publish/" class="menu_dropdown_item">Open Visteras Publish...</a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Menu Bar Cross-App Switchers -->
+      <div class="menu_right_controls">
+        <a href="../studio/" class="visteras_switch_btn" title="Switch to Visteras Studio (Raster Graphics Editor)">
+          <span class="visteras_badge" style="color: #4a9eff;">STUDIO</span> ↗
+        </a>
+        <a href="../vector/" class="visteras_switch_btn" title="Switch to Visteras Vector (SVG Vector Graphics Editor)">
+          <span class="visteras_badge" style="color: #fa7c1b;">VECTOR</span> ↗
+        </a>
+        <a href="../publish/" class="visteras_switch_btn" title="Switch to Visteras Publish (Personal Morning Newspaper)">
+          <span class="visteras_badge" style="color: #14b8a6;">PUBLISH</span> ↗
+        </a>
+      </div>
+    </nav>
+
+    <!-- ==================================================================
+         2. Top Options Bar
+         ================================================================== -->
+    <header id="tools_top">
+      <a href="#" class="visteras_collage_logo_wrap" title="Visteras Collage">
+        <img src="images/visteras_collage_logo.png" alt="Visteras Collage">
+        <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">COLLAGE</span></span>
+      </a>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- Quick Layout Dropdown -->
+      <select id="quick-layout-select" class="panel_select" style="width: 170px; margin-right: 8px;">
+        <!-- Populated by JS -->
+      </select>
+
+      <!-- Generate Action Button -->
+      <button type="button" id="action_generate_fodder" class="btn_visteras_rose" title="Generate new random fodder arrangement">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Generate Fodder
+      </button>
+
+      <!-- Right Action Controls -->
+      <div class="options_actions_right">
+        <button type="button" id="action_print_sheet" class="btn_visteras_secondary" title="Print 8.5x11 Sheet (⌘P)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Sheet
+        </button>
+
+        <button type="button" id="action_download_jpg" class="btn_visteras_secondary" title="Download High-Res JPG">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Download JPG
+        </button>
+      </div>
+    </header>
+
+    <!-- ==================================================================
+         3. Left Toolbar
+         ================================================================== -->
+    <aside id="tools_left" aria-label="Tools">
+      <button type="button" class="tool_btn active" id="tool_layout" data-tool="layout" title="Select Grid Layout">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="12" y1="3" x2="12" y2="21"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_tags" data-tool="tags" title="Filter Image Tags">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_overlay" data-tool="overlay" title="Textures & Overlays">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_paint" data-tool="paint" title="Color & Paint Overlay">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 11l-8-8-8.5 8.5a5.5 5.5 0 0 0 7.78 7.78l.72-.72 8 8 2.5-2.5-2.5-2.5 8-8z"></path>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_text" data-tool="text" title="Typography & Text Overlay">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7"></polyline>
+          <line x1="12" y1="4" x2="12" y2="20"></line>
+          <line x1="9" y1="20" x2="15" y2="20"></line>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_image" data-tool="image" title="Custom Image URL">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_saves" data-tool="saves" title="Saved Collages">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#cccccc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- ==================================================================
+         4. Middle Workarea (Printable Sheet)
+         ================================================================== -->
+    <main id="workarea">
+      <div id="letter-page" class="letter-page">
+        <!-- Main Collage Grid -->
+        <div id="collage-container" class="collage-container"></div>
+
+        <!-- Overlays -->
+        <div id="texture-overlay-layer"></div>
+        <div id="paint-overlay-layer"></div>
+
+        <!-- Interactive Text Overlay -->
+        <div id="text-overlay" class="text-overlay">
+          <span id="text-content"></span>
+        </div>
+
+        <!-- Initial Placeholder State -->
+        <div id="generate-overlay" class="generate-overlay">
+          <h3 style="margin: 0; font-weight: 600; color: #ffffff;">Collage Fodder Generator</h3>
+          <p style="margin: 0; font-size: 12px; color: #888888;">Select your tags, choose a layout, and generate printable sheets.</p>
+          <button type="button" id="generateBtn" class="btn_visteras_rose" style="font-size: 13px; padding: 8px 18px;">
+            Generate Fodder Sheet
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================================================================
+         5. Right Sidepanels
+         ================================================================== -->
+    <aside id="sidepanels" aria-label="Panels">
+      
+      <!-- Panel: Layouts -->
+      <div id="panel_layout" class="sidepanel_pane active">
+        <div class="panel_header">
+          <span>Grid Layout</span>
+          <span class="panel_badge">LAYOUT</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body" id="layout-list">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Tags & Filter -->
+      <div id="panel_tags" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Image Categories & Tags</span>
+          <span class="panel_badge">FILTER</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body" id="tag-filters-container">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Textures & Overlays -->
+      <div id="panel_overlay" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Textures & Overlays</span>
+          <span class="panel_badge">TEXTURE</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body">
+            <span class="panel_label">Overlay Pattern</span>
+            <div id="overlay-list" style="display: flex; flex-direction: column; gap: 4px;">
+              <!-- Populated by JS -->
+            </div>
+            <div class="panel_field" style="margin-top: 8px;">
+              <span class="panel_label">Overlay Opacity: <span id="opacityValue">100%</span></span>
+              <input type="range" id="overlayOpacity" class="panel_range" min="0" max="100" value="100">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Paint & Background -->
+      <div id="panel_paint" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Paint & Tint</span>
+          <span class="panel_badge">COLOR</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body">
+            <label class="panel_checkbox_row">
+              <input type="checkbox" id="paintToggle">
+              <span>Enable Paint Tint Overlay</span>
+            </label>
+            <div class="panel_row">
+              <span class="panel_label">Color</span>
+              <input type="color" id="paintColor" value="#F2B041" style="width: 40px; height: 24px; border: none; background: transparent; cursor: pointer;">
+              <span id="paintColorValue" style="font-family: var(--mono-font); font-size: 10px; color: #888888;">#F2B041</span>
+            </div>
+            <div class="panel_field">
+              <span class="panel_label">Paint Opacity: <span id="paintOpacityValue">50%</span></span>
+              <input type="range" id="paintOpacity" class="panel_range" min="0" max="100" value="50">
+            </div>
+            <div class="menu_dropdown_separator" style="margin: 8px 0;"></div>
+            <label class="panel_checkbox_row">
+              <input type="checkbox" id="backgroundColorToggle">
+              <span>Enable Paper Tint</span>
+            </label>
+            <div class="panel_row">
+              <span class="panel_label">Paper Color</span>
+              <input type="color" id="backgroundColor" value="#E8D4B9" style="width: 40px; height: 24px; border: none; background: transparent; cursor: pointer;">
+              <span id="backgroundColorValue" style="font-family: var(--mono-font); font-size: 10px; color: #888888;">#E8D4B9</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Typography & Text Overlay -->
+      <div id="panel_text" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Typography Overlay</span>
+          <span class="panel_badge">TEXT</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body">
+            <div class="panel_field">
+              <span class="panel_label">Overlay Text</span>
+              <textarea id="textInput" class="panel_input" rows="2" placeholder="Type headline or phrase..."></textarea>
+            </div>
+            <div class="panel_field">
+              <span class="panel_label">Font Family</span>
+              <select id="fontFamily" class="panel_select">
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Playfair Display', Georgia, serif">Playfair Display (Serif)</option>
+                <option value="'Roboto', sans-serif">Roboto</option>
+                <option value="'Lora', serif">Lora</option>
+                <option value="'Courier New', monospace">Typewriter / Mono</option>
+              </select>
+            </div>
+            <div class="panel_row">
+              <div class="panel_field" style="flex: 1;">
+                <span class="panel_label">Size</span>
+                <input type="number" id="fontSize" class="panel_input" value="28" min="10" max="120">
+              </div>
+              <div class="panel_field" style="flex: 1;">
+                <span class="panel_label">Color</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                  <input type="color" id="fontColor" value="#212529" style="width: 30px; height: 24px; border: none; background: transparent; cursor: pointer;">
+                  <span id="fontColorValue" style="font-size: 10px; color: #888888;">#212529</span>
+                </div>
+              </div>
+            </div>
+            <div class="panel_row" style="margin-top: 4px;">
+              <button type="button" id="fontBold" class="btn_visteras_secondary" style="flex: 1; text-align: center; justify-content: center;"><strong>B</strong></button>
+              <button type="button" id="fontItalic" class="btn_visteras_secondary" style="flex: 1; text-align: center; justify-content: center;"><em>I</em></button>
+              <button type="button" id="fontUnderline" class="btn_visteras_secondary" style="flex: 1; text-align: center; justify-content: center;"><u>U</u></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Custom Image URL -->
+      <div id="panel_image" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Custom Image URL</span>
+          <span class="panel_badge">IMAGE</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body">
+            <div class="panel_field">
+              <span class="panel_label">Direct Image URL</span>
+              <input type="text" id="imageUrlInput" class="panel_input" placeholder="https://example.com/image.jpg">
+            </div>
+            <button type="button" id="applyImageBtn" class="btn_visteras_rose" style="justify-content: center; width: 100%;">
+              Apply to Hero Tile
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: Saved Collages -->
+      <div id="panel_saves" class="sidepanel_pane">
+        <div class="panel_header">
+          <span>Saved Collages</span>
+          <span class="panel_badge">SAVES</span>
+        </div>
+        <div class="panel_section">
+          <div class="panel_section_body">
+            <div id="saves-list" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Populated by JS -->
+            </div>
+            <button type="button" id="exportSavesBtn" class="btn_visteras_secondary" style="width: 100%; justify-content: center; margin-top: 8px;">
+              Export JSON Library
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ==================================================================
+         6. Bottom Status Bar
+         ================================================================== -->
+    <footer id="tools_bottom">
+      <div class="status_info_left">
+        <span class="status_tag">Sheet: <span class="status_tag_rose">8.5" × 11" (Letter @ 300 DPI)</span></span>
+        <span class="status_tag">Layout: <span id="status-layout-text">2 × 2 Equal Grid</span></span>
+        <span class="status_tag">Status: <span id="status-bar-text">Ready</span></span>
+      </div>
+      <div class="status_info_right">
+        <span class="status_tag">Visteras Collage v1.0</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- SVG Filters for Collage Effects -->
+  <svg style="display: none;">
+    <defs>
+      <filter id="svg-blur"><feGaussianBlur stdDeviation="3" /></filter>
+      <filter id="svg-sharpen"><feConvolveMatrix kernelMatrix="0 -2 0 -2 11 -2 0 -2 0" divisor="3" /></filter>
+      <filter id="svg-sepia"><feColorMatrix type="matrix" values=".393 .769 .189 0 0 .349 .686 .168 0 0 .272 .534 .131 0 0 0 0 0 1 0" /></filter>
+      <filter id="svg-highcontrast"><feComponentTransfer><feFuncR type="discrete" tableValues="0 1"/><feFuncG type="discrete" tableValues="0 1"/><feFuncB type="discrete" tableValues="0 1"/></feComponentTransfer></filter>
+      <filter id="svg-vintage"><feColorMatrix type="saturate" values="0.6" /><feComponentTransfer><feFuncR type="linear" slope="0.8" intercept="0.1"/><feFuncG type="linear" slope="0.8" intercept="0.08"/><feFuncB type="linear" slope="0.6" intercept="0.05"/></feComponentTransfer></filter>
+    </defs>
+  </svg>
+
+  <!-- App Logic -->
+  <script src="js/images.js"></script>
+  <script src="js/overlays.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

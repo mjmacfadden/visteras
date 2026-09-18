@@ -8,6 +8,7 @@ This repository is a **monorepo**:
 apps/studio/   # Visteras Studio — raster image editor (PSD-capable)
 apps/vector/   # Visteras Vector — SVG-Edit companion
 apps/publish/  # Visteras Publish — personal morning newspaper
+apps/collage/  # Visteras Collage — printable collage fodder generator
 packages/      # Future shared libraries (placeholder)
 docs/          # Product / engineering notes
 scripts/       # build-site.sh — assemble publish tree
@@ -19,6 +20,7 @@ site/          # GENERATED (gitignored) — GitHub Pages publish root
 | `apps/studio/`  | https://visteras.com/studio/       |
 | `apps/vector/`  | https://visteras.com/vector/       |
 | `apps/publish/` | https://visteras.com/publish/      |
+| `apps/collage/` | https://visteras.com/collage/      |
 
 Architecture only for now — **no Studio ↔ Vector document compatibility**.
 

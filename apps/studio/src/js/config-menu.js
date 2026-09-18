@@ -97,6 +97,10 @@ const menuDefinition = [
 				href: '../publish/'
 			},
 			{
+				name: 'Visteras Collage',
+				href: '../collage/'
+			},
+			{
 				divider: true
 			},
 			{
@@ -996,6 +1000,10 @@ const menuDefinition = [
 			{
 				name: 'Visteras Publish (Morning Newspaper)',
 				href: '../publish/'
+			},
+			{
+				name: 'Visteras Collage (Collage Fodder Generator)',
+				href: '../collage/'
 			}
 		]
 	}
