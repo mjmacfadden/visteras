@@ -142,6 +142,7 @@ import {
     textOverlay: {
       content: '',
       fontFamily: DEFAULT_FONT_FAMILY,
+      fontWeight: '400',
       fontSize: 28,
       fontColor: '#212529',
       bold: false,
@@ -495,12 +496,16 @@ import {
 
   function initFontPicker() {
     const slot = document.getElementById('slot_font_family');
+    const weightSel = document.getElementById('fontWeight');
     if (slot && !fontPickerInstance) {
       fontPickerInstance = mountCollageFontPicker({
         slotElement: slot,
+        weightSelectElement: weightSel,
         initialFamily: state.textOverlay.fontFamily || DEFAULT_FONT_FAMILY,
-        onFontChange: (family) => {
+        initialWeight: state.textOverlay.fontWeight || '400',
+        onFontChange: (family, weight) => {
           state.textOverlay.fontFamily = family;
+          state.textOverlay.fontWeight = weight;
           updateTextOverlay();
         }
       });
@@ -520,10 +525,16 @@ import {
     el.textOverlay.style.fontFamily = `"${state.textOverlay.fontFamily}", sans-serif`;
     el.textOverlay.style.fontSize = `${state.textOverlay.fontSize}px`;
     el.textOverlay.style.color = state.textOverlay.fontColor;
-    el.textOverlay.style.fontWeight = state.textOverlay.bold ? 'bold' : 'normal';
+    el.textOverlay.style.fontWeight = state.textOverlay.fontWeight || (state.textOverlay.bold ? '700' : '400');
     el.textOverlay.style.fontStyle = state.textOverlay.italic ? 'italic' : 'normal';
     el.textOverlay.style.textDecoration = state.textOverlay.underline ? 'underline' : 'none';
     el.textOverlay.style.zIndex = state.textOverlay.zIndex;
+
+    const fontBoldBtn = document.getElementById('fontBold');
+    if (fontBoldBtn) {
+      const isBold = parseInt(state.textOverlay.fontWeight || '400', 10) >= 700;
+      fontBoldBtn.classList.toggle('active', isBold);
+    }
   }
 
   function initTextInteract() {
@@ -1175,7 +1186,7 @@ import {
     if (saveObj.textOverlay) {
       state.textOverlay = saveObj.textOverlay;
       if (fontPickerInstance && state.textOverlay.fontFamily) {
-        fontPickerInstance.selectFamily(state.textOverlay.fontFamily);
+        fontPickerInstance.selectFamily(state.textOverlay.fontFamily, state.textOverlay.fontWeight || '400');
       }
     }
 
@@ -1461,8 +1472,13 @@ import {
     const fontBoldBtn = document.getElementById('fontBold');
     if (fontBoldBtn) {
       fontBoldBtn.addEventListener('click', () => {
-        state.textOverlay.bold = !state.textOverlay.bold;
-        fontBoldBtn.classList.toggle('active', state.textOverlay.bold);
+        const currentNum = parseInt(state.textOverlay.fontWeight || '400', 10);
+        const newWeight = currentNum >= 700 ? '400' : '700';
+        state.textOverlay.fontWeight = newWeight;
+        state.textOverlay.bold = newWeight >= 700;
+        if (fontPickerInstance) {
+          fontPickerInstance.setWeight(newWeight);
+        }
         updateTextOverlay();
       });
     }

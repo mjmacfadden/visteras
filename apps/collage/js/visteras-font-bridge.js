@@ -1,12 +1,15 @@
 /**
  * Visteras Collage — Font Engine Bridge.
- * Connects Collage to the shared @visteras/fonts package catalog and browser loader.
+ * Connects Collage to the shared @visteras/fonts package catalog, variable weights, and browser loader.
  */
 import {
   DEFAULT_FONTS,
   DEFAULT_FONT_FAMILY,
   SYSTEM_FONT_FAMILIES,
   getGoogleFontsCache,
+  findGoogleFontEntry,
+  formatWeightLabel,
+  styleNameToCssWeight,
   isSystemFontFamily,
   listGoogleCacheFamilies,
   loadFontFamily,
@@ -17,6 +20,43 @@ const SYSTEM_SET = new Set(SYSTEM_FONT_FAMILIES.map(f => f.toLowerCase()));
 function badgeFor(family) {
   if (SYSTEM_SET.has(String(family).toLowerCase()) || isSystemFontFamily(family)) return 'System';
   return 'Google';
+}
+
+/**
+ * Returns available weights for a font family from Google cache or fallback standard weights.
+ * @param {string} family
+ * @returns {{ variant: string, cssWeight: string, label: string }[]}
+ */
+export function getFontWeightsForFamily(family) {
+  const entry = findGoogleFontEntry(family);
+  if (entry && entry.variants && entry.variants.length > 0) {
+    const weights = [];
+    const seen = new Set();
+    for (const v of entry.variants) {
+      if (/italic|oblique/i.test(v)) continue;
+      const cssWeight = styleNameToCssWeight(v);
+      const label = formatWeightLabel(v) || `Weight (${cssWeight})`;
+      if (!seen.has(cssWeight)) {
+        seen.add(cssWeight);
+        weights.push({ variant: v, cssWeight, label });
+      }
+    }
+    if (weights.length > 0) {
+      weights.sort((a, b) => parseInt(a.cssWeight, 10) - parseInt(b.cssWeight, 10));
+      return weights;
+    }
+  }
+  // Standard fallback weights for system fonts or unlisted fonts
+  return [
+    { variant: '100', cssWeight: '100', label: 'Thin (100)' },
+    { variant: '300', cssWeight: '300', label: 'Light (300)' },
+    { variant: 'regular', cssWeight: '400', label: 'Regular (400)' },
+    { variant: '500', cssWeight: '500', label: 'Medium (500)' },
+    { variant: '600', cssWeight: '600', label: 'SemiBold (600)' },
+    { variant: '700', cssWeight: '700', label: 'Bold (700)' },
+    { variant: '800', cssWeight: '800', label: 'ExtraBold (800)' },
+    { variant: '900', cssWeight: '900', label: 'Black (900)' },
+  ];
 }
 
 function ensureStyles() {
@@ -139,8 +179,8 @@ function ensureStyles() {
   justify-content: center;
 }
 #collage_font_picker .cfp-dialog {
-  width: min(440px, 92vw);
-  max-height: min(500px, 82vh);
+  width: min(500px, 94vw);
+  max-height: min(540px, 84vh);
   display: flex;
   flex-direction: column;
   background: #1e1e1e;
@@ -153,7 +193,7 @@ function ensureStyles() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid #2d2d2d;
   font-weight: 600;
   font-size: 13px;
@@ -170,8 +210,8 @@ function ensureStyles() {
   color: #ffffff;
 }
 #collage_font_picker .cfp-dialog-search {
-  margin: 10px 14px 6px;
-  padding: 8px 10px;
+  margin: 10px 16px 6px;
+  padding: 8px 12px;
   background: #141414;
   border: 1px solid #383838;
   border-radius: 4px;
@@ -184,24 +224,67 @@ function ensureStyles() {
 #collage_font_picker .cfp-dialog-list {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 6px 12px;
+  padding: 6px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-#collage_font_picker .cfp-dialog-list .cfp-item {
-  padding: 8px 10px;
+#collage_font_picker .cfp-dialog-list .cfp-dialog-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
   border-radius: 4px;
+  cursor: pointer;
+  background: #242424;
+  border: 1px solid transparent;
+  transition: all 0.12s;
+}
+#collage_font_picker .cfp-dialog-list .cfp-dialog-entry:hover {
+  background: #2d2438;
+  border-color: var(--collage-purple);
+}
+#collage_font_picker .cfp-entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+#collage_font_picker .cfp-entry-title {
+  font-size: 14px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#collage_font_picker .cfp-entry-meta {
+  font-size: 10px;
+  color: #888888;
+}
+#collage_font_picker .cfp-entry-meta .highlight {
+  color: var(--collage-purple-light, #a855f7);
+  font-weight: 500;
 }
 `;
   document.head.appendChild(style);
 }
 
 /**
- * Mounts the shared Visteras font picker in Collage.
+ * Mounts the shared Visteras font picker in Collage with dynamic weight selection.
  * @param {Object} options
  * @param {HTMLElement} options.slotElement
+ * @param {HTMLSelectElement} [options.weightSelectElement]
  * @param {string} [options.initialFamily='Roboto']
- * @param {(family: string) => void} [options.onFontChange]
+ * @param {string} [options.initialWeight='400']
+ * @param {(family: string, weight: string) => void} [options.onFontChange]
  */
-export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FONT_FAMILY, onFontChange } = {}) {
+export function mountCollageFontPicker({
+  slotElement,
+  weightSelectElement,
+  initialFamily = DEFAULT_FONT_FAMILY,
+  initialWeight = '400',
+  onFontChange
+} = {}) {
   ensureStyles();
 
   if (!slotElement) {
@@ -209,7 +292,8 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
     return null;
   }
 
-  let current = initialFamily || DEFAULT_FONT_FAMILY;
+  let currentFamily = initialFamily || DEFAULT_FONT_FAMILY;
+  let currentWeight = initialWeight || '400';
   let extras = [];
 
   const root = document.createElement('div');
@@ -243,6 +327,43 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
     labelEl.style.fontFamily = `"${family}", sans-serif`;
   }
 
+  function updateWeightDropdown(family, preferredWeight) {
+    if (!weightSelectElement) return currentWeight;
+    const weights = getFontWeightsForFamily(family);
+    weightSelectElement.innerHTML = '';
+
+    let matched = false;
+    let fallbackWeight = '400';
+
+    weights.forEach(w => {
+      const opt = document.createElement('option');
+      opt.value = w.cssWeight;
+      opt.textContent = w.label;
+      if (w.cssWeight === preferredWeight) {
+        opt.selected = true;
+        matched = true;
+      }
+      weightSelectElement.appendChild(opt);
+    });
+
+    if (!matched && weights.length > 0) {
+      // Find closest weight or select first
+      const has400 = weights.find(w => w.cssWeight === '400');
+      if (has400) {
+        weightSelectElement.value = '400';
+        fallbackWeight = '400';
+      } else {
+        weightSelectElement.value = weights[0].cssWeight;
+        fallbackWeight = weights[0].cssWeight;
+      }
+    } else {
+      fallbackWeight = preferredWeight;
+    }
+
+    currentWeight = weightSelectElement.value || fallbackWeight;
+    return currentWeight;
+  }
+
   function closeMenu() {
     root.classList.remove('open');
     trigger.setAttribute('aria-expanded', 'false');
@@ -261,14 +382,14 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
       const item = document.createElement('div');
       item.className = 'cfp-item';
       item.setAttribute('role', 'option');
-      item.setAttribute('aria-selected', family === current ? 'true' : 'false');
+      item.setAttribute('aria-selected', family === currentFamily ? 'true' : 'false');
       item.dataset.family = family;
       item.innerHTML = `
         <span class="cfp-item-name" style="font-family:'${family.replace(/'/g, "\\'")}',sans-serif">${family}</span>
         <span class="cfp-badge">${badgeFor(family)}</span>
       `;
       item.addEventListener('click', () => {
-        selectFamily(family);
+        selectFamily(family, currentWeight);
         closeMenu();
       });
       menu.appendChild(item);
@@ -284,32 +405,41 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
     menu.appendChild(add);
   }
 
-  async function selectFamily(family) {
-    current = family;
+  async function selectFamily(family, weight) {
+    currentFamily = family;
     setLabel(family);
+    const resolvedWeight = updateWeightDropdown(family, weight || currentWeight);
     const source = isSystemFontFamily(family) ? 'system' : 'google';
+
+    const weights = getFontWeightsForFamily(family);
+    const variantKeys = weights.map(w => w.variant);
+
     try {
-      await loadFontFamily({ family, source });
+      await loadFontFamily({
+        family,
+        source,
+        variants: variantKeys.length > 0 ? variantKeys : ['regular', '700']
+      });
     } catch (e) {
       console.warn('[collage-font-bridge] loadFontFamily', family, e);
     }
+
     if (typeof onFontChange === 'function') {
-      onFontChange(family);
+      onFontChange(family, resolvedWeight);
     }
   }
 
   function openAddFontDialog() {
     const cache = getGoogleFontsCache();
-    const families = listGoogleCacheFamilies(cache);
     const backdrop = document.createElement('div');
     backdrop.className = 'cfp-dialog-backdrop';
     backdrop.innerHTML = `
-      <div class="cfp-dialog" role="dialog" aria-label="Add Font">
+      <div class="cfp-dialog" role="dialog" aria-label="Add Google Font">
         <div class="cfp-dialog-header">
-          <span>Google Fonts Library (${families.length})</span>
+          <span>Google Fonts Library (${cache.length} typefaces)</span>
           <button type="button" class="cfp-dialog-close" aria-label="Close">×</button>
         </div>
-        <input type="search" class="cfp-dialog-search" placeholder="Search Google fonts…" autocomplete="off" />
+        <input type="search" class="cfp-dialog-search" placeholder="Search by name, category (serif, display, sans-serif, handwriting)..." autocomplete="off" />
         <div class="cfp-dialog-list"></div>
       </div>
     `;
@@ -325,34 +455,73 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
     function renderList(query) {
       const q = String(query || '').trim().toLowerCase();
       list.innerHTML = '';
-      const matches = families.filter((f) => !q || f.toLowerCase().includes(q)).slice(0, 100);
-      for (const family of matches) {
-        const item = document.createElement('div');
-        item.className = 'cfp-item';
-        item.innerHTML = `
-          <span class="cfp-item-name" style="font-family:'${family.replace(/'/g, "\\'")}',sans-serif">${family}</span>
+      const matches = cache.filter((f) => {
+        if (!f || !f.family) return false;
+        if (!q) return true;
+        const name = f.family.toLowerCase();
+        const cat = (f.category || '').toLowerCase();
+        return name.includes(q) || cat.includes(q);
+      }).slice(0, 100);
+
+      for (const entry of matches) {
+        const family = entry.family;
+        const weights = entry.variants ? entry.variants.filter(v => !/italic/i.test(v)) : ['regular'];
+        const weightCount = weights.length;
+        const cat = entry.category || 'sans-serif';
+
+        const row = document.createElement('div');
+        row.className = 'cfp-dialog-entry';
+        row.innerHTML = `
+          <div class="cfp-entry-info">
+            <span class="cfp-entry-title" style="font-family:'${family.replace(/'/g, "\\'")}',sans-serif">${family}</span>
+            <span class="cfp-entry-meta"><span class="highlight">${weightCount} weight${weightCount === 1 ? '' : 's'}</span> • ${cat}</span>
+          </div>
           <span class="cfp-badge">Google</span>
         `;
-        item.addEventListener('click', async () => {
+        row.addEventListener('click', async () => {
           if (!extras.includes(family) && !DEFAULT_FONTS.includes(family)) {
             extras.push(family);
           }
           close();
-          await selectFamily(family);
+          await selectFamily(family, currentWeight);
         });
-        list.appendChild(item);
+        list.appendChild(row);
       }
       if (!matches.length) {
         const empty = document.createElement('div');
-        empty.className = 'cfp-item';
+        empty.style.padding = '18px';
+        empty.style.textAlign = 'center';
         empty.style.color = '#888888';
-        empty.textContent = 'No matching Google fonts found';
+        empty.style.fontSize = '12px';
+        empty.textContent = 'No matching Google fonts found.';
         list.appendChild(empty);
       }
     }
     search.addEventListener('input', () => renderList(search.value));
     renderList('');
     search.focus();
+  }
+
+  // Weight dropdown change listener
+  if (weightSelectElement) {
+    weightSelectElement.addEventListener('change', async (e) => {
+      currentWeight = e.target.value;
+      const source = isSystemFontFamily(currentFamily) ? 'system' : 'google';
+      const weights = getFontWeightsForFamily(currentFamily);
+      const match = weights.find(w => w.cssWeight === currentWeight);
+      if (match) {
+        try {
+          await loadFontFamily({
+            family: currentFamily,
+            source,
+            variants: [match.variant, 'regular', '700']
+          });
+        } catch (_) {}
+      }
+      if (typeof onFontChange === 'function') {
+        onFontChange(currentFamily, currentWeight);
+      }
+    });
   }
 
   trigger.addEventListener('click', (e) => {
@@ -366,12 +535,23 @@ export function mountCollageFontPicker({ slotElement, initialFamily = DEFAULT_FO
   });
 
   // Initial preload and UI label
-  setLabel(current);
-  loadFontFamily({ family: current, source: isSystemFontFamily(current) ? 'system' : 'google' }).catch(() => {});
+  setLabel(currentFamily);
+  updateWeightDropdown(currentFamily, currentWeight);
+  loadFontFamily({
+    family: currentFamily,
+    source: isSystemFontFamily(currentFamily) ? 'system' : 'google',
+    variants: getFontWeightsForFamily(currentFamily).map(w => w.variant)
+  }).catch(() => {});
 
   return {
     selectFamily,
-    getCurrent: () => current,
+    setWeight: (weight) => {
+      currentWeight = weight;
+      if (weightSelectElement) weightSelectElement.value = weight;
+      if (typeof onFontChange === 'function') onFontChange(currentFamily, currentWeight);
+    },
+    getCurrentFamily: () => currentFamily,
+    getCurrentWeight: () => currentWeight,
   };
 }
 
@@ -380,6 +560,9 @@ export {
   DEFAULT_FONT_FAMILY,
   SYSTEM_FONT_FAMILIES,
   getGoogleFontsCache,
+  findGoogleFontEntry,
+  formatWeightLabel,
+  styleNameToCssWeight,
   listGoogleCacheFamilies,
   loadFontFamily,
   isSystemFontFamily,
