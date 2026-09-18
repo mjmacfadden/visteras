@@ -43,8 +43,11 @@ class Media_class extends Base_tools_class {
 		var html = '';
 		var html_paging = '';
 
-		var key = config.pixabay_key;
-		key = key.split("").reverse().join("");
+		var key = config.pixabay_key || '';
+		// If key was reversed/obfuscated in legacy configs, un-reverse it; otherwise use as-is
+		if (key && !/^\d+-/.test(key)) {
+			key = key.split("").reverse().join("");
+		}
 
 		var safe_search = this.Tools_settings.get_setting('safe_search');
 

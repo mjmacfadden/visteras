@@ -97,7 +97,7 @@
     
     // API Configuration
     apiEndpoint: localStorage.getItem('visteras_pixabay_endpoint') || '',
-    directApiKey: localStorage.getItem('visteras_pixabay_key') || '',
+    directApiKey: localStorage.getItem('visteras_pixabay_key') || '8275657-8140dd6f1736f5e58a5c35ad4',
     apiCache: {},
 
     customImageUrl: '',
