@@ -128,7 +128,8 @@
 	box-sizing: border-box;
 	width: 100%;
 }
-#popups .popup td, #popups .popup th{
+#popups .popup:not(.raw_develop_popup) td,
+#popups .popup:not(.raw_develop_popup) th{
 	height: 25px;
 }
 #popups .popup td{

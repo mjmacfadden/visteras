@@ -285,6 +285,17 @@ class Image_rawDevelop_class {
 				else if (action === 'reset') this._reset_all();
 			});
 		});
+
+		// Re-measure after the absolute-fill layout has applied.
+		var self = this;
+		requestAnimationFrame(function () {
+			self._previewSizeKey = '';
+			self._schedule_preview();
+			setTimeout(function () {
+				self._previewSizeKey = '';
+				self._schedule_preview();
+			}, 100);
+		});
 	}
 
 	_reset_all() {
@@ -315,12 +326,19 @@ class Image_rawDevelop_class {
 			this._schedule_preview();
 			return;
 		}
-		var maxW = Math.max(1, (viewer.clientWidth || 0) - 24);
-		var maxH = Math.max(1, (viewer.clientHeight || 0) - 24);
-		if (maxW < 32 || maxH < 32) {
-			this._schedule_preview();
-			return;
+
+		// Prefer the viewer box; if the popup height chain is still settling /
+		// collapsed, fall back to the visible viewport so the preview is usable.
+		var maxW = (viewer.clientWidth || 0) - 24;
+		var maxH = (viewer.clientHeight || 0) - 24;
+		if (maxW < 120 || maxH < 120) {
+			var fallbackW = Math.floor((window.innerWidth || 1200) - 280 - 48);
+			var fallbackH = Math.floor((window.innerHeight || 800) - 72);
+			if (maxW < 120) maxW = fallbackW;
+			if (maxH < 120) maxH = fallbackH;
 		}
+		maxW = Math.max(64, maxW);
+		maxH = Math.max(64, maxH);
 		var scale = Math.min(1, maxW / this._source.width, maxH / this._source.height);
 		var pw = Math.max(1, Math.round(this._source.width * scale));
 		var ph = Math.max(1, Math.round(this._source.height * scale));

@@ -1,4 +1,4 @@
-var CACHE_NAME = 'visteras-studio-shell-v63';
+var CACHE_NAME = 'visteras-studio-shell-v64';
 var APP_SHELL = [
 	'./',
 	'./index.html',
