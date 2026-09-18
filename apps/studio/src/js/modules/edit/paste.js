@@ -123,8 +123,8 @@ class Edit_paste_class {
 				y: y,
 				width: new_width,
 				height: new_height,
-				width_original: new_width,
-				height_original: new_height,
+				width_original: img_width,
+				height_original: img_height,
 			}, false)
 		);
 	}
