@@ -426,6 +426,14 @@ html {
   justify-content: center;
   background-color: #ffffff;
   overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.collage-item.is-panning,
+.collage-item:active {
+  cursor: grabbing;
 }
 
 .tile-spinner {
@@ -465,7 +473,7 @@ html {
   transform-origin: center center;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.22s ease-out, transform 0.2s ease-out;
+  transition: opacity 0.22s ease-out;
 }
 
 .collage-item img.loaded {
@@ -482,9 +490,11 @@ html {
   opacity: 0;
   transition: opacity 0.2s ease;
   z-index: 200;
+  cursor: default;
 }
 
-.collage-item:hover .image-controls {
+.collage-item:hover .image-controls,
+.collage-item:focus-within .image-controls {
   opacity: 1;
 }
 
@@ -519,6 +529,77 @@ html {
   border-color: var(--collage-purple-light);
   transform: scale(1.1);
   box-shadow: 0 2px 10px rgba(168, 85, 247, 0.4);
+}
+
+/* Tile Zoom Slider Popover */
+.tile-zoom-popover {
+  position: absolute;
+  bottom: calc(50% + 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22, 22, 22, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 140px;
+  pointer-events: auto;
+  user-select: none;
+  cursor: default;
+}
+
+.tile-zoom-popover.hidden {
+  display: none !important;
+}
+
+.tile-zoom-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.tile-zoom-val {
+  color: var(--collage-purple-light);
+  font-family: var(--mono-font);
+}
+
+.tile-zoom-slider {
+  width: 100%;
+  accent-color: var(--collage-purple);
+  height: 4px;
+  cursor: pointer;
+}
+
+.tile-zoom-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.tile-zoom-btn {
+  flex: 1;
+  background: #333333;
+  border: 1px solid #444444;
+  border-radius: 2px;
+  color: #bbbbbb;
+  font-size: 9px;
+  padding: 3px 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+
+.tile-zoom-btn:hover {
+  background: var(--collage-purple);
+  border-color: var(--collage-purple-light);
+  color: #ffffff;
 }
 
 /* Layer Overlays */

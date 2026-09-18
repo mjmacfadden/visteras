@@ -353,64 +353,44 @@
     const prevItems = [...state.items];
     state.items = [];
 
+    const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : [];
+
     for (let i = 0; i < layout.count; i++) {
       const span = layout.spans[i] || { c: 1, r: 1 };
       let chosenImg = null;
+      let prevPanX = 0;
+      let prevPanY = 0;
+      let prevZoom = 1.0;
+      let prevLocked = false;
 
-      if (prevItems[i] && prevItems[i].image) {
-        chosenImg = prevItems[i].image;
-      } else if (state.onlinePool && state.onlinePool.length > 0) {
-        chosenImg = state.onlinePool[i % state.onlinePool.length];
-      } else {
-        chosenImg = { path: '', largePath: '', attribution: 'None' };
+      if (prevItems[i]) {
+        if (prevItems[i].image) chosenImg = prevItems[i].image;
+        if (prevItems[i].panX !== undefined) prevPanX = prevItems[i].panX;
+        if (prevItems[i].panY !== undefined) prevPanY = prevItems[i].panY;
+        if (prevItems[i].zoom !== undefined) prevZoom = prevItems[i].zoom;
+        if (prevItems[i].locked !== undefined) prevLocked = prevItems[i].locked;
+      }
+
+      if (!chosenImg) {
+        if (pool.length > 0) {
+          chosenImg = pool[i % pool.length];
+        } else {
+          chosenImg = { path: '', largePath: '', attribution: 'None' };
+        }
       }
 
       const itemData = {
         index: i,
         image: chosenImg,
-        zoom: prevItems[i] ? prevItems[i].zoom : 1,
-        span: span
+        zoom: prevZoom,
+        panX: prevPanX,
+        panY: prevPanY,
+        span: span,
+        locked: prevLocked
       };
       state.items.push(itemData);
 
-      const tile = document.createElement('div');
-      tile.className = 'collage-item';
-      tile.style.gridColumn = `span ${span.c}`;
-      tile.style.gridRow = `span ${span.r}`;
-
-      const img = document.createElement('img');
-      img.src = chosenImg.path;
-      img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
-      img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
-      img.crossOrigin = 'anonymous';
-      if (itemData.zoom !== 1) img.style.transform = `scale(${itemData.zoom})`;
-
-      const controls = document.createElement('div');
-      controls.className = 'image-controls';
-      controls.innerHTML = `
-        <button class="tile-icon-btn" title="Replace tile">↻</button>
-        <button class="tile-icon-btn" title="Zoom tile">🔍</button>
-      `;
-
-      controls.children[0].addEventListener('click', (e) => {
-        e.stopPropagation();
-        const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : [];
-        const next = pool[Math.floor(Math.random() * pool.length)];
-        if (next) {
-          itemData.image = next;
-          img.src = next.path;
-          img.dataset.largeSrc = next.largePath || next.path;
-        }
-      });
-
-      controls.children[1].addEventListener('click', (e) => {
-        e.stopPropagation();
-        itemData.zoom = itemData.zoom === 1 ? 1.4 : (itemData.zoom === 1.4 ? 1.8 : 1);
-        img.style.transform = `scale(${itemData.zoom})`;
-      });
-
-      tile.appendChild(img);
-      tile.appendChild(controls);
+      const tile = createTileElement(itemData, i, pool);
       el.container.appendChild(tile);
     }
 
@@ -712,6 +692,198 @@
     }
   }
 
+  // --- Transform & Tile Element Helper ---
+  function updateTileTransform(img, itemData) {
+    if (!img) return;
+    const z = itemData.zoom || 1;
+    const px = itemData.panX || 0;
+    const py = itemData.panY || 0;
+    img.style.transform = `translate(${px}px, ${py}px) scale(${z})`;
+  }
+
+  function createTileElement(itemData, i, availablePool) {
+    const tile = document.createElement('div');
+    tile.className = 'collage-item';
+    tile.style.gridColumn = `span ${itemData.span ? itemData.span.c : 1}`;
+    tile.style.gridRow = `span ${itemData.span ? itemData.span.r : 1}`;
+
+    // Loading Spinner
+    const spinner = document.createElement('div');
+    spinner.className = 'tile-spinner';
+    spinner.setAttribute('data-html2canvas-ignore', 'true');
+    spinner.innerHTML = `
+      <svg class="spinner-svg" viewBox="0 0 24 24" width="22" height="22">
+        <circle cx="12" cy="12" r="9" stroke="rgba(168, 85, 247, 0.2)" stroke-width="2.5" fill="none"></circle>
+        <circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="28" stroke-dashoffset="10"></circle>
+      </svg>
+    `;
+
+    // Tile Image
+    const img = document.createElement('img');
+    if (itemData.image && itemData.image.path) {
+      img.src = itemData.image.path;
+      img.dataset.largeSrc = itemData.image.largePath || itemData.image.path;
+      img.alt = itemData.image.attribution || `Collage tile ${i + 1}`;
+      bindTileImageEvents(img, spinner);
+    } else {
+      img.alt = `Loading tile ${i + 1}...`;
+    }
+    updateTileTransform(img, itemData);
+
+    // Zoom Popover
+    const zoomPopover = document.createElement('div');
+    zoomPopover.className = 'tile-zoom-popover hidden';
+    zoomPopover.setAttribute('data-html2canvas-ignore', 'true');
+    zoomPopover.innerHTML = `
+      <div class="tile-zoom-popover-header">
+        <span>ZOOM</span>
+        <span class="tile-zoom-val">${Math.round((itemData.zoom || 1) * 100)}%</span>
+      </div>
+      <input type="range" class="tile-zoom-slider" min="1.0" max="3.5" step="0.05" value="${itemData.zoom || 1}" />
+      <div class="tile-zoom-actions">
+        <button type="button" class="tile-zoom-btn btn-reset-zoom" title="Reset Zoom">100%</button>
+        <button type="button" class="tile-zoom-btn btn-reset-center" title="Center Image">Center</button>
+      </div>
+    `;
+
+    const zoomSlider = zoomPopover.querySelector('.tile-zoom-slider');
+    const zoomValText = zoomPopover.querySelector('.tile-zoom-val');
+    const btnResetZoom = zoomPopover.querySelector('.btn-reset-zoom');
+    const btnResetCenter = zoomPopover.querySelector('.btn-reset-center');
+
+    // Controls Toolbar
+    const controls = document.createElement('div');
+    controls.className = 'image-controls';
+    controls.setAttribute('data-html2canvas-ignore', 'true');
+    controls.innerHTML = `
+      <button class="tile-icon-btn btn-replace" title="Replace tile">
+        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      </button>
+      <button class="tile-icon-btn btn-zoom" title="Zoom & Position">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+      </button>
+    `;
+
+    // Replace Button Event
+    const btnReplace = controls.querySelector('.btn-replace');
+    btnReplace.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : availablePool;
+      if (pool && pool.length > 0) {
+        const next = pool[Math.floor(Math.random() * pool.length)];
+        if (next) {
+          itemData.image = next;
+          itemData.locked = true;
+          img.src = next.path;
+          img.dataset.largeSrc = next.largePath || next.path;
+          img.alt = next.attribution || `Collage tile ${i + 1}`;
+          bindTileImageEvents(img, spinner);
+        }
+      }
+    });
+
+    // Zoom Button Event (Toggles Popover)
+    const btnZoom = controls.querySelector('.btn-zoom');
+    btnZoom.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = zoomPopover.classList.contains('hidden');
+      document.querySelectorAll('.tile-zoom-popover').forEach(pop => {
+        if (pop !== zoomPopover) pop.classList.add('hidden');
+      });
+      if (isHidden) {
+        zoomSlider.value = itemData.zoom || 1;
+        zoomValText.textContent = `${Math.round((itemData.zoom || 1) * 100)}%`;
+        zoomPopover.classList.remove('hidden');
+      } else {
+        zoomPopover.classList.add('hidden');
+      }
+    });
+
+    // Slider Input Event
+    zoomSlider.addEventListener('input', (e) => {
+      e.stopPropagation();
+      itemData.zoom = parseFloat(e.target.value);
+      zoomValText.textContent = `${Math.round(itemData.zoom * 100)}%`;
+      updateTileTransform(img, itemData);
+    });
+    zoomSlider.addEventListener('click', (e) => e.stopPropagation());
+    zoomSlider.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    // Reset Zoom Button Event
+    btnResetZoom.addEventListener('click', (e) => {
+      e.stopPropagation();
+      itemData.zoom = 1.0;
+      zoomSlider.value = 1.0;
+      zoomValText.textContent = '100%';
+      updateTileTransform(img, itemData);
+    });
+
+    // Reset Center Button Event
+    btnResetCenter.addEventListener('click', (e) => {
+      e.stopPropagation();
+      itemData.panX = 0;
+      itemData.panY = 0;
+      updateTileTransform(img, itemData);
+    });
+
+    // Prevent popover / control clicks from triggering tile dragging
+    zoomPopover.addEventListener('pointerdown', (e) => e.stopPropagation());
+    controls.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+    // Freeform Tile Dragging / Repositioning
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startPanX = 0;
+    let startPanY = 0;
+
+    tile.addEventListener('pointerdown', (e) => {
+      if (state.spaceHeld || e.button !== 0) return;
+      if (e.target.closest('.image-controls') || e.target.closest('.tile-zoom-popover')) return;
+
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startPanX = itemData.panX || 0;
+      startPanY = itemData.panY || 0;
+
+      tile.classList.add('is-panning');
+      try {
+        tile.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    });
+
+    tile.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const workspaceZoom = state.zoom || 1;
+      const dx = (e.clientX - startX) / workspaceZoom;
+      const dy = (e.clientY - startY) / workspaceZoom;
+
+      itemData.panX = startPanX + dx;
+      itemData.panY = startPanY + dy;
+      updateTileTransform(img, itemData);
+    });
+
+    function endDrag(e) {
+      if (!isDragging) return;
+      isDragging = false;
+      tile.classList.remove('is-panning');
+      try {
+        tile.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+
+    tile.addEventListener('pointerup', endDrag);
+    tile.addEventListener('pointercancel', endDrag);
+
+    tile.appendChild(spinner);
+    tile.appendChild(img);
+    tile.appendChild(zoomPopover);
+    tile.appendChild(controls);
+
+    return tile;
+  }
+
   // --- Render Initial Empty Loading Skeletons ---
   function renderLoadingSkeletonTiles() {
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
@@ -724,33 +896,18 @@
 
     for (let i = 0; i < layout.count; i++) {
       const span = layout.spans[i] || { c: 1, r: 1 };
-      const tile = document.createElement('div');
-      tile.className = 'collage-item';
-      tile.style.gridColumn = `span ${span.c}`;
-      tile.style.gridRow = `span ${span.r}`;
-
-      const spinner = document.createElement('div');
-      spinner.className = 'tile-spinner';
-      spinner.innerHTML = `
-        <svg class="spinner-svg" viewBox="0 0 24 24" width="22" height="22">
-          <circle cx="12" cy="12" r="9" stroke="rgba(168, 85, 247, 0.2)" stroke-width="2.5" fill="none"></circle>
-          <circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="28" stroke-dashoffset="10"></circle>
-        </svg>
-      `;
-
-      const img = document.createElement('img');
-      img.alt = `Loading tile ${i + 1}...`;
-
-      state.items.push({
+      const itemData = {
         index: i,
         image: { path: '', largePath: '', attribution: '' },
-        zoom: 1,
+        zoom: 1.0,
+        panX: 0,
+        panY: 0,
         span: span,
         locked: false
-      });
+      };
+      state.items.push(itemData);
 
-      tile.appendChild(spinner);
-      tile.appendChild(img);
+      const tile = createTileElement(itemData, i, []);
       el.container.appendChild(tile);
     }
   }
@@ -794,6 +951,7 @@
               img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
               img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
               bindTileImageEvents(img, spinnerEl);
+              updateTileTransform(img, state.items[i]);
             }
           }
         }
@@ -803,68 +961,15 @@
       const itemData = {
         index: i,
         image: chosenImg,
-        zoom: 1,
+        zoom: 1.0,
+        panX: 0,
+        panY: 0,
         span: span,
         locked: false
       };
       state.items.push(itemData);
 
-      const tile = document.createElement('div');
-      tile.className = 'collage-item';
-      tile.style.gridColumn = `span ${span.c}`;
-      tile.style.gridRow = `span ${span.r}`;
-
-      // Loading Spinner
-      const spinner = document.createElement('div');
-      spinner.className = 'tile-spinner';
-      spinner.innerHTML = `
-        <svg class="spinner-svg" viewBox="0 0 24 24" width="22" height="22">
-          <circle cx="12" cy="12" r="9" stroke="rgba(168, 85, 247, 0.2)" stroke-width="2.5" fill="none"></circle>
-          <circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="28" stroke-dashoffset="10"></circle>
-        </svg>
-      `;
-
-      const img = document.createElement('img');
-      img.src = chosenImg.path;
-      img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
-      img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
-      bindTileImageEvents(img, spinner);
-
-      const controls = document.createElement('div');
-      controls.className = 'image-controls';
-      controls.innerHTML = `
-        <button class="tile-icon-btn" title="Replace tile">
-          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-        </button>
-        <button class="tile-icon-btn" title="Zoom tile">
-          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
-        </button>
-      `;
-
-      controls.children[0].addEventListener('click', (e) => {
-        e.stopPropagation();
-        const activePool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : availablePool;
-        if (activePool.length > 0) {
-          const next = activePool[Math.floor(Math.random() * activePool.length)];
-          if (next) {
-            itemData.image = next;
-            itemData.locked = true;
-            img.src = next.path;
-            img.dataset.largeSrc = next.largePath || next.path;
-            bindTileImageEvents(img, spinner);
-          }
-        }
-      });
-
-      controls.children[1].addEventListener('click', (e) => {
-        e.stopPropagation();
-        itemData.zoom = itemData.zoom === 1 ? 1.4 : (itemData.zoom === 1.4 ? 1.8 : 1);
-        img.style.transform = `scale(${itemData.zoom})`;
-      });
-
-      tile.appendChild(spinner);
-      tile.appendChild(img);
-      tile.appendChild(controls);
+      const tile = createTileElement(itemData, i, availablePool);
       el.container.appendChild(tile);
     }
 
@@ -1016,7 +1121,13 @@
       paintEnabled: state.paintEnabled,
       paintColor: state.paintColor,
       textOverlay: state.textOverlay,
-      items: state.items.map(it => ({ imagePath: it.image?.path, largePath: it.image?.largePath, zoom: it.zoom }))
+      items: state.items.map(it => ({
+        imagePath: it.image?.path,
+        largePath: it.image?.largePath,
+        zoom: it.zoom || 1.0,
+        panX: it.panX || 0,
+        panY: it.panY || 0
+      }))
     };
 
     state.savedCollages.push(saveObj);
@@ -1382,8 +1493,11 @@
       });
     });
 
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (e) => {
       document.querySelectorAll('.menu_entry').forEach(en => en.classList.remove('open'));
+      if (!e.target.closest('.tile-zoom-popover') && !e.target.closest('.btn-zoom')) {
+        document.querySelectorAll('.tile-zoom-popover').forEach(pop => pop.classList.add('hidden'));
+      }
     });
 
     // Keyboard Shortcuts
