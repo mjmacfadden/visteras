@@ -1278,9 +1278,10 @@ function mountToolbarColorSwatches(svgEditor) {
     <div class="tool_sep" id="tools_swatch_sep"></div>
     <div id="tools_left_swatches" class="tools-left-swatches" title="Fill & Stroke (X to toggle focus, Shift+X to swap, D for default)">
       <button id="swatch_swap_btn" class="swatch-swap-btn" title="Swap Fill and Stroke (Shift+X)" type="button">
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 8 C4 3.5 12 3.5 12 8 M9.5 5.5 L12 8 L9.5 10.5"/>
-          <path d="M12 8 C12 12.5 4 12.5 4 8 M6.5 10.5 L4 8 L6.5 5.5"/>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor">
+          <path d="M 3.5,3 A 5.5,5.5 0 0,1 9,8.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          <polygon points="3.5,0.8 0.5,3 3.5,5.2"/>
+          <polygon points="6.8,8.5 9,11.5 11.2,8.5"/>
         </svg>
       </button>
       <div class="swatches-cluster">
