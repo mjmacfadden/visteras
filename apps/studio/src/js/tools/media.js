@@ -100,7 +100,7 @@ class Media_class extends Base_tools_class {
 						var data = {
 							url: this.dataset.url,
 						};
-						_this.File_open.file_open_url_handler(data);
+						_this.File_open.file_open_url_handler(data, true);
 						_this.POP.hide();
 
 						new app.Actions.Activate_tool_action('select', true).do();

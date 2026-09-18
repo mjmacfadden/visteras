@@ -823,7 +823,7 @@ class File_open_class {
 	}
 
 	//handler for open url. Example url: http://i.imgur.com/ATda8Ae.jpg
-	async file_open_url_handler(user_response) {
+	async file_open_url_handler(user_response, as_layer = false) {
 		var _this = this;
 		var url = user_response.url;
 		if (!url)
@@ -839,7 +839,19 @@ class File_open_class {
 			const reader = new FileReader();
 			reader.onload = async function () {
 				const dataUrl = reader.result;
-				if (app.Documents) {
+
+				if (as_layer) {
+					// Insert directly into the active document as a new layer without creating a new tab
+					const new_layer = {
+						name: layer_name,
+						type: 'image',
+						data: dataUrl,
+					};
+					app.State.do_action(
+						new app.Actions.Insert_layer_action(new_layer, false)
+					);
+					alertify.success(`Added "${layer_name}" as layer.`);
+				} else if (app.Documents) {
 					await app.Documents.create_document_from_image({
 						name: layer_name,
 						data: dataUrl,
@@ -874,7 +886,22 @@ class File_open_class {
 			var img = new Image();
 			img.crossOrigin = "Anonymous";
 			img.onload = async function () {
-				if (app.Documents) {
+				if (as_layer) {
+					var new_layer = {
+						name: layer_name,
+						type: 'image',
+						link: img,
+						data: url,
+						width: img.width,
+						height: img.height,
+						width_original: img.width,
+						height_original: img.height,
+					};
+					app.State.do_action(
+						new app.Actions.Insert_layer_action(new_layer, false)
+					);
+					alertify.success(`Added "${layer_name}" as layer.`);
+				} else if (app.Documents) {
 					await app.Documents.create_document_from_image({
 						name: layer_name,
 						data: url,
