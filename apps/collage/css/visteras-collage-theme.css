@@ -468,14 +468,14 @@ html {
 }
 
 .collage-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
   transform-origin: center center;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.22s ease-out;
+  user-select: none;
 }
 
 .collage-item img.loaded {

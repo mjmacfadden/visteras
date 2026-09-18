@@ -696,11 +696,45 @@ import {
     return [];
   }
 
+  // --- Tile Dimension and Panning Clamp Helpers ---
+  function getTileDimensions(tile, img) {
+    const tw = (tile && tile.clientWidth) ? tile.clientWidth : 300;
+    const th = (tile && tile.clientHeight) ? tile.clientHeight : 300;
+    const nw = (img && img.naturalWidth) ? img.naturalWidth : tw;
+    const nh = (img && img.naturalHeight) ? img.naturalHeight : th;
+    const scaleCover = Math.max(tw / nw, th / nh);
+    const baseWidth = nw * scaleCover;
+    const baseHeight = nh * scaleCover;
+    return { tw, th, nw, nh, baseWidth, baseHeight };
+  }
+
+  function clampTilePan(itemData, tile, img) {
+    if (!img || !tile) return;
+    const { tw, th, baseWidth, baseHeight } = getTileDimensions(tile, img);
+    const zoom = Math.max(1.0, itemData.zoom || 1.0);
+    const renderedW = baseWidth * zoom;
+    const renderedH = baseHeight * zoom;
+
+    const maxPanX = Math.max(0, (renderedW - tw) / 2);
+    const maxPanY = Math.max(0, (renderedH - th) / 2);
+
+    itemData.panX = Math.min(maxPanX, Math.max(-maxPanX, itemData.panX || 0));
+    itemData.panY = Math.min(maxPanY, Math.max(-maxPanY, itemData.panY || 0));
+  }
+
   // --- Tile Image Load & Spinner Binding ---
   function bindTileImageEvents(img, spinnerEl) {
     function markDone() {
       img.classList.add('loaded');
       if (spinnerEl) spinnerEl.classList.add('hidden');
+      const tile = img.closest('.collage-item');
+      if (tile) {
+        const itemIdx = Array.from(tile.parentElement ? tile.parentElement.children : []).indexOf(tile);
+        const itemData = state.items[itemIdx];
+        if (itemData) {
+          updateTileTransform(img, itemData, tile);
+        }
+      }
     }
 
     if (!img.src || img.src === window.location.href) {
@@ -722,12 +756,24 @@ import {
   }
 
   // --- Transform & Tile Element Helper ---
-  function updateTileTransform(img, itemData) {
+  function updateTileTransform(img, itemData, tile) {
     if (!img) return;
-    const z = itemData.zoom || 1;
+    const parentTile = tile || img.closest('.collage-item');
+    if (parentTile && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const { baseWidth, baseHeight } = getTileDimensions(parentTile, img);
+      img.style.width = `${baseWidth}px`;
+      img.style.height = `${baseHeight}px`;
+      img.style.maxWidth = 'none';
+      img.style.maxHeight = 'none';
+      img.style.position = 'absolute';
+      img.style.top = '50%';
+      img.style.left = '50%';
+      clampTilePan(itemData, parentTile, img);
+    }
+    const z = Math.max(1.0, itemData.zoom || 1.0);
     const px = itemData.panX || 0;
     const py = itemData.panY || 0;
-    img.style.transform = `translate(${px}px, ${py}px) scale(${z})`;
+    img.style.transform = `translate(-50%, -50%) translate(${px}px, ${py}px) scale(${z})`;
   }
 
   function createTileElement(itemData, i, availablePool) {
@@ -757,7 +803,7 @@ import {
     } else {
       img.alt = `Loading tile ${i + 1}...`;
     }
-    updateTileTransform(img, itemData);
+    updateTileTransform(img, itemData, tile);
 
     // Zoom Popover (Minimalist & Granular)
     const zoomPopover = document.createElement('div');
@@ -827,7 +873,7 @@ import {
       e.stopPropagation();
       itemData.zoom = parseFloat(e.target.value);
       zoomValText.textContent = `${Math.round(itemData.zoom * 100)}%`;
-      updateTileTransform(img, itemData);
+      updateTileTransform(img, itemData, tile);
     });
     zoomSlider.addEventListener('click', (e) => e.stopPropagation());
     zoomSlider.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -836,7 +882,7 @@ import {
     zoomPopover.addEventListener('pointerdown', (e) => e.stopPropagation());
     controls.addEventListener('pointerdown', (e) => e.stopPropagation());
 
-    // Freeform Tile Dragging / Repositioning
+    // Freeform Tile Dragging / Repositioning with Boundary Clamp
     let isDragging = false;
     let startX = 0;
     let startY = 0;
@@ -867,7 +913,7 @@ import {
 
       itemData.panX = startPanX + dx;
       itemData.panY = startPanY + dy;
-      updateTileTransform(img, itemData);
+      updateTileTransform(img, itemData, tile);
     });
 
     function endDrag(e) {
