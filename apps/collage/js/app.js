@@ -538,16 +538,53 @@
     });
   }
 
-  // --- Pixabay Fetch & Image Pool Engine ---
+  // --- Multi-Tier Caching & Instant Local Asset Scoring ---
+  function getInstantFodderPool() {
+    const query = (state.searchQuery || '').toLowerCase();
+    const colors = (state.selectedColors || []).map(c => c.toLowerCase());
+    const src = state.imageSource || 'both';
+    const queryWords = query.split(/\s+/).filter(w => w.length > 2);
+
+    const basePool = (typeof images !== 'undefined' && Array.isArray(images)) ? images : [];
+    if (basePool.length === 0) return [];
+
+    // Score items based on tag match, source match, and color match
+    const scored = basePool.map(item => {
+      let score = 1;
+      const tags = (item.tags || []).map(t => t.toLowerCase());
+
+      // Source bonus
+      if (src === 'loc' && item.source === 'loc') score += 10;
+      if (src === 'pixabay' && item.source === 'pixabay') score += 10;
+      if (src === 'both') score += 2;
+
+      // Color matches
+      for (const col of colors) {
+        if (tags.includes(col)) score += 8;
+      }
+
+      // Query word matches
+      for (const word of queryWords) {
+        if (tags.some(t => t.includes(word) || word.includes(t))) score += 6;
+      }
+
+      return { item, score: score + Math.random() * 0.5 };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map(s => s.item);
+  }
+
+  // --- Fast Pixabay Fetch Engine ---
   async function fetchSinglePixabayQuery(query, color, imageType, category, editorsChoice) {
     let url = '';
     if (state.apiEndpoint) {
-      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=20`;
+      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=24`;
       if (color) url += `&colors=${encodeURIComponent(color)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
       if (editorsChoice) url += `&editors_choice=true`;
     } else if (state.directApiKey) {
-      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=20`;
+      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=24`;
       if (color) url += `&colors=${encodeURIComponent(color)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
       if (editorsChoice) url += `&editors_choice=true`;
@@ -556,7 +593,10 @@
     if (!url) return [];
 
     try {
-      const res = await fetch(url);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 4000); // Fast 4s timeout
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.hits)) {
@@ -564,97 +604,82 @@
             id: h.id,
             path: h.webformatURL,
             largePath: h.largeImageURL || h.webformatURL,
-            attribution: h.user,
-            link: h.pageURL
+            attribution: h.user || 'Pixabay',
+            link: h.pageURL,
+            source: 'pixabay'
           }));
         }
       }
     } catch (err) {
-      console.warn('Pixabay single query fetch error:', err);
+      console.warn('Pixabay query warning:', err);
     }
     return [];
   }
 
-  async function fetchPixabayImages() {
+  async function fetchPixabayImagesFast() {
     const query = state.searchQuery || 'vintage';
     const colors = state.selectedColors || [];
     const imageType = state.selectedStyle || 'all';
     const category = state.selectedCategory || '';
     const editorsChoice = state.editorsChoice;
 
-    const cacheKey = `${query}|${colors.join(',')}|${imageType}|${category}|${editorsChoice}`;
+    const cacheKey = `pixabay|${query}|${colors.join(',')}|${imageType}|${category}|${editorsChoice}`;
     if (state.apiCache[cacheKey]) {
       return state.apiCache[cacheKey];
     }
 
     if (!state.apiEndpoint && !state.directApiKey) {
-      if (typeof images !== 'undefined' && Array.isArray(images)) return images;
-      return [];
+      return getInstantFodderPool();
     }
 
-    let combinedHits = [];
-
-    if (colors.length > 0) {
-      // Query for each selected color in parallel to create a true multi-color harmony palette
-      const colorPromises = colors.map(col => fetchSinglePixabayQuery(query, col, imageType, category, editorsChoice));
-      const results = await Promise.all(colorPromises);
-      
-      // Interleave results from each color
-      const maxLen = Math.max(...results.map(r => r.length), 0);
-      for (let i = 0; i < maxLen; i++) {
-        for (const colResults of results) {
-          if (colResults[i]) {
-            combinedHits.push(colResults[i]);
-          }
-        }
-      }
+    let hits = [];
+    if (colors.length > 0 && colors.length <= 2) {
+      const promises = colors.map(col => fetchSinglePixabayQuery(query, col, imageType, category, editorsChoice));
+      const res = await Promise.all(promises);
+      hits = res.flat();
     } else {
-      combinedHits = await fetchSinglePixabayQuery(query, '', imageType, category, editorsChoice);
+      hits = await fetchSinglePixabayQuery(query, '', imageType, category, editorsChoice);
     }
 
-    // If 0 hits found, retry with relaxed parameters (e.g. without editorsChoice or simplified query)
-    if (combinedHits.length === 0 && editorsChoice) {
-      combinedHits = await fetchSinglePixabayQuery(query, colors.join(','), imageType, category, false);
-    }
-    if (combinedHits.length === 0 && query.includes(' ')) {
+    if (hits.length === 0 && query.includes(' ')) {
       const broadTerm = query.split(' ')[0];
-      combinedHits = await fetchSinglePixabayQuery(broadTerm, '', 'all', '', false);
+      hits = await fetchSinglePixabayQuery(broadTerm, '', 'all', '', false);
     }
 
-    // Deduplicate by image id
+    // Deduplicate
     const seen = new Set();
     const unique = [];
-    for (const item of combinedHits) {
-      if (!seen.has(item.id)) {
-        seen.add(item.id);
-        unique.push(item);
+    for (const h of hits) {
+      if (!seen.has(h.id)) {
+        seen.add(h.id);
+        unique.push(h);
       }
     }
 
     if (unique.length > 0) {
       state.apiCache[cacheKey] = unique;
-      showToast(`Loaded ${unique.length} live Pixabay assets for "${query}"`);
-      return unique;
     }
-
-    // Fallback to local curated image pool if offline or no hits
-    if (typeof images !== 'undefined' && Array.isArray(images)) {
-      return images;
-    }
-    return [];
+    return unique;
   }
 
-  // --- Library of Congress / Chronicling America API Engine ---
-  async function fetchChroniclingAmericaImages(query) {
+  // --- Fast Library of Congress API Engine with Strict Timeout ---
+  async function fetchChroniclingAmericaImagesFast(query) {
     const q = query || 'newspaper vintage';
     const cacheKey = `loc|${q}`;
     if (state.apiCache[cacheKey]) {
       return state.apiCache[cacheKey];
     }
 
-    const url = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(q)}&c=25`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500); // 2.5s max timeout to prevent UI lag
+
+    const url = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(q)}&c=20`;
     try {
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      const res = await fetch(url, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timer);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.results) && data.results.length > 0) {
@@ -671,7 +696,7 @@
               id: `loc-${item.id || item.date || Math.random()}`,
               path: preview,
               largePath: large,
-              attribution: item.title ? `${item.title.slice(0, 42)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
+              attribution: item.title ? `${item.title.slice(0, 40)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
               link: item.url || 'https://www.loc.gov/collections/chronicling-america/',
               source: 'loc'
             });
@@ -683,81 +708,25 @@
         }
       }
     } catch (err) {
-      console.warn('Library of Congress search failed:', err);
+      clearTimeout(timer);
     }
     return [];
   }
 
-  // --- Combined Fodder Fetcher (Pixabay + Library of Congress) ---
-  async function fetchFodderImages() {
-    const src = state.imageSource || 'both';
-    const query = state.searchQuery || 'vintage';
-
-    if (src === 'pixabay') {
-      return await fetchPixabayImages();
-    }
-
-    if (src === 'loc') {
-      const locHits = await fetchChroniclingAmericaImages(query);
-      if (locHits.length > 0) {
-        showToast(`Loaded ${locHits.length} historic clippings from Library of Congress`);
-        return locHits;
-      }
-      return typeof images !== 'undefined' ? images : [];
-    }
-
-    // Both / Mixed Source Mode (Pixabay + Library of Congress)
-    const [pixabayHits, locHits] = await Promise.all([
-      fetchPixabayImages(),
-      fetchChroniclingAmericaImages(query)
-    ]);
-
-    let interleaved = [];
-    const max = Math.max(pixabayHits.length, locHits.length);
-    for (let i = 0; i < max; i++) {
-      if (pixabayHits[i]) interleaved.push(pixabayHits[i]);
-      if (locHits[i]) interleaved.push(locHits[i]);
-    }
-
-    if (interleaved.length > 0) {
-      showToast(`Loaded ${interleaved.length} mixed assets (${pixabayHits.length} Pixabay + ${locHits.length} Historic LOC)`);
-      return interleaved;
-    }
-
-    // Fallback to local curated image pool if offline
-    if (typeof images !== 'undefined' && Array.isArray(images)) {
-      return images;
-    }
-    return [];
-  }
-
-  // --- Generate Fodder Grid ---
-  let currentGenerationId = 0;
-
-  async function generateFodder() {
-    const genId = ++currentGenerationId;
-    initElements();
-    if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
-    state.assetsGenerated = true;
-
-    if (el.statusBarStatus) el.statusBarStatus.textContent = 'Fetching fodder...';
-
+  // --- Synchronous Immediate Tile Renderer (< 10ms) ---
+  function renderTilesWithPool(pool, isLiveUpdate = false) {
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
-    const pool = await fetchFodderImages();
+    if (!el.container) return;
 
-    // If another generation started while fetching over the network, discard stale result
-    if (genId !== currentGenerationId) {
-      return;
+    if (!isLiveUpdate) {
+      el.container.innerHTML = '';
+      el.container.style.gridTemplateColumns = layout.cols;
+      el.container.style.gridTemplateRows = layout.rows;
+      state.items = [];
     }
 
-    state.onlinePool = pool;
-    
-    el.container.innerHTML = '';
-    el.container.style.gridTemplateColumns = layout.cols;
-    el.container.style.gridTemplateRows = layout.rows;
-
-    state.items = [];
-    const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
+    const availablePool = (pool && pool.length > 0) ? pool : getInstantFodderPool();
+    const shuffledPool = [...availablePool].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < layout.count; i++) {
       const span = layout.spans[i] || { c: 1, r: 1 };
@@ -771,11 +740,29 @@
         chosenImg = { path: '', largePath: '', attribution: 'None' };
       }
 
+      if (isLiveUpdate && state.items[i]) {
+        // Smoothly update existing DOM tile image
+        if (!state.items[i].locked) {
+          state.items[i].image = chosenImg;
+          const tile = el.container.children[i];
+          if (tile) {
+            const img = tile.querySelector('img');
+            if (img) {
+              img.src = chosenImg.path;
+              img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
+              img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
+            }
+          }
+        }
+        continue;
+      }
+
       const itemData = {
         index: i,
         image: chosenImg,
         zoom: 1,
-        span: span
+        span: span,
+        locked: false
       };
       state.items.push(itemData);
 
@@ -799,9 +786,11 @@
 
       controls.children[0].addEventListener('click', (e) => {
         e.stopPropagation();
-        const next = pool[Math.floor(Math.random() * pool.length)];
+        const activePool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : availablePool;
+        const next = activePool[Math.floor(Math.random() * activePool.length)];
         if (next) {
           itemData.image = next;
+          itemData.locked = true;
           img.src = next.path;
           img.dataset.largeSrc = next.largePath || next.path;
         }
@@ -824,7 +813,92 @@
     updateTextOverlay();
 
     if (el.statusLayout) el.statusLayout.textContent = layout.name;
-    if (el.statusBarStatus) el.statusBarStatus.textContent = pool.length > 0 ? `Ready (${layout.count} tiles from Pixabay / ${pool.length} in pool)` : `Ready (${layout.count} tiles)`;
+  }
+
+  // --- Generate Fodder Grid (Immediate 0ms Render + Fast Background Stream) ---
+  let currentGenerationId = 0;
+
+  async function generateFodder() {
+    const genId = ++currentGenerationId;
+    initElements();
+    if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
+    state.assetsGenerated = true;
+
+    const query = state.searchQuery || 'vintage';
+    const src = state.imageSource || 'both';
+    const masterCacheKey = `${src}|${query}|${state.selectedColors.join(',')}|${state.selectedStyle}|${state.selectedCategory}`;
+
+    // STEP 1: Immediate Render in 0ms (Instant response)
+    const cachedHits = state.apiCache[masterCacheKey];
+    if (cachedHits && cachedHits.length > 0) {
+      state.onlinePool = cachedHits;
+      renderTilesWithPool(cachedHits, false);
+      if (el.statusBarStatus) el.statusBarStatus.textContent = `Ready (${cachedHits.length} assets)`;
+      return;
+    }
+
+    const instantPool = getInstantFodderPool();
+    state.onlinePool = instantPool;
+    renderTilesWithPool(instantPool, false);
+
+    if (el.statusBarStatus) {
+      el.statusBarStatus.textContent = `✦ Instant fodder ready • Updating live...`;
+    }
+
+    // STEP 2: Fast Background Stream (< 200ms)
+    try {
+      let liveHits = [];
+
+      if (src === 'pixabay') {
+        liveHits = await fetchPixabayImagesFast();
+      } else if (src === 'loc') {
+        liveHits = await fetchChroniclingAmericaImagesFast(query);
+      } else {
+        // Both: Fetch fast Pixabay immediately & fast LOC concurrently
+        const [pResult, lResult] = await Promise.allSettled([
+          fetchPixabayImagesFast(),
+          fetchChroniclingAmericaImagesFast(query)
+        ]);
+
+        const pHits = (pResult.status === 'fulfilled' && Array.isArray(pResult.value)) ? pResult.value : [];
+        const lHits = (lResult.status === 'fulfilled' && Array.isArray(lResult.value)) ? lResult.value : [];
+
+        // Interleave
+        const maxLen = Math.max(pHits.length, lHits.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (pHits[i]) liveHits.push(pHits[i]);
+          if (lHits[i]) liveHits.push(lHits[i]);
+        }
+      }
+
+      if (genId !== currentGenerationId) return;
+
+      if (liveHits && liveHits.length > 0) {
+        // Merge with instant pool for rich variety
+        const merged = [...liveHits];
+        for (const inst of instantPool) {
+          if (!merged.some(m => m.path === inst.path)) {
+            merged.push(inst);
+          }
+        }
+        state.onlinePool = merged;
+        state.apiCache[masterCacheKey] = merged;
+
+        renderTilesWithPool(merged, true);
+        if (el.statusBarStatus) {
+          el.statusBarStatus.textContent = `Ready (${merged.length} assets)`;
+        }
+      } else {
+        if (el.statusBarStatus) {
+          el.statusBarStatus.textContent = `Ready (${instantPool.length} vintage assets)`;
+        }
+      }
+    } catch (err) {
+      console.warn('Background fodder fetch:', err);
+      if (el.statusBarStatus) {
+        el.statusBarStatus.textContent = `Ready (${instantPool.length} vintage assets)`;
+      }
+    }
   }
 
   // --- High-Resolution Download & Print ---

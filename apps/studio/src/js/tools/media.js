@@ -173,9 +173,18 @@ class Media_class extends Base_tools_class {
 				};
 
 				var fetchLoc = async function() {
+					var controller = new AbortController();
+					var timer = setTimeout(function() {
+						controller.abort();
+					}, 2500); // 2.5s max timeout so LOC never blocks UI
+
 					var locUrl = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(params.query)}&c=${_this.per_page}&sp=${_this.page}`;
 					try {
-						var res = await fetch(locUrl, { headers: { 'Accept': 'application/json' } });
+						var res = await fetch(locUrl, {
+							headers: { 'Accept': 'application/json' },
+							signal: controller.signal
+						});
+						clearTimeout(timer);
 						if (res.ok) {
 							var data = await res.json();
 							var mapped = [];
@@ -196,7 +205,9 @@ class Media_class extends Base_tools_class {
 								totalHits: data.pagination ? data.pagination.total : mapped.length
 							};
 						}
-					} catch (_) {}
+					} catch (_) {
+						clearTimeout(timer);
+					}
 					return { hits: [], totalHits: 0 };
 				};
 
@@ -213,7 +224,7 @@ class Media_class extends Base_tools_class {
 						combinedHits = lResult.hits;
 						totalHits = lResult.totalHits;
 					} else {
-						// Both / Mixed
+						// Both / Mixed: Fast Pixabay + Fast LOC with timeout
 						var [pResult, lResult] = await Promise.all([fetchPixabay(), fetchLoc()]);
 						var maxLen = Math.max(pResult.hits.length, lResult.hits.length);
 						for (var i = 0; i < maxLen; i++) {
