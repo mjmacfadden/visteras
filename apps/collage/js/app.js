@@ -759,7 +759,7 @@ import {
     }
     updateTileTransform(img, itemData);
 
-    // Zoom Popover
+    // Zoom Popover (Minimalist & Granular)
     const zoomPopover = document.createElement('div');
     zoomPopover.className = 'tile-zoom-popover hidden';
     zoomPopover.setAttribute('data-html2canvas-ignore', 'true');
@@ -768,17 +768,11 @@ import {
         <span>ZOOM</span>
         <span class="tile-zoom-val">${Math.round((itemData.zoom || 1) * 100)}%</span>
       </div>
-      <input type="range" class="tile-zoom-slider" min="1.0" max="3.5" step="0.05" value="${itemData.zoom || 1}" />
-      <div class="tile-zoom-actions">
-        <button type="button" class="tile-zoom-btn btn-reset-zoom" title="Reset Zoom">100%</button>
-        <button type="button" class="tile-zoom-btn btn-reset-center" title="Center Image">Center</button>
-      </div>
+      <input type="range" class="tile-zoom-slider" min="1.0" max="3.5" step="0.01" value="${itemData.zoom || 1}" />
     `;
 
     const zoomSlider = zoomPopover.querySelector('.tile-zoom-slider');
     const zoomValText = zoomPopover.querySelector('.tile-zoom-val');
-    const btnResetZoom = zoomPopover.querySelector('.btn-reset-zoom');
-    const btnResetCenter = zoomPopover.querySelector('.btn-reset-center');
 
     // Controls Toolbar
     const controls = document.createElement('div');
@@ -828,7 +822,7 @@ import {
       }
     });
 
-    // Slider Input Event
+    // Slider Input Event (Granular Zooming)
     zoomSlider.addEventListener('input', (e) => {
       e.stopPropagation();
       itemData.zoom = parseFloat(e.target.value);
@@ -837,23 +831,6 @@ import {
     });
     zoomSlider.addEventListener('click', (e) => e.stopPropagation());
     zoomSlider.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    // Reset Zoom Button Event
-    btnResetZoom.addEventListener('click', (e) => {
-      e.stopPropagation();
-      itemData.zoom = 1.0;
-      zoomSlider.value = 1.0;
-      zoomValText.textContent = '100%';
-      updateTileTransform(img, itemData);
-    });
-
-    // Reset Center Button Event
-    btnResetCenter.addEventListener('click', (e) => {
-      e.stopPropagation();
-      itemData.panX = 0;
-      itemData.panY = 0;
-      updateTileTransform(img, itemData);
-    });
 
     // Prevent popover / control clicks from triggering tile dragging
     zoomPopover.addEventListener('pointerdown', (e) => e.stopPropagation());
