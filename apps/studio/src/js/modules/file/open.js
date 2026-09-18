@@ -829,7 +829,7 @@ class File_open_class {
 		if (!url)
 			return;
 
-		var layer_name = url.replace(/^.*[\\\/]/, '').split('?')[0] || 'Image';
+		var layer_name = user_response.name || url.replace(/^.*[\\\/]/, '').split('?')[0] || 'Image';
 
 		try {
 			// Fetch as blob and convert to local data URL to prevent canvas CORS tainting

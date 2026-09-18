@@ -97,8 +97,10 @@ class Media_class extends Base_tools_class {
 				for (var i = 0; i < targets.length; i++) {
 					targets[i].addEventListener('click', function (event) {
 						//we have click
+						var searchTerm = (params && params.query) ? params.query.trim() : (query ? query.trim() : '');
 						var data = {
 							url: this.dataset.url,
+							name: searchTerm || 'Stock Image',
 						};
 						_this.File_open.file_open_url_handler(data, true);
 						_this.POP.hide();
