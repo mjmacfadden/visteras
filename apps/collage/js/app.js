@@ -325,6 +325,93 @@
   }
 
   // --- Layout Rendering in Panel ---
+  function applyLayout(layoutId) {
+    state.activeLayoutId = layoutId;
+    const layout = layouts.find(l => l.id === layoutId) || layouts[0];
+    renderLayoutList();
+
+    if (!state.assetsGenerated || !state.items || state.items.length === 0) {
+      generateFodder();
+      return;
+    }
+
+    el.container.innerHTML = '';
+    el.container.style.gridTemplateColumns = layout.cols;
+    el.container.style.gridTemplateRows = layout.rows;
+
+    const prevItems = [...state.items];
+    state.items = [];
+
+    for (let i = 0; i < layout.count; i++) {
+      const span = layout.spans[i] || { c: 1, r: 1 };
+      let chosenImg = null;
+
+      if (prevItems[i] && prevItems[i].image) {
+        chosenImg = prevItems[i].image;
+      } else if (state.onlinePool && state.onlinePool.length > 0) {
+        chosenImg = state.onlinePool[i % state.onlinePool.length];
+      } else {
+        chosenImg = { path: '', largePath: '', attribution: 'None' };
+      }
+
+      const itemData = {
+        index: i,
+        image: chosenImg,
+        zoom: prevItems[i] ? prevItems[i].zoom : 1,
+        span: span
+      };
+      state.items.push(itemData);
+
+      const tile = document.createElement('div');
+      tile.className = 'collage-item';
+      tile.style.gridColumn = `span ${span.c}`;
+      tile.style.gridRow = `span ${span.r}`;
+
+      const img = document.createElement('img');
+      img.src = chosenImg.path;
+      img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
+      img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
+      img.crossOrigin = 'anonymous';
+      if (itemData.zoom !== 1) img.style.transform = `scale(${itemData.zoom})`;
+
+      const controls = document.createElement('div');
+      controls.className = 'image-controls';
+      controls.innerHTML = `
+        <button class="tile-icon-btn" title="Replace tile">↻</button>
+        <button class="tile-icon-btn" title="Zoom tile">🔍</button>
+      `;
+
+      controls.children[0].addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : [];
+        const next = pool[Math.floor(Math.random() * pool.length)];
+        if (next) {
+          itemData.image = next;
+          img.src = next.path;
+          img.dataset.largeSrc = next.largePath || next.path;
+        }
+      });
+
+      controls.children[1].addEventListener('click', (e) => {
+        e.stopPropagation();
+        itemData.zoom = itemData.zoom === 1 ? 1.4 : (itemData.zoom === 1.4 ? 1.8 : 1);
+        img.style.transform = `scale(${itemData.zoom})`;
+      });
+
+      tile.appendChild(img);
+      tile.appendChild(controls);
+      el.container.appendChild(tile);
+    }
+
+    applySvgEffectsToItems();
+    applyTextureOverlay();
+    applyPaintOverlay();
+    updateTextOverlay();
+
+    if (el.statusLayout) el.statusLayout.textContent = layout.name;
+    if (el.statusBarStatus) el.statusBarStatus.textContent = `Ready (${layout.count} tiles)`;
+  }
+
   function renderLayoutList() {
     const list = document.getElementById('layout-list');
     if (!list) return;
@@ -338,9 +425,7 @@
         <span style="color: #888888; font-size: 10px;">${layout.count} tiles</span>
       `;
       card.addEventListener('click', () => {
-        state.activeLayoutId = layout.id;
-        renderLayoutList();
-        generateFodder();
+        applyLayout(layout.id);
       });
       list.appendChild(card);
     });
@@ -349,9 +434,7 @@
     if (quickSel) {
       quickSel.innerHTML = layouts.map(l => `<option value="${l.id}" ${l.id === state.activeLayoutId ? 'selected' : ''}>${l.name}</option>`).join('');
       quickSel.onchange = (e) => {
-        state.activeLayoutId = e.target.value;
-        renderLayoutList();
-        generateFodder();
+        applyLayout(e.target.value);
       };
     }
   }
@@ -649,7 +732,10 @@
   }
 
   // --- Generate Fodder Grid ---
+  let currentGenerationId = 0;
+
   async function generateFodder() {
+    const genId = ++currentGenerationId;
     initElements();
     if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
     state.assetsGenerated = true;
@@ -658,6 +744,12 @@
 
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
     const pool = await fetchFodderImages();
+
+    // If another generation started while fetching over the network, discard stale result
+    if (genId !== currentGenerationId) {
+      return;
+    }
+
     state.onlinePool = pool;
     
     el.container.innerHTML = '';
