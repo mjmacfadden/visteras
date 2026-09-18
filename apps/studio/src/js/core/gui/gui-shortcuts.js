@@ -460,6 +460,10 @@ class GUI_shortcuts_class {
 							app.GUI.GUI_tools.activate_tool('selection');
 						}
 					}
+				} else if (targetTool === 'rectangle') {
+					if (app.GUI && app.GUI.GUI_tools) {
+						app.GUI.GUI_tools.cycle_tool_group('rectangle');
+					}
 				} else {
 					var resolved = (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
 						? app.GUI.GUI_tools.get_active_tool_for_group(targetTool)

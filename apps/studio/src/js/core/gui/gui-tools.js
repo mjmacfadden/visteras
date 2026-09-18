@@ -348,6 +348,54 @@ class GUI_tools_class {
 	}
 
 	/**
+	 * Cycles through the items of a tool group.
+	 * If the active tool is not in the group, activates the group's current active shape.
+	 * If the active tool is already in the group, advances to the next shape in the group.
+	 */
+	cycle_tool_group(ownerName) {
+		var itemDef = null;
+		for (var i in config.TOOLS) {
+			if (config.TOOLS[i].name === ownerName) {
+				itemDef = config.TOOLS[i];
+				break;
+			}
+		}
+		if (!itemDef || !itemDef.tool_group || !itemDef.tool_group.items || !itemDef.tool_group.items.length) {
+			this.activate_tool(ownerName);
+			return;
+		}
+
+		var items = itemDef.tool_group.items;
+		var currentIndex = -1;
+		for (var j = 0; j < items.length; j++) {
+			var toolKey = items[j].tool || items[j].shape || itemDef.name;
+			if (this.active_tool === toolKey) {
+				currentIndex = j;
+				break;
+			}
+		}
+
+		var nextIndex = 0;
+		if (currentIndex !== -1) {
+			nextIndex = (currentIndex + 1) % items.length;
+		} else {
+			var activeShape = itemDef.tool_group.active_shape
+				|| this.Helper.getCookie(this.group_cookie_key(ownerName));
+			if (activeShape) {
+				for (var k = 0; k < items.length; k++) {
+					if (items[k].shape === activeShape) {
+						nextIndex = k;
+						break;
+					}
+				}
+			}
+		}
+
+		var nextItem = items[nextIndex];
+		this.update_tool_shape(ownerName, nextItem.shape);
+	}
+
+	/**
 	 * when the given tool key is a member of a tool group, sync the group's
 	 * active shape, cookie, button icon and title to it (e.g. activating the
 	 * pencil tool makes the brush button show the pencil icon).
