@@ -135,7 +135,7 @@ a[href]::after {
 /* —— Masthead —— */
 .masthead {
   text-align: center;
-  border-bottom: var(--rule-double);
+  border-bottom: none;
   padding-bottom: 0.15rem;
 }
 
@@ -172,7 +172,7 @@ a[href]::after {
   display: flex;
   justify-content: space-between;
   border-top: var(--rule-thin);
-  border-bottom: var(--rule-thin);
+  border-bottom: var(--rule-double);
   padding: 0.18rem 0;
   font-family: var(--sans-small);
   font-size: 7.5pt;
@@ -192,7 +192,7 @@ a[href]::after {
 
 /* —— Weather print strip —— */
 .weather-strip {
-  border-top: var(--rule-double);
+  border-top: none;
   border-bottom: var(--rule-thin);
   padding: 0.12rem 0.25rem;
   margin: 0 0 0.3rem;

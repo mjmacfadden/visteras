@@ -152,7 +152,7 @@ a:hover {
 /* —— Masthead —— */
 .masthead {
   text-align: center;
-  border-bottom: var(--rule-double);
+  border-bottom: none;
   padding-bottom: 0.2rem;
   margin-bottom: 0.3rem;
 }
@@ -200,7 +200,7 @@ a:hover {
   justify-content: space-between;
   align-items: center;
   border-top: var(--rule-thin);
-  border-bottom: var(--rule-thin);
+  border-bottom: var(--rule-double);
   padding: 0.25rem 0;
   font-family: var(--sans-small);
   font-size: 0.68rem;
@@ -260,7 +260,7 @@ a:hover {
 
 /* Weather strip — 1-line hourly forecast across top of page 1 */
 .weather-strip {
-  border-top: var(--rule-double, 3px double #000);
+  border-top: none;
   border-bottom: var(--rule-thin, 1px solid #000);
   padding: 0.22rem 0.4rem;
   margin: 0 0 0.45rem;
