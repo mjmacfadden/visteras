@@ -5362,12 +5362,12 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	top: 8px !important;
 	left: 8px !important;
 	right: 8px !important;
-	bottom: 8px !important;
+	bottom: 32px !important;
 	width: auto !important;
 	height: auto !important;
 	max-width: none !important;
-	max-height: calc(100dvh - 16px) !important;
-	max-height: calc(100vh - 16px) !important;
+	max-height: calc(100dvh - 40px) !important;
+	max-height: calc(100vh - 40px) !important;
 	transform: none !important;
 	padding: 0 !important;
 	margin: 0 !important;
