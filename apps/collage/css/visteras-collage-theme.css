@@ -535,10 +535,14 @@ html {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #252525;
+  background: rgba(26, 26, 26, 0.96);
+  backdrop-filter: blur(6px);
   color: #cccccc;
   z-index: 300;
-  gap: 16px;
+  gap: 14px;
+  border-radius: 2px;
+  box-sizing: border-box;
+  padding: 32px;
 }
 
 .generate-overlay.hidden {

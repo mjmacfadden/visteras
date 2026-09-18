@@ -1303,8 +1303,9 @@
     if (el.queryInput) el.queryInput.value = state.searchQuery;
     if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
 
-    // Generate initial fodder
-    generateFodder();
+    if (el.statusBarStatus) {
+      el.statusBarStatus.textContent = 'Ready • Click Generate to create collage fodder';
+    }
 
     // Fit canvas to workspace by default
     setTimeout(() => {
