@@ -36,13 +36,13 @@ class GUI_menu_class {
 		menuTemplate += '</ul>';
 		menuTemplate += `
 			<div class="menu_right_controls">
-				<a href="../vector/" class="visteras_switch_btn" title="Switch to Visteras Vector (SVG Vector Graphics Editor)">
+				<a href="../vector/" class="visteras_switch_btn" title="Visteras - Vector">
 					<span class="visteras_badge" style="color: #CCCCCC;">VECTOR</span> ↗
 				</a>
-				<a href="../publish/" class="visteras_switch_btn" title="Switch to Visteras Publish (Personal Morning Newspaper)">
+				<a href="../publish/" class="visteras_switch_btn" title="Visteras - Publish">
 					<span class="visteras_badge" style="color: #CCCCCC;">PUBLISH</span> ↗
 				</a>
-				<a href="../collage/" class="visteras_switch_btn" title="Switch to Visteras Collage (Printable Collage Fodder Generator)">
+				<a href="../collage/" class="visteras_switch_btn" title="Visteras - Collage">
 					<span class="visteras_badge" style="color: #CCCCCC;">COLLAGE</span> ↗
 				</a>
 			</div>
