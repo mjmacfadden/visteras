@@ -31,13 +31,14 @@ class File_new_class {
 		this.Helper = new Helper_class();
 		this.Tools_settings = new Tools_settings_class();
 
-		this.activeCategory = 'photo';
+		this.activeCategory = 'recent';
 		this.currentPreset = null;
-		this.currentUnit = 'in';
-		this.currentResolution = 300;
+		this.currentUnit = 'px';
+		this.currentResolution = 72;
 		this.currentOrientation = 'portrait'; // 'portrait' | 'landscape'
 		this.currentBackground = 'white'; // 'white' | 'transparent' | 'custom'
 		this.customBgColor = '#ffffff';
+		this.clipboardPreset = null;
 	}
 
 	get_recent_presets() {
@@ -129,6 +130,9 @@ class File_new_class {
 		let presets = [];
 		if (category === 'recent') {
 			presets = this.get_recent_presets();
+			if (this.clipboardPreset) {
+				presets = [this.clipboardPreset, ...presets.filter(p => p.id !== 'clipboard')];
+			}
 		} else {
 			presets = DOCUMENT_PRESETS[category] || [];
 		}
@@ -162,7 +166,9 @@ class File_new_class {
 
 		const presetsGridHtml = this.render_preset_cards(this.activeCategory);
 
-		const defaultName = app.Documents ? ('Untitled-' + app.Documents.auto_title_count) : 'Untitled-1';
+		const defaultName = (this.currentPreset && this.currentPreset.name === 'Clipboard')
+			? 'Clipboard'
+			: (app.Documents ? ('Untitled-' + app.Documents.auto_title_count) : 'Untitled-1');
 		const initialWidth = this.currentPreset ? this.currentPreset.width : 8.5;
 		const initialHeight = this.currentPreset ? this.currentPreset.height : 11;
 		const initialUnit = this.currentPreset ? this.currentPreset.unit : 'in';
@@ -267,12 +273,30 @@ class File_new_class {
 	}
 
 	async new() {
-		// Default active preset
-		if (!this.currentPreset) {
-			this.currentPreset = DOCUMENT_PRESETS.photo[3]; // 8x10
-			this.activeCategory = 'photo';
-			this.currentUnit = 'in';
-			this.currentResolution = 300;
+		this.activeCategory = 'recent';
+
+		const clipDims = await this.get_clipboard_dimensions();
+		const recents = this.get_recent_presets();
+
+		if (clipDims && clipDims.width > 0 && clipDims.height > 0) {
+			this.clipboardPreset = {
+				id: 'clipboard',
+				name: 'Clipboard',
+				width: clipDims.width,
+				height: clipDims.height,
+				unit: 'px',
+				resolution: 72,
+				category: 'recent',
+				description: `${clipDims.width} × ${clipDims.height} px @ 72 ppi`
+			};
+			this.currentPreset = this.clipboardPreset;
+			this.currentUnit = 'px';
+			this.currentResolution = 72;
+		} else {
+			this.clipboardPreset = null;
+			this.currentPreset = recents[0] || DOCUMENT_PRESETS.photo[3];
+			this.currentUnit = this.currentPreset ? (this.currentPreset.unit || 'px') : 'px';
+			this.currentResolution = this.currentPreset ? (this.currentPreset.resolution || 72) : 72;
 		}
 
 		const _this = this;
@@ -504,7 +528,11 @@ class File_new_class {
 				const idx = parseInt(card.getAttribute('data-index'));
 				let preset = null;
 				if (cat === 'recent') {
-					preset = this.get_recent_presets()[idx];
+					const recents = this.get_recent_presets();
+					const allRecents = this.clipboardPreset
+						? [this.clipboardPreset, ...recents.filter(p => p.id !== 'clipboard')]
+						: recents;
+					preset = allRecents[idx];
 				} else if (DOCUMENT_PRESETS[cat]) {
 					preset = DOCUMENT_PRESETS[cat][idx];
 				}
@@ -526,8 +554,10 @@ class File_new_class {
 						}
 					}
 					const nameInput = document.querySelector('#new_doc_name');
-					if (nameInput && (!nameInput.value || nameInput.value.startsWith('Untitled-'))) {
-						nameInput.value = preset.name;
+					if (nameInput && (!nameInput.value || nameInput.value.startsWith('Untitled-') || nameInput.value === 'Clipboard')) {
+						nameInput.value = preset.name === 'Clipboard'
+							? 'Clipboard'
+							: (app.Documents ? ('Untitled-' + app.Documents.auto_title_count) : 'Untitled-1');
 					}
 					if (updateOrientationState) {
 						updateOrientationState();
