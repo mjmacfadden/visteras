@@ -440,10 +440,6 @@ const hasWireStories =
         document.querySelectorAll<HTMLElement>('.running-head span:first-child, .edition-end-folio span:first-child').forEach((el) => {
           el.textContent = upper;
         });
-
-        // Browser title stays product chrome ("Visteras Publish"), not the paper masthead.
-        const dateStr = document.querySelector('.masthead-date-line span:first-child')?.textContent || '';
-        document.title = dateStr ? `Visteras Publish — ${dateStr}` : 'Visteras Publish';
       }
 
       async function runPaginate() {

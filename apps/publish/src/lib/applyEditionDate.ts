@@ -172,9 +172,6 @@ function updateDateDisplays(isoDate: string, dateDisplay: string) {
   document.querySelectorAll<HTMLElement>('.running-head span:last-child').forEach((el) => {
     el.textContent = dateDisplay;
   });
-
-  // Product browser title — never the newspaper masthead (THE DAILY MIKE / custom).
-  document.title = 'Visteras - Publish';
 }
 
 function updatePuzzles(isoDate: string) {
