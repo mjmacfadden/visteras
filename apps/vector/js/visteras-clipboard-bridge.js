@@ -44,6 +44,33 @@ function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 				const helpers = clone.querySelectorAll('.selected, .selectorGrip, [id^="selectorGrip_"]');
 				for (const h of helpers) h.remove();
 			}
+
+			// Preserve live stroke, stroke-width, and fill attributes on clone
+			try {
+				const stroke = el.getAttribute('stroke') || el.style.stroke;
+				const strokeWidth = el.getAttribute('stroke-width') || el.style.strokeWidth;
+				const fill = el.getAttribute('fill') || el.style.fill;
+				const comp = (typeof window !== 'undefined' && window.getComputedStyle) ? window.getComputedStyle(el) : null;
+
+				if (stroke) {
+					clone.setAttribute('stroke', stroke);
+				} else if (comp && comp.stroke && comp.stroke !== 'none') {
+					clone.setAttribute('stroke', comp.stroke);
+				}
+
+				if (strokeWidth) {
+					clone.setAttribute('stroke-width', strokeWidth);
+				} else if (comp && comp.strokeWidth && parseFloat(comp.strokeWidth) > 0) {
+					clone.setAttribute('stroke-width', comp.strokeWidth);
+				}
+
+				if (fill) {
+					clone.setAttribute('fill', fill);
+				} else if (comp && comp.fill) {
+					clone.setAttribute('fill', comp.fill);
+				}
+			} catch (e2) { /* ignore */ }
+
 			parts.push(serializer.serializeToString(clone));
 			if (typeof svgCanvas.getStrokedBBox === 'function') {
 				const bb = svgCanvas.getStrokedBBox([el]);

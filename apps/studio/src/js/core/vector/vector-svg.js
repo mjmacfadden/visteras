@@ -411,17 +411,33 @@ function apply_element_style(el, defaults = {}) {
 		return fallback;
 	};
 
-	const fill = get('fill', defaults.fill != null ? defaults.fill : '#000000');
-	const stroke = get('stroke', defaults.stroke != null ? defaults.stroke : 'none');
-	const stroke_width = parseFloat(get('stroke-width', defaults.stroke_width != null ? defaults.stroke_width : 0)) || 0;
+	let fill = get('fill', defaults.fill != null ? defaults.fill : null);
+	if (fill === null) {
+		fill = defaults.fill !== undefined ? defaults.fill : '#000000';
+	}
+	let stroke = get('stroke', defaults.stroke != null ? defaults.stroke : null);
+	const strokeWidthRaw = get('stroke-width', null);
+	let stroke_width = strokeWidthRaw != null ? parseFloat(strokeWidthRaw) : null;
+
+	if (stroke && stroke !== 'none') {
+		// In SVG standard, if stroke is specified and stroke-width is not, stroke-width defaults to 1
+		if (stroke_width === null || isNaN(stroke_width)) {
+			stroke_width = 1;
+		}
+	} else {
+		if (stroke_width === null || isNaN(stroke_width)) {
+			stroke_width = 0;
+		}
+	}
+
 	const fill_rule = get('fill-rule', defaults.fill_rule || 'nonzero');
 	const stroke_join = get('stroke-linejoin', defaults.stroke_join || 'miter');
 	const stroke_cap = get('stroke-linecap', defaults.stroke_cap || 'butt');
 	const op = parseFloat(get('opacity', '1'));
 	return {
-		fill,
-		stroke,
-		stroke_width,
+		fill: (fill === 'none' || !fill) ? null : fill,
+		stroke: (stroke === 'none' || !stroke) ? null : stroke,
+		stroke_width: stroke_width || 0,
 		fill_rule,
 		stroke_join,
 		stroke_cap,
