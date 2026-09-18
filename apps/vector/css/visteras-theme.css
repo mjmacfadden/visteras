@@ -218,16 +218,16 @@ html, body {
 
 .svg_editor {
   display: grid !important;
-  /* Row 1: 45px options bar + 4px Studio chassis gap
+  /* Row 1: 45px options bar
      Row 2: 16px ruler X
      Row 3: 1fr workspace
      Row 4: 24px status bar */
-  grid-template-rows: 49px 16px 1fr 24px !important;
-  /* Col 1: 40px left toolbar (36px + 4px gap)
+  grid-template-rows: 45px 16px 1fr 24px !important;
+  /* Col 1: 36px left toolbar
      Col 2: 16px ruler Y
      Col 3: 1fr workspace
      Col 4: 240px right panel */
-  grid-template-columns: 40px 16px 1fr 240px !important;
+  grid-template-columns: 36px 16px 1fr 240px !important;
   grid-template-areas:
     "top top top top"
     "left corner rulerX side"
@@ -248,7 +248,6 @@ html, body {
   max-height: 45px !important;
   background-color: var(--studio-options-bg) !important;
   border-bottom: 1px solid var(--studio-border-dark) !important;
-  margin-bottom: 4px !important;
   box-sizing: border-box !important;
   display: flex !important;
   flex-direction: row !important;
@@ -382,7 +381,6 @@ html, body {
   height: 100% !important;
   background-color: var(--studio-toolbar-bg) !important;
   border-right: 1px solid var(--studio-border-dark) !important;
-  margin-right: 4px !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
@@ -551,7 +549,6 @@ html, body {
   height: 100% !important;
   background-color: var(--studio-panel-bg) !important;
   border-left: 1px solid var(--studio-border-dark) !important;
-  margin-left: 4px !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
