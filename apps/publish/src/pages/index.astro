@@ -432,7 +432,7 @@ const hasWireStories =
         if (chromeName) chromeName.textContent = upper;
 
         document.querySelectorAll<HTMLElement>('[data-masthead-title]').forEach((el) => {
-          el.textContent = upper;
+          el.textContent = cleanName;
         });
         document.querySelectorAll<HTMLElement>('[data-masthead-tagline]').forEach((el) => {
           el.textContent = cleanTagline;
