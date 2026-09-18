@@ -90,10 +90,10 @@
     
     // Pixabay Search & Harmony Parameters
     searchQuery: 'autumn vintage leaves',
-    selectedStyle: 'illustration',
+    selectedStyle: 'all',
     selectedCategory: '',
     selectedColors: ['red', 'orange', 'yellow', 'brown'], // Multi-select colors
-    editorsChoice: true,
+    editorsChoice: false,
     
     // API Configuration
     apiEndpoint: localStorage.getItem('visteras_pixabay_endpoint') || '',
@@ -432,56 +432,105 @@
   }
 
   // --- Pixabay Fetch & Image Pool Engine ---
+  async function fetchSinglePixabayQuery(query, color, imageType, category, editorsChoice) {
+    let url = '';
+    if (state.apiEndpoint) {
+      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=20`;
+      if (color) url += `&colors=${encodeURIComponent(color)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      if (editorsChoice) url += `&editors_choice=true`;
+    } else if (state.directApiKey) {
+      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=20`;
+      if (color) url += `&colors=${encodeURIComponent(color)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      if (editorsChoice) url += `&editors_choice=true`;
+    }
+
+    if (!url) return [];
+
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.hits)) {
+          return data.hits.map(h => ({
+            id: h.id,
+            path: h.webformatURL,
+            largePath: h.largeImageURL || h.webformatURL,
+            attribution: h.user,
+            link: h.pageURL
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Pixabay single query fetch error:', err);
+    }
+    return [];
+  }
+
   async function fetchPixabayImages() {
     const query = state.searchQuery || 'vintage';
-    const colors = state.selectedColors.join(',');
+    const colors = state.selectedColors || [];
     const imageType = state.selectedStyle || 'all';
     const category = state.selectedCategory || '';
     const editorsChoice = state.editorsChoice;
 
-    const cacheKey = `${query}|${colors}|${imageType}|${category}|${editorsChoice}`;
+    const cacheKey = `${query}|${colors.join(',')}|${imageType}|${category}|${editorsChoice}`;
     if (state.apiCache[cacheKey]) {
       return state.apiCache[cacheKey];
     }
 
-    let url = '';
-    if (state.apiEndpoint) {
-      // Use Firebase Proxy
-      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=40`;
-      if (colors) url += `&colors=${encodeURIComponent(colors)}`;
-      if (category) url += `&category=${encodeURIComponent(category)}`;
-      if (editorsChoice) url += `&editors_choice=true`;
-    } else if (state.directApiKey) {
-      // Use Direct Pixabay Key
-      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=40`;
-      if (colors) url += `&colors=${encodeURIComponent(colors)}`;
-      if (category) url += `&category=${encodeURIComponent(category)}`;
-      if (editorsChoice) url += `&editors_choice=true`;
+    if (!state.apiEndpoint && !state.directApiKey) {
+      if (typeof images !== 'undefined' && Array.isArray(images)) return images;
+      return [];
     }
 
-    if (url) {
-      try {
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.hits) && data.hits.length > 0) {
-            const mapped = data.hits.map(h => ({
-              id: h.id,
-              path: h.webformatURL,
-              largePath: h.largeImageURL || h.webformatURL,
-              attribution: h.user,
-              link: h.pageURL
-            }));
-            state.apiCache[cacheKey] = mapped;
-            return mapped;
+    let combinedHits = [];
+
+    if (colors.length > 0) {
+      // Query for each selected color in parallel to create a true multi-color harmony palette
+      const colorPromises = colors.map(col => fetchSinglePixabayQuery(query, col, imageType, category, editorsChoice));
+      const results = await Promise.all(colorPromises);
+      
+      // Interleave results from each color
+      const maxLen = Math.max(...results.map(r => r.length), 0);
+      for (let i = 0; i < maxLen; i++) {
+        for (const colResults of results) {
+          if (colResults[i]) {
+            combinedHits.push(colResults[i]);
           }
         }
-      } catch (err) {
-        console.warn('Live Pixabay search failed, falling back to local pool:', err);
+      }
+    } else {
+      combinedHits = await fetchSinglePixabayQuery(query, '', imageType, category, editorsChoice);
+    }
+
+    // If 0 hits found, retry with relaxed parameters (e.g. without editorsChoice or simplified query)
+    if (combinedHits.length === 0 && editorsChoice) {
+      combinedHits = await fetchSinglePixabayQuery(query, colors.join(','), imageType, category, false);
+    }
+    if (combinedHits.length === 0 && query.includes(' ')) {
+      const broadTerm = query.split(' ')[0];
+      combinedHits = await fetchSinglePixabayQuery(broadTerm, '', 'all', '', false);
+    }
+
+    // Deduplicate by image id
+    const seen = new Set();
+    const unique = [];
+    for (const item of combinedHits) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        unique.push(item);
       }
     }
 
-    // Fallback to local curated image pool
+    if (unique.length > 0) {
+      state.apiCache[cacheKey] = unique;
+      showToast(`Loaded ${unique.length} live Pixabay assets for "${query}"`);
+      return unique;
+    }
+
+    // Fallback to local curated image pool if offline or no hits
     if (typeof images !== 'undefined' && Array.isArray(images)) {
       return images;
     }
@@ -505,6 +554,7 @@
     el.container.style.gridTemplateRows = layout.rows;
 
     state.items = [];
+    const shuffledPool = [...pool].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < layout.count; i++) {
       const span = layout.spans[i] || { c: 1, r: 1 };
@@ -512,8 +562,8 @@
 
       if (state.customImageUrl && i === 0) {
         chosenImg = { path: state.customImageUrl, largePath: state.customImageUrl, attribution: 'Custom URL' };
-      } else if (pool.length > 0) {
-        chosenImg = pool[Math.floor(Math.random() * pool.length)];
+      } else if (shuffledPool.length > 0) {
+        chosenImg = shuffledPool[i % shuffledPool.length];
       } else {
         chosenImg = { path: '', largePath: '', attribution: 'None' };
       }
@@ -571,7 +621,7 @@
     updateTextOverlay();
 
     if (el.statusLayout) el.statusLayout.textContent = layout.name;
-    if (el.statusBarStatus) el.statusBarStatus.textContent = `Ready (${layout.count} tiles)`;
+    if (el.statusBarStatus) el.statusBarStatus.textContent = pool.length > 0 ? `Ready (${layout.count} tiles from Pixabay / ${pool.length} in pool)` : `Ready (${layout.count} tiles)`;
   }
 
   // --- High-Resolution Download & Print ---
