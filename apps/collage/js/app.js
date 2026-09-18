@@ -26,7 +26,8 @@
   const THEME_PRESETS = [
     {
       id: 'autumn_mix',
-      name: '🍂 Autumn Mixed Fodder',
+      name: 'Autumn Mixed Fodder',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13C4 7 12 3 20 4c1 8-3 16-9 16z"></path><path d="M4 13l9-3"></path></svg>',
       q: 'autumn vintage leaves',
       colors: ['red', 'orange', 'yellow', 'brown'],
       style: 'illustration',
@@ -35,7 +36,8 @@
     },
     {
       id: 'vintage_news',
-      name: '🗞️ Historic News & Headlines',
+      name: 'Historic News & Headlines',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"></path><path d="M18 14h-8"></path><path d="M15 18h-5"></path><path d="M10 6h8v4h-8V6z"></path></svg>',
       q: 'newspaper headlines news',
       colors: ['brown', 'grayscale', 'black'],
       style: 'all',
@@ -44,7 +46,8 @@
     },
     {
       id: 'antique_ads',
-      name: '📜 Antique Ads & Ephemera',
+      name: 'Antique Ads & Ephemera',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
       q: 'antique advertisement vintage paper label',
       colors: ['brown', 'yellow'],
       style: 'all',
@@ -53,7 +56,8 @@
     },
     {
       id: 'botanical',
-      name: '🌿 Botanical Herbarium',
+      name: 'Botanical Herbarium',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"></path><path d="M9 7a3 3 0 0 1 6 0c0 3-3 6-3 6s-3-3-3-6z"></path><path d="M9 14c-3 0-5-2-5-5 3 0 5 2 5 5z"></path><path d="M15 14c3 0 5-2 5-5-3 0-5 2-5 5z"></path></svg>',
       q: 'botanical illustration flower vintage flora',
       colors: ['green', 'brown'],
       style: 'illustration',
@@ -62,7 +66,8 @@
     },
     {
       id: 'wildlife',
-      name: '🦋 Victorian Wildlife & Birds',
+      name: 'Victorian Wildlife & Birds',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h.01"></path><path d="M3.4 18H12a8 8 0 0 0 8-8V7a4 4 0 0 0-7.28-2.3L12 7"></path><path d="M6 18c0-3.3 2.7-6 6-6"></path><path d="M2 21l3-3"></path></svg>',
       q: 'vintage animal illustration bird wildlife',
       colors: [],
       style: 'illustration',
@@ -71,7 +76,8 @@
     },
     {
       id: 'circus_theatre',
-      name: '🎪 Circus, Theatre & Playbills',
+      name: 'Circus, Theatre & Playbills',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 22 22 22"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><path d="M2 22a10 10 0 0 0 10-10"></path><path d="M22 22a10 10 0 0 1-10-10"></path></svg>',
       q: 'circus theatre entertainment broadside poster',
       colors: ['red', 'yellow'],
       style: 'all',
@@ -80,7 +86,8 @@
     },
     {
       id: 'retro_pop',
-      name: '📻 Retro Pop & Comics',
+      name: 'Retro Pop & Comics',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
       q: 'retro comic vintage pop art poster',
       colors: ['yellow', 'pink', 'turquoise'],
       style: 'illustration',
@@ -89,7 +96,8 @@
     },
     {
       id: 'textures',
-      name: '🎨 Textures & Old Paper',
+      name: 'Textures & Old Paper',
+      icon: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>',
       q: 'grunge paper texture wood grain',
       colors: ['brown', 'grayscale'],
       style: 'photo',
@@ -295,8 +303,11 @@
       const card = document.createElement('div');
       card.className = `preset-card ${state.activePresetId === preset.id ? 'active' : ''}`;
       card.innerHTML = `
-        <span style="font-weight: 600;">${preset.name}</span>
-        <span style="font-size: 9px; color: #888888;">${preset.colors.join(', ') || 'Any'}</span>
+        <div style="display: flex; align-items: center; gap: 7px; overflow: hidden;">
+          <span style="color: var(--collage-purple); display: flex; align-items: center; flex-shrink: 0;">${preset.icon || ''}</span>
+          <span style="font-weight: 600; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${preset.name}</span>
+        </div>
+        <span style="font-size: 9px; color: #888888; margin-left: 6px; flex-shrink: 0;">${preset.colors.join(', ') || 'Any'}</span>
       `;
       card.addEventListener('click', () => {
         applyPreset(preset);
@@ -714,6 +725,22 @@
   }
 
   // --- Synchronous Immediate Tile Renderer (< 10ms) ---
+  function bindTileImageEvents(img, spinnerEl) {
+    function markDone() {
+      img.classList.add('loaded');
+      if (spinnerEl) spinnerEl.classList.add('hidden');
+    }
+
+    if (img.complete && img.naturalWidth > 0) {
+      markDone();
+    } else {
+      img.classList.remove('loaded');
+      if (spinnerEl) spinnerEl.classList.remove('hidden');
+      img.onload = markDone;
+      img.onerror = markDone;
+    }
+  }
+
   function renderTilesWithPool(pool, isLiveUpdate = false) {
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
     if (!el.container) return;
@@ -747,10 +774,12 @@
           const tile = el.container.children[i];
           if (tile) {
             const img = tile.querySelector('img');
-            if (img) {
+            const spinnerEl = tile.querySelector('.tile-spinner');
+            if (img && spinnerEl) {
               img.src = chosenImg.path;
               img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
               img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
+              bindTileImageEvents(img, spinnerEl);
             }
           }
         }
@@ -771,17 +800,32 @@
       tile.style.gridColumn = `span ${span.c}`;
       tile.style.gridRow = `span ${span.r}`;
 
+      // Loading Spinner
+      const spinner = document.createElement('div');
+      spinner.className = 'tile-spinner';
+      spinner.innerHTML = `
+        <svg class="spinner-svg" viewBox="0 0 24 24" width="22" height="22">
+          <circle cx="12" cy="12" r="9" stroke="rgba(168, 85, 247, 0.2)" stroke-width="2.5" fill="none"></circle>
+          <circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="28" stroke-dashoffset="10"></circle>
+        </svg>
+      `;
+
       const img = document.createElement('img');
       img.src = chosenImg.path;
       img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
       img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
       img.crossOrigin = 'anonymous';
+      bindTileImageEvents(img, spinner);
 
       const controls = document.createElement('div');
       controls.className = 'image-controls';
       controls.innerHTML = `
-        <button class="tile-icon-btn" title="Replace tile">↻</button>
-        <button class="tile-icon-btn" title="Zoom tile">🔍</button>
+        <button class="tile-icon-btn" title="Replace tile">
+          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        </button>
+        <button class="tile-icon-btn" title="Zoom tile">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+        </button>
       `;
 
       controls.children[0].addEventListener('click', (e) => {
@@ -793,6 +837,7 @@
           itemData.locked = true;
           img.src = next.path;
           img.dataset.largeSrc = next.largePath || next.path;
+          bindTileImageEvents(img, spinner);
         }
       });
 
@@ -802,6 +847,7 @@
         img.style.transform = `scale(${itemData.zoom})`;
       });
 
+      tile.appendChild(spinner);
       tile.appendChild(img);
       tile.appendChild(controls);
       el.container.appendChild(tile);
@@ -842,7 +888,7 @@
     renderTilesWithPool(instantPool, false);
 
     if (el.statusBarStatus) {
-      el.statusBarStatus.textContent = `✦ Instant fodder ready • Updating live...`;
+      el.statusBarStatus.textContent = `Instant fodder ready • Updating live...`;
     }
 
     // STEP 2: Fast Background Stream (< 200ms)

@@ -424,8 +424,37 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #e9ecef;
+  background-color: #1e1e1e;
   overflow: hidden;
+}
+
+.tile-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  z-index: 10;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.tile-spinner.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.spinner-svg {
+  animation: visteras-spin 0.85s linear infinite;
+}
+
+@keyframes visteras-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .collage-item img {
@@ -435,6 +464,12 @@ html {
   object-position: center;
   transform-origin: center center;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease-out, transform 0.2s ease-out;
+}
+
+.collage-item img.loaded {
+  opacity: 1;
 }
 
 .image-controls {
@@ -454,24 +489,36 @@ html {
 }
 
 .tile-icon-btn {
-  background: rgba(0, 0, 0, 0.75);
-  color: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(18, 18, 18, 0.82);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  padding: 0;
+}
+
+.tile-icon-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .tile-icon-btn:hover {
   background: var(--collage-purple);
   border-color: var(--collage-purple-light);
   transform: scale(1.1);
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.4);
 }
 
 /* Layer Overlays */
