@@ -659,7 +659,7 @@ class File_new_class {
 							}
 							: {
 								name: 'Background',
-								locked: false,
+								locked: true,
 								type: 'image',
 								link: bgCanvas,
 								data: bgCanvas.toDataURL(),

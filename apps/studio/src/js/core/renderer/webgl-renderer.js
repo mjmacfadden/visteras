@@ -622,9 +622,10 @@ class WebGL_renderer_class {
 	 * stroke / inner_glow are handled by _layer_effect_filters (not CSS).
 	 * @param {Object} layer
 	 * @param {number|string|Array|null} disabled_filter_id
+	 * @param {number} [superScale=1]
 	 * @returns {{css: string, signature: string, pad: number}|null}
 	 */
-	_layer_filters_css(layer, disabled_filter_id) {
+	_layer_filters_css(layer, disabled_filter_id, superScale = 1) {
 		var filters = layer.filters;
 		if (!filters || !filters.length) return null;
 		var parts = [];
@@ -670,7 +671,7 @@ class WebGL_renderer_class {
 			} else if (name === 'blur') {
 				var br = (value !== undefined) ? Number(value) : 0;
 				if (!isFinite(br) || br < 0) br = 0;
-				css = 'blur(' + br + 'px)';
+				css = 'blur(' + (br * superScale) + 'px)';
 				// CSS blur spreads ~radius; use 3x for safe bleed (matches browser gaussian tails).
 				pad = Math.max(pad, Math.ceil(br * 3));
 			} else if (name === 'shadow') {
@@ -683,7 +684,7 @@ class WebGL_renderer_class {
 				if (!isFinite(sr) || sr < 0) sr = 0;
 				if (!isFinite(opacity)) opacity = 100;
 				var color = this._shadow_css_color(params.color || '#000000', opacity);
-				css = 'drop-shadow(' + sx + 'px ' + sy + 'px ' + sr + 'px ' + color + ')';
+				css = 'drop-shadow(' + (sx * superScale) + 'px ' + (sy * superScale) + 'px ' + (sr * superScale) + 'px ' + color + ')';
 				pad = Math.max(pad, Math.ceil(Math.max(Math.abs(sx), Math.abs(sy)) + sr * 3));
 			} else if (name === 'outer_glow') {
 				var ogr = (value !== undefined) ? Number(value) : 10;
@@ -691,7 +692,7 @@ class WebGL_renderer_class {
 				if (!isFinite(ogr) || ogr < 0) ogr = 0;
 				if (!isFinite(ogOpacity)) ogOpacity = 75;
 				var ogColor = this._shadow_css_color(params.color || '#ffff00', ogOpacity);
-				css = 'drop-shadow(0px 0px ' + ogr + 'px ' + ogColor + ')';
+				css = 'drop-shadow(0px 0px ' + (ogr * superScale) + 'px ' + ogColor + ')';
 				pad = Math.max(pad, Math.ceil(ogr * 3));
 			} else {
 				return null;
@@ -1496,10 +1497,12 @@ class WebGL_renderer_class {
 		var source = this._get_layer_source(layer);
 		if (!source) return null;
 
-		var filterInfo = this._layer_filters_css(layer, null);
+		var superScale = source._super || (layer.render_function ? 2 : 1);
+		var filterInfo = this._layer_filters_css(layer, null, superScale);
 		var effectInfo = this._layer_effect_filters(layer, null);
 		var filterSig = (filterInfo ? filterInfo.signature : '') +
-			(effectInfo ? ('#' + effectInfo.signature) : '');
+			(effectInfo ? ('#' + effectInfo.signature) : '') +
+			('@' + superScale);
 		var filterPad = filterInfo && filterInfo.pad ? filterInfo.pad : 0;
 		var effectPad = effectInfo && effectInfo.pad ? effectInfo.pad : 0;
 		if (filterInfo && filterInfo.css && filterInfo.css !== 'none') {
@@ -1614,23 +1617,17 @@ class WebGL_renderer_class {
 	 * @returns {HTMLCanvasElement|null}
 	 */
 	_bake_css_filter(source, cssFilter, layer, pad) {
-		var w = source.naturalWidth || source.width || layer.width || 0;
-		var h = source.naturalHeight || source.height || layer.height || 0;
+		var superScale = source._super || (layer && layer.render_function ? 2 : 1);
+		var w = source.naturalWidth || source.width || ((layer ? layer.width : 0) * superScale) || 0;
+		var h = source.naturalHeight || source.height || ((layer ? layer.height : 0) * superScale) || 0;
 		if (!w || !h) return null;
 		var srcPad = source._pad || 0;
 		var spatialPad = Math.max(0, pad || 0);
 		var totalPad = srcPad + spatialPad;
-		var outW = Math.max(1, Math.round(w + spatialPad * 2));
-		var outH = Math.max(1, Math.round(h + spatialPad * 2));
-		// When source already includes brush pad, its pixels are (w) including that pad;
-		// spatial pad expands further around the full source bitmap.
-		if (srcPad && !spatialPad) {
-			outW = w;
-			outH = h;
-		} else if (srcPad && spatialPad) {
-			outW = Math.max(1, Math.round(w + spatialPad * 2));
-			outH = Math.max(1, Math.round(h + spatialPad * 2));
-		}
+		var spatialPadPx = Math.round(spatialPad * superScale);
+		var outW = Math.max(1, Math.round(w + spatialPadPx * 2));
+		var outH = Math.max(1, Math.round(h + spatialPadPx * 2));
+
 		if (!this._filterBakeCanvas) {
 			this._filterBakeCanvas = document.createElement('canvas');
 		}
@@ -1644,13 +1641,14 @@ class WebGL_renderer_class {
 		ctx.clearRect(0, 0, outW, outH);
 		ctx.filter = cssFilter;
 		try {
-			ctx.drawImage(source, spatialPad, spatialPad);
+			ctx.drawImage(source, spatialPadPx, spatialPadPx);
 		} catch (e) {
 			ctx.filter = 'none';
 			return null;
 		}
 		ctx.filter = 'none';
 		canvas._pad = totalPad;
+		canvas._super = superScale;
 		return canvas;
 	}
 
@@ -1665,14 +1663,16 @@ class WebGL_renderer_class {
 	 * @returns {HTMLCanvasElement|null}
 	 */
 	_bake_effect_filters(source, effects, layer, pad) {
-		var w = source.naturalWidth || source.width || layer.width || 0;
-		var h = source.naturalHeight || source.height || layer.height || 0;
+		var superScale = source._super || (layer && layer.render_function ? 2 : 1);
+		var w = source.naturalWidth || source.width || ((layer ? layer.width : 0) * superScale) || 0;
+		var h = source.naturalHeight || source.height || ((layer ? layer.height : 0) * superScale) || 0;
 		if (!w || !h) return null;
 		var srcPad = source._pad || 0;
 		var spatialPad = Math.max(0, pad || 0);
 		var totalPad = srcPad + spatialPad;
-		var outW = Math.max(1, Math.round(w + spatialPad * 2));
-		var outH = Math.max(1, Math.round(h + spatialPad * 2));
+		var spatialPadPx = Math.round(spatialPad * superScale);
+		var outW = Math.max(1, Math.round(w + spatialPadPx * 2));
+		var outH = Math.max(1, Math.round(h + spatialPadPx * 2));
 
 		if (!this._effectBakeCanvas) {
 			this._effectBakeCanvas = document.createElement('canvas');
@@ -1686,7 +1686,7 @@ class WebGL_renderer_class {
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
 		ctx.clearRect(0, 0, outW, outH);
 		try {
-			ctx.drawImage(source, spatialPad, spatialPad);
+			ctx.drawImage(source, spatialPadPx, spatialPadPx);
 		} catch (e) {
 			return null;
 		}
@@ -1704,13 +1704,14 @@ class WebGL_renderer_class {
 			if (name === 'color_overlay') {
 				this._bake_color_overlay_onto(ctx, sil, params, outW, outH);
 			} else if (name === 'stroke') {
-				this._bake_stroke_onto(ctx, sil, params, outW, outH);
+				this._bake_stroke_onto(ctx, sil, params, outW, outH, superScale);
 			} else if (name === 'inner_glow') {
-				this._bake_inner_glow_onto(ctx, sil, params, outW, outH);
+				this._bake_inner_glow_onto(ctx, sil, params, outW, outH, superScale);
 			}
 		}
 
 		canvas._pad = totalPad;
+		canvas._super = superScale;
 		return canvas;
 	}
 
@@ -1751,8 +1752,8 @@ class WebGL_renderer_class {
 		ctx.restore();
 	}
 
-	_bake_stroke_onto(ctx, sil, params, w, h) {
-		var rawSize = (params.size !== undefined) ? Number(params.size) : 3;
+	_bake_stroke_onto(ctx, sil, params, w, h, superScale = 1) {
+		var rawSize = ((params.size !== undefined) ? Number(params.size) : 3) * superScale;
 		if (!isFinite(rawSize) || rawSize <= 0) return;
 		var position = params.position || 'outside';
 		var opacity = (params.opacity !== undefined) ? Number(params.opacity) : 100;
@@ -1835,8 +1836,8 @@ class WebGL_renderer_class {
 		ctx.restore();
 	}
 
-	_bake_inner_glow_onto(ctx, sil, params, w, h) {
-		var radius = (params.value !== undefined) ? Number(params.value) : 10;
+	_bake_inner_glow_onto(ctx, sil, params, w, h, superScale = 1) {
+		var radius = ((params.value !== undefined) ? Number(params.value) : 10) * superScale;
 		var opacity = (params.opacity !== undefined) ? Number(params.opacity) : 75;
 		if (!isFinite(radius) || radius <= 0 || !isFinite(opacity) || opacity <= 0) return;
 		var color = this._effect_css_color(params.color || '#ffffff', opacity, 'rgba(255,255,255,1)');
@@ -1978,6 +1979,7 @@ class WebGL_renderer_class {
 						}
 
 						canvas._pad = pad;
+						canvas._super = SUPER;
 						return canvas;
 					}
 				}

@@ -68,7 +68,7 @@ export class Insert_layer_action extends Base_action {
 			height: null,
 			height_original: null,
 			visible: true,
-			locked: false,
+			locked: (this.settings && this.settings.name === 'Background') ? true : false,
 			is_vector: false,
 			vector_id: null,
 			vector: null,
