@@ -737,7 +737,16 @@
       img.classList.remove('loaded');
       if (spinnerEl) spinnerEl.classList.remove('hidden');
       img.onload = markDone;
-      img.onerror = markDone;
+      img.onerror = function() {
+        // Fallback to local verified image pool if remote asset fails
+        if (typeof images !== 'undefined' && images.length > 0 && img.src && img.src.startsWith('http')) {
+          const fallback = images[Math.floor(Math.random() * images.length)];
+          img.src = fallback.path;
+          img.dataset.largeSrc = fallback.largePath || fallback.path;
+        } else {
+          markDone();
+        }
+      };
     }
   }
 
@@ -814,7 +823,6 @@
       img.src = chosenImg.path;
       img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
       img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
-      img.crossOrigin = 'anonymous';
       bindTileImageEvents(img, spinner);
 
       const controls = document.createElement('div');
