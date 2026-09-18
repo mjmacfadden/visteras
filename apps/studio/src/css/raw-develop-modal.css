@@ -1,0 +1,358 @@
+/**
+ * Raw Develop — nearly fullscreen modal (ACR-style)
+ * Layout inspired by Photoshop ACR / raw-viewer UX; original CSS.
+ *
+ * Important: miniPaint popups wrap params in <table>/<td> with a global
+ * `td { height: 25px }` rule. We absolutely fill the popup so the viewer
+ * does not depend on that percentage/flex height chain.
+ */
+
+@keyframes rawDevelopModalIn {
+	0% { opacity: 0; transform: scale(0.985); }
+	100% { opacity: 1; transform: scale(1); }
+}
+
+/* Pin to the visible viewport with a consistent inset on all sides.
+   Prefer dvh so mobile/desktop browser chrome does not clip the bottom. */
+#popups .popup.raw_develop_popup {
+	position: fixed !important;
+	top: 8px !important;
+	left: 8px !important;
+	right: 8px !important;
+	bottom: 32px !important;
+	width: auto !important;
+	height: auto !important;
+	max-width: none !important;
+	max-height: calc(100dvh - 40px) !important;
+	max-height: calc(100vh - 40px) !important;
+	transform: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+	display: block !important;
+	background: #2a2a2a !important;
+	color: #e8e8e8 !important;
+	border: 1px solid #3d3d3d !important;
+	border-radius: 8px !important;
+	box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7) !important;
+	overflow: hidden !important;
+	z-index: 120 !important;
+	animation: rawDevelopModalIn 160ms ease-out forwards !important;
+	box-sizing: border-box !important;
+	text-align: left !important;
+}
+
+/* Hide stock popup chrome */
+#popups .popup.raw_develop_popup > h2,
+#popups .popup.raw_develop_popup > .close,
+#popups .popup.raw_develop_popup > [data-id="popup_close"],
+#popups .popup.raw_develop_popup > .buttons,
+#popups .popup.raw_develop_popup > [data-id="popup_comment"],
+#popups .popup.raw_develop_popup > [data-id="pretitle_area"],
+#popups .popup.raw_develop_popup > [data-id="popup_title"] {
+	display: none !important;
+}
+
+/* Every wrapper between the popup and .raw-develop fills the popup. */
+#popups .popup.raw_develop_popup .dialog_content,
+#popups .popup.raw_develop_popup [data-id="dialog_content"],
+#popups .popup.raw_develop_popup [data-id="params_content"],
+#popups .popup.raw_develop_popup table,
+#popups .popup.raw_develop_popup tr,
+#popups .popup.raw_develop_popup td,
+#popups .popup.raw_develop_popup th,
+#popups .popup.raw_develop_popup td.html_value {
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	width: auto !important;
+	height: auto !important;
+	max-width: none !important;
+	max-height: none !important;
+	min-height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	display: block !important;
+	overflow: hidden !important;
+	box-sizing: border-box !important;
+	text-align: left !important;
+	vertical-align: top !important;
+	background: transparent !important;
+}
+
+/* Empty preview slot from Dialog_class — do not leave a flex ghost. */
+#popups .popup.raw_develop_popup [data-id="preview_content"] {
+	display: none !important;
+}
+
+.raw-develop {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	display: flex;
+	flex-direction: column;
+	width: auto;
+	height: auto;
+	min-height: 0;
+	box-sizing: border-box;
+	font-size: 12px;
+	text-align: left;
+	background: #2a2a2a;
+}
+
+.raw-develop__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 8px 12px;
+	border-bottom: 1px solid #3a3a3a;
+	background: #232323;
+	flex: 0 0 auto;
+	z-index: 1;
+}
+
+.raw-develop__title {
+	font-size: 13px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.raw-develop__subtitle {
+	color: #9a9a9a;
+	font-size: 11px;
+	margin-left: 10px;
+	font-weight: 400;
+}
+
+.raw-develop__header-actions {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+
+.raw-develop__btn {
+	appearance: none;
+	border: 1px solid #4a4a4a;
+	background: #333;
+	color: #eee;
+	border-radius: 5px;
+	padding: 5px 12px;
+	cursor: pointer;
+	font-size: 12px;
+}
+
+.raw-develop__btn:hover { background: #3d3d3d; }
+.raw-develop__btn:disabled {
+	opacity: 0.55;
+	cursor: wait;
+}
+
+.raw-develop__btn--primary {
+	background: #0d6efd;
+	border-color: #0d6efd;
+	color: #fff;
+}
+
+.raw-develop__btn--primary:hover:not(:disabled) { background: #0b5ed7; }
+
+.raw-develop__btn--ghost { background: transparent; }
+
+.raw-develop__body {
+	display: flex;
+	flex-direction: row;
+	flex: 1 1 auto;
+	min-height: 0;
+	min-width: 0;
+	width: 100%;
+	align-items: stretch;
+	justify-content: flex-start;
+	text-align: left;
+	overflow: hidden;
+}
+
+.raw-develop__viewer {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 0;
+	position: relative;
+	background:
+		linear-gradient(45deg, #1c1c1c 25%, transparent 25%),
+		linear-gradient(-45deg, #1c1c1c 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #1c1c1c 75%),
+		linear-gradient(-45deg, transparent 75%, #1c1c1c 75%);
+	background-size: 16px 16px;
+	background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+	background-color: #242424;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+}
+
+.raw-develop__viewer canvas {
+	max-width: 100%;
+	max-height: 100%;
+	width: auto;
+	height: auto;
+	display: block;
+	box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 12px 40px rgba(0,0,0,0.45);
+}
+
+.raw-develop__sidebar {
+	flex: 0 0 280px;
+	width: 280px;
+	max-width: 280px;
+	margin: 0;
+	border-left: 1px solid #3a3a3a;
+	border-right: 0;
+	background: #262626;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: auto;
+	padding-bottom: 8px;
+	box-sizing: border-box;
+	text-align: left;
+}
+
+.raw-develop__hint {
+	padding: 8px 12px 2px;
+	color: #888;
+	font-size: 10px;
+	line-height: 1.35;
+	margin: 0;
+}
+
+.raw-develop__panel {
+	border-bottom: 1px solid #333;
+}
+
+.raw-develop__panel-toggle {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 7px 12px;
+	background: transparent;
+	border: 0;
+	color: #d0d0d0;
+	cursor: pointer;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	text-align: left;
+}
+
+.raw-develop__panel-toggle:hover { background: #2e2e2e; }
+
+.raw-develop__panel-toggle::after {
+	content: '';
+	width: 0;
+	height: 0;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 5px solid #999;
+	transition: transform 120ms ease;
+}
+
+.raw-develop__panel.is-collapsed .raw-develop__panel-toggle::after {
+	transform: rotate(-90deg);
+}
+
+.raw-develop__panel-body { padding: 2px 12px 8px; }
+
+.raw-develop__panel.is-collapsed .raw-develop__panel-body { display: none; }
+
+.raw-develop__control {
+	display: grid;
+	grid-template-columns: 72px 1fr 36px;
+	gap: 6px;
+	align-items: center;
+	margin: 4px 0;
+}
+
+.raw-develop__control label {
+	color: #bdbdbd;
+	font-size: 11px;
+	user-select: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.raw-develop__control input[type="range"] {
+	width: 100%;
+	height: 14px;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	cursor: pointer;
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.raw-develop__control input[type="range"]:focus {
+	outline: none;
+}
+
+.raw-develop__control input[type="range"]::-webkit-slider-runnable-track {
+	height: 2px;
+	background: #4a4a4a;
+	border-radius: 1px;
+}
+
+.raw-develop__control input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 10px;
+	height: 10px;
+	margin-top: -4px;
+	border-radius: 50%;
+	background: #c8c8c8;
+	border: 0;
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+
+.raw-develop__control input[type="range"]:hover::-webkit-slider-thumb {
+	background: #6ea8fe;
+}
+
+.raw-develop__control input[type="range"]::-moz-range-track {
+	height: 2px;
+	background: #4a4a4a;
+	border-radius: 1px;
+	border: 0;
+}
+
+.raw-develop__control input[type="range"]::-moz-range-thumb {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: #c8c8c8;
+	border: 0;
+}
+
+.raw-develop__control output {
+	font-variant-numeric: tabular-nums;
+	color: #a8a8a8;
+	font-size: 10px;
+	text-align: right;
+}
+
+@media (max-width: 900px) {
+	.raw-develop__body { flex-direction: column; }
+	.raw-develop__sidebar {
+		flex: 0 0 40%;
+		width: 100%;
+		max-width: none;
+		border-left: 0;
+		border-top: 1px solid #3a3a3a;
+	}
+}

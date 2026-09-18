@@ -18,7 +18,7 @@
 	}
 }
 
-#popups .popup:not(.new_doc_popup) {
+#popups .popup:not(.new_doc_popup):not(.raw_develop_popup) {
 	position: fixed;
 	display: none;
 	top: 15vh;
@@ -87,12 +87,12 @@
 	z-index: 0;
 	cursor:move;
 }
-#popups .popup:not(.new_doc_popup) .dialog_content {
+#popups .popup:not(.new_doc_popup):not(.raw_develop_popup) .dialog_content {
 	overflow-y: auto;
 	max-height: calc(80vh - 11rem);
 	padding: 1rem;
 }
-#popups .popup:not(.new_doc_popup) .buttons{
+#popups .popup:not(.new_doc_popup):not(.raw_develop_popup) .buttons{
 	position: absolute;
 	background-color: var(--block-background-color);
 	bottom: 0;
@@ -128,7 +128,8 @@
 	box-sizing: border-box;
 	width: 100%;
 }
-#popups .popup td, #popups .popup th{
+#popups .popup:not(.raw_develop_popup) td,
+#popups .popup:not(.raw_develop_popup) th{
 	height: 25px;
 }
 #popups .popup td{

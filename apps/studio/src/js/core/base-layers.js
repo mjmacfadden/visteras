@@ -99,7 +99,7 @@ class Base_layers_class {
 
 		new app.Actions.Insert_layer_action({
 			name: 'Background',
-			locked: false,
+			locked: true,
 			type: 'image',
 			data: bgCanvas.toDataURL(),
 		}).do();

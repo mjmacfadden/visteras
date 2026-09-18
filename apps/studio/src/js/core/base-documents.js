@@ -94,7 +94,7 @@ class Base_documents_class {
 			const defaultLayer = {
 				id: 1,
 				name: transp ? 'Layer 1' : 'Background',
-				locked: false,
+				locked: !transp,
 				visible: true,
 				type: 'image',
 				link: bgCanvas,

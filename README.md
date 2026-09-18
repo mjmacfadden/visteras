@@ -20,6 +20,14 @@ site/          # GENERATED (gitignored) — GitHub Pages publish root
 
 Architecture only for now — **no Studio ↔ Vector document compatibility**.
 
+## Raw Develop credits
+
+Studio’s **Raw Develop** modal (Camera Raw–style layout: large preview, collapsible right panels) is original Visteras code.
+
+- **UX inspiration only** (no code copied): [pg0/raw-viewer](https://github.com/pg0/raw-viewer). That repository did not publish a LICENSE file at the time of this work, so it is cited as inspiration only.
+- **v1 sources**: JPEG/PNG and other already-rasterized Studio image layers via canvas `ImageData`.
+- **Future RAW files**: decode is routed through `apps/studio/src/js/libs/raw-source.js` so a LibRaw (or similar) WASM decoder can be registered later without rewriting the UI. LibRaw itself is not bundled yet.
+
 ## Based on miniPaint / SVG-Edit
 
 Studio is a heavily forked descendant of miniPaint by Vilius L. (MIT License).

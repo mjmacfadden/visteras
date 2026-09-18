@@ -157,8 +157,10 @@ export function get_layer_content_bounds(layer) {
 		return null;
 	}
 
-	const scaleX = (layer.width || w) / (layer.width_original || w);
-	const scaleY = (layer.height || h) / (layer.height_original || h);
+	const baseW = w || layer.width_original || layer.width || 1;
+	const baseH = h || layer.height_original || layer.height || 1;
+	const scaleX = (layer.width || baseW) / baseW;
+	const scaleY = (layer.height || baseH) / baseH;
 
 	const contentX = (layer.x || 0) + minX * scaleX;
 	const contentY = (layer.y || 0) + minY * scaleY;

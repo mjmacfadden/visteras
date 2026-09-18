@@ -3944,7 +3944,10 @@ class Text_class extends Base_tools_class {
 				if (wasDynamic && this.mousedownBounds.width > 0) {
 					const preData = config.layer.data ? JSON.parse(JSON.stringify(config.layer.data)) : null;
 					const preParams = JSON.parse(JSON.stringify(config.layer.params || {}));
-					const committed = this.commit_point_text_resize(config.layer, nextW, nextH);
+					const committed = this.commit_point_text_resize(config.layer, nextW, nextH, {
+						x: nextX,
+						y: nextY
+					});
 					if (committed) {
 						update.x = committed.x;
 						update.y = committed.y;
@@ -5085,6 +5088,21 @@ class Text_class extends Base_tools_class {
 		if (!this._point_resize_snapshot) {
 			this.begin_point_text_resize(layer);
 		}
+		const targetX = (options && options.x != null) ? options.x : layer.x;
+		const targetY = (options && options.y != null) ? options.y : layer.y;
+		layer.x = targetX;
+		layer.y = targetY;
+		if (!layer.params) layer.params = {};
+		const halign = normalize_halign(layer.params.halign);
+		if (halign === 'center') {
+			layer.params.anchor_x = targetX + width / 2;
+		} else if (halign === 'right') {
+			layer.params.anchor_x = targetX + width;
+		} else {
+			layer.params.anchor_x = targetX;
+		}
+		layer.params.anchor_y = targetY;
+
 		this.apply_point_text_resize(layer, width, height, options);
 		const baked = this.bake_point_text_resize_commit(layer);
 		const result = {
@@ -5163,6 +5181,9 @@ class Text_class extends Base_tools_class {
 				new_x = Math.round(anchor_x);
 			}
 			if (layer.x !== new_x) layer.x = new_x;
+			if (layer.params.anchor_y != null && layer.y !== Math.round(layer.params.anchor_y)) {
+				layer.y = Math.round(layer.params.anchor_y);
+			}
 			if (layer.width !== new_width) layer.width = new_width;
 			if (layer.height !== new_height) layer.height = new_height;
 			editor.lastCalculatedLayerWidth = new_width;
