@@ -25,60 +25,76 @@
   // --- Curated Theme Presets ---
   const THEME_PRESETS = [
     {
-      id: 'autumn',
-      name: '🍂 Autumn Fodder',
+      id: 'autumn_mix',
+      name: '🍂 Autumn Mixed Fodder',
       q: 'autumn vintage leaves',
       colors: ['red', 'orange', 'yellow', 'brown'],
       style: 'illustration',
+      source: 'both',
+      category: ''
+    },
+    {
+      id: 'vintage_news',
+      name: '🗞️ Historic News & Headlines',
+      q: 'newspaper headlines news',
+      colors: ['brown', 'grayscale', 'black'],
+      style: 'all',
+      source: 'loc',
+      category: ''
+    },
+    {
+      id: 'antique_ads',
+      name: '📜 Antique Ads & Ephemera',
+      q: 'antique advertisement vintage paper label',
+      colors: ['brown', 'yellow'],
+      style: 'all',
+      source: 'both',
       category: ''
     },
     {
       id: 'botanical',
       name: '🌿 Botanical Herbarium',
-      q: 'botanical illustration flower vintage',
+      q: 'botanical illustration flower vintage flora',
       colors: ['green', 'brown'],
       style: 'illustration',
+      source: 'both',
       category: 'nature'
-    },
-    {
-      id: 'antique_ads',
-      name: '📜 Antique Ads & Ephemera',
-      q: 'antique advertisement vintage paper',
-      colors: ['brown', 'yellow'],
-      style: 'all',
-      category: ''
     },
     {
       id: 'wildlife',
       name: '🦋 Victorian Wildlife & Birds',
-      q: 'vintage animal illustration bird',
+      q: 'vintage animal illustration bird wildlife',
       colors: [],
       style: 'illustration',
+      source: 'both',
       category: 'animals'
     },
     {
+      id: 'circus_theatre',
+      name: '🎪 Circus, Theatre & Playbills',
+      q: 'circus theatre entertainment broadside poster',
+      colors: ['red', 'yellow'],
+      style: 'all',
+      source: 'both',
+      category: ''
+    },
+    {
       id: 'retro_pop',
-      name: '🗞️ Retro Pop & Comics',
-      q: 'retro comic vintage poster',
-      colors: [],
+      name: '📻 Retro Pop & Comics',
+      q: 'retro comic vintage pop art poster',
+      colors: ['yellow', 'pink', 'turquoise'],
       style: 'illustration',
+      source: 'pixabay',
       category: ''
     },
     {
       id: 'textures',
-      name: '🎨 Textures & Grunge',
-      q: 'grunge paper texture wood',
-      colors: [],
+      name: '🎨 Textures & Old Paper',
+      q: 'grunge paper texture wood grain',
+      colors: ['brown', 'grayscale'],
       style: 'photo',
+      source: 'both',
       category: 'backgrounds'
-    },
-    {
-      id: 'celestial',
-      name: '🌌 Celestial & Star Maps',
-      q: 'vintage astronomy celestial star map',
-      colors: ['blue', 'black'],
-      style: 'illustration',
-      category: ''
     }
   ];
 
@@ -86,9 +102,10 @@
   const state = {
     activeTool: 'layout',
     activeLayoutId: 'grid-2x2',
-    activePresetId: 'autumn',
+    activePresetId: 'autumn_mix',
     
-    // Pixabay Search & Harmony Parameters
+    // Search & Harmony Parameters
+    imageSource: 'both', // 'both', 'pixabay', 'loc'
     searchQuery: 'autumn vintage leaves',
     selectedStyle: 'all',
     selectedCategory: '',
@@ -177,6 +194,7 @@
     el.statusZoomBtn = document.getElementById('status-zoom-btn');
     el.queryInput = document.getElementById('pixabayQueryInput');
     el.styleSelect = document.getElementById('pixabayStyleSelect');
+    el.imageSourceSelect = document.getElementById('imageSourceSelect');
     el.editorsChoiceToggle = document.getElementById('editorsChoiceToggle');
   }
 
@@ -292,6 +310,10 @@
     state.selectedStyle = preset.style || 'all';
     state.selectedCategory = preset.category || '';
     state.selectedColors = preset.colors ? [...preset.colors] : [];
+    if (preset.source) {
+      state.imageSource = preset.source;
+      if (el.imageSourceSelect) el.imageSourceSelect.value = preset.source;
+    }
 
     if (el.queryInput) el.queryInput.value = state.searchQuery;
     if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
@@ -537,6 +559,93 @@
     return [];
   }
 
+  // --- Library of Congress / Chronicling America API Engine ---
+  async function fetchChroniclingAmericaImages(query) {
+    const q = query || 'newspaper vintage';
+    const cacheKey = `loc|${q}`;
+    if (state.apiCache[cacheKey]) {
+      return state.apiCache[cacheKey];
+    }
+
+    const url = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(q)}&c=25`;
+    try {
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.results) && data.results.length > 0) {
+          const mapped = [];
+          for (const item of data.results) {
+            if (!item.image_url || !Array.isArray(item.image_url)) continue;
+            const jpgs = item.image_url.filter(u => typeof u === 'string' && u.includes('.jpg'));
+            if (jpgs.length === 0) continue;
+
+            const preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
+            const large = preview.replace(/pct:\d+(\.\d+)?/, 'pct:25');
+
+            mapped.push({
+              id: `loc-${item.id || item.date || Math.random()}`,
+              path: preview,
+              largePath: large,
+              attribution: item.title ? `${item.title.slice(0, 42)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
+              link: item.url || 'https://www.loc.gov/collections/chronicling-america/',
+              source: 'loc'
+            });
+          }
+          if (mapped.length > 0) {
+            state.apiCache[cacheKey] = mapped;
+            return mapped;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Library of Congress search failed:', err);
+    }
+    return [];
+  }
+
+  // --- Combined Fodder Fetcher (Pixabay + Library of Congress) ---
+  async function fetchFodderImages() {
+    const src = state.imageSource || 'both';
+    const query = state.searchQuery || 'vintage';
+
+    if (src === 'pixabay') {
+      return await fetchPixabayImages();
+    }
+
+    if (src === 'loc') {
+      const locHits = await fetchChroniclingAmericaImages(query);
+      if (locHits.length > 0) {
+        showToast(`Loaded ${locHits.length} historic clippings from Library of Congress`);
+        return locHits;
+      }
+      return typeof images !== 'undefined' ? images : [];
+    }
+
+    // Both / Mixed Source Mode (Pixabay + Library of Congress)
+    const [pixabayHits, locHits] = await Promise.all([
+      fetchPixabayImages(),
+      fetchChroniclingAmericaImages(query)
+    ]);
+
+    let interleaved = [];
+    const max = Math.max(pixabayHits.length, locHits.length);
+    for (let i = 0; i < max; i++) {
+      if (pixabayHits[i]) interleaved.push(pixabayHits[i]);
+      if (locHits[i]) interleaved.push(locHits[i]);
+    }
+
+    if (interleaved.length > 0) {
+      showToast(`Loaded ${interleaved.length} mixed assets (${pixabayHits.length} Pixabay + ${locHits.length} Historic LOC)`);
+      return interleaved;
+    }
+
+    // Fallback to local curated image pool if offline
+    if (typeof images !== 'undefined' && Array.isArray(images)) {
+      return images;
+    }
+    return [];
+  }
+
   // --- Generate Fodder Grid ---
   async function generateFodder() {
     initElements();
@@ -546,7 +655,7 @@
     if (el.statusBarStatus) el.statusBarStatus.textContent = 'Fetching fodder...';
 
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
-    const pool = await fetchPixabayImages();
+    const pool = await fetchFodderImages();
     state.onlinePool = pool;
     
     el.container.innerHTML = '';
@@ -844,11 +953,19 @@
     if (genBtnOverlay) genBtnOverlay.addEventListener('click', generateFodder);
     const applyThemeBtn = document.getElementById('action_apply_theme_generate');
     if (applyThemeBtn) applyThemeBtn.addEventListener('click', () => {
+      if (el.imageSourceSelect) state.imageSource = el.imageSourceSelect.value;
       if (el.queryInput) state.searchQuery = el.queryInput.value.trim();
       if (el.styleSelect) state.selectedStyle = el.styleSelect.value;
       if (el.editorsChoiceToggle) state.editorsChoice = el.editorsChoiceToggle.checked;
       generateFodder();
     });
+
+    if (el.imageSourceSelect) {
+      el.imageSourceSelect.value = state.imageSource;
+      el.imageSourceSelect.addEventListener('change', (e) => {
+        state.imageSource = e.target.value;
+      });
+    }
 
     // Clear Colors Button
     const clearColorsBtn = document.getElementById('clearColorsBtn');

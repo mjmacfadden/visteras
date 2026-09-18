@@ -81,11 +81,15 @@ class Media_class extends Base_tools_class {
 		}
 
 		var settings = {
-			title: 'Search',
-			//comment: 'Source: <a class="text_muted" href="https://pixabay.com/">pixabay.com</a>.',
+			title: 'Search Media & Ephemera',
 			className: 'wide',
 			params: [
 				{name: "query", title: "Keyword:", value: query},
+				{name: "source", title: "Source:", value: "both", values: [
+					{name: "both", title: "Mixed (Pixabay + Library of Congress)"},
+					{name: "pixabay", title: "Pixabay (Stock / Vectors)"},
+					{name: "loc", title: "Chronicling America (Historic LOC)"}
+				]},
 			],
 			on_load: function (params, popup) {
 				var node = document.createElement("div");
@@ -117,59 +121,118 @@ class Media_class extends Base_tools_class {
 					});
 				}
 			},
-			on_finish: function (params) {
+			on_finish: async function (params) {
 				if (params.query == '')
 					return;
+
+				var selectedSource = params.source || 'both';
+				var cacheKey = `${selectedSource}|${_this.page}|${params.query}`;
+
+				if (_this.cache[cacheKey] != undefined) {
+					var data = _this.cache[cacheKey];
+					var pages = Math.ceil(data.totalHits / _this.per_page);
+					_this.search(params.query, data.hits, pages);
+					return;
+				}
 
 				var endpoint = localStorage.getItem('visteras_pixabay_endpoint') || '';
 				var customKey = localStorage.getItem('visteras_pixabay_key') || '';
 				var effectiveKey = customKey || key;
 
-				var URL = '';
-				if (endpoint) {
-					URL = endpoint + (endpoint.includes('?') ? '&' : '?')
-						+ "page=" + _this.page
-						+ "&per_page=" + _this.per_page
-						+ "&safesearch=" + safe_search
-						+ "&q=" + encodeURIComponent(params.query);
-				} else {
-					URL = "https://pixabay.com/api/?key=" + encodeURIComponent(effectiveKey)
-						+ "&page=" + _this.page
-						+ "&per_page=" + _this.per_page
-						+ "&safesearch=" + safe_search
-						+ "&q="	+ encodeURIComponent(params.query);
-				}
-
-				if (_this.cache[URL] != undefined) {
-					//using cache
-
-					setTimeout(function () {
-						//only call same function after all handlers finishes
-						var data = _this.cache[URL];
-
-						if (parseInt(data.totalHits) == 0) {
-							alertify.error('Your search did not match any images.');
+				var fetchPixabay = async function() {
+					if (!effectiveKey && !endpoint) return { hits: [], totalHits: 0 };
+					var URL = '';
+					if (endpoint) {
+						URL = endpoint + (endpoint.includes('?') ? '&' : '?')
+							+ "page=" + _this.page
+							+ "&per_page=" + _this.per_page
+							+ "&safesearch=" + safe_search
+							+ "&q=" + encodeURIComponent(params.query);
+					} else {
+						URL = "https://pixabay.com/api/?key=" + encodeURIComponent(effectiveKey)
+							+ "&page=" + _this.page
+							+ "&per_page=" + _this.per_page
+							+ "&safesearch=" + safe_search
+							+ "&q="	+ encodeURIComponent(params.query);
+					}
+					try {
+						var res = await fetch(URL);
+						if (res.ok) {
+							var data = await res.json();
+							return {
+								hits: (data.hits || []).map(h => ({
+									previewURL: h.previewURL,
+									webformatURL: h.largeImageURL || h.webformatURL,
+									source: 'Pixabay'
+								})),
+								totalHits: data.totalHits || 0
+							};
 						}
+					} catch (_) {}
+					return { hits: [], totalHits: 0 };
+				};
 
-						var pages = Math.ceil(data.totalHits / _this.per_page);
-						_this.search(params.query, data.hits, pages);
-					}, 100);
-				}
-				else {
-					//query to service
-					$.getJSON(URL, function (data) {
-						_this.cache[URL] = data;
-
-						if (parseInt(data.totalHits) == 0) {
-							alertify.error('Your search did not match any images.');
+				var fetchLoc = async function() {
+					var locUrl = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(params.query)}&c=${_this.per_page}&sp=${_this.page}`;
+					try {
+						var res = await fetch(locUrl, { headers: { 'Accept': 'application/json' } });
+						if (res.ok) {
+							var data = await res.json();
+							var mapped = [];
+							for (var item of (data.results || [])) {
+								if (!item.image_url || !Array.isArray(item.image_url)) continue;
+								var jpgs = item.image_url.filter(u => typeof u === 'string' && u.includes('.jpg'));
+								if (jpgs.length === 0) continue;
+								var preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
+								var large = preview.replace(/pct:\d+(\.\d+)?/, 'pct:25');
+								mapped.push({
+									previewURL: preview,
+									webformatURL: large,
+									source: 'Library of Congress'
+								});
+							}
+							return {
+								hits: mapped,
+								totalHits: data.pagination ? data.pagination.total : mapped.length
+							};
 						}
+					} catch (_) {}
+					return { hits: [], totalHits: 0 };
+				};
 
-						var pages = Math.ceil(data.totalHits / _this.per_page);
-						_this.search(params.query, data.hits, pages);
-					})
-					.fail(function () {
-						alertify.error('Error connecting to image service. Check your API configuration.');
-					});
+				try {
+					var combinedHits = [];
+					var totalHits = 0;
+
+					if (selectedSource === 'pixabay') {
+						var pResult = await fetchPixabay();
+						combinedHits = pResult.hits;
+						totalHits = pResult.totalHits;
+					} else if (selectedSource === 'loc') {
+						var lResult = await fetchLoc();
+						combinedHits = lResult.hits;
+						totalHits = lResult.totalHits;
+					} else {
+						// Both / Mixed
+						var [pResult, lResult] = await Promise.all([fetchPixabay(), fetchLoc()]);
+						var maxLen = Math.max(pResult.hits.length, lResult.hits.length);
+						for (var i = 0; i < maxLen; i++) {
+							if (pResult.hits[i]) combinedHits.push(pResult.hits[i]);
+							if (lResult.hits[i]) combinedHits.push(lResult.hits[i]);
+						}
+						totalHits = (pResult.totalHits || 0) + (lResult.totalHits || 0);
+					}
+
+					if (combinedHits.length === 0) {
+						alertify.error('Your search did not match any images.');
+					}
+
+					_this.cache[cacheKey] = { hits: combinedHits, totalHits: totalHits };
+					var pages = Math.ceil(totalHits / _this.per_page);
+					_this.search(params.query, combinedHits, pages);
+				} catch (err) {
+					console.error('Media search failed:', err);
+					alertify.error('Error connecting to image services.');
 				}
 			},
 		};
