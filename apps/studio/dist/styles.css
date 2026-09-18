@@ -2086,7 +2086,7 @@ body .sp-preview{
 	flex-wrap: nowrap;
 	align-items: center;
 	background-color: #3c3c3c;
-	padding: 4px 4px 4px 4px;
+	padding: 6px 0;
 	margin-right: 4px;
 	overflow: hidden;
 	align-self: start;
@@ -2095,42 +2095,49 @@ body .sp-preview{
 	max-width: 36px;
 	overflow-y: auto;
 	max-height: 100%;
-	border-right: 1px solid #2a2a2a;
+	border-right: 1px solid #1a1a1a;
+	user-select: none;
+	box-sizing: border-box;
 }
 .sidebar_left .item{
 	position: relative;
-	display:block;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	background-color: transparent;
-	height: 24px;
-	width: 24px;
-	margin: 2px;
+	height: 28px;
+	width: 28px;
+	margin: 1px auto;
 	overflow: hidden;
 	cursor: pointer;
 	border-radius: 2px;
+	border: 1px solid transparent;
+	box-sizing: border-box;
+	transition: background-color 0.12s, border-color 0.12s;
 }
 .sidebar_left .item:after{
 	position: absolute;
 	content: '';
-	left:0;
-	top:0;
-	bottom:0;
-	right:0;
+	left: 0;
+	top: 0;
+	bottom: 0;
+	right: 0;
 	filter: var(--menu-icons-filter);
 	background-position: center center;
 	background-repeat: no-repeat;
-	background-size: 20px 20px;
+	background-size: 15px 15px;
 }
 .sidebar_left .item:hover{
-	background-color: var(--button-background-color-hover);
+	background-color: #505050;
 }
 .sidebar_left .item.active{
-	/* Match News/Publish active tool: left accent stroke + tinted icon */
+	/* Match News/Publish active tool: left accent stroke + blue tinted icon */
 	background-color: #242424;
 	border: 1px solid #1a1a1a;
-	border-left: 2px solid #2f6fae; /* Studio chrome blue (document tabs) */
+	border-left: 2px solid #2f6fae; /* Studio chrome blue */
 	box-sizing: border-box;
-	box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05);
-	color: var(--text-color-active);
+	box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6);
+	border-radius: 2px;
 }
 .sidebar_left .item.active:hover{
 	background-color: #1e1e1e;
@@ -2161,8 +2168,8 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .custom_shape:after{ background-image: url('../images/icons/custom_shape.svg'); }
 .sidebar_left .pen:after{ background-image: url('../images/icons/pen.svg'); }
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
-.sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 16px auto; }
-.sidebar_left .gradient:after{ background-image: url('../images/icons/gradient.png'); background-size: 18px 12px; filter: none; }
+.sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
+.sidebar_left .gradient:after{ background-image: url('../images/icons/gradient.png'); background-size: 14px 9px; filter: none; }
 .sidebar_left .clone:after{ background-image: url('../images/icons/clone.svg'); }
 .sidebar_left .spot_heal:after{ background-image: url('../images/icons/spot_heal.svg'); }
 .sidebar_left .crop:after{ background-image: url('../images/icons/crop.svg'); }

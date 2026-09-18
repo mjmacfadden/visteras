@@ -386,11 +386,12 @@ html, body {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  padding: 4px 0 !important;
+  padding: 6px 0 !important;
   gap: 2px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   box-sizing: border-box !important;
+  user-select: none !important;
   z-index: 100 !important;
 }
 
@@ -402,11 +403,15 @@ html, body {
   margin: 1px auto !important;
   width: 28px !important;
   height: 28px !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  box-sizing: border-box !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   border-radius: 2px !important;
-  transition: all 0.12s !important;
+  cursor: pointer !important;
+  transition: background-color 0.12s, border-color 0.12s !important;
 }
 
 /* Tool button states — hover stays subtle; only pressed/active gets accent */
@@ -418,13 +423,19 @@ html, body {
 #tools_left se-button[pressed],
 #tools_left se-flyingbutton[pressed],
 #tools_left [pressed] {
-  /* Match News/Publish active tool: left accent stroke + orange icon (icon via shadow CSS) */
+  /* Match News/Publish active tool: left accent stroke + orange icon */
   background-color: #242424 !important;
   border: 1px solid #1a1a1a !important;
   border-left: 2px solid var(--studio-orange) !important; /* #fa7c1b */
   box-sizing: border-box !important;
-  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6), inset -1px -1px 1px rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6) !important;
   border-radius: 2px !important;
+}
+
+#tools_left se-button[pressed]:hover,
+#tools_left se-flyingbutton[pressed]:hover,
+#tools_left [pressed]:hover {
+  background-color: #1e1e1e !important;
 }
 
 #tools_left se-flyingbutton se-button {

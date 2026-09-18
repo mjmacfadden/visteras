@@ -1179,11 +1179,90 @@
       (function styleToolsLeftAccent() {
         const orangeFilter =
           'brightness(0) saturate(100%) invert(56%) sepia(95%) saturate(2500%) hue-rotate(359deg) brightness(102%) contrast(96%)';
-        const shadowCss = `
-          img { transition: filter 0.12s; }
-          div.pressed img,
-          :host([pressed]) img {
+        const buttonShadowCss = `
+          :host(:not([in-flyout])) .btn-box {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            animation: none !important;
+          }
+          :host(:not([in-flyout])) img {
+            width: 15px !important;
+            height: 15px !important;
+            max-width: 15px !important;
+            max-height: 15px !important;
+            object-fit: contain !important;
+            background: transparent !important;
+            transition: filter 0.12s;
+          }
+          :host(:not([in-flyout])[pressed]) img,
+          :host(:not([in-flyout])) div.pressed img {
             filter: ${orangeFilter} !important;
+          }
+          :host(:not([in-flyout])[pressed]) .btn-box,
+          :host(:not([in-flyout])) .btn-box.pressed {
+            background: transparent !important;
+          }
+        `;
+        const flyingButtonShadowCss = `
+          .overall, .menu-button {
+            width: 100% !important;
+            height: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: transparent !important;
+            border-radius: 0 !important;
+            animation: none !important;
+          }
+          .overall .menu-button:hover {
+            animation: none !important;
+            background-color: transparent !important;
+          }
+          img, .button-icon {
+            width: 15px !important;
+            height: 15px !important;
+            max-width: 15px !important;
+            max-height: 15px !important;
+            object-fit: contain !important;
+            background: transparent !important;
+            transition: filter 0.12s;
+          }
+          .handle {
+            position: absolute !important;
+            bottom: 1px !important;
+            right: 1px !important;
+            width: 6px !important;
+            height: 6px !important;
+            background: transparent url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><polygon points="6,0 6,6 0,6" fill="%23999999"/></svg>') no-repeat center / contain !important;
+          }
+          :host([pressed]) img,
+          .overall.pressed img,
+          :host([pressed]) .button-icon,
+          .overall.pressed .button-icon {
+            filter: ${orangeFilter} !important;
+            background: transparent !important;
+          }
+          :host([pressed]) .handle,
+          .overall.pressed .handle {
+            background: transparent url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><polygon points="6,0 6,6 0,6" fill="%23fa7c1b"/></svg>') no-repeat center / contain !important;
+          }
+          .overall.pressed,
+          .overall.pressed .button-icon,
+          .overall.pressed .menu-button,
+          :host([pressed]) .overall,
+          :host([pressed]) .menu-button {
+            background-color: transparent !important;
+            background: transparent !important;
           }
         `;
         const apply = () => {
@@ -1197,7 +1276,8 @@
               style.setAttribute('data-visteras-tool-accent', '1');
               host.shadowRoot.appendChild(style);
             }
-            style.textContent = shadowCss;
+            const isFlying = host.tagName.toLowerCase() === 'se-flyingbutton';
+            style.textContent = isFlying ? flyingButtonShadowCss : buttonShadowCss;
           });
         };
         apply();
