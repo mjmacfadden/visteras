@@ -86,7 +86,7 @@
     toast.style.transform = 'translateX(-50%)';
     toast.style.background = 'rgba(20, 20, 20, 0.92)';
     toast.style.color = '#ffffff';
-    toast.style.border = '1px solid #e11d48';
+    toast.style.border = '1px solid #a855f7';
     toast.style.borderRadius = '3px';
     toast.style.padding = '6px 14px';
     toast.style.fontSize = '11px';

@@ -14,10 +14,10 @@
   --studio-text-muted: #888888;
   
   /* Visteras Collage Brand Color */
-  --collage-rose: #e11d48;
-  --collage-rose-light: #fb7185;
-  --collage-rose-dark: #be123c;
-  --collage-rose-bg: rgba(225, 29, 72, 0.18);
+  --collage-purple: #a855f7;
+  --collage-purple-light: #c084fc;
+  --collage-purple-dark: #9333ea;
+  --collage-purple-bg: rgba(168, 85, 247, 0.18);
   
   --page-width: 8.5in;
   --page-height: 11in;
@@ -110,7 +110,7 @@ html {
 }
 
 .menu_entry.open .menu_entry_title {
-  background: var(--collage-rose);
+  background: var(--collage-purple);
   color: #ffffff;
 }
 
@@ -145,7 +145,7 @@ html {
 }
 
 .menu_dropdown_item:hover:not(.disabled) {
-  background: var(--collage-rose);
+  background: var(--collage-purple);
   color: #ffffff;
 }
 
@@ -261,13 +261,13 @@ html {
   flex-shrink: 0;
 }
 
-.btn_visteras_rose {
+.btn_visteras_purple {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 12px;
-  background: var(--collage-rose);
-  border: 1px solid var(--collage-rose-light);
+  background: var(--collage-purple);
+  border: 1px solid var(--collage-purple-light);
   border-radius: 2px;
   color: #ffffff;
   font-size: 11px;
@@ -276,8 +276,8 @@ html {
   transition: background 0.15s;
 }
 
-.btn_visteras_rose:hover {
-  background: var(--collage-rose-light);
+.btn_visteras_purple:hover {
+  background: var(--collage-purple-light);
   color: #ffffff;
 }
 
@@ -348,7 +348,7 @@ html {
 .tool_btn.active {
   background-color: #242424;
   border: 1px solid #1a1a1a;
-  border-left: 2px solid var(--collage-rose);
+  border-left: 2px solid var(--collage-purple);
   color: #ffffff;
   box-shadow: inset 1px 1px 2px rgba(0,0,0,0.6);
 }
@@ -359,7 +359,7 @@ html {
 }
 
 .tool_btn.active svg {
-  stroke: var(--collage-rose-light) !important;
+  stroke: var(--collage-purple-light) !important;
 }
 
 /* 4. Middle Workspace & Printable Sheet */
@@ -472,8 +472,8 @@ html {
 }
 
 .tile-icon-btn:hover {
-  background: var(--collage-rose);
-  border-color: var(--collage-rose-light);
+  background: var(--collage-purple);
+  border-color: var(--collage-purple-light);
   transform: scale(1.1);
 }
 
@@ -523,8 +523,8 @@ html {
 }
 
 .text-overlay:hover, .text-overlay.active {
-  border-color: var(--collage-rose);
-  background: rgba(225, 29, 72, 0.1);
+  border-color: var(--collage-purple);
+  background: rgba(168, 85, 247, 0.1);
 }
 
 /* Empty State Initial Screen */
@@ -604,9 +604,9 @@ html {
   font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;
-  background: var(--collage-rose-bg);
-  color: var(--collage-rose-light);
-  border: 1px solid var(--collage-rose);
+  background: var(--collage-purple-bg);
+  color: var(--collage-purple-light);
+  border: 1px solid var(--collage-purple);
   border-radius: 2px;
 }
 
@@ -693,12 +693,12 @@ html {
 }
 
 .panel_input:focus, .panel_select:focus {
-  border-color: var(--collage-rose);
+  border-color: var(--collage-purple);
 }
 
 .panel_range {
   width: 100%;
-  accent-color: var(--collage-rose);
+  accent-color: var(--collage-purple);
 }
 
 .panel_checkbox_row {
@@ -712,7 +712,7 @@ html {
 }
 
 .panel_checkbox_row input[type="checkbox"], .panel_checkbox_row input[type="radio"] {
-  accent-color: var(--collage-rose);
+  accent-color: var(--collage-purple);
   cursor: pointer;
 }
 
@@ -759,8 +759,8 @@ html {
 }
 
 .tag-badge.active {
-  background: var(--collage-rose);
-  border-color: var(--collage-rose-light);
+  background: var(--collage-purple);
+  border-color: var(--collage-purple-light);
   color: #ffffff;
 }
 
@@ -778,13 +778,13 @@ html {
 }
 
 .layout-card:hover {
-  border-color: var(--collage-rose);
+  border-color: var(--collage-purple);
   background: #2d2d2d;
 }
 
 .layout-card.active {
-  border-color: var(--collage-rose);
-  background: var(--collage-rose-bg);
+  border-color: var(--collage-purple);
+  background: var(--collage-purple-bg);
   color: #ffffff;
 }
 
@@ -813,8 +813,8 @@ html {
   color: #777777;
 }
 
-.status_tag_rose {
-  color: var(--collage-rose-light);
+.status_tag_purple {
+  color: var(--collage-purple-light);
   font-weight: 600;
 }
 

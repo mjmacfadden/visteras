@@ -43,7 +43,7 @@ class GUI_menu_class {
 					<span class="visteras_badge" style="color: #14b8a6;">PUBLISH</span> ↗
 				</a>
 				<a href="../collage/" class="visteras_switch_btn" title="Switch to Visteras Collage (Printable Collage Fodder Generator)">
-					<span class="visteras_badge" style="color: #e11d48;">COLLAGE</span> ↗
+					<span class="visteras_badge" style="color: #a855f7;">COLLAGE</span> ↗
 				</a>
 			</div>
 		`;
