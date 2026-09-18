@@ -174,7 +174,7 @@ function updateDateDisplays(isoDate: string, dateDisplay: string) {
   });
 
   // Product browser title — never the newspaper masthead (THE DAILY MIKE / custom).
-  document.title = `Visteras Publish — ${dateDisplay}`;
+  document.title = 'Visteras - Publish';
 }
 
 function updatePuzzles(isoDate: string) {
