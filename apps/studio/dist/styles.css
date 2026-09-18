@@ -2087,12 +2087,11 @@ body .sp-preview{
 	background-color: #3c3c3c;
 	padding: 6px 0;
 	overflow: hidden;
-	align-self: start;
+	height: 100%;
 	width: 36px;
 	min-width: 36px;
 	max-width: 36px;
 	overflow-y: auto;
-	max-height: 100%;
 	border-right: 1px solid #1a1a1a;
 	user-select: none;
 	box-sizing: border-box;
@@ -2277,6 +2276,7 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 	overflow-x: hidden;
 	overflow-y: scroll;
 	margin: 0;
+	height: 100%;
 	width: 250px;
 	background-color: #3c3c3c;
 	border-left: 1px solid #1a1a1a;
