@@ -417,12 +417,9 @@
             </div>
             <div class="panel_field">
               <span class="panel_label">Font Family</span>
-              <select id="fontFamily" class="panel_select">
-                <option value="'Roboto', sans-serif" selected>Roboto</option>
-                <option value="Arial, sans-serif">Arial</option>
-                <option value="'Playfair Display', Georgia, serif">Playfair Display (Serif)</option>
-                <option value="'Lora', serif">Lora</option>
-                <option value="'Courier New', monospace">Typewriter / Mono</option>
+              <div id="slot_font_family"></div>
+              <select id="fontFamily" class="panel_select" style="display: none;">
+                <option value="Roboto" selected>Roboto</option>
               </select>
             </div>
             <div class="panel_row">
@@ -516,6 +513,6 @@
 
   <!-- App Logic -->
   <script src="js/overlays.js"></script>
-  <script src="js/app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

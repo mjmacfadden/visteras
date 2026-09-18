@@ -1,7 +1,9 @@
-/**
- * Visteras Collage - Printable Collage Fodder Generator
- * Monorepo app for Visteras Suite
- */
+import {
+  mountCollageFontPicker,
+  loadFontFamily,
+  DEFAULT_FONT_FAMILY,
+  isSystemFontFamily,
+} from './visteras-font-bridge.js';
 
 (function() {
   'use strict';
@@ -139,7 +141,7 @@
     // Text Overlay
     textOverlay: {
       content: '',
-      fontFamily: "'Roboto', sans-serif",
+      fontFamily: DEFAULT_FONT_FAMILY,
       fontSize: 28,
       fontColor: '#212529',
       bold: false,
@@ -488,7 +490,23 @@
     });
   }
 
-  // --- Text Overlay Handling ---
+  // --- Text Overlay & Font Engine Handling ---
+  let fontPickerInstance = null;
+
+  function initFontPicker() {
+    const slot = document.getElementById('slot_font_family');
+    if (slot && !fontPickerInstance) {
+      fontPickerInstance = mountCollageFontPicker({
+        slotElement: slot,
+        initialFamily: state.textOverlay.fontFamily || DEFAULT_FONT_FAMILY,
+        onFontChange: (family) => {
+          state.textOverlay.fontFamily = family;
+          updateTextOverlay();
+        }
+      });
+    }
+  }
+
   function updateTextOverlay() {
     if (!el.textOverlay || !el.textContent) return;
     const txt = state.textOverlay.content.trim();
@@ -499,7 +517,7 @@
 
     el.textOverlay.style.display = 'inline-block';
     el.textContent.textContent = txt;
-    el.textOverlay.style.fontFamily = state.textOverlay.fontFamily;
+    el.textOverlay.style.fontFamily = `"${state.textOverlay.fontFamily}", sans-serif`;
     el.textOverlay.style.fontSize = `${state.textOverlay.fontSize}px`;
     el.textOverlay.style.color = state.textOverlay.fontColor;
     el.textOverlay.style.fontWeight = state.textOverlay.bold ? 'bold' : 'normal';
@@ -1071,6 +1089,15 @@
 
     showToast('Rendering high-res 300 DPI sheet...');
     try {
+      if (state.textOverlay && state.textOverlay.content && state.textOverlay.fontFamily) {
+        try {
+          await loadFontFamily({
+            family: state.textOverlay.fontFamily,
+            source: isSystemFontFamily(state.textOverlay.fontFamily) ? 'system' : 'google'
+          });
+        } catch (_) {}
+      }
+
       // Temporarily swap images to high-res large URLs for pristine 300 DPI rasterization
       const imgs = el.container.querySelectorAll('img');
       const originalSrcs = [];
@@ -1145,7 +1172,12 @@
     state.overlayOpacity = saveObj.overlayOpacity || 100;
     state.paintEnabled = saveObj.paintEnabled || false;
     state.paintColor = saveObj.paintColor || '#F2B041';
-    if (saveObj.textOverlay) state.textOverlay = saveObj.textOverlay;
+    if (saveObj.textOverlay) {
+      state.textOverlay = saveObj.textOverlay;
+      if (fontPickerInstance && state.textOverlay.fontFamily) {
+        fontPickerInstance.selectFamily(state.textOverlay.fontFamily);
+      }
+    }
 
     renderLayoutList();
     renderThemePresets();
@@ -1530,6 +1562,7 @@
   // --- App Initialization ---
   function init() {
     initElements();
+    initFontPicker();
     try {
       const stored = localStorage.getItem('visteras_collage_saves');
       if (stored) state.savedCollages = JSON.parse(stored);

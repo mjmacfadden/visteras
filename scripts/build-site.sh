@@ -42,7 +42,7 @@ copy_tree() {
   fi
 }
 
-echo "==> Building shared fonts bundle for Vector"
+echo "==> Building shared fonts bundle for Vector & Collage"
 npm run build:vector --prefix "$ROOT/packages/fonts"
 
 echo "==> Building Studio (apps/studio → dist/)"
