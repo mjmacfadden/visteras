@@ -25,9 +25,9 @@ function extractSvgFromHtml(html) {
 	return m ? m[0] : null;
 }
 
-function serializeSelectedToSvg(svgCanvas) {
+function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	if (!svgCanvas) return null;
-	const selected = (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : [])
+	const selected = (customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
 		.filter(Boolean);
 	if (!selected.length) return null;
 
@@ -40,6 +40,10 @@ function serializeSelectedToSvg(svgCanvas) {
 			const clone = el.cloneNode(true);
 			// Drop SVG-Edit selection helpers if present
 			clone.classList && clone.classList.remove('selected');
+			if (clone.querySelectorAll) {
+				const helpers = clone.querySelectorAll('.selected, .selectorGrip, [id^="selectorGrip_"]');
+				for (const h of helpers) h.remove();
+			}
 			parts.push(serializer.serializeToString(clone));
 			if (typeof svgCanvas.getStrokedBBox === 'function') {
 				const bb = svgCanvas.getStrokedBBox([el]);
@@ -51,10 +55,12 @@ function serializeSelectedToSvg(svgCanvas) {
 				}
 			} else if (el.getBBox) {
 				const bb = el.getBBox();
-				if (bb.x < minX) minX = bb.x;
-				if (bb.y < minY) minY = bb.y;
-				if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
-				if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
+				if (bb) {
+					if (bb.x < minX) minX = bb.x;
+					if (bb.y < minY) minY = bb.y;
+					if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
+					if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
+				}
 			}
 		} catch (err) {
 			console.warn('serializeSelectedToSvg element failed', err);
@@ -116,8 +122,10 @@ function publishChannel(svgText) {
 async function readSvgFromEvent(e) {
 	const asSvg = (text) => {
 		if (!text) return null;
+		const m = String(text).match(/<svg[\s\S]*?<\/svg>/i);
+		if (m) return m[0];
 		if (looksLikeSvg(text)) return text;
-		return extractSvgFromHtml(text);
+		return null;
 	};
 
 	if (e && e.clipboardData) {
@@ -201,6 +209,52 @@ export function installVisterasClipboardBridge(opts = {}) {
 		return;
 	}
 
+	function getSelectedElementsSafe() {
+		let selected = (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : [])
+			.filter(Boolean);
+		if (!selected.length && svgEditor && svgEditor.selectedElement) {
+			selected = [svgEditor.selectedElement];
+		}
+		if (!selected.length && svgCanvas.selectedElements && Array.isArray(svgCanvas.selectedElements)) {
+			selected = svgCanvas.selectedElements.filter(Boolean);
+		}
+		return selected;
+	}
+
+	// Synchronous native copy and cut capture on document
+	const onCopyOrCut = (e) => {
+		const target = e.target;
+		if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+			return;
+		}
+
+		const selected = getSelectedElementsSafe();
+		if (!selected.length) return;
+
+		const svgText = serializeSelectedToSvg(svgCanvas, selected);
+		if (!svgText) return;
+
+		publishChannel(svgText);
+
+		if (e.clipboardData) {
+			try {
+				e.clipboardData.clearData();
+				e.clipboardData.setData(SVG_MIME, svgText);
+				e.clipboardData.setData('text/plain', svgText);
+				e.clipboardData.setData('text/html', svgText);
+				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, svg: svgText }));
+				e.preventDefault();
+			} catch (err) {
+				console.warn('e.clipboardData.setData error:', err);
+			}
+		}
+
+		writeSvgClipboard(svgText);
+	};
+
+	document.addEventListener('copy', onCopyOrCut, true);
+	document.addEventListener('cut', onCopyOrCut, true);
+
 	// --- Copy: wrap copySelectedElements ---
 	const origCopy = svgCanvas.copySelectedElements
 		? svgCanvas.copySelectedElements.bind(svgCanvas)
@@ -209,7 +263,8 @@ export function installVisterasClipboardBridge(opts = {}) {
 	svgCanvas.copySelectedElements = function wrappedCopySelectedElements(...args) {
 		const result = origCopy ? origCopy(...args) : undefined;
 		try {
-			const svgText = serializeSelectedToSvg(svgCanvas);
+			const selected = getSelectedElementsSafe();
+			const svgText = serializeSelectedToSvg(svgCanvas, selected);
 			if (svgText) {
 				publishChannel(svgText);
 				writeSvgClipboard(svgText);
@@ -224,9 +279,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 	if (typeof svgCanvas.cutSelectedElements === 'function') {
 		const origCut = svgCanvas.cutSelectedElements.bind(svgCanvas);
 		svgCanvas.cutSelectedElements = function (...args) {
-			// copySelectedElements is called by cut in SVG-Edit, but be safe
 			try {
-				const svgText = serializeSelectedToSvg(svgCanvas);
+				const selected = getSelectedElementsSafe();
+				const svgText = serializeSelectedToSvg(svgCanvas, selected);
 				if (svgText) {
 					publishChannel(svgText);
 					writeSvgClipboard(svgText);

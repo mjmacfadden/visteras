@@ -381,11 +381,39 @@ function parse_points_attr(points) {
 	return pts;
 }
 
+function parse_inline_style(styleStr) {
+	if (!styleStr) return {};
+	const res = {};
+	const decls = styleStr.split(';');
+	for (const decl of decls) {
+		const idx = decl.indexOf(':');
+		if (idx > -1) {
+			const prop = decl.slice(0, idx).trim().toLowerCase();
+			const val = decl.slice(idx + 1).trim();
+			if (prop && val) res[prop] = val;
+		}
+	}
+	return res;
+}
+
 function apply_element_style(el, defaults = {}) {
-	const get = (name, fallback) => (el.hasAttribute(name) ? el.getAttribute(name) : fallback);
+	const inline = parse_inline_style(el.getAttribute('style'));
+	const get = (name, fallback) => {
+		if (inline[name] != null) return inline[name];
+		if (el.hasAttribute(name)) return el.getAttribute(name);
+		let p = el.parentElement;
+		while (p && p.tagName && p.tagName.toLowerCase() === 'g') {
+			const pInline = parse_inline_style(p.getAttribute('style'));
+			if (pInline[name] != null) return pInline[name];
+			if (p.hasAttribute(name)) return p.getAttribute(name);
+			p = p.parentElement;
+		}
+		return fallback;
+	};
+
 	const fill = get('fill', defaults.fill != null ? defaults.fill : '#000000');
 	const stroke = get('stroke', defaults.stroke != null ? defaults.stroke : 'none');
-	const stroke_width = parseFloat(get('stroke-width', defaults.stroke_width != null ? defaults.stroke_width : 1)) || 0;
+	const stroke_width = parseFloat(get('stroke-width', defaults.stroke_width != null ? defaults.stroke_width : 0)) || 0;
 	const fill_rule = get('fill-rule', defaults.fill_rule || 'nonzero');
 	const stroke_join = get('stroke-linejoin', defaults.stroke_join || 'miter');
 	const stroke_cap = get('stroke-linecap', defaults.stroke_cap || 'butt');
@@ -399,6 +427,111 @@ function apply_element_style(el, defaults = {}) {
 		stroke_cap,
 		opacity: Number.isFinite(op) ? Math.round(op * 100) : 100
 	};
+}
+
+function parse_svg_transform(str) {
+	if (!str || typeof str !== 'string') return null;
+	let matrix = [1, 0, 0, 1, 0, 0];
+
+	const multiply = (m1, m2) => [
+		m1[0] * m2[0] + m1[2] * m2[1],
+		m1[1] * m2[0] + m1[3] * m2[1],
+		m1[0] * m2[2] + m1[2] * m2[3],
+		m1[1] * m2[2] + m1[3] * m2[3],
+		m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+		m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+	];
+
+	const re = /([a-zA-Z]+)\s*\(([^)]+)\)/g;
+	let m;
+	while ((m = re.exec(str)) !== null) {
+		const type = m[1].toLowerCase();
+		const args = m[2].trim().split(/[\s,]+/).map(parseFloat).filter(Number.isFinite);
+		let cur = [1, 0, 0, 1, 0, 0];
+
+		if (type === 'matrix' && args.length >= 6) {
+			cur = [args[0], args[1], args[2], args[3], args[4], args[5]];
+		} else if (type === 'translate') {
+			const tx = args[0] || 0;
+			const ty = args[1] != null ? args[1] : 0;
+			cur = [1, 0, 0, 1, tx, ty];
+		} else if (type === 'scale') {
+			const sx = args[0] || 1;
+			const sy = args[1] != null ? args[1] : sx;
+			cur = [sx, 0, 0, sy, 0, 0];
+		} else if (type === 'rotate') {
+			const deg = args[0] || 0;
+			const rad = (deg * Math.PI) / 180;
+			const cos = Math.cos(rad);
+			const sin = Math.sin(rad);
+			if (args.length >= 3) {
+				const cx = args[1], cy = args[2];
+				const t1 = [1, 0, 0, 1, cx, cy];
+				const r = [cos, sin, -sin, cos, 0, 0];
+				const t2 = [1, 0, 0, 1, -cx, -cy];
+				cur = multiply(multiply(t1, r), t2);
+			} else {
+				cur = [cos, sin, -sin, cos, 0, 0];
+			}
+		} else if (type === 'skewx') {
+			const rad = ((args[0] || 0) * Math.PI) / 180;
+			cur = [1, 0, Math.tan(rad), 1, 0, 0];
+		} else if (type === 'skewy') {
+			const rad = ((args[0] || 0) * Math.PI) / 180;
+			cur = [1, Math.tan(rad), 0, 1, 0, 0];
+		}
+		matrix = multiply(matrix, cur);
+	}
+
+	return matrix;
+}
+
+function get_cumulative_transform(el) {
+	let matrix = [1, 0, 0, 1, 0, 0];
+	const multiply = (m1, m2) => [
+		m1[0] * m2[0] + m1[2] * m2[1],
+		m1[1] * m2[0] + m1[3] * m2[1],
+		m1[0] * m2[2] + m1[2] * m2[3],
+		m1[1] * m2[2] + m1[3] * m2[3],
+		m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+		m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+	];
+
+	const stack = [];
+	let curr = el;
+	while (curr && curr.tagName && curr.tagName.toLowerCase() !== 'svg') {
+		const t = curr.getAttribute('transform');
+		if (t) stack.unshift(t);
+		curr = curr.parentElement;
+	}
+
+	for (const tStr of stack) {
+		const m = parse_svg_transform(tStr);
+		if (m) matrix = multiply(matrix, m);
+	}
+	return matrix;
+}
+
+function transform_point(pt, matrix) {
+	if (!pt || !matrix) return pt;
+	return {
+		x: matrix[0] * pt.x + matrix[2] * pt.y + matrix[4],
+		y: matrix[1] * pt.x + matrix[3] * pt.y + matrix[5]
+	};
+}
+
+function apply_transform_to_subpaths(subpaths, matrix) {
+	if (!matrix || (matrix[0] === 1 && matrix[1] === 0 && matrix[2] === 0 && matrix[3] === 1 && matrix[4] === 0 && matrix[5] === 0)) {
+		return subpaths;
+	}
+	for (const sp of subpaths) {
+		for (const a of sp.anchors) {
+			a.point = transform_point(a.point, matrix);
+			if (a.handle_in) a.handle_in = transform_point(a.handle_in, matrix);
+			if (a.handle_out) a.handle_out = transform_point(a.handle_out, matrix);
+		}
+	}
+	return subpaths;
 }
 
 function shape_to_subpaths(el) {
@@ -515,8 +648,10 @@ function svg_dom_to_vectors(doc) {
 	for (const el of filtered) {
 		const style = apply_element_style(el);
 		const style_key = JSON.stringify(style);
-		const subpaths = shape_to_subpaths(el);
+		const matrix = get_cumulative_transform(el);
+		let subpaths = shape_to_subpaths(el);
 		if (!subpaths.length) continue;
+		subpaths = apply_transform_to_subpaths(subpaths, matrix);
 
 		if (!current || style_key !== current_style_key) {
 			current = new Vector({
@@ -547,13 +682,16 @@ function svg_dom_to_vectors(doc) {
 export function svg_to_vectors(svgText) {
 	if (!looks_like_svg(svgText)) return [];
 
-	const embedded = try_embedded_vectors(svgText);
+	const m = String(svgText).match(/<svg[\s\S]*?<\/svg>/i);
+	const cleanSvg = m ? m[0] : svgText;
+
+	const embedded = try_embedded_vectors(cleanSvg);
 	if (embedded && embedded.length) return embedded;
 
 	const parser = new DOMParser();
-	let doc = parser.parseFromString(svgText, 'image/svg+xml');
+	let doc = parser.parseFromString(cleanSvg, 'image/svg+xml');
 	if (doc.querySelector('parsererror')) {
-		doc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${svgText}</svg>`, 'image/svg+xml');
+		doc = parser.parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${cleanSvg}</svg>`, 'image/svg+xml');
 		if (doc.querySelector('parsererror')) return [];
 	}
 	return svg_dom_to_vectors(doc);
@@ -617,9 +755,10 @@ export async function write_svg_clipboard(svgText, extra = {}) {
 export async function read_svg_from_clipboard_event(e) {
 	const as_svg = (text) => {
 		if (!text) return null;
-		if (looks_like_svg(text)) return text;
 		const m = String(text).match(/<svg[\s\S]*?<\/svg>/i);
-		return m ? m[0] : null;
+		if (m) return m[0];
+		if (looks_like_svg(text)) return text;
+		return null;
 	};
 
 	if (e && e.clipboardData) {
@@ -638,8 +777,9 @@ export async function read_svg_from_clipboard_event(e) {
 					if (type === VISTERAS_VECTOR_MIME && text) {
 						try {
 							const data = JSON.parse(text);
-							if (data && data.format === 'visteras-vector' && Array.isArray(data.vectors)) {
-								return vectors_to_svg(data.vectors.map(Vector.fromJSON));
+							if (data && data.format === 'visteras-vector') {
+								if (data.svg) return as_svg(data.svg);
+								if (Array.isArray(data.vectors)) return vectors_to_svg(data.vectors.map(Vector.fromJSON));
 							}
 						} catch (err) { /* fall through */ }
 					}
@@ -654,6 +794,11 @@ export async function read_svg_from_clipboard_event(e) {
 		if (html) return html;
 	}
 
+	// Check cross-app broadcast cache
+	if (window.__visteras_last_cross_app_svg) {
+		return window.__visteras_last_cross_app_svg;
+	}
+
 	try {
 		if (navigator.clipboard && navigator.clipboard.read) {
 			const clip_items = await navigator.clipboard.read();
@@ -666,8 +811,9 @@ export async function read_svg_from_clipboard_event(e) {
 						if (type === VISTERAS_VECTOR_MIME) {
 							try {
 								const data = JSON.parse(text);
-								if (data && data.format === 'visteras-vector' && Array.isArray(data.vectors)) {
-									return vectors_to_svg(data.vectors.map(Vector.fromJSON));
+								if (data && data.format === 'visteras-vector') {
+									if (data.svg) return as_svg(data.svg);
+									if (Array.isArray(data.vectors)) return vectors_to_svg(data.vectors.map(Vector.fromJSON));
 								}
 							} catch (err) { /* ignore */ }
 						}
@@ -682,7 +828,7 @@ export async function read_svg_from_clipboard_event(e) {
 			if (svg) return svg;
 		}
 	} catch (err) {
-		// Permission denied — event path may still have succeeded
+		// Permission denied — event path or broadcast cache may still have succeeded
 	}
 	return null;
 }

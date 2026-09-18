@@ -10,12 +10,19 @@ import {
 
 class Edit_paste_class {
 
-	paste() {
+	async paste() {
 		if (config._internal_clipboard != null) {
 			this.paste_internal();
 			return;
 		}
-		alertify.error('Use Ctrl+V to paste from the clipboard.');
+		if (window.__visteras_last_cross_app_svg) {
+			const ok = this.paste_svg_text(window.__visteras_last_cross_app_svg);
+			if (ok) return;
+		}
+		const ok = await this.paste_from_system_svg(null);
+		if (!ok) {
+			alertify.error('Use Ctrl+V to paste from the clipboard.');
+		}
 	}
 
 	paste_svg_text(svgText) {
@@ -37,6 +44,13 @@ class Edit_paste_class {
 				new app.Actions.Bundle_action('paste_vectors', 'Paste Vectors', actions)
 			);
 		}
+		if (app.GUI && app.GUI.GUI_vectors) {
+			app.GUI.GUI_vectors.render_vectors();
+		}
+		if (app.GUI && app.GUI.GUI_layers) {
+			app.GUI.GUI_layers.render_layers();
+		}
+		config.need_render = true;
 		return true;
 	}
 

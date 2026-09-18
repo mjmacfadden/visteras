@@ -32,6 +32,19 @@ class Clipboard_class {
 			_self.paste_auto(e);
 		}, false); //official paste handler
 
+		// Cross-app Vector clipboard listener
+		try {
+			if (typeof BroadcastChannel !== 'undefined') {
+				const ch = new BroadcastChannel('visteras-vector-clip');
+				ch.addEventListener('message', (ev) => {
+					if (ev.data && ev.data.svg) {
+						window.__visteras_last_cross_app_svg = ev.data.svg;
+						window.__visteras_last_cross_app_ts = ev.data.ts || Date.now();
+					}
+				});
+			}
+		} catch (e) { /* ignore */ }
+
 		this.init();
 	}
 
