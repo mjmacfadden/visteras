@@ -6,13 +6,100 @@
 (function() {
   'use strict';
 
+  // --- Available Pixabay Color Options ---
+  const COLOR_OPTIONS = [
+    { id: 'red', name: 'Red', hex: '#ef4444' },
+    { id: 'orange', name: 'Orange', hex: '#f97316' },
+    { id: 'yellow', name: 'Yellow', hex: '#eab308' },
+    { id: 'green', name: 'Green', hex: '#22c55e' },
+    { id: 'turquoise', name: 'Teal', hex: '#06b6d4' },
+    { id: 'blue', name: 'Blue', hex: '#3b82f6' },
+    { id: 'lilac', name: 'Lilac', hex: '#a855f7' },
+    { id: 'pink', name: 'Pink', hex: '#ec4899' },
+    { id: 'brown', name: 'Brown', hex: '#92400e' },
+    { id: 'grayscale', name: 'Gray', hex: '#6b7280' },
+    { id: 'black', name: 'Black', hex: '#18181b' },
+    { id: 'white', name: 'White', hex: '#ffffff' },
+  ];
+
+  // --- Curated Theme Presets ---
+  const THEME_PRESETS = [
+    {
+      id: 'autumn',
+      name: '🍂 Autumn Fodder',
+      q: 'autumn vintage leaves',
+      colors: ['red', 'orange', 'yellow', 'brown'],
+      style: 'illustration',
+      category: ''
+    },
+    {
+      id: 'botanical',
+      name: '🌿 Botanical Herbarium',
+      q: 'botanical illustration flower vintage',
+      colors: ['green', 'brown'],
+      style: 'illustration',
+      category: 'nature'
+    },
+    {
+      id: 'antique_ads',
+      name: '📜 Antique Ads & Ephemera',
+      q: 'antique advertisement vintage paper',
+      colors: ['brown', 'yellow'],
+      style: 'all',
+      category: ''
+    },
+    {
+      id: 'wildlife',
+      name: '🦋 Victorian Wildlife & Birds',
+      q: 'vintage animal illustration bird',
+      colors: [],
+      style: 'illustration',
+      category: 'animals'
+    },
+    {
+      id: 'retro_pop',
+      name: '🗞️ Retro Pop & Comics',
+      q: 'retro comic vintage poster',
+      colors: [],
+      style: 'illustration',
+      category: ''
+    },
+    {
+      id: 'textures',
+      name: '🎨 Textures & Grunge',
+      q: 'grunge paper texture wood',
+      colors: [],
+      style: 'photo',
+      category: 'backgrounds'
+    },
+    {
+      id: 'celestial',
+      name: '🌌 Celestial & Star Maps',
+      q: 'vintage astronomy celestial star map',
+      colors: ['blue', 'black'],
+      style: 'illustration',
+      category: ''
+    }
+  ];
+
   // --- State Management ---
   const state = {
     activeTool: 'layout',
     activeLayoutId: 'grid-2x2',
-    selectedTags: [],
-    selectedEffects: [],
-    effectIntensity: { blur: 3, glitch: 10 },
+    activePresetId: 'autumn',
+    
+    // Pixabay Search & Harmony Parameters
+    searchQuery: 'autumn vintage leaves',
+    selectedStyle: 'illustration',
+    selectedCategory: '',
+    selectedColors: ['red', 'orange', 'yellow', 'brown'], // Multi-select colors
+    editorsChoice: true,
+    
+    // API Configuration
+    apiEndpoint: localStorage.getItem('visteras_pixabay_endpoint') || '',
+    directApiKey: localStorage.getItem('visteras_pixabay_key') || '',
+    apiCache: {},
+
     customImageUrl: '',
     
     // Viewport Zoom & Pan
@@ -54,6 +141,7 @@
 
     // Active collage items state
     items: [],
+    onlinePool: [],
     assetsGenerated: false,
     savedCollages: []
   };
@@ -87,6 +175,9 @@
     el.statusBarStatus = document.getElementById('status-bar-text');
     el.statusLayout = document.getElementById('status-layout-text');
     el.statusZoomBtn = document.getElementById('status-zoom-btn');
+    el.queryInput = document.getElementById('pixabayQueryInput');
+    el.styleSelect = document.getElementById('pixabayStyleSelect');
+    el.editorsChoiceToggle = document.getElementById('editorsChoiceToggle');
   }
 
   // --- UI Toast / Feedback ---
@@ -126,7 +217,6 @@
     if (!el.workarea) return;
     const availW = el.workarea.clientWidth - 48;
     const availH = el.workarea.clientHeight - 48;
-    // 8.5" x 11" at 96 CSS DPI = 816px x 1056px
     const scale = Math.min(availW / 816, availH / 1056);
     state.zoom = Math.max(0.15, Math.min(2.5, Math.round(scale * 100) / 100));
     state.panX = 0;
@@ -134,9 +224,8 @@
     applyViewportTransform();
   }
 
-  function setZoom(newZoom, centerX = null, centerY = null) {
-    const clamped = Math.max(0.1, Math.min(4.0, Math.round(newZoom * 100) / 100));
-    state.zoom = clamped;
+  function setZoom(newZoom) {
+    state.zoom = Math.max(0.1, Math.min(4.0, Math.round(newZoom * 100) / 100));
     applyViewportTransform();
   }
 
@@ -149,6 +238,67 @@
     document.querySelectorAll('.sidepanel_pane').forEach(pane => {
       pane.classList.toggle('active', pane.id === `panel_${toolName}`);
     });
+  }
+
+  // --- Multi-Select Color Harmony Palette ---
+  function renderColorChips() {
+    const container = document.getElementById('color-chip-group');
+    if (!container) return;
+    container.innerHTML = '';
+
+    COLOR_OPTIONS.forEach(col => {
+      const chip = document.createElement('div');
+      const isSelected = state.selectedColors.includes(col.id);
+      chip.className = `color-chip ${isSelected ? 'active' : ''}`;
+      chip.innerHTML = `
+        <span class="color-chip-dot" style="background: ${col.hex}; ${col.id === 'white' ? 'border: 1px solid #666;' : ''}"></span>
+        <span>${col.name}</span>
+      `;
+      chip.addEventListener('click', () => {
+        if (state.selectedColors.includes(col.id)) {
+          state.selectedColors = state.selectedColors.filter(c => c !== col.id);
+        } else {
+          state.selectedColors.push(col.id);
+        }
+        renderColorChips();
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  // --- Theme Presets Rendering ---
+  function renderThemePresets() {
+    const list = document.getElementById('theme-presets-list');
+    if (!list) return;
+    list.innerHTML = '';
+
+    THEME_PRESETS.forEach(preset => {
+      const card = document.createElement('div');
+      card.className = `preset-card ${state.activePresetId === preset.id ? 'active' : ''}`;
+      card.innerHTML = `
+        <span style="font-weight: 600;">${preset.name}</span>
+        <span style="font-size: 9px; color: #888888;">${preset.colors.join(', ') || 'Any'}</span>
+      `;
+      card.addEventListener('click', () => {
+        applyPreset(preset);
+      });
+      list.appendChild(card);
+    });
+  }
+
+  function applyPreset(preset) {
+    state.activePresetId = preset.id;
+    state.searchQuery = preset.q;
+    state.selectedStyle = preset.style || 'all';
+    state.selectedCategory = preset.category || '';
+    state.selectedColors = preset.colors ? [...preset.colors] : [];
+
+    if (el.queryInput) el.queryInput.value = state.searchQuery;
+    if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
+
+    renderThemePresets();
+    renderColorChips();
+    generateFodder();
   }
 
   // --- Layout Rendering in Panel ---
@@ -181,43 +331,6 @@
         generateFodder();
       };
     }
-  }
-
-  // --- Tag Filter Rendering ---
-  function renderTagFilters() {
-    const container = document.getElementById('tag-filters-container');
-    if (!container || typeof getTagsByCategory !== 'function') return;
-
-    const categories = getTagsByCategory();
-    container.innerHTML = '';
-
-    Object.keys(categories).forEach(cat => {
-      const sec = document.createElement('div');
-      sec.className = 'panel_field';
-      sec.innerHTML = `<span class="panel_label">${cat}</span>`;
-      
-      const badgeGroup = document.createElement('div');
-      badgeGroup.className = 'tag-badge-group';
-
-      categories[cat].forEach(tag => {
-        const badge = document.createElement('div');
-        badge.className = `tag-badge ${state.selectedTags.includes(tag) ? 'active' : ''}`;
-        badge.textContent = tag;
-        badge.addEventListener('click', () => {
-          if (state.selectedTags.includes(tag)) {
-            state.selectedTags = state.selectedTags.filter(t => t !== tag);
-          } else {
-            state.selectedTags.push(tag);
-          }
-          renderTagFilters();
-          generateFodder();
-        });
-        badgeGroup.appendChild(badge);
-      });
-
-      sec.appendChild(badgeGroup);
-      container.appendChild(sec);
-    });
   }
 
   // --- Texture Overlay Rendering ---
@@ -318,14 +431,74 @@
     });
   }
 
+  // --- Pixabay Fetch & Image Pool Engine ---
+  async function fetchPixabayImages() {
+    const query = state.searchQuery || 'vintage';
+    const colors = state.selectedColors.join(',');
+    const imageType = state.selectedStyle || 'all';
+    const category = state.selectedCategory || '';
+    const editorsChoice = state.editorsChoice;
+
+    const cacheKey = `${query}|${colors}|${imageType}|${category}|${editorsChoice}`;
+    if (state.apiCache[cacheKey]) {
+      return state.apiCache[cacheKey];
+    }
+
+    let url = '';
+    if (state.apiEndpoint) {
+      // Use Firebase Proxy
+      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=40`;
+      if (colors) url += `&colors=${encodeURIComponent(colors)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      if (editorsChoice) url += `&editors_choice=true`;
+    } else if (state.directApiKey) {
+      // Use Direct Pixabay Key
+      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=40`;
+      if (colors) url += `&colors=${encodeURIComponent(colors)}`;
+      if (category) url += `&category=${encodeURIComponent(category)}`;
+      if (editorsChoice) url += `&editors_choice=true`;
+    }
+
+    if (url) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.hits) && data.hits.length > 0) {
+            const mapped = data.hits.map(h => ({
+              id: h.id,
+              path: h.webformatURL,
+              largePath: h.largeImageURL || h.webformatURL,
+              attribution: h.user,
+              link: h.pageURL
+            }));
+            state.apiCache[cacheKey] = mapped;
+            return mapped;
+          }
+        }
+      } catch (err) {
+        console.warn('Live Pixabay search failed, falling back to local pool:', err);
+      }
+    }
+
+    // Fallback to local curated image pool
+    if (typeof images !== 'undefined' && Array.isArray(images)) {
+      return images;
+    }
+    return [];
+  }
+
   // --- Generate Fodder Grid ---
-  function generateFodder() {
+  async function generateFodder() {
     initElements();
     if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
     state.assetsGenerated = true;
 
+    if (el.statusBarStatus) el.statusBarStatus.textContent = 'Fetching fodder...';
+
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
-    const availableImages = filterImagesByTags(state.selectedTags);
+    const pool = await fetchPixabayImages();
+    state.onlinePool = pool;
     
     el.container.innerHTML = '';
     el.container.style.gridTemplateColumns = layout.cols;
@@ -338,19 +511,17 @@
       let chosenImg = null;
 
       if (state.customImageUrl && i === 0) {
-        chosenImg = { path: state.customImageUrl, attribution: 'Custom URL' };
-      } else if (availableImages.length > 0) {
-        chosenImg = availableImages[Math.floor(Math.random() * availableImages.length)];
+        chosenImg = { path: state.customImageUrl, largePath: state.customImageUrl, attribution: 'Custom URL' };
+      } else if (pool.length > 0) {
+        chosenImg = pool[Math.floor(Math.random() * pool.length)];
       } else {
-        chosenImg = { path: '', attribution: 'None' };
+        chosenImg = { path: '', largePath: '', attribution: 'None' };
       }
 
       const itemData = {
         index: i,
         image: chosenImg,
         zoom: 1,
-        panX: 50,
-        panY: 50,
         span: span
       };
       state.items.push(itemData);
@@ -362,22 +533,24 @@
 
       const img = document.createElement('img');
       img.src = chosenImg.path;
+      img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
       img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
       img.crossOrigin = 'anonymous';
 
       const controls = document.createElement('div');
       controls.className = 'image-controls';
       controls.innerHTML = `
-        <button class="tile-icon-btn" title="Replace with random tile">↻</button>
+        <button class="tile-icon-btn" title="Replace tile">↻</button>
         <button class="tile-icon-btn" title="Zoom tile">🔍</button>
       `;
 
       controls.children[0].addEventListener('click', (e) => {
         e.stopPropagation();
-        const next = availableImages[Math.floor(Math.random() * availableImages.length)];
+        const next = pool[Math.floor(Math.random() * pool.length)];
         if (next) {
           itemData.image = next;
           img.src = next.path;
+          img.dataset.largeSrc = next.largePath || next.path;
         }
       });
 
@@ -410,7 +583,14 @@
 
     showToast('Rendering high-res 300 DPI sheet...');
     try {
-      // Temporarily reset viewport scale during capture for pristine rasterization
+      // Temporarily swap images to high-res large URLs for pristine 300 DPI rasterization
+      const imgs = el.container.querySelectorAll('img');
+      const originalSrcs = [];
+      imgs.forEach((img, idx) => {
+        originalSrcs[idx] = img.src;
+        if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
+      });
+
       const savedTransform = el.viewport.style.transform;
       el.viewport.style.transform = 'none';
 
@@ -422,6 +602,7 @@
       });
 
       el.viewport.style.transform = savedTransform;
+      imgs.forEach((img, idx) => { img.src = originalSrcs[idx]; });
 
       const link = document.createElement('a');
       link.download = `visteras-collage-${Date.now()}.jpg`;
@@ -444,14 +625,15 @@
       id: Date.now(),
       name: name || `Collage ${new Date().toLocaleDateString()}`,
       layoutId: state.activeLayoutId,
-      tags: state.selectedTags,
-      effects: state.selectedEffects,
+      query: state.searchQuery,
+      colors: state.selectedColors,
+      style: state.selectedStyle,
       overlay: state.selectedOverlay,
       overlayOpacity: state.overlayOpacity,
       paintEnabled: state.paintEnabled,
       paintColor: state.paintColor,
       textOverlay: state.textOverlay,
-      items: state.items.map(it => ({ imagePath: it.image?.path, zoom: it.zoom }))
+      items: state.items.map(it => ({ imagePath: it.image?.path, largePath: it.image?.largePath, zoom: it.zoom }))
     };
 
     state.savedCollages.push(saveObj);
@@ -462,8 +644,9 @@
 
   function loadSavedCollage(saveObj) {
     state.activeLayoutId = saveObj.layoutId || 'grid-2x2';
-    state.selectedTags = saveObj.tags || [];
-    state.selectedEffects = saveObj.effects || [];
+    state.searchQuery = saveObj.query || 'vintage';
+    state.selectedColors = saveObj.colors || [];
+    state.selectedStyle = saveObj.style || 'all';
     state.selectedOverlay = saveObj.overlay || '';
     state.overlayOpacity = saveObj.overlayOpacity || 100;
     state.paintEnabled = saveObj.paintEnabled || false;
@@ -471,7 +654,8 @@
     if (saveObj.textOverlay) state.textOverlay = saveObj.textOverlay;
 
     renderLayoutList();
-    renderTagFilters();
+    renderThemePresets();
+    renderColorChips();
     renderOverlayList();
     generateFodder();
     showToast(`Loaded "${saveObj.name}"`);
@@ -506,7 +690,6 @@
   function setupPanAndZoom() {
     if (!el.workarea) return;
 
-    // Option + Scroll (or Trackpad Pinch) to Zoom
     el.workarea.addEventListener('wheel', (e) => {
       if (e.altKey || e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -515,7 +698,6 @@
       }
     }, { passive: false });
 
-    // Spacebar to toggle grab cursor
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
         if (!state.spaceHeld) {
@@ -532,7 +714,6 @@
       }
     });
 
-    // Mouse drag to pan when space held or middle click
     el.workarea.addEventListener('mousedown', (e) => {
       if (state.spaceHeld || e.button === 1) {
         e.preventDefault();
@@ -558,13 +739,10 @@
       }
     });
 
-    // Resize handler to auto-refit if desired
     window.addEventListener('resize', () => {
-      // Recalculate transform boundaries
       applyViewportTransform();
     });
 
-    // Status bar zoom button click
     if (el.statusZoomBtn) {
       el.statusZoomBtn.addEventListener('click', () => {
         if (Math.abs(state.zoom - 1.0) < 0.05) {
@@ -578,7 +756,6 @@
       });
     }
 
-    // View menu items
     const fitItem = document.getElementById('action_menu_fit');
     if (fitItem) fitItem.addEventListener('click', fitToWorkspace);
     const actualItem = document.getElementById('action_menu_100');
@@ -615,6 +792,49 @@
     if (genBtnTop) genBtnTop.addEventListener('click', generateFodder);
     const genBtnOverlay = document.getElementById('generateBtn');
     if (genBtnOverlay) genBtnOverlay.addEventListener('click', generateFodder);
+    const applyThemeBtn = document.getElementById('action_apply_theme_generate');
+    if (applyThemeBtn) applyThemeBtn.addEventListener('click', () => {
+      if (el.queryInput) state.searchQuery = el.queryInput.value.trim();
+      if (el.styleSelect) state.selectedStyle = el.styleSelect.value;
+      if (el.editorsChoiceToggle) state.editorsChoice = el.editorsChoiceToggle.checked;
+      generateFodder();
+    });
+
+    // Clear Colors Button
+    const clearColorsBtn = document.getElementById('clearColorsBtn');
+    if (clearColorsBtn) {
+      clearColorsBtn.addEventListener('click', () => {
+        state.selectedColors = [];
+        renderColorChips();
+      });
+    }
+
+    // API Config toggle and save
+    const toggleApiBtn = document.getElementById('toggleApiSettingsBtn');
+    const apiConfigBox = document.getElementById('api-config-container');
+    if (toggleApiBtn && apiConfigBox) {
+      toggleApiBtn.addEventListener('click', () => {
+        apiConfigBox.style.display = apiConfigBox.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+
+    const saveApiBtn = document.getElementById('saveApiConfigBtn');
+    if (saveApiBtn) {
+      const endpointInput = document.getElementById('apiEndpointInput');
+      const directKeyInput = document.getElementById('pixabayDirectKeyInput');
+      if (endpointInput) endpointInput.value = state.apiEndpoint;
+      if (directKeyInput) directKeyInput.value = state.directApiKey;
+
+      saveApiBtn.addEventListener('click', () => {
+        state.apiEndpoint = endpointInput ? endpointInput.value.trim() : '';
+        state.directApiKey = directKeyInput ? directKeyInput.value.trim() : '';
+        localStorage.setItem('visteras_pixabay_endpoint', state.apiEndpoint);
+        localStorage.setItem('visteras_pixabay_key', state.directApiKey);
+        if (apiConfigBox) apiConfigBox.style.display = 'none';
+        showToast('Saved API configuration.');
+        generateFodder();
+      });
+    }
 
     // Print & Download buttons
     const printBtn = document.getElementById('action_print_sheet');
@@ -811,12 +1031,16 @@
     } catch (_) {}
 
     renderLayoutList();
-    renderTagFilters();
+    renderThemePresets();
+    renderColorChips();
     renderOverlayList();
     renderSavedList();
     initTextInteract();
     setupEvents();
     selectTool('layout');
+
+    if (el.queryInput) el.queryInput.value = state.searchQuery;
+    if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
 
     // Generate initial fodder
     generateFodder();

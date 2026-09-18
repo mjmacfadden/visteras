@@ -116,11 +116,24 @@ class Media_class extends Base_tools_class {
 				if (params.query == '')
 					return;
 
-				var URL = "https://pixabay.com/api/?key=" + key
-					+ "&page=" + _this.page
-					+ "&per_page=" + _this.per_page
-					+ "&safesearch=" + safe_search
-					+ "&q="	+ encodeURIComponent(params.query);
+				var endpoint = localStorage.getItem('visteras_pixabay_endpoint') || '';
+				var customKey = localStorage.getItem('visteras_pixabay_key') || '';
+				var effectiveKey = customKey || key;
+
+				var URL = '';
+				if (endpoint) {
+					URL = endpoint + (endpoint.includes('?') ? '&' : '?')
+						+ "page=" + _this.page
+						+ "&per_page=" + _this.per_page
+						+ "&safesearch=" + safe_search
+						+ "&q=" + encodeURIComponent(params.query);
+				} else {
+					URL = "https://pixabay.com/api/?key=" + encodeURIComponent(effectiveKey)
+						+ "&page=" + _this.page
+						+ "&per_page=" + _this.per_page
+						+ "&safesearch=" + safe_search
+						+ "&q="	+ encodeURIComponent(params.query);
+				}
 
 				if (_this.cache[URL] != undefined) {
 					//using cache
@@ -150,7 +163,7 @@ class Media_class extends Base_tools_class {
 						_this.search(params.query, data.hits, pages);
 					})
 					.fail(function () {
-						alertify.error('Error connecting to service.');
+						alertify.error('Error connecting to image service. Check your API configuration.');
 					});
 				}
 			},

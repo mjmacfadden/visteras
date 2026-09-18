@@ -247,15 +247,80 @@
         </div>
       </div>
 
-      <!-- Panel: Tags & Filter -->
+      <!-- Panel: Themes & Search (Pixabay Live Generator) -->
       <div id="panel_tags" class="sidepanel_pane">
         <div class="panel_header">
-          <span>Image Categories & Tags</span>
-          <span class="panel_badge">FILTER</span>
+          <span>Theme & Harmony</span>
+          <span class="panel_badge">PIXABAY</span>
         </div>
         <div class="panel_section">
-          <div class="panel_section_body" id="tag-filters-container">
-            <!-- Populated by JS -->
+          <div class="panel_section_body">
+            
+            <!-- Curated Theme Presets -->
+            <div class="panel_field">
+              <span class="panel_label">Curated Theme Presets</span>
+              <div id="theme-presets-list" style="display: flex; flex-direction: column; gap: 4px;">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <div class="menu_dropdown_separator" style="margin: 4px 0;"></div>
+
+            <!-- Custom Query -->
+            <div class="panel_field">
+              <span class="panel_label">Search Keywords</span>
+              <input type="text" id="pixabayQueryInput" class="panel_input" placeholder="Search terms (e.g. autumn leaves)...">
+            </div>
+
+            <!-- Style Selector -->
+            <div class="panel_field">
+              <span class="panel_label">Artistic Style</span>
+              <select id="pixabayStyleSelect" class="panel_select">
+                <option value="all">All Styles</option>
+                <option value="illustration" selected>Illustrations &amp; Drawings</option>
+                <option value="vector">Clean Vector Graphics</option>
+                <option value="photo">Real Photographs</option>
+              </select>
+            </div>
+
+            <!-- Multi-Select Color Harmony Palette -->
+            <div class="panel_field">
+              <div class="panel_row">
+                <span class="panel_label">Color Harmony (Multi-Select)</span>
+                <button type="button" id="clearColorsBtn" class="btn_visteras_secondary" style="padding: 1px 5px; font-size: 9px;">Clear</button>
+              </div>
+              <div class="color-chip-group" id="color-chip-group">
+                <!-- Color chips populated by JS -->
+              </div>
+            </div>
+
+            <label class="panel_checkbox_row">
+              <input type="checkbox" id="editorsChoiceToggle" checked>
+              <span>Curated Editor's Choice Only</span>
+            </label>
+
+            <button type="button" id="action_apply_theme_generate" class="btn_visteras_purple" style="width: 100%; justify-content: center; margin-top: 4px;">
+              Apply &amp; Generate Fodder
+            </button>
+
+            <!-- Pixabay Attribution & Config -->
+            <div class="pixabay-source-badge" style="margin-top: 6px; justify-content: space-between;">
+              <span>Images via <a href="https://pixabay.com/" target="_blank" rel="noopener">Pixabay</a></span>
+              <button type="button" id="toggleApiSettingsBtn" class="btn_visteras_secondary" style="padding: 1px 5px; font-size: 9px;" title="Configure API Endpoint / Key">⚙ API Config</button>
+            </div>
+
+            <div id="api-config-container" style="display: none; background: #202020; border: 1px solid #383838; border-radius: 2px; padding: 6px; margin-top: 6px;">
+              <div class="panel_field">
+                <span class="panel_label">Firebase Proxy Endpoint</span>
+                <input type="text" id="apiEndpointInput" class="panel_input" placeholder="https://<region>-<proj>.cloudfunctions.net/pixabaySearch">
+              </div>
+              <div class="panel_field" style="margin-top: 4px;">
+                <span class="panel_label">Or Direct Pixabay Key (BYOK)</span>
+                <input type="password" id="pixabayDirectKeyInput" class="panel_input" placeholder="Enter Pixabay API Key...">
+              </div>
+              <button type="button" id="saveApiConfigBtn" class="btn_visteras_secondary" style="width: 100%; justify-content: center; margin-top: 6px;">Save API Settings</button>
+            </div>
+
           </div>
         </div>
       </div>

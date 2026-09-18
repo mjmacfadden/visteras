@@ -785,6 +785,88 @@ html {
   color: #ffffff;
 }
 
+/* Multi-select color chips */
+.color-chip-group {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.color-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  background: #242424;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  font-size: 10px;
+  color: #aaaaaa;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.color-chip:hover {
+  background: #2e2e2e;
+  border-color: #555555;
+  color: #ffffff;
+}
+
+.color-chip.active {
+  border-color: var(--collage-purple);
+  background: rgba(168, 85, 247, 0.2);
+  color: #ffffff;
+}
+
+.color-chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.3);
+  flex-shrink: 0;
+}
+
+.preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: #242424;
+  border: 1px solid #383838;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.preset-card:hover {
+  background: #2c2c2c;
+  border-color: var(--collage-purple);
+}
+
+.preset-card.active {
+  background: var(--collage-purple-bg);
+  border-color: var(--collage-purple);
+  color: #ffffff;
+}
+
+.pixabay-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: #777777;
+}
+
+.pixabay-source-badge a {
+  color: #888888;
+  text-decoration: none;
+}
+.pixabay-source-badge a:hover {
+  color: var(--collage-purple-light);
+  text-decoration: underline;
+}
+
 /* 6. Status Bar */
 #tools_bottom {
   grid-area: status;
