@@ -5347,19 +5347,21 @@ body.canvas-only-mode .canvas_wrapper canvas {
  */
 
 @keyframes rawDevelopModalIn {
-	0% { opacity: 0; transform: translate(-50%, -50%) scale(0.985); }
-	100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+	0% { opacity: 0; transform: scale(0.985); }
+	100% { opacity: 1; transform: scale(1); }
 }
 
 #popups .popup.raw_develop_popup {
 	position: fixed !important;
-	top: 50% !important;
-	left: 50% !important;
-	transform: translate(-50%, -50%) !important;
-	width: calc(100vw - 16px) !important;
-	height: calc(100vh - 16px) !important;
+	top: 8px !important;
+	left: 8px !important;
+	right: 8px !important;
+	bottom: 8px !important;
+	width: auto !important;
+	height: auto !important;
 	max-width: none !important;
 	max-height: none !important;
+	transform: none !important;
 	padding: 0 !important;
 	margin: 0 !important;
 	display: flex !important;
@@ -5406,7 +5408,8 @@ body.canvas-only-mode .canvas_wrapper canvas {
 #popups .popup.raw_develop_popup th {
 	display: block !important;
 	width: 100% !important;
-	height: auto !important;
+	height: 100% !important;
+	min-height: 0 !important;
 	border: 0 !important;
 	padding: 0 !important;
 	margin: 0 !important;
@@ -5498,6 +5501,7 @@ body.canvas-only-mode .canvas_wrapper canvas {
 .raw-develop__viewer {
 	flex: 1 1 auto;
 	min-width: 0;
+	min-height: 0;
 	background:
 		linear-gradient(45deg, #1c1c1c 25%, transparent 25%),
 		linear-gradient(-45deg, #1c1c1c 25%, transparent 25%),

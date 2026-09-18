@@ -125,6 +125,7 @@ class Image_rawDevelop_class {
 		this._source = null;
 		this._layerId = null;
 		this._previewCanvas = null;
+		this._viewerResizeObserver = null;
 		this._previewCtx = null;
 		this._previewBuffer = null;
 		this._previewSizeKey = '';
@@ -163,7 +164,13 @@ class Image_rawDevelop_class {
 			],
 			on_load: function () {
 				_this._bind_ui();
-				_this._schedule_preview();
+				// Let flex layout settle before measuring viewer size.
+				requestAnimationFrame(function () {
+					_this._schedule_preview();
+				});
+				setTimeout(function () {
+					_this._schedule_preview();
+				}, 80);
 			},
 			on_cancel: function () {
 				_this._teardown();
@@ -229,6 +236,19 @@ class Image_rawDevelop_class {
 		this._previewCanvas = document.getElementById('raw_develop_canvas');
 		this._previewCtx = this._previewCanvas.getContext('2d', { willReadFrequently: true });
 
+		var viewerEl = this._previewCanvas && this._previewCanvas.parentElement;
+		if (viewerEl && typeof ResizeObserver !== 'undefined') {
+			if (this._viewerResizeObserver) {
+				try { this._viewerResizeObserver.disconnect(); } catch (e) { /* ignore */ }
+			}
+			var self = this;
+			this._viewerResizeObserver = new ResizeObserver(function () {
+				self._previewSizeKey = '';
+				self._schedule_preview();
+			});
+			this._viewerResizeObserver.observe(viewerEl);
+		}
+
 		this._root.querySelectorAll('input[type="range"]').forEach((input) => {
 			input.addEventListener('input', () => {
 				var name = input.name;
@@ -291,8 +311,16 @@ class Image_rawDevelop_class {
 		if (!this._source || !this._previewCanvas || !this._previewCtx) return;
 
 		var viewer = this._previewCanvas.parentElement;
-		var maxW = Math.max(320, (viewer && viewer.clientWidth) ? viewer.clientWidth - 24 : 800);
-		var maxH = Math.max(240, (viewer && viewer.clientHeight) ? viewer.clientHeight - 24 : 560);
+		if (!viewer) {
+			this._schedule_preview();
+			return;
+		}
+		var maxW = Math.max(1, (viewer.clientWidth || 0) - 24);
+		var maxH = Math.max(1, (viewer.clientHeight || 0) - 24);
+		if (maxW < 32 || maxH < 32) {
+			this._schedule_preview();
+			return;
+		}
 		var scale = Math.min(1, maxW / this._source.width, maxH / this._source.height);
 		var pw = Math.max(1, Math.round(this._source.width * scale));
 		var ph = Math.max(1, Math.round(this._source.height * scale));
@@ -391,6 +419,10 @@ class Image_rawDevelop_class {
 	_teardown() {
 		if (this._raf) cancelAnimationFrame(this._raf);
 		this._raf = 0;
+		if (this._viewerResizeObserver) {
+			try { this._viewerResizeObserver.disconnect(); } catch (e) { /* ignore */ }
+			this._viewerResizeObserver = null;
+		}
 		this._source = null;
 		this._layerId = null;
 		this._previewBuffer = null;
