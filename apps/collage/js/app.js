@@ -549,53 +549,16 @@
     });
   }
 
-  // --- Multi-Tier Caching & Instant Local Asset Scoring ---
-  function getInstantFodderPool() {
-    const query = (state.searchQuery || '').toLowerCase();
-    const colors = (state.selectedColors || []).map(c => c.toLowerCase());
-    const src = state.imageSource || 'both';
-    const queryWords = query.split(/\s+/).filter(w => w.length > 2);
-
-    const basePool = (typeof images !== 'undefined' && Array.isArray(images)) ? images : [];
-    if (basePool.length === 0) return [];
-
-    // Score items based on tag match, source match, and color match
-    const scored = basePool.map(item => {
-      let score = 1;
-      const tags = (item.tags || []).map(t => t.toLowerCase());
-
-      // Source bonus
-      if (src === 'loc' && item.source === 'loc') score += 10;
-      if (src === 'pixabay' && item.source === 'pixabay') score += 10;
-      if (src === 'both') score += 2;
-
-      // Color matches
-      for (const col of colors) {
-        if (tags.includes(col)) score += 8;
-      }
-
-      // Query word matches
-      for (const word of queryWords) {
-        if (tags.some(t => t.includes(word) || word.includes(t))) score += 6;
-      }
-
-      return { item, score: score + Math.random() * 0.5 };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored.map(s => s.item);
-  }
-
   // --- Fast Pixabay Fetch Engine ---
   async function fetchSinglePixabayQuery(query, color, imageType, category, editorsChoice) {
     let url = '';
     if (state.apiEndpoint) {
-      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=24`;
+      url = `${state.apiEndpoint}?q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=30`;
       if (color) url += `&colors=${encodeURIComponent(color)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
       if (editorsChoice) url += `&editors_choice=true`;
     } else if (state.directApiKey) {
-      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=24`;
+      url = `https://pixabay.com/api/?key=${state.directApiKey}&q=${encodeURIComponent(query)}&image_type=${encodeURIComponent(imageType)}&safesearch=true&per_page=30`;
       if (color) url += `&colors=${encodeURIComponent(color)}`;
       if (category) url += `&category=${encodeURIComponent(category)}`;
       if (editorsChoice) url += `&editors_choice=true`;
@@ -605,17 +568,17 @@
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000); // Fast 4s timeout
+      const timer = setTimeout(() => controller.abort(), 4000); // 4s timeout
       const res = await fetch(url, { signal: controller.signal });
       clearTimeout(timer);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.hits)) {
           return data.hits.map(h => ({
-            id: h.id,
+            id: `pixabay-${h.id}`,
             path: h.webformatURL,
             largePath: h.largeImageURL || h.webformatURL,
-            attribution: h.user || 'Pixabay',
+            attribution: h.user ? `${h.user} (Pixabay)` : 'Pixabay',
             link: h.pageURL,
             source: 'pixabay'
           }));
@@ -640,7 +603,7 @@
     }
 
     if (!state.apiEndpoint && !state.directApiKey) {
-      return getInstantFodderPool();
+      return [];
     }
 
     let hits = [];
@@ -724,11 +687,17 @@
     return [];
   }
 
-  // --- Synchronous Immediate Tile Renderer (< 10ms) ---
+  // --- Tile Image Load & Spinner Binding ---
   function bindTileImageEvents(img, spinnerEl) {
     function markDone() {
       img.classList.add('loaded');
       if (spinnerEl) spinnerEl.classList.add('hidden');
+    }
+
+    if (!img.src || img.src === window.location.href) {
+      img.classList.remove('loaded');
+      if (spinnerEl) spinnerEl.classList.remove('hidden');
+      return;
     }
 
     if (img.complete && img.naturalWidth > 0) {
@@ -738,18 +707,55 @@
       if (spinnerEl) spinnerEl.classList.remove('hidden');
       img.onload = markDone;
       img.onerror = function() {
-        // Fallback to local verified image pool if remote asset fails
-        if (typeof images !== 'undefined' && images.length > 0 && img.src && img.src.startsWith('http')) {
-          const fallback = images[Math.floor(Math.random() * images.length)];
-          img.src = fallback.path;
-          img.dataset.largeSrc = fallback.largePath || fallback.path;
-        } else {
-          markDone();
-        }
+        if (spinnerEl) spinnerEl.classList.add('hidden');
       };
     }
   }
 
+  // --- Render Initial Empty Loading Skeletons ---
+  function renderLoadingSkeletonTiles() {
+    const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
+    if (!el.container) return;
+
+    el.container.innerHTML = '';
+    el.container.style.gridTemplateColumns = layout.cols;
+    el.container.style.gridTemplateRows = layout.rows;
+    state.items = [];
+
+    for (let i = 0; i < layout.count; i++) {
+      const span = layout.spans[i] || { c: 1, r: 1 };
+      const tile = document.createElement('div');
+      tile.className = 'collage-item';
+      tile.style.gridColumn = `span ${span.c}`;
+      tile.style.gridRow = `span ${span.r}`;
+
+      const spinner = document.createElement('div');
+      spinner.className = 'tile-spinner';
+      spinner.innerHTML = `
+        <svg class="spinner-svg" viewBox="0 0 24 24" width="22" height="22">
+          <circle cx="12" cy="12" r="9" stroke="rgba(168, 85, 247, 0.2)" stroke-width="2.5" fill="none"></circle>
+          <circle cx="12" cy="12" r="9" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="28" stroke-dashoffset="10"></circle>
+        </svg>
+      `;
+
+      const img = document.createElement('img');
+      img.alt = `Loading tile ${i + 1}...`;
+
+      state.items.push({
+        index: i,
+        image: { path: '', largePath: '', attribution: '' },
+        zoom: 1,
+        span: span,
+        locked: false
+      });
+
+      tile.appendChild(spinner);
+      tile.appendChild(img);
+      el.container.appendChild(tile);
+    }
+  }
+
+  // --- Render Live API Images into Tiles ---
   function renderTilesWithPool(pool, isLiveUpdate = false) {
     const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
     if (!el.container) return;
@@ -761,7 +767,7 @@
       state.items = [];
     }
 
-    const availablePool = (pool && pool.length > 0) ? pool : getInstantFodderPool();
+    const availablePool = (pool && pool.length > 0) ? pool : [];
     const shuffledPool = [...availablePool].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < layout.count; i++) {
@@ -773,11 +779,10 @@
       } else if (shuffledPool.length > 0) {
         chosenImg = shuffledPool[i % shuffledPool.length];
       } else {
-        chosenImg = { path: '', largePath: '', attribution: 'None' };
+        chosenImg = { path: '', largePath: '', attribution: 'No API image' };
       }
 
       if (isLiveUpdate && state.items[i]) {
-        // Smoothly update existing DOM tile image
         if (!state.items[i].locked) {
           state.items[i].image = chosenImg;
           const tile = el.container.children[i];
@@ -839,13 +844,15 @@
       controls.children[0].addEventListener('click', (e) => {
         e.stopPropagation();
         const activePool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : availablePool;
-        const next = activePool[Math.floor(Math.random() * activePool.length)];
-        if (next) {
-          itemData.image = next;
-          itemData.locked = true;
-          img.src = next.path;
-          img.dataset.largeSrc = next.largePath || next.path;
-          bindTileImageEvents(img, spinner);
+        if (activePool.length > 0) {
+          const next = activePool[Math.floor(Math.random() * activePool.length)];
+          if (next) {
+            itemData.image = next;
+            itemData.locked = true;
+            img.src = next.path;
+            img.dataset.largeSrc = next.largePath || next.path;
+            bindTileImageEvents(img, spinner);
+          }
         }
       });
 
@@ -869,7 +876,7 @@
     if (el.statusLayout) el.statusLayout.textContent = layout.name;
   }
 
-  // --- Generate Fodder Grid (Immediate 0ms Render + Fast Background Stream) ---
+  // --- Generate Fodder Grid (Strictly API-Driven) ---
   let currentGenerationId = 0;
 
   async function generateFodder() {
@@ -882,24 +889,21 @@
     const src = state.imageSource || 'both';
     const masterCacheKey = `${src}|${query}|${state.selectedColors.join(',')}|${state.selectedStyle}|${state.selectedCategory}`;
 
-    // STEP 1: Immediate Render in 0ms (Instant response)
+    // If already in API cache from this session, render immediately
     const cachedHits = state.apiCache[masterCacheKey];
     if (cachedHits && cachedHits.length > 0) {
       state.onlinePool = cachedHits;
       renderTilesWithPool(cachedHits, false);
-      if (el.statusBarStatus) el.statusBarStatus.textContent = `Ready (${cachedHits.length} assets)`;
+      if (el.statusBarStatus) el.statusBarStatus.textContent = `Ready (${cachedHits.length} live API images)`;
       return;
     }
 
-    const instantPool = getInstantFodderPool();
-    state.onlinePool = instantPool;
-    renderTilesWithPool(instantPool, false);
-
+    // Show active loading skeleton with spinning loaders
+    renderLoadingSkeletonTiles();
     if (el.statusBarStatus) {
-      el.statusBarStatus.textContent = `Instant fodder ready • Updating live...`;
+      el.statusBarStatus.textContent = `Searching API for "${query}"...`;
     }
 
-    // STEP 2: Fast Background Stream (< 200ms)
     try {
       let liveHits = [];
 
@@ -908,7 +912,7 @@
       } else if (src === 'loc') {
         liveHits = await fetchChroniclingAmericaImagesFast(query);
       } else {
-        // Both: Fetch fast Pixabay immediately & fast LOC concurrently
+        // Both: Pixabay + LOC
         const [pResult, lResult] = await Promise.allSettled([
           fetchPixabayImagesFast(),
           fetchChroniclingAmericaImagesFast(query)
@@ -928,30 +932,28 @@
       if (genId !== currentGenerationId) return;
 
       if (liveHits && liveHits.length > 0) {
-        // Merge with instant pool for rich variety
-        const merged = [...liveHits];
-        for (const inst of instantPool) {
-          if (!merged.some(m => m.path === inst.path)) {
-            merged.push(inst);
-          }
-        }
-        state.onlinePool = merged;
-        state.apiCache[masterCacheKey] = merged;
+        state.onlinePool = liveHits;
+        state.apiCache[masterCacheKey] = liveHits;
 
-        renderTilesWithPool(merged, true);
+        renderTilesWithPool(liveHits, false);
         if (el.statusBarStatus) {
-          el.statusBarStatus.textContent = `Ready (${merged.length} assets)`;
+          el.statusBarStatus.textContent = `Ready (${liveHits.length} live API images)`;
         }
       } else {
+        state.onlinePool = [];
+        showToast(`No images found on API for "${query}"`);
         if (el.statusBarStatus) {
-          el.statusBarStatus.textContent = `Ready (${instantPool.length} vintage assets)`;
+          el.statusBarStatus.textContent = `No images found for "${query}" from API.`;
         }
+        // Remove spinners on empty results
+        el.container.querySelectorAll('.tile-spinner').forEach(s => s.classList.add('hidden'));
       }
     } catch (err) {
-      console.warn('Background fodder fetch:', err);
+      console.warn('API fodder fetch error:', err);
       if (el.statusBarStatus) {
-        el.statusBarStatus.textContent = `Ready (${instantPool.length} vintage assets)`;
+        el.statusBarStatus.textContent = `Error loading from API. Check connection.`;
       }
+      el.container.querySelectorAll('.tile-spinner').forEach(s => s.classList.add('hidden'));
     }
   }
 
