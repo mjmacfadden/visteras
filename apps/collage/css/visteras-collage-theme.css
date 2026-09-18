@@ -1030,7 +1030,7 @@ html {
   border-top: 1px solid var(--studio-border-dark);
   padding: 0 10px;
   font-size: 11px;
-  color: #999999;
+  color: #cccccc;
   user-select: none;
   z-index: 100;
 }
@@ -1042,22 +1042,25 @@ html {
 }
 
 .status_tag {
-  color: #777777;
+  color: #888888;
 }
 
-.status_tag_purple {
-  color: var(--collage-purple-light);
-  font-weight: 600;
+.status_tag_val,
+.status_tag_purple,
+#status-layout-text,
+#status-bar-text {
+  color: #cccccc;
+  font-weight: 500;
 }
 
 .status_zoom_badge {
   background: #242424;
   border: 1px solid #3c3c3c;
   border-radius: 2px;
-  color: var(--collage-purple-light);
+  color: #cccccc;
   font-family: var(--ui-font);
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 1px 6px;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -1066,7 +1069,7 @@ html {
 .status_zoom_badge:hover {
   background: #333333;
   color: #ffffff;
-  border-color: var(--collage-purple);
+  border-color: #555555;
 }
 
 .status_info_right {
@@ -1074,6 +1077,7 @@ html {
   display: flex;
   align-items: center;
   gap: 12px;
+  color: #cccccc;
 }
 
 /* Print Rules for 8.5x11in letter sheets */
