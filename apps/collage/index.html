@@ -60,9 +60,11 @@
         <div class="menu_entry" id="menu_view">
           <div class="menu_entry_title">View</div>
           <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item">Letter Sheet (8.5" × 11")</div>
+            <div class="menu_dropdown_item" id="action_menu_fit">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_menu_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" onclick="document.getElementById('workarea').scrollTop = 0">Fit to Workspace</div>
+            <div class="menu_dropdown_item" id="action_menu_zoomin">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
+            <div class="menu_dropdown_item" id="action_menu_zoomout">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
           </div>
         </div>
 
@@ -111,7 +113,7 @@
       </select>
 
       <!-- Generate Action Button -->
-      <button type="button" id="action_generate_fodder" class="btn_visteras_purple" title="Generate new random fodder arrangement">
+      <button type="button" id="action_generate_fodder" class="btn_visteras_secondary" title="Generate new random fodder arrangement">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
           <polyline points="1 20 1 14 7 14"></polyline>
@@ -120,17 +122,8 @@
         Generate Fodder
       </button>
 
-      <!-- Right Action Controls -->
+      <!-- Right Action Controls (Download JPG on left, Print Sheet on far right styled like Publish) -->
       <div class="options_actions_right">
-        <button type="button" id="action_print_sheet" class="btn_visteras_secondary" title="Print 8.5x11 Sheet (⌘P)">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-          </svg>
-          Print Sheet
-        </button>
-
         <button type="button" id="action_download_jpg" class="btn_visteras_secondary" title="Download High-Res JPG">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -138,6 +131,15 @@
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
           Download JPG
+        </button>
+
+        <button type="button" id="action_print_sheet" class="btn_visteras_purple" title="Print Letter Page Sheets (⌘P)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Sheet
         </button>
       </div>
     </header>
@@ -198,29 +200,31 @@
     </aside>
 
     <!-- ==================================================================
-         4. Middle Workarea (Printable Sheet)
+         4. Middle Workarea (Scalable Canvas Viewport)
          ================================================================== -->
     <main id="workarea">
-      <div id="letter-page" class="letter-page">
-        <!-- Main Collage Grid -->
-        <div id="collage-container" class="collage-container"></div>
+      <div id="canvas_viewport" class="canvas_viewport">
+        <div id="letter-page" class="letter-page">
+          <!-- Main Collage Grid -->
+          <div id="collage-container" class="collage-container"></div>
 
-        <!-- Overlays -->
-        <div id="texture-overlay-layer"></div>
-        <div id="paint-overlay-layer"></div>
+          <!-- Overlays -->
+          <div id="texture-overlay-layer"></div>
+          <div id="paint-overlay-layer"></div>
 
-        <!-- Interactive Text Overlay -->
-        <div id="text-overlay" class="text-overlay">
-          <span id="text-content"></span>
-        </div>
+          <!-- Interactive Text Overlay -->
+          <div id="text-overlay" class="text-overlay">
+            <span id="text-content"></span>
+          </div>
 
-        <!-- Initial Placeholder State -->
-        <div id="generate-overlay" class="generate-overlay">
-          <h3 style="margin: 0; font-weight: 600; color: #ffffff;">Collage Fodder Generator</h3>
-          <p style="margin: 0; font-size: 12px; color: #888888;">Select your tags, choose a layout, and generate printable sheets.</p>
-          <button type="button" id="generateBtn" class="btn_visteras_purple" style="font-size: 13px; padding: 8px 18px;">
-            Generate Fodder Sheet
-          </button>
+          <!-- Initial Placeholder State -->
+          <div id="generate-overlay" class="generate-overlay">
+            <h3 style="margin: 0; font-weight: 600; color: #ffffff;">Collage Fodder Generator</h3>
+            <p style="margin: 0; font-size: 12px; color: #888888;">Select your tags, choose a layout, and generate printable sheets.</p>
+            <button type="button" id="generateBtn" class="btn_visteras_purple" style="font-size: 13px; padding: 8px 18px;">
+              Generate Fodder Sheet
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -404,7 +408,8 @@
         <span class="status_tag">Status: <span id="status-bar-text">Ready</span></span>
       </div>
       <div class="status_info_right">
-        <span class="status_tag">Visteras Collage v1.0</span>
+        <span class="status_tag">Zoom: <button type="button" id="status-zoom-btn" class="status_zoom_badge" title="Click to fit workspace (⌘0)">100%</button></span>
+        <span class="status_tag">Visteras Collage</span>
       </div>
     </footer>
 

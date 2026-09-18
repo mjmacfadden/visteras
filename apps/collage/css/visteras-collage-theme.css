@@ -261,6 +261,7 @@ html {
   flex-shrink: 0;
 }
 
+/* Print Button styled like Publish: Purple accent */
 .btn_visteras_purple {
   display: inline-flex;
   align-items: center;
@@ -273,7 +274,7 @@ html {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
 
 .btn_visteras_purple:hover {
@@ -285,7 +286,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  padding: 5px 10px;
   background: #333333;
   border: 1px solid #444444;
   border-radius: 2px;
@@ -293,7 +294,7 @@ html {
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
 
 .btn_visteras_secondary:hover {
@@ -362,33 +363,30 @@ html {
   stroke: var(--collage-purple-light) !important;
 }
 
-/* 4. Middle Workspace & Printable Sheet */
+/* 4. Middle Workspace & Scalable Viewport */
 #workarea {
   grid-area: workarea;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   background-color: var(--studio-workspace-bg);
-  padding: 24px 16px 48px;
-  overflow: auto;
+  padding: 0;
+  overflow: hidden;
   position: relative;
   border: none;
-  scrollbar-width: thin;
-  scrollbar-color: #4f4f4f #1e1e1e;
+  user-select: none;
 }
 
-#workarea::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-#workarea::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-#workarea::-webkit-scrollbar-thumb {
-  background-color: #4f4f4f;
-  border-radius: 6px;
-  border: 2px solid #1e1e1e;
-  background-clip: padding-box;
+.canvas_viewport {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  will-change: transform;
 }
 
 .letter-page {
@@ -400,8 +398,7 @@ html {
   min-height: 11in;
   max-height: 11in;
   background-color: #ffffff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.25);
-  margin: 12px auto 24px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -818,11 +815,30 @@ html {
   font-weight: 600;
 }
 
+.status_zoom_badge {
+  background: #242424;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  color: var(--collage-purple-light);
+  font-family: var(--ui-font);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.status_zoom_badge:hover {
+  background: #333333;
+  color: #ffffff;
+  border-color: var(--collage-purple);
+}
+
 .status_info_right {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 /* Print Rules for 8.5x11in letter sheets */
@@ -868,6 +884,15 @@ html {
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
+    position: static !important;
+  }
+
+  .canvas_viewport {
+    position: static !important;
+    transform: none !important;
+    display: block !important;
+    width: 8.5in !important;
+    height: 11in !important;
   }
 
   .letter-page {

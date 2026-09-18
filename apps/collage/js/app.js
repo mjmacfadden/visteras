@@ -15,6 +15,15 @@
     effectIntensity: { blur: 3, glitch: 10 },
     customImageUrl: '',
     
+    // Viewport Zoom & Pan
+    zoom: 1.0,
+    panX: 0,
+    panY: 0,
+    spaceHeld: false,
+    isPanning: false,
+    dragStartX: 0,
+    dragStartY: 0,
+
     // Text Overlay
     textOverlay: {
       content: '',
@@ -66,8 +75,10 @@
   const el = {};
 
   function initElements() {
-    el.container = document.getElementById('collage-container');
+    el.workarea = document.getElementById('workarea');
+    el.viewport = document.getElementById('canvas_viewport');
     el.letterPage = document.getElementById('letter-page');
+    el.container = document.getElementById('collage-container');
     el.generateOverlay = document.getElementById('generate-overlay');
     el.textureLayer = document.getElementById('texture-overlay-layer');
     el.paintLayer = document.getElementById('paint-overlay-layer');
@@ -75,6 +86,7 @@
     el.textContent = document.getElementById('text-content');
     el.statusBarStatus = document.getElementById('status-bar-text');
     el.statusLayout = document.getElementById('status-layout-text');
+    el.statusZoomBtn = document.getElementById('status-zoom-btn');
   }
 
   // --- UI Toast / Feedback ---
@@ -99,6 +111,33 @@
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 200);
     }, 2200);
+  }
+
+  // --- Viewport Zoom & Pan System ---
+  function applyViewportTransform() {
+    if (!el.viewport) return;
+    el.viewport.style.transform = `translate(calc(-50% + ${state.panX}px), calc(-50% + ${state.panY}px)) scale(${state.zoom})`;
+    if (el.statusZoomBtn) {
+      el.statusZoomBtn.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+  }
+
+  function fitToWorkspace() {
+    if (!el.workarea) return;
+    const availW = el.workarea.clientWidth - 48;
+    const availH = el.workarea.clientHeight - 48;
+    // 8.5" x 11" at 96 CSS DPI = 816px x 1056px
+    const scale = Math.min(availW / 816, availH / 1056);
+    state.zoom = Math.max(0.15, Math.min(2.5, Math.round(scale * 100) / 100));
+    state.panX = 0;
+    state.panY = 0;
+    applyViewportTransform();
+  }
+
+  function setZoom(newZoom, centerX = null, centerY = null) {
+    const clamped = Math.max(0.1, Math.min(4.0, Math.round(newZoom * 100) / 100));
+    state.zoom = clamped;
+    applyViewportTransform();
   }
 
   // --- Tool & Panel Switching ---
@@ -133,7 +172,6 @@
       list.appendChild(card);
     });
 
-    // Also populate top quick dropdown if present
     const quickSel = document.getElementById('quick-layout-select');
     if (quickSel) {
       quickSel.innerHTML = layouts.map(l => `<option value="${l.id}" ${l.id === state.activeLayoutId ? 'selected' : ''}>${l.name}</option>`).join('');
@@ -372,12 +410,18 @@
 
     showToast('Rendering high-res 300 DPI sheet...');
     try {
+      // Temporarily reset viewport scale during capture for pristine rasterization
+      const savedTransform = el.viewport.style.transform;
+      el.viewport.style.transform = 'none';
+
       const canvas = await html2canvas(el.letterPage, {
         scale: 3, // ~300 DPI Letter resolution
         useCORS: true,
         allowTaint: true,
         backgroundColor: state.backgroundColorEnabled ? state.backgroundColor : '#ffffff'
       });
+
+      el.viewport.style.transform = savedTransform;
 
       const link = document.createElement('a');
       link.download = `visteras-collage-${Date.now()}.jpg`;
@@ -458,8 +502,102 @@
     });
   }
 
+  // --- Pan and Zoom Interactions ---
+  function setupPanAndZoom() {
+    if (!el.workarea) return;
+
+    // Option + Scroll (or Trackpad Pinch) to Zoom
+    el.workarea.addEventListener('wheel', (e) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.08 : 0.92;
+        setZoom(state.zoom * factor);
+      }
+    }, { passive: false });
+
+    // Spacebar to toggle grab cursor
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        if (!state.spaceHeld) {
+          state.spaceHeld = true;
+          if (!state.isPanning) el.workarea.style.cursor = 'grab';
+        }
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') {
+        state.spaceHeld = false;
+        if (!state.isPanning) el.workarea.style.cursor = '';
+      }
+    });
+
+    // Mouse drag to pan when space held or middle click
+    el.workarea.addEventListener('mousedown', (e) => {
+      if (state.spaceHeld || e.button === 1) {
+        e.preventDefault();
+        state.isPanning = true;
+        state.dragStartX = e.clientX - state.panX;
+        state.dragStartY = e.clientY - state.panY;
+        el.workarea.style.cursor = 'grabbing';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (state.isPanning) {
+        state.panX = e.clientX - state.dragStartX;
+        state.panY = e.clientY - state.dragStartY;
+        applyViewportTransform();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (state.isPanning) {
+        state.isPanning = false;
+        el.workarea.style.cursor = state.spaceHeld ? 'grab' : '';
+      }
+    });
+
+    // Resize handler to auto-refit if desired
+    window.addEventListener('resize', () => {
+      // Recalculate transform boundaries
+      applyViewportTransform();
+    });
+
+    // Status bar zoom button click
+    if (el.statusZoomBtn) {
+      el.statusZoomBtn.addEventListener('click', () => {
+        if (Math.abs(state.zoom - 1.0) < 0.05) {
+          fitToWorkspace();
+        } else {
+          state.zoom = 1.0;
+          state.panX = 0;
+          state.panY = 0;
+          applyViewportTransform();
+        }
+      });
+    }
+
+    // View menu items
+    const fitItem = document.getElementById('action_menu_fit');
+    if (fitItem) fitItem.addEventListener('click', fitToWorkspace);
+    const actualItem = document.getElementById('action_menu_100');
+    if (actualItem) actualItem.addEventListener('click', () => {
+      state.zoom = 1.0;
+      state.panX = 0;
+      state.panY = 0;
+      applyViewportTransform();
+    });
+    const zoomInItem = document.getElementById('action_menu_zoomin');
+    if (zoomInItem) zoomInItem.addEventListener('click', () => setZoom(state.zoom * 1.15));
+    const zoomOutItem = document.getElementById('action_menu_zoomout');
+    if (zoomOutItem) zoomOutItem.addEventListener('click', () => setZoom(state.zoom / 1.15));
+  }
+
   // --- Event Wireup ---
   function setupEvents() {
+    setupPanAndZoom();
+
     // Toolbar buttons
     document.querySelectorAll('.tool_btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -611,7 +749,7 @@
       });
     }
 
-    // Export & Import saves JSON
+    // Export saves JSON
     const exportBtn = document.getElementById('exportSavesBtn');
     if (exportBtn) {
       exportBtn.addEventListener('click', () => {
@@ -645,6 +783,21 @@
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         saveCurrentCollage();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+        e.preventDefault();
+        fitToWorkspace();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === '1') {
+        e.preventDefault();
+        state.zoom = 1.0;
+        state.panX = 0;
+        state.panY = 0;
+        applyViewportTransform();
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        setZoom(state.zoom * 1.15);
+      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        setZoom(state.zoom / 1.15);
       }
     });
   }
@@ -665,8 +818,13 @@
     setupEvents();
     selectTool('layout');
 
-    // Generate initial fodder automatically
+    // Generate initial fodder
     generateFodder();
+
+    // Fit canvas to workspace by default
+    setTimeout(() => {
+      fitToWorkspace();
+    }, 50);
   }
 
   if (document.readyState === 'loading') {
