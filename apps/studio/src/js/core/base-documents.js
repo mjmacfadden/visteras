@@ -452,6 +452,7 @@ class Base_documents_class {
 	async create_document_from_image({ name, data, exif, force_new = false }) {
 		return new Promise((resolve) => {
 			const img = new Image();
+			img.crossOrigin = 'Anonymous';
 			img.onload = async () => {
 				const w = img.width;
 				const h = img.height;
@@ -695,6 +696,7 @@ class Base_documents_class {
 
 			if (dataUrl) {
 				const img = new Image();
+				img.crossOrigin = 'Anonymous';
 				await new Promise((res) => {
 					img.onload = () => {
 						if (img.decode) {

@@ -823,44 +823,85 @@ class File_open_class {
 	}
 
 	//handler for open url. Example url: http://i.imgur.com/ATda8Ae.jpg
-	file_open_url_handler(user_response) {
+	async file_open_url_handler(user_response) {
 		var _this = this;
 		var url = user_response.url;
-		if (url == '')
+		if (!url)
 			return;
 
-		var layer_name = url.replace(/^.*[\\\/]/, '');
+		var layer_name = url.replace(/^.*[\\\/]/, '').split('?')[0] || 'Image';
 
-		var img = new Image();
-		img.crossOrigin = "Anonymous";
-		img.onload = async function () {
-			if (app.Documents) {
-				await app.Documents.create_document_from_image({
-					name: layer_name,
-					data: url,
-				});
-			} else {
-				var new_layer = {
-					name: layer_name,
-					type: 'image',
-					link: img,
-					width: img.width,
-					height: img.height,
-					width_original: img.width,
-					height_original: img.height,
-				};
-				app.State.do_action(
-					new app.Actions.Bundle_action('open_file_url', 'Open File URL', [
-						new app.Actions.Insert_layer_action(new_layer),
-						new app.Actions.Autoresize_canvas_action(img.width, img.height, null, true, true)
-					])
-				);
-			}
-		};
-		img.onerror = function (ex) {
-			alertify.error('Sorry, image could not be loaded. Try copy image and paste it.');
-		};
-		img.src = url;
+		try {
+			// Fetch as blob and convert to local data URL to prevent canvas CORS tainting
+			const response = await fetch(url);
+			if (!response.ok) throw new Error('Fetch failed with status ' + response.status);
+			const blob = await response.blob();
+			const reader = new FileReader();
+			reader.onload = async function () {
+				const dataUrl = reader.result;
+				if (app.Documents) {
+					await app.Documents.create_document_from_image({
+						name: layer_name,
+						data: dataUrl,
+					});
+				} else {
+					const img = new Image();
+					img.crossOrigin = "Anonymous";
+					img.onload = function () {
+						var new_layer = {
+							name: layer_name,
+							type: 'image',
+							link: img,
+							data: dataUrl,
+							width: img.width,
+							height: img.height,
+							width_original: img.width,
+							height_original: img.height,
+						};
+						app.State.do_action(
+							new app.Actions.Bundle_action('open_file_url', 'Open File URL', [
+								new app.Actions.Insert_layer_action(new_layer),
+								new app.Actions.Autoresize_canvas_action(img.width, img.height, null, true, true)
+							])
+						);
+					};
+					img.src = dataUrl;
+				}
+			};
+			reader.readAsDataURL(blob);
+		} catch (err) {
+			console.warn('Direct blob fetch failed, falling back to crossOrigin Image:', err);
+			var img = new Image();
+			img.crossOrigin = "Anonymous";
+			img.onload = async function () {
+				if (app.Documents) {
+					await app.Documents.create_document_from_image({
+						name: layer_name,
+						data: url,
+					});
+				} else {
+					var new_layer = {
+						name: layer_name,
+						type: 'image',
+						link: img,
+						width: img.width,
+						height: img.height,
+						width_original: img.width,
+						height_original: img.height,
+					};
+					app.State.do_action(
+						new app.Actions.Bundle_action('open_file_url', 'Open File URL', [
+							new app.Actions.Insert_layer_action(new_layer),
+							new app.Actions.Autoresize_canvas_action(img.width, img.height, null, true, true)
+						])
+					);
+				}
+			};
+			img.onerror = function (ex) {
+				alertify.error('Sorry, image could not be loaded. Try copy image and paste it.');
+			};
+			img.src = url;
+		}
 	}
 
 	async load_json(data, filename) {
