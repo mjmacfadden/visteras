@@ -4654,6 +4654,14 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	left: 0;
 	right: 0;
 	z-index: 3000;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 28px;
+	background: var(--menu-background-color);
+	border-bottom: 1px solid #222222;
+	padding-right: 8px;
+	box-sizing: border-box;
 }
 .main_menu > ul.menu_bar {
 	display: flex;
@@ -4663,8 +4671,37 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	margin: 0;
 	height: 28px;
 	padding-left: 8px;
-	background: var(--menu-background-color);
-	border-bottom: 1px solid #222222;
+	background: transparent;
+	border-bottom: none;
+}
+.main_menu .menu_right_controls {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.main_menu .visteras_switch_btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	text-decoration: none;
+	font-size: 11px;
+	font-weight: 600;
+	color: #aaaaaa;
+	padding: 2px 8px;
+	border-radius: 2px;
+	background: #242424;
+	border: 1px solid #383838;
+	transition: all 0.15s;
+	font-family: "Segoe UI", "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+.main_menu .visteras_switch_btn:hover {
+	background: #333333;
+	color: #ffffff;
+	border-color: #555555;
+}
+.main_menu .visteras_switch_btn .visteras_badge {
+	font-weight: 800;
 }
 .main_menu > ul.menu_bar > li {
 	padding: 0;

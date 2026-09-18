@@ -34,6 +34,16 @@ class GUI_menu_class {
 			menuTemplate += this.generate_menu_bar_item_template(item, i);
 		}
 		menuTemplate += '</ul>';
+		menuTemplate += `
+			<div class="menu_right_controls">
+				<a href="../vector/" class="visteras_switch_btn" title="Switch to Visteras Vector (SVG Vector Graphics Editor)">
+					<span class="visteras_badge" style="color: #fa7c1b;">VECTOR</span> ↗
+				</a>
+				<a href="../publish/" class="visteras_switch_btn" title="Switch to Visteras Publish (Personal Morning Newspaper)">
+					<span class="visteras_badge" style="color: #14b8a6;">PUBLISH</span> ↗
+				</a>
+			</div>
+		`;
 
 		this.menuContainer.innerHTML = menuTemplate;
 		this.menuBarNode = this.menuContainer.querySelector('[role="menubar"]');
