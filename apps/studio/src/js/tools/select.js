@@ -533,7 +533,10 @@ class Select_tool_class extends Base_tools_class {
 										height: init_pos.height,
 										boundary: preParams.boundary || 'dynamic'
 									};
-									const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height);
+									const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height, {
+										x: finalPos.x,
+										y: finalPos.y
+									});
 									if (committed) {
 										layerUpdate.x = committed.x;
 										layerUpdate.y = committed.y;

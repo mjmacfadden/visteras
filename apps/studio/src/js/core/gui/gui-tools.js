@@ -1124,7 +1124,10 @@ class GUI_tools_class {
 							x: preX, y: preY, width: preW, height: preH,
 							boundary: config.layer.params.boundary || 'dynamic'
 						};
-						const committed = textTool.commit_point_text_resize(config.layer, newW, newH);
+						const committed = textTool.commit_point_text_resize(config.layer, newW, newH, {
+							x: preX,
+							y: preY
+						});
 						if (committed) {
 							settings.x = committed.x;
 							settings.y = committed.y;
