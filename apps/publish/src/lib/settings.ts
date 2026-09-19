@@ -106,10 +106,7 @@ export function loadSettings(): PaperSettings {
             url: String(f.url),
           }))
       : [];
-    const rssEnabled =
-      typeof parsed.rssEnabled === 'boolean'
-        ? parsed.rssEnabled
-        : enabledFeedIds.length > 0 || customFeeds.length > 0;
+    const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
     return {
       paperName: typeof parsed.paperName === 'string' && parsed.paperName.trim() ? parsed.paperName.trim() : base.paperName,
       paperTagline: typeof parsed.paperTagline === 'string' && parsed.paperTagline.trim() ? parsed.paperTagline.trim() : base.paperTagline,
@@ -187,26 +184,22 @@ export function buildLocalStorageBundle(opts?: { settings?: PaperSettings }): Lo
 /** Normalize a settings object the same way loadSettings does. */
 export function normalizePaperSettings(parsed: Partial<PaperSettings> | null | undefined): PaperSettings {
   const base = defaultSettings();
-  if (!parsed || typeof parsed !== 'object') return base;
   const enabledFeedIds = Array.isArray(parsed.enabledFeedIds)
     ? parsed.enabledFeedIds.filter((id) => typeof id === 'string')
     : base.enabledFeedIds;
-  const rssEnabled =
-    typeof parsed.rssEnabled === 'boolean'
-      ? parsed.rssEnabled
-      : enabledFeedIds.length > 0 ||
-        (Array.isArray(parsed.customFeeds) && parsed.customFeeds.length > 0);
+  const customFeeds = Array.isArray(parsed.customFeeds)
+    ? parsed.customFeeds.filter(
+        (f) => f && typeof f.url === 'string' && f.url.startsWith('http'),
+      )
+    : [];
+  const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
   return {
     paperName: typeof parsed.paperName === 'string' && parsed.paperName.trim() ? parsed.paperName.trim() : base.paperName,
     paperTagline: typeof parsed.paperTagline === 'string' && parsed.paperTagline.trim() ? parsed.paperTagline.trim() : base.paperTagline,
     zip: typeof parsed.zip === 'string' && /^\d{5}$/.test(parsed.zip) ? parsed.zip : base.zip,
     rssEnabled,
     enabledFeedIds,
-    customFeeds: Array.isArray(parsed.customFeeds)
-      ? parsed.customFeeds.filter(
-          (f) => f && typeof f.url === 'string' && f.url.startsWith('http'),
-        )
-      : [],
+    customFeeds,
     enabledComicIds: withNewComicDefaults(
       Array.isArray(parsed.enabledComicIds)
         ? parsed.enabledComicIds.filter((id) => typeof id === 'string')

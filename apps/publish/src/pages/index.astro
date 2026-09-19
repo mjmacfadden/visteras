@@ -1057,23 +1057,21 @@ const hasWireStories =
 
       async function refreshStories(s: PaperSettings) {
         const status = document.getElementById('settings-status');
+        const rssStatus = document.getElementById('rss-status');
+        const hasBuiltIn = Array.isArray(s.enabledFeedIds) && s.enabledFeedIds.length > 0;
         const hasCustom = Array.isArray(s.customFeeds) && s.customFeeds.length > 0;
-        if (!s.rssEnabled && !hasCustom) {
+        if (!hasBuiltIn && !hasCustom) {
           lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [] };
           composeEdition(lastRss, lastGrok);
           if (status) status.textContent = 'RSS disabled · paper uses Grok brief';
           return;
         }
         if (status) status.textContent = 'Refreshing feeds…';
+        if (rssStatus) rssStatus.textContent = 'Refreshing feeds…';
         const editionDate = document.body.dataset.editionDate || '';
         try {
-          // When RSS master is on but no checkboxes saved yet, pass null (= all built-ins).
-          const enabledFeedIds =
-            s.rssEnabled
-              ? (s.enabledFeedIds?.length ? s.enabledFeedIds : null)
-              : [];
           let data = await fetchAllFeeds({
-            enabledFeedIds,
+            enabledFeedIds: s.enabledFeedIds,
             customFeeds: s.customFeeds,
             editionDate,
             todayOnlyBuiltIn: true,
@@ -1084,9 +1082,9 @@ const hasWireStories =
             !data.sports?.length &&
             !data.lead?.length;
           // Mirror SSR buildLiveEdition: if today-only yields nothing, retry without the filter.
-          if (emptyBuiltIn && s.rssEnabled) {
+          if (emptyBuiltIn && hasBuiltIn) {
             data = await fetchAllFeeds({
-              enabledFeedIds,
+              enabledFeedIds: s.enabledFeedIds,
               customFeeds: s.customFeeds,
               editionDate,
               todayOnlyBuiltIn: false,
@@ -1250,16 +1248,6 @@ const hasWireStories =
         });
       }
 
-      function syncRssGroupsDisabled() {
-        const master = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        const groups = document.getElementById('settings-feed-groups');
-        const on = Boolean(master?.checked);
-        if (groups) groups.classList.toggle('is-disabled', !on);
-        document.querySelectorAll<HTMLInputElement>('input[name="feed"]').forEach((cb) => {
-          cb.disabled = !on;
-        });
-      }
-
       function populateSettingsForm(s: PaperSettings) {
         const nameInput = document.getElementById('settings-paper-name') as HTMLInputElement | null;
         if (nameInput) nameInput.value = s.paperName || 'The Daily Mike';
@@ -1267,13 +1255,9 @@ const hasWireStories =
         if (taglineInput) taglineInput.value = s.paperTagline || 'NOTEWORTHY EVENTS WEATHER AND SPORTS';
         const zipInput = document.getElementById('settings-zip') as HTMLInputElement | null;
         if (zipInput) zipInput.value = s.zip;
-        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        if (rssMaster) rssMaster.checked = s.rssEnabled === true;
         const feedBoxes = document.querySelectorAll<HTMLInputElement>('input[name="feed"]');
-        // Master on + empty enabledFeedIds → treat as all built-ins (matches fetchAllFeeds).
-        const defaultAllFeeds = s.rssEnabled && (!s.enabledFeedIds || s.enabledFeedIds.length === 0);
         feedBoxes.forEach((cb) => {
-          cb.checked = defaultAllFeeds || s.enabledFeedIds.includes(cb.value);
+          cb.checked = Array.isArray(s.enabledFeedIds) && s.enabledFeedIds.includes(cb.value);
         });
         document.querySelectorAll<HTMLInputElement>('input[name="comic"]').forEach((cb) => {
           cb.checked = s.enabledComicIds.includes(cb.value);
@@ -1282,7 +1266,6 @@ const hasWireStories =
         calendars = [...s.calendars];
         renderCustomList();
         renderCalendarsList();
-        syncRssGroupsDisabled();
         const grokStore = loadGrokBrief();
         const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
         if (ta) ta.value = grokStore?.text || '';
@@ -1295,17 +1278,10 @@ const hasWireStories =
         const paperTagline = (taglineInput?.value || 'NOTEWORTHY EVENTS WEATHER AND SPORTS').trim() || 'NOTEWORTHY EVENTS WEATHER AND SPORTS';
         const zipInput = document.getElementById('settings-zip') as HTMLInputElement | null;
         const zip = (zipInput?.value || '60062').trim();
-        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        let enabledFeedIds = Array.from(
+        const enabledFeedIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="feed"]:checked'),
         ).map((cb) => cb.value);
-        // Master on with nothing checked → default to all built-in feed ids.
-        if (rssMaster?.checked && enabledFeedIds.length === 0) {
-          enabledFeedIds = Array.from(
-            document.querySelectorAll<HTMLInputElement>('input[name="feed"]'),
-          ).map((cb) => cb.value);
-        }
-        const rssEnabled = Boolean(rssMaster?.checked) || customFeeds.length > 0 || enabledFeedIds.length > 0;
+        const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
         const enabledComicIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="comic"]:checked'),
         ).map((cb) => cb.value);
@@ -1330,16 +1306,6 @@ const hasWireStories =
         dialog?.showModal();
       });
 
-      document.getElementById('settings-rss-enabled')?.addEventListener('change', () => {
-        const master = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        if (master?.checked) {
-          const boxes = document.querySelectorAll<HTMLInputElement>('input[name="feed"]');
-          const anyChecked = Array.from(boxes).some((cb) => cb.checked);
-          if (!anyChecked) boxes.forEach((cb) => { cb.checked = true; });
-        }
-        syncRssGroupsDisabled();
-      });
-
       document.getElementById('custom-feed-add-btn')?.addEventListener('click', () => {
         const name = (document.getElementById('custom-feed-name') as HTMLInputElement)?.value.trim() || 'Custom';
         const url = (document.getElementById('custom-feed-url') as HTMLInputElement)?.value.trim();
@@ -1349,14 +1315,6 @@ const hasWireStories =
         customFeeds.push({ id: `custom-${Date.now()}`, name, url, section });
         (document.getElementById('custom-feed-name') as HTMLInputElement).value = '';
         (document.getElementById('custom-feed-url') as HTMLInputElement).value = '';
-
-        // Auto-check RSS master so the user sees RSS is enabled
-        const rssMaster = document.getElementById('settings-rss-enabled') as HTMLInputElement | null;
-        if (rssMaster && !rssMaster.checked) {
-          rssMaster.checked = true;
-          syncRssGroupsDisabled();
-        }
-
         renderCustomList();
       });
 
@@ -1435,7 +1393,7 @@ const hasWireStories =
         }
       });
 
-      document.getElementById('settings-save')?.addEventListener('click', async () => {
+      async function saveAndRefreshAll(statusElementId?: string) {
         settings = readSettingsFromForm();
         saveSettings(settings);
         applyPaperIdentity(settings.paperName, settings.paperTagline);
@@ -1447,6 +1405,25 @@ const hasWireStories =
           refreshStories(settings),
           refreshAgenda(settings),
         ]);
+        if (statusElementId) {
+          const status = document.getElementById(statusElementId);
+          if (status) {
+            status.textContent = 'Saved & refreshed!';
+            setTimeout(() => {
+              if (status.textContent === 'Saved & refreshed!') {
+                status.textContent = '';
+              }
+            }, 3000);
+          }
+        }
+      }
+
+      document.getElementById('settings-save')?.addEventListener('click', async () => {
+        await saveAndRefreshAll('settings-status');
+      });
+
+      document.getElementById('rss-save')?.addEventListener('click', async () => {
+        await saveAndRefreshAll('rss-status');
       });
 
       document.getElementById('grok-brief-save')?.addEventListener('click', () => {

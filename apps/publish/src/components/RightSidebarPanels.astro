@@ -254,27 +254,12 @@ const feedsBySection = {
     </div>
 
     <div class="panel_section">
-      <div class="panel_section_header" data-toggle-target="rss_master_body">
-        <span class="panel_section_arrow">▼</span>
-        <span>Live RSS Ingestion</span>
-      </div>
-      <div class="panel_section_body" id="rss_master_body">
-        <label class="panel_checkbox_row" style="font-weight:600;">
-          <input type="checkbox" name="rss-enabled" id="settings-rss-enabled" />
-          <span>Enable Live RSS Wires</span>
-        </label>
-        <p class="panel_help">
-          When disabled, stories are populated purely from the Grok Automation paste. Enable to interleave live wires into the edition.
-        </p>
-      </div>
-    </div>
-
-    <div class="panel_section">
       <div class="panel_section_header" data-toggle-target="rss_curated_body">
         <span class="panel_section_arrow">▼</span>
         <span>Curated News Feeds</span>
       </div>
       <div class="panel_section_body" id="rss_curated_body">
+        <p class="panel_help">Toggle feeds to include wire stories in your paper edition.</p>
         <div id="settings-feed-groups" style="display:flex; flex-direction:column; gap:8px;">
           <div>
             <div class="panel_label" style="margin-bottom:4px;">News &amp; Lead</div>
@@ -323,6 +308,15 @@ const feedsBySection = {
             Add Feed
           </button>
         </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_body" style="padding-top: 8px;">
+        <button type="button" id="rss-save" class="panel_btn_full btn_visteras_teal">
+          Save &amp; Refresh
+        </button>
+        <p class="panel_help" id="rss-status" aria-live="polite" style="color: #4ade80; font-weight: 500; min-height: 16px;"></p>
       </div>
     </div>
   </div>
