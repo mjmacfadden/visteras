@@ -19,6 +19,9 @@ config.ZOOM = 1;
 config.SNAP = true;
 // Third-party keys: window.__VP_KEYS__, then gitignored config.keys.local.js (see example).
 // Never commit real keys in this file. GitHub Pages cannot keep client keys secret.
+var _vpLocalKeys = (typeof window !== 'undefined' && window._vpLocalKeys)
+	|| (typeof window !== 'undefined' && window.__VP_KEYS__)
+	|| null;
 config.pixabay_key = (typeof window !== 'undefined' && window.__VP_KEYS__ && window.__VP_KEYS__.pixabay_key)
 	|| (_vpLocalKeys && _vpLocalKeys.pixabay_key)
 	|| '';
