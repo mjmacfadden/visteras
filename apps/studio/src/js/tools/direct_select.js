@@ -18,6 +18,7 @@ import app from '../app.js';
 import config from '../config.js';
 import Base_tools_class from '../core/base-tools.js';
 import Base_layers_class from '../core/base-layers.js';
+import Base_selection_class from '../core/base-selection.js';
 import Helper_class from '../libs/helpers.js';
 import Vector_manager from '../core/vector/vector-manager.js';
 import Vector_renderer from '../core/vector/vector-renderer.js';
@@ -31,6 +32,18 @@ class Direct_select_tool_class extends Base_tools_class {
 		this.name = 'direct_select';
 		this.Base_layers = new Base_layers_class();
 		this.Helper = new Helper_class();
+
+		// Register with Base_selection so it doesn't fall back to generic
+		// selection settings (which enable transform handles / body-move).
+		var sel_config = {
+			enable_background: false,
+			enable_borders: false,
+			enable_controls: false,
+			enable_rotation: false,
+			enable_move: false,
+			data_function: () => null,
+		};
+		this.Base_selection = new Base_selection_class(ctx, sel_config, this.name);
 
 		// Interaction state
 		this.drag_mode = null; // 'move_anchor' | 'move_handle' | 'marquee'
