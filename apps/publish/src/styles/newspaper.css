@@ -1721,6 +1721,99 @@ a:hover {
   border: 1px dotted #999;
 }
 
+/* Custom RSS feed rows: [checkbox] [ name / url ] [count] [trash] */
+.custom-feed-row.rss-source-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.custom-feed-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.custom-feed-row-main input[type="checkbox"] {
+  flex: 0 0 auto;
+  accent-color: var(--news-teal, #14b8a6);
+  cursor: pointer;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+}
+
+.custom-feed-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.custom-feed-row-label {
+  flex: 0 1 auto;
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-feed-row-url {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #666;
+  font-size: 0.66rem;
+}
+
+.custom-feed-count {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.custom-feed-count input[type="number"] {
+  width: 2.6rem;
+  padding: 0.1rem 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+  color: #333;
+  background: #fff;
+  border: 1px solid #999;
+  border-radius: 2px;
+}
+
+.custom-feed-count input[type="number"]:focus {
+  outline: none;
+  border-color: var(--news-teal, #14b8a6);
+}
+
+.custom-feed-remove {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.custom-feed-remove:hover {
+  color: #cc3333;
+}
+
 .custom-feed-add {
   display: grid;
   grid-template-columns: 1fr 2fr auto;

@@ -80,8 +80,6 @@ export function buildFlowUnits(editionEl: HTMLElement): {
     '.empty-column',
     '.page3-grid',
     '.answers-qr-url',
-    '.lead-image-controls',
-    '.lead-image-placeholder-box',
     'script',
     'iframe',
     'link',
@@ -129,7 +127,7 @@ export function buildFlowUnits(editionEl: HTMLElement): {
     banner.push(wrapUnit(frontPack, 'sheet-front'));
   }
 
-  liveClone.querySelectorAll('.stories-flow > .flow-block').forEach((block) => {
+  liveClone.querySelectorAll('.stories-flow .flow-block').forEach((block) => {
     const storySection = block.firstElementChild;
     if (!storySection || !hasPrintableContent(storySection)) return;
 

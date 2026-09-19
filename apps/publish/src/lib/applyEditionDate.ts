@@ -152,12 +152,16 @@ async function updateAnswersQr(isoDate: string) {
     if (captionLink) {
       captionLink.href = url;
       captionLink.textContent = caption;
+      captionLink.target = '_blank';
+      captionLink.rel = 'noopener noreferrer';
     }
 
     const urlLink = root.querySelector<HTMLAnchorElement>('.answers-qr-url a');
     if (urlLink) {
       urlLink.href = url;
       urlLink.textContent = url;
+      urlLink.target = '_blank';
+      urlLink.rel = 'noopener noreferrer';
     }
   });
 }

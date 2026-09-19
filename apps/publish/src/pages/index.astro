@@ -276,7 +276,15 @@ const hasWireStories =
                 <StoryColumn label="Sports" stories={edition.sports} />
               ) : null}
             </div>
-            <div class="flow-block" data-live-custom-feeds></div>
+            <div data-live-rss-feeds style="display: contents;">
+              {rssEnabled && edition.feeds && edition.feeds.length > 0
+                ? edition.feeds.map((feed) => (
+                    <div class="flow-block rss-source-block" data-feed-id={feed.id}>
+                      <StoryColumn label={feed.name} stories={feed.stories} />
+                    </div>
+                  ))
+                : null}
+            </div>
           </div>
 
           <p class="feed-status-note screen-only">
@@ -358,6 +366,27 @@ const hasWireStories =
       </footer>
     </div>
 
+    <dialog class="feed-delete-dialog screen-only" id="feed-delete-dialog" aria-labelledby="feed-delete-title">
+      <div class="feed-delete-box">
+        <div class="feed-delete-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </div>
+        <h2 id="feed-delete-title" class="feed-delete-title">Remove this feed?</h2>
+        <p class="feed-delete-text">
+          <span class="feed-delete-name" id="feed-delete-name"></span> will be removed from your
+          saved feeds. You can add it back anytime.
+        </p>
+        <div class="feed-delete-actions">
+          <button type="button" class="feed-delete-btn feed-delete-cancel" id="feed-delete-cancel">Keep feed</button>
+          <button type="button" class="feed-delete-btn feed-delete-confirm" id="feed-delete-confirm">Remove feed</button>
+        </div>
+      </div>
+    </dialog>
 
     <script id="feed-catalog" type="application/json" set:html={JSON.stringify(feedCatalog)} />
     <script id="comic-catalog" type="application/json" set:html={JSON.stringify(comicCatalog)} />
@@ -369,6 +398,7 @@ const hasWireStories =
       news: edition.news,
       businessTech: edition.businessTech,
       sports: edition.sports,
+      feeds: edition.feeds || [],
       agenda: edition.agenda,
       weatherFallback: edition.weather.fallback,
       rssEnabled,
@@ -596,11 +626,20 @@ const hasWireStories =
       }
 
       function escapeHtml(t: string) {
-        return t
+        return (t || '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+
+      function escapeAttr(t: string) {
+        return (t || '')
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
       }
 
       function storyImageHtml(imageUrl?: string) {
@@ -904,18 +943,16 @@ const hasWireStories =
       let customFeedPools: Record<string, any[]> = {};
       let customFeedIndices: Record<string, number> = {};
 
-      function customStoryHtml(feed: { id: string; name: string }, story: any, idx: number, total: number) {
+      function customFeedCount(feedId: string): number {
+        const f = (settings.customFeeds || []).find((x) => x.id === feedId);
+        const n = f && typeof f.count === 'number' ? f.count : 1;
+        return Math.min(10, Math.max(1, Math.floor(n) || 1));
+      }
+
+      function customStoryItemHtml(feed: { id: string; name: string }, story: any) {
         const title = story.url
           ? `<a href="${escapeAttr(story.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(story.title)}</a>`
           : escapeHtml(story.title);
-        const cycleControls =
-          total > 1
-            ? `<div class="story-cycle-controls" role="toolbar" aria-label="Change article">
-                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="prev" data-feed-id="${escapeAttr(feed.id)}" title="Previous article" aria-label="Previous article">◂ Prev</button>
-                <span class="story-cycle-indicator">${idx + 1} of ${total}</span>
-                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="next" data-feed-id="${escapeAttr(feed.id)}" title="Next article" aria-label="Next article">Next ▸</button>
-              </div>`
-            : '';
 
         let bodyHtml = '';
         if (Array.isArray(story.blocks) && story.blocks.length) {
@@ -940,74 +977,108 @@ const hasWireStories =
           bodyHtml = `${storyImageHtml(story.imageUrl || story.image)}${parasHtml}`;
         }
 
+        return `<article class="story-item custom-feed-story" data-feed-id="${escapeAttr(feed.id)}">
+          <h3>${title}</h3>
+          ${bodyHtml}
+          <p class="meta">${escapeHtml(story.source || feed.name)}</p>
+        </article>`;
+      }
+
+      function customFeedBlockHtml(feed: { id: string; name: string }, stories: any[]) {
+        const total = stories.length;
+        const count = customFeedCount(feed.id);
+        const start = (customFeedIndices[feed.id] ?? 0) % total;
+        const window = stories.slice(start, start + count);
+        const showingAll = count >= total;
+        const cycleControls =
+          !showingAll && total > 1
+            ? `<div class="story-cycle-controls" role="toolbar" aria-label="Change articles">
+                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="prev" data-feed-id="${escapeAttr(feed.id)}" title="Previous set of articles" aria-label="Previous articles">◂ Prev</button>
+                <span class="story-cycle-indicator">${start + 1}${window.length > 1 ? `–${start + window.length}` : ''} of ${total}</span>
+                <button type="button" class="story-cycle-btn" data-custom-feed-cycle="next" data-feed-id="${escapeAttr(feed.id)}" title="Next set of articles" aria-label="Next articles">Next ▸</button>
+              </div>`
+            : '';
+        const articlesHtml = window.map((story) => customStoryItemHtml(feed, story)).join('');
         return `<section class="story-column custom-feed-column" data-custom-feed-id="${escapeAttr(feed.id)}">
           <div class="custom-feed-header">
             <h2 class="section-label">${escapeHtml(feed.name)}</h2>
             ${cycleControls}
           </div>
-          <article class="story-item custom-feed-story" data-feed-id="${escapeAttr(feed.id)}">
-            <h3>${title}</h3>
-            ${bodyHtml}
-            <p class="meta">${escapeHtml(story.source || feed.name)}</p>
-          </article>
+          ${articlesHtml}
         </section>`;
       }
 
-      function renderCustomFeeds(customFeedsData?: { id: string; name: string; url: string; stories: any[] }[]) {
-        if (customFeedsData) {
-          customFeedsData.forEach((f) => {
-            if (f.stories?.length) {
-              customFeedPools[f.id] = f.stories;
-            }
-          });
-        }
-        const sectionsHtml = (settings.customFeeds || [])
-          .map((feed) => {
-            const stories = customFeedPools[feed.id] || [];
-            if (!stories.length) return '';
-            const idx = (customFeedIndices[feed.id] ?? 0) % stories.length;
-            const story = stories[idx];
-            return customStoryHtml(feed, story, idx, stories.length);
-          })
-          .filter(Boolean)
-          .join('');
+      let liveRssFeeds: { id: string; name: string; url?: string; stories: any[] }[] | null = null;
 
-        document.querySelectorAll<HTMLElement>('[data-live-custom-feeds]').forEach((el) => {
-          el.innerHTML = sectionsHtml;
-        });
+      function customFeedIds(): Set<string> {
+        return new Set((settings.customFeeds || []).map((f) => f.id));
       }
 
-      /** Grok maps directly to columns; built-in RSS if settings.rssEnabled; custom RSS in dedicated end sections. */
+      function renderRssSourceColumns(feeds?: { id: string; name: string; url?: string; stories: any[] }[]) {
+        const root = document.querySelector('[data-live-rss-feeds]');
+        if (!root) return;
+        liveRssFeeds = feeds || null;
+        const usable = (feeds || []).filter((f) => f.stories && f.stories.length > 0);
+        if (!usable.length) {
+          root.innerHTML = '';
+          return;
+        }
+        const customIds = customFeedIds();
+        const html = usable
+          .map((f) => {
+            if (customIds.has(f.id) || f.id.startsWith('custom-')) {
+              customFeedPools[f.id] = f.stories;
+              const stories = customFeedPools[f.id] || [];
+              if (!stories.length) return '';
+              return `<div class="flow-block rss-source-block custom-feed-block" data-feed-id="${escapeAttr(f.id)}">
+                ${customFeedBlockHtml(f, stories)}
+              </div>`;
+            }
+            const storiesHtml = f.stories.slice(0, 5).map((s) => storyHtml(s)).join('');
+            return `<div class="flow-block rss-source-block" data-feed-id="${escapeAttr(f.id)}">
+              <section class="story-column rss-source-column">
+                <h2 class="section-label">${escapeHtml(f.name)}</h2>
+                ${storiesHtml}
+              </section>
+            </div>`;
+          })
+          .join('');
+        root.innerHTML = html;
+      }
+
+      /** Grok maps directly to columns; RSS feeds render into columns titled by source name sorted alphabetically. */
       function composeEdition(rss: any, grok: ParsedGrokBrief | null) {
         const useRss = settings.rssEnabled === true;
-        const newsRss = useRss ? asBriefCards(rss?.news || [], 'news') : [];
-        const bizRss = useRss ? asBriefCards(rss?.businessTech || [], 'businessTech') : [];
-        const sportsRss = useRss ? asBriefCards(rss?.sports || [], 'sports') : [];
-        const alsoRss = useRss ? asBriefCards(rss?.alsoToday || [], 'also') : [];
-        const leadRss = useRss ? rss?.lead?.[0] || rss?.news?.[0] || null : null;
+        const feeds: { id: string; name: string; url?: string; stories: any[] }[] =
+          useRss && Array.isArray(rss?.feeds) ? rss.feeds : [];
 
         if (!grok) {
-          if (useRss && (leadRss || newsRss.length || bizRss.length || sportsRss.length || alsoRss.length)) {
-            const newsRssRest =
-              leadRss && newsRss.length && (newsRss[0].title === leadRss.title || newsRss[0].url === leadRss.url)
-                ? newsRss.slice(1)
-                : newsRss;
+          if (useRss && feeds.length > 0) {
+            const leadFeed = feeds.find((f) => f.stories && f.stories.length > 0);
+            const leadRss = leadFeed?.stories?.[0] || rss?.lead?.[0] || null;
+            const feedsToRender = feeds.map((f) => {
+              if (leadFeed && f.id === leadFeed.id && f.stories.length > 1) {
+                return { ...f, stories: f.stories.slice(1) };
+              }
+              return f;
+            });
             renderLead(leadRss, null, [], true);
-            renderAlso(alsoRss.slice(0, 5));
-            renderColumn('[data-live-news]', 'News', newsRssRest.slice(0, 5));
-            renderColumn('[data-live-biz]', 'Business · Tech', bizRss.slice(0, 5));
-            renderColumn('[data-live-sports]', 'Sports', sportsRss.slice(0, 5));
+            renderAlso([]);
+            renderColumn('[data-live-news]', 'News', []);
+            renderColumn('[data-live-biz]', 'Business · Tech · Markets', []);
+            renderColumn('[data-live-sports]', 'Sports', []);
+            renderRssSourceColumns(feedsToRender);
           } else {
             renderLead(null, null, [], true);
             renderAlso([]);
             renderColumn('[data-live-news]', 'News', []);
             renderColumn('[data-live-biz]', 'Business · Tech · Markets', []);
             renderColumn('[data-live-sports]', 'Sports', []);
+            renderRssSourceColumns([]);
           }
           renderGrokWeather(null);
           renderGrokGlance(null);
           renderGrokWatch(null);
-          renderCustomFeeds(rss?.customFeeds);
           schedulePaginate();
           return;
         }
@@ -1029,29 +1100,23 @@ const hasWireStories =
             }
           : null;
         const newsRest = briefNews.slice(leadFromGrok ? 1 : 0);
-        const effectiveLead = leadFromGrok || leadRss;
-        const newsRssRest =
-          !leadFromGrok && leadRss && newsRss.length && (newsRss[0].title === leadRss.title || newsRss[0].url === leadRss.url)
-            ? newsRss.slice(1)
-            : newsRss;
+        const effectiveLead = leadFromGrok || (useRss && feeds[0]?.stories?.[0]) || null;
 
         renderLead(effectiveLead, grok.lede, []);
         renderGrokWeather(grok);
         renderGrokGlance(grok);
         renderGrokWatch(grok);
 
+        renderAlso(briefAlso.slice(0, 6));
+        renderColumn('[data-live-news]', 'News', newsRest.slice(0, 6));
+        renderColumn('[data-live-biz]', 'Business · Tech', briefBiz.slice(0, 6));
+        renderColumn('[data-live-sports]', 'Sports', briefSports.slice(0, 6));
+
         if (useRss) {
-          renderAlso(interleave(briefAlso, alsoRss).slice(0, 6));
-          renderColumn('[data-live-news]', 'News', interleave(newsRest, newsRssRest).slice(0, 6));
-          renderColumn('[data-live-biz]', 'Business · Tech', interleave(briefBiz, bizRss).slice(0, 6));
-          renderColumn('[data-live-sports]', 'Sports', interleave(briefSports, sportsRss).slice(0, 6));
+          renderRssSourceColumns(feeds);
         } else {
-          renderAlso(briefAlso.slice(0, 6));
-          renderColumn('[data-live-news]', 'News', newsRest.slice(0, 6));
-          renderColumn('[data-live-biz]', 'Business · Tech · Markets', briefBiz.slice(0, 6));
-          renderColumn('[data-live-sports]', 'Sports', briefSports.slice(0, 6));
+          renderRssSourceColumns([]);
         }
-        renderCustomFeeds(rss?.customFeeds);
         schedulePaginate();
       }
 
@@ -1059,9 +1124,9 @@ const hasWireStories =
         const status = document.getElementById('settings-status');
         const rssStatus = document.getElementById('rss-status');
         const hasBuiltIn = Array.isArray(s.enabledFeedIds) && s.enabledFeedIds.length > 0;
-        const hasCustom = Array.isArray(s.customFeeds) && s.customFeeds.length > 0;
+        const hasCustom = Array.isArray(s.customFeeds) && s.customFeeds.some((f) => f.enabled !== false);
         if (!hasBuiltIn && !hasCustom) {
-          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [] };
+          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [], feeds: [] };
           composeEdition(lastRss, lastGrok);
           if (status) status.textContent = 'RSS disabled · paper uses Grok brief';
           return;
@@ -1099,6 +1164,7 @@ const hasWireStories =
               ? data.alsoToday.slice(0, 5)
               : (data.news || []).slice(1, 5),
             customFeeds: data.customFeeds || [],
+            feeds: data.feeds || [],
           };
           composeEdition(lastRss, lastGrok);
           if (status) {
@@ -1107,7 +1173,7 @@ const hasWireStories =
               (data.failedFeeds?.length ? ` · ${data.failedFeeds.length} skipped` : '');
           }
         } catch (e) {
-          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [] };
+          lastRss = { news: [], businessTech: [], sports: [], lead: [], alsoToday: [], customFeeds: [], feeds: [] };
           composeEdition(lastRss, lastGrok);
           if (status) {
             status.textContent =
@@ -1143,6 +1209,8 @@ const hasWireStories =
             sports: bootstrap.sports || [],
             lead: bootstrap.lead ? [bootstrap.lead] : [],
             alsoToday: bootstrap.alsoToday || [],
+            customFeeds: bootstrap.customFeeds || [],
+            feeds: bootstrap.feeds || [],
           };
         }
       }
@@ -1201,29 +1269,101 @@ const hasWireStories =
         showPage(1);
       }
 
-      function sectionLabel(sec?: string) {
-        if (sec === 'alsoToday') return 'Also today / Local';
-        if (sec === 'businessTech') return 'Business · Tech';
-        if (sec === 'sports') return 'Sports';
-        return 'News';
+      const CUSTOM_FEED_TRASH_ICON =
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>' +
+        '<line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+
+      let pendingDeleteIdx: number | null = null;
+
+      function confirmDeleteFeed(index: number) {
+        pendingDeleteIdx = index;
+        const nameEl = document.getElementById('feed-delete-name');
+        const feed = customFeeds[index];
+        if (nameEl) nameEl.textContent = feed ? `“${feed.name}”` : 'This feed';
+        const dialog = document.getElementById('feed-delete-dialog') as HTMLDialogElement | null;
+        dialog?.showModal();
+        const confirmBtn = document.getElementById('feed-delete-confirm') as HTMLButtonElement | null;
+        confirmBtn?.focus();
       }
+
+      const feedDeleteDialog = document.getElementById('feed-delete-dialog') as HTMLDialogElement | null;
+      function dropDeletedFeedFromEdition(feedId: string) {
+        if (!lastRss) return;
+        lastRss.feeds = (lastRss.feeds || []).filter((f) => f && f.id !== feedId);
+        lastRss.customFeeds = (lastRss.customFeeds || []).filter((f) => f && f.id !== feedId);
+        composeEdition(lastRss, lastGrok);
+        schedulePaginate();
+      }
+      document.getElementById('feed-delete-confirm')?.addEventListener('click', () => {
+        if (pendingDeleteIdx !== null) {
+          const removed = customFeeds[pendingDeleteIdx];
+          customFeeds.splice(pendingDeleteIdx, 1);
+          renderCustomList();
+          settings = readSettingsFromForm();
+          saveSettings(settings);
+          if (removed?.id) dropDeletedFeedFromEdition(removed.id);
+        }
+        feedDeleteDialog?.close();
+        pendingDeleteIdx = null;
+      });
+      document.getElementById('feed-delete-cancel')?.addEventListener('click', () => {
+        feedDeleteDialog?.close();
+        pendingDeleteIdx = null;
+      });
+      feedDeleteDialog?.addEventListener('close', () => {
+        pendingDeleteIdx = null;
+      });
 
       function renderCustomList() {
         const list = document.getElementById('custom-feeds-list');
         if (!list) return;
         list.innerHTML = customFeeds
           .map(
-            (f, i) => `<div class="custom-feed-row" data-idx="${i}">
-              <span><strong>${escapeHtml(f.name)}</strong> <em style="font-size: 0.72rem; color: #555;">(${sectionLabel(f.section)})</em><br/>${escapeHtml(f.url)}</span>
-              <button type="button" data-remove-custom="${i}">Remove</button>
+            (f, i) => `<div class="custom-feed-row rss-source-row" data-idx="${i}">
+              <label class="custom-feed-row-main" title="${escapeAttr(f.url)}">
+                <input type="checkbox" data-toggle-custom="${i}" ${f.enabled ? 'checked' : ''} />
+                <span class="custom-feed-row-text">
+                  <span class="custom-feed-row-label">${escapeHtml(f.name)}</span>
+                  <span class="custom-feed-row-url">${escapeHtml(f.url)}</span>
+                </span>
+              </label>
+              <label class="custom-feed-count" title="Articles shown at once">
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  step="1"
+                  value="${typeof f.count === 'number' ? f.count : 1}"
+                  data-count-custom="${i}"
+                  aria-label="Articles to include"
+                />
+              </label>
+              <button type="button" class="custom-feed-remove" data-remove-custom="${i}" title="Delete feed" aria-label="Delete feed">${CUSTOM_FEED_TRASH_ICON}</button>
             </div>`,
           )
           .join('');
+        list.querySelectorAll('[data-toggle-custom]').forEach((cb) => {
+          cb.addEventListener('change', () => {
+            const idx = Number((cb as HTMLElement).getAttribute('data-toggle-custom'));
+            const feed = customFeeds[idx];
+            if (feed) feed.enabled = (cb as HTMLInputElement).checked;
+          });
+        });
+        list.querySelectorAll('[data-count-custom]').forEach((num) => {
+          num.addEventListener('change', () => {
+            const idx = Number((num as HTMLElement).getAttribute('data-count-custom'));
+            const feed = customFeeds[idx];
+            if (!feed) return;
+            const val = Math.min(10, Math.max(1, Math.floor(Number((num as HTMLInputElement).value)) || 1));
+            (num as HTMLInputElement).value = String(val);
+            feed.count = val;
+          });
+        });
         list.querySelectorAll('[data-remove-custom]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const idx = Number((btn as HTMLElement).getAttribute('data-remove-custom'));
-            customFeeds.splice(idx, 1);
-            renderCustomList();
+            confirmDeleteFeed(idx);
           });
         });
       }
@@ -1281,7 +1421,7 @@ const hasWireStories =
         const enabledFeedIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="feed"]:checked'),
         ).map((cb) => cb.value);
-        const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
+        const rssEnabled = enabledFeedIds.length > 0 || customFeeds.some((f) => f.enabled !== false);
         const enabledComicIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="comic"]:checked'),
         ).map((cb) => cb.value);
@@ -1312,7 +1452,7 @@ const hasWireStories =
         const sectionSelect = document.getElementById('custom-feed-section') as HTMLSelectElement | null;
         const section = (sectionSelect?.value || 'news') as any;
         if (!url || !url.startsWith('http')) return;
-        customFeeds.push({ id: `custom-${Date.now()}`, name, url, section });
+        customFeeds.push({ id: `custom-${Date.now()}`, name, url, section, enabled: true, count: 1 });
         (document.getElementById('custom-feed-name') as HTMLInputElement).value = '';
         (document.getElementById('custom-feed-url') as HTMLInputElement).value = '';
         renderCustomList();
@@ -1534,9 +1674,6 @@ const hasWireStories =
         });
       }
 
-      function escapeAttr(t: string) {
-        return escapeHtml(t).replace(/`/g, '&#96;');
-      }
 
       const NY_GENERIC_BLURB = 'A drawing that riffs on the latest news and happenings.';
 
@@ -1797,12 +1934,17 @@ const hasWireStories =
           const feedId = customCycleBtn.getAttribute('data-feed-id') || '';
           const dir = customCycleBtn.getAttribute('data-custom-feed-cycle');
           const stories = customFeedPools[feedId] || [];
-          if (stories.length > 1) {
+          const count = customFeedCount(feedId);
+          if (stories.length > count) {
             let cur = customFeedIndices[feedId] ?? 0;
-            cur = dir === 'next' ? (cur + 1) % stories.length : (cur - 1 + stories.length) % stories.length;
+            cur = dir === 'next'
+              ? (cur + count) % stories.length
+              : (cur - count + stories.length) % stories.length;
             customFeedIndices[feedId] = cur;
-            renderCustomFeeds();
-            schedulePaginate();
+            if (liveRssFeeds) {
+              renderRssSourceColumns(liveRssFeeds);
+              schedulePaginate();
+            }
           }
           return;
         }
@@ -2142,7 +2284,7 @@ const hasWireStories =
         }
       }
 
-      if (settings.rssEnabled || (Array.isArray(settings.customFeeds) && settings.customFeeds.length > 0)) {
+      if (settings.rssEnabled || (Array.isArray(settings.customFeeds) && settings.customFeeds.some((f) => f.enabled !== false))) {
         void refreshStories(settings);
       }
       if (settings.calendars.length) refreshAgenda(settings);

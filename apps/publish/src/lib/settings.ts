@@ -45,6 +45,17 @@ export interface CustomFeed {
   id: string;
   name: string;
   url: string;
+  /** Whether the feed is fetched/rendered. Defaults to true. */
+  enabled: boolean;
+  /** How many articles from this feed to show at once (cycle step). 1..10. */
+  count: number;
+}
+
+/** Clamp a user-facing article count into the valid 1..10 range. */
+function clampFeedCount(value: unknown): number {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(10, n);
 }
 
 export interface GrokBriefStore {
@@ -104,9 +115,11 @@ export function loadSettings(): PaperSettings {
             id: String(f.id || `custom-${Date.now()}`),
             name: String(f.name || 'Custom'),
             url: String(f.url),
+            enabled: (f as { enabled?: unknown }).enabled !== false,
+            count: clampFeedCount((f as { count?: unknown }).count),
           }))
       : [];
-    const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
+    const rssEnabled = enabledFeedIds.length > 0 || customFeeds.some((f) => f.enabled);
     return {
       paperName: typeof parsed.paperName === 'string' && parsed.paperName.trim() ? parsed.paperName.trim() : base.paperName,
       paperTagline: typeof parsed.paperTagline === 'string' && parsed.paperTagline.trim() ? parsed.paperTagline.trim() : base.paperTagline,
@@ -188,11 +201,19 @@ export function normalizePaperSettings(parsed: Partial<PaperSettings> | null | u
     ? parsed.enabledFeedIds.filter((id) => typeof id === 'string')
     : base.enabledFeedIds;
   const customFeeds = Array.isArray(parsed.customFeeds)
-    ? parsed.customFeeds.filter(
-        (f) => f && typeof f.url === 'string' && f.url.startsWith('http'),
-      )
+    ? parsed.customFeeds
+        .filter(
+          (f) => f && typeof f.url === 'string' && f.url.startsWith('http'),
+        )
+        .map((f) => ({
+          id: String(f.id || `custom-${Date.now()}`),
+          name: String(f.name || 'Custom'),
+          url: String(f.url),
+          enabled: (f as { enabled?: unknown }).enabled !== false,
+          count: clampFeedCount((f as { count?: unknown }).count),
+        }))
     : [];
-  const rssEnabled = enabledFeedIds.length > 0 || customFeeds.length > 0;
+  const rssEnabled = enabledFeedIds.length > 0 || customFeeds.some((f) => f.enabled);
   return {
     paperName: typeof parsed.paperName === 'string' && parsed.paperName.trim() ? parsed.paperName.trim() : base.paperName,
     paperTagline: typeof parsed.paperTagline === 'string' && parsed.paperTagline.trim() ? parsed.paperTagline.trim() : base.paperTagline,

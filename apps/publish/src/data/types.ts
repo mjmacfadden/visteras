@@ -102,6 +102,7 @@ export interface Edition {
   comics: ComicStripData[];
   todayInHistory: HistoryItem[];
   birthdays: BirthdayItem[];
+  feeds?: { id: string; name: string; section?: string; url: string; stories: RssStory[] }[];
 }
 
 export interface JumbleEntry {

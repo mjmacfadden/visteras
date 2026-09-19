@@ -8,14 +8,14 @@ export function getSiteBaseUrl(): string {
       (import.meta as ImportMeta & { env?: Record<string, string> }).env?.PUBLIC_SITE_URL) ||
     '';
   if (fromEnv) {
-    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+    const base = (import.meta.env.BASE_URL || '/publish/').replace(/\/$/, '');
     return `${fromEnv.trim().replace(/\/$/, '')}${base}`;
   }
-  return 'http://mjmacfadden.github.io/royko';
+  return 'https://visteras.com/publish';
 }
 
 export function answersUrlForDate(date: string): string {
-  return `${getSiteBaseUrl()}/answers?date=${date}`;
+  return `${getSiteBaseUrl()}/answers/?date=${date}`;
 }
 
 /** Paper name — use everywhere instead of legacy Chronicle branding. */

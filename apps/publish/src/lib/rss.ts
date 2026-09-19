@@ -16,12 +16,22 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+export interface FeedResult {
+  id: string;
+  name: string;
+  section: FeedSection | string;
+  url: string;
+  stories: RssStory[];
+}
+
 export interface FetchedSections {
   lead: RssStory[];
   alsoToday: RssStory[];
   news: RssStory[];
   businessTech: RssStory[];
   sports: RssStory[];
+  customFeeds?: CustomFeedResult[];
+  feeds: FeedResult[];
   okFeeds: string[];
   failedFeeds: { id: string; error: string }[];
 }
@@ -390,8 +400,8 @@ function dedupe(stories: RssStory[]): RssStory[] {
 export interface FetchFeedsOptions {
   /** null/undefined = all built-ins; [] = none; non-empty = those ids. */
   enabledFeedIds?: string[] | null;
-  /** Extra custom feeds. */
-  customFeeds?: { id: string; name: string; url: string }[];
+  /** Extra custom feeds (only ones with enabled !== false are fetched). */
+  customFeeds?: { id: string; name: string; url: string; enabled?: boolean }[];
   /** When true, keep only items published on editionDate (America/Chicago). */
   todayOnlyBuiltIn?: boolean;
   editionDate?: string;
@@ -406,6 +416,7 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
     businessTech: [],
     sports: [],
     customFeeds: [],
+    feeds: [],
     okFeeds: [],
     failedFeeds: [],
   };
@@ -423,15 +434,18 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
   const builtIns = NEWS_FEEDS.filter((f) => !enabled || enabled.has(f.id));
   const customMap = new Map<string, CustomFeedResult>();
   (opts.customFeeds || []).forEach((c) => {
+    if (c.enabled === false) return;
     customMap.set(c.id, { id: c.id, name: c.name || 'Custom', url: c.url, stories: [] });
   });
 
-  const customs: FeedConfig[] = (opts.customFeeds || []).map((c) => ({
+  const customs: FeedConfig[] = (opts.customFeeds || [])
+    .filter((c) => c.enabled !== false)
+    .map((c) => ({
     id: c.id,
     name: c.name || 'Custom',
     url: c.url,
     section: 'news',
-    limit: 12,
+    limit: 10,
   }));
 
   const editionDate = opts.editionDate;
@@ -461,20 +475,34 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
     }),
   );
 
+  const feedResults: FeedResult[] = [];
+
   for (const r of results) {
     if (r.error) {
       empty.failedFeeds.push({ id: r.feed.id, error: r.error });
       continue;
     }
     empty.okFeeds.push(r.feed.id);
+    const dedupedStories = dedupe(r.stories);
+    if (dedupedStories.length > 0) {
+      feedResults.push({
+        id: r.feed.id,
+        name: r.feed.name,
+        section: r.feed.section,
+        url: r.feed.url,
+        stories: dedupedStories,
+      });
+    }
     if (customMap.has(r.feed.id)) {
       const entry = customMap.get(r.feed.id)!;
-      entry.stories = dedupe(r.stories);
+      entry.stories = dedupedStories;
     } else {
       empty[r.feed.section].push(...r.stories);
     }
   }
 
+  feedResults.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  empty.feeds = feedResults;
   empty.customFeeds = Array.from(customMap.values());
 
   empty.lead = dedupe(empty.lead);

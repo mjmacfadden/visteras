@@ -973,3 +973,124 @@ html {
     justify-content: space-between !important;
   }
 }
+
+/* ==========================================================================
+   Custom feed delete confirmation dialog
+   ========================================================================== */
+.feed-delete-dialog {
+  border: 1px solid #3c3c3c;
+  padding: 0;
+  max-width: 21rem;
+  width: calc(100vw - 2rem);
+  background: #242424;
+  color: #dddddd;
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  font-family: var(--ui-font);
+  overflow: hidden;
+}
+
+.feed-delete-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.feed-delete-dialog[open] {
+  animation: feed-delete-in 0.14s ease-out;
+}
+
+@keyframes feed-delete-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feed-delete-box {
+  padding: 18px 20px;
+}
+
+.feed-delete-icon {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(220, 60, 60, 0.14);
+  color: #ef6b6b;
+}
+
+.feed-delete-title {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+}
+
+.feed-delete-text {
+  margin: 0 0 16px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #aaaaaa;
+}
+
+.feed-delete-name {
+  color: #ffffff;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.feed-delete-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.feed-delete-btn {
+  flex: 1 1 auto;
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.feed-delete-cancel {
+  background: #333333;
+  color: #cccccc;
+  border: 1px solid #444444;
+}
+
+.feed-delete-cancel:hover,
+.feed-delete-cancel:focus-visible {
+  background: #444444;
+  color: #ffffff;
+  border-color: #666666;
+}
+
+.feed-delete-confirm {
+  background: #8c2f2f;
+  color: #ffffff;
+  border: 1px solid #b14848;
+}
+
+.feed-delete-confirm:hover,
+.feed-delete-confirm:focus-visible {
+  background: #a63a3a;
+  border-color: #d05a5a;
+}
+
+.feed-delete-btn:focus-visible {
+  outline: 2px solid var(--news-teal-light);
+  outline-offset: 1px;
+}

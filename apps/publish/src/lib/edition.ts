@@ -78,6 +78,7 @@ export async function buildLiveEdition(
       sports: [],
       comics: comicSlots,
       morningRoundup: null,
+      feeds: [],
     };
     return {
       edition,
@@ -125,6 +126,7 @@ export async function buildLiveEdition(
     businessTech,
     sports,
     comics: comicSlots,
+    feeds: feeds.feeds || [],
   };
 
   return {
