@@ -123,8 +123,8 @@ import {
     editorsChoice: false,
     
     // API Configuration
-    apiEndpoint: localStorage.getItem('visteras_pixabay_endpoint') || '',
-    directApiKey: localStorage.getItem('visteras_pixabay_key') || '8275657-8140dd6f1736f5e58a5c35ad4',
+    apiEndpoint: localStorage.getItem('visteras_pixabay_endpoint') || 'https://us-central1-visteras-5a8b0.cloudfunctions.net/pixabaySearch',
+    directApiKey: localStorage.getItem('visteras_pixabay_key') || '',
     apiCache: {},
 
     customImageUrl: '',

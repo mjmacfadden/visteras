@@ -19,10 +19,12 @@ config.ZOOM = 1;
 config.SNAP = true;
 // Third-party keys: window.__VP_KEYS__, then gitignored config.keys.local.js (see example).
 // Never commit real keys in this file. GitHub Pages cannot keep client keys secret.
-var _vpLocalKeys = require('vp-local-keys');
 config.pixabay_key = (typeof window !== 'undefined' && window.__VP_KEYS__ && window.__VP_KEYS__.pixabay_key)
 	|| (_vpLocalKeys && _vpLocalKeys.pixabay_key)
 	|| '';
+config.pixabay_endpoint = (typeof window !== 'undefined' && window.__VP_KEYS__ && window.__VP_KEYS__.pixabay_endpoint)
+	|| (_vpLocalKeys && _vpLocalKeys.pixabay_endpoint)
+	|| 'https://us-central1-visteras-5a8b0.cloudfunctions.net/pixabaySearch';
 config.safe_search_can_be_disabled = true;
 config.google_webfonts_key = (typeof window !== 'undefined' && window.__VP_KEYS__ && window.__VP_KEYS__.google_webfonts_key)
 	|| (_vpLocalKeys && _vpLocalKeys.google_webfonts_key)

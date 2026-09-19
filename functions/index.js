@@ -11,7 +11,7 @@ const pixabayApiKey = defineSecret("PIXABAY_API_KEY");
 exports.pixabaySearch = onRequest(
   {
     secrets: [pixabayApiKey],
-    cors: [/visteras\.com$/, /localhost(:\d+)?$/, /127\.0\.0\.1(:\d+)?$/],
+    cors: true,
     maxInstances: 10,
   },
   async (req, res) => {

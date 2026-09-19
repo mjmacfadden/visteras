@@ -135,7 +135,7 @@ class Media_class extends Base_tools_class {
 					return;
 				}
 
-				var endpoint = localStorage.getItem('visteras_pixabay_endpoint') || '';
+				var endpoint = localStorage.getItem('visteras_pixabay_endpoint') || config.pixabay_endpoint || 'https://us-central1-visteras-5a8b0.cloudfunctions.net/pixabaySearch';
 				var customKey = localStorage.getItem('visteras_pixabay_key') || '';
 				var effectiveKey = customKey || key;
 
