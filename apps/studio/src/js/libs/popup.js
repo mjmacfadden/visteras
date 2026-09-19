@@ -279,7 +279,12 @@ class Dialog_class {
 
 		if (this.onfinish) {
 			try {
-				this.onfinish(params);
+				var result = this.onfinish(params);
+				if (result && typeof result.then === 'function') {
+					result.then((val) => { if (val !== false) this.hide(true); }).catch(() => this.hide(true));
+					return;
+				}
+				if (result === false) return;
 			} catch (e) {
 				console.error('Error in popup onfinish handler:', e);
 			}
