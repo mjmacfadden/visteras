@@ -38842,7 +38842,15 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		}
 		update() {
 			let { elem: e } = this;
-			return Tg(e) ? (this.matrix = Rh(e), this.imatrix = this.matrix.inverse()) : (this.matrix = null, this.imatrix = null), this.eachSeg(function(t) {
+			let tl = Mh(e);
+			if (Tg(e) || tl?.numberOfItems > 0) {
+				this.matrix = Rh(e);
+				this.imatrix = this.matrix.inverse();
+			} else {
+				this.matrix = null;
+				this.imatrix = null;
+			}
+			return this.eachSeg(function(t) {
 				this.item = e.pathSegList.getItem(t), this.update();
 			}), this;
 		}
@@ -39117,7 +39125,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 							K.addPtsToSelection(a);
 						}
 					}
-				} else if (mouseTarget === K.elem || e.target === K.elem || K.elem.contains(e.target)) {
+			} else if (mouseTarget === K.elem || e.target === K.elem || K.elem.contains(e.target)) {
 					// Clicked on object body -> activate ALL anchor points and allow moving the whole object
 					K.selectAllPts();
 					K.cur_pt = null;
@@ -39240,6 +39248,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			K = p_.getPath_(e), p_.setCurrentMode("pathedit"), p_.clearSelection(), K.setPathContext(), K.show(!0).update(), K.oldbbox = fg(K.elem), this.#e = !1;
 		}
 		toSelectMode(e) {
+			e = e || K?.elem;
 			let t = e === K?.elem;
 			p_.setCurrentMode("select"), K && (K.setPathContext(), K.show(!1)), this.#r = !1, p_.clearSelection(), K?.matrix && p_.recalcRotatedPath(), t && (p_.call("selected", [e]), p_.addToSelection([e], !0));
 		}
@@ -40842,7 +40851,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					y: Math.min(q.getRStartY() * n, b),
 					width: Math.abs(v - q.getRStartX() * n),
 					height: Math.abs(b - q.getRStartY() * n)
-				}, 100)), q.pathActions.mouseMove(y, x);
+				}, 100));
+				q.pathActions.mouseMove(y, x);
 				break;
 			case "textedit":
 				y *= n, x *= n, q.textActions.mouseMove(h, g);
@@ -41140,6 +41150,20 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			for (; _.numberOfItems > 0;) _.removeItem(0);
 			let t = q.getSvgRoot().createSVGTransform();
 			t.setMatrix(e), _.appendItem(t);
+		}
+		if (K && K.elem && q.getCurrentMode() === "select" && document.getElementById("tool_direct_select")?.pressed && (m === K.elem || K.elem.contains(e.target))) {
+			q.setCurrentMode("pathedit");
+			q.clearSelection();
+			K.setPathContext(), K.show(!0).update();
+			let container = document.getElementById("pathpointgrip_container");
+			if (container) {
+				container.querySelectorAll('[id^="segline_"]').forEach(el => el.setAttribute("display", "none"));
+				container.querySelectorAll('[id^="ctrlLine_"]').forEach(el => el.setAttribute("display", "none"));
+			}
+			let stretchLine = document.getElementById("path_stretch_line");
+			if (stretchLine) stretchLine.setAttribute("display", "none");
+			q.setStartX(q.getStartX() * r), q.setStartY(q.getStartY() * r), q.pathActions.mouseDown(e, m, q.getStartX(), q.getStartY()), q.setStarted(!0);
+			return;
 		}
 		switch (q.getCurrentMode()) {
 			case "select":
