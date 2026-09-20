@@ -1,3 +1,4 @@
+import { normalizeEditablePath } from "./js/visteras-path-geometry.js";
 //#region \0rolldown/runtime.js
 var e = Object.defineProperty, t = (e, t, n) => () => {
 	if (n) throw n[0];
@@ -20081,7 +20082,7 @@ var kr, Ar, jr, Mr = t((() => {
 					let n = `${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.shiftKey ? "shift+" : ""}${t.key.toUpperCase()}`;
 					let simpleKey = t.key.toUpperCase();
 
-					if (sc.toUpperCase() === n || (sc.toUpperCase() === simpleKey && !isCmdOrCtrl && !t.altKey)) {
+					if (!t.defaultPrevented && !this.disabled && (sc.toUpperCase() === n || (sc.toUpperCase() === simpleKey && !isCmdOrCtrl && !t.altKey && !t.shiftKey))) {
 						this.click();
 						t.preventDefault();
 					}
@@ -24466,7 +24467,7 @@ var Su = t((() => {
 		connectedCallback() {
 			let e = this.getAttribute("shortcut");
 			e && document.addEventListener("keydown", (t) => {
-				if (t.target.nodeName !== "BODY") return;
+				if (t.defaultPrevented || t.target.nodeName !== "BODY") return;
 				let n = `${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.shiftKey ? "shift+" : ""}${t.key.toUpperCase()}`;
 				e === n && (this.id && document.getElementById(this.id).click(), t.preventDefault());
 			});
@@ -38471,13 +38472,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let i = Qg.getZoom();
 		return r.x *= i, r.y *= i, r;
 	}, n_ = (e, t) => {
-		let n = {
-			x: e.x,
-			y: e.y
-		};
-		t.matrix && (e = jh(n.x, n.y, t.imatrix), n.x = e.x, n.y = e.y);
-		let r = Qg.getZoom();
-		return n.x /= r, n.y /= r, n;
+		let zoom = Qg.getZoom();
+		let point = { x: e.x / zoom, y: e.y / zoom };
+		return t.matrix ? jh(point.x, point.y, t.imatrix) : point;
 	}, r_ = () => {
 		let e = Og("pathpointgrip_container");
 		if (!e) {
@@ -38715,27 +38712,37 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				e.setAttribute("display", "none");
 			});
 			let t = this.elem.pathSegList, n = t.numberOfItems;
+			if (n === 0 && this.elem.getAttribute("d")) {
+				console.log('[pathfinder] Path.init() numberOfItems=0 but d exists, re-parsing:', this.elem.getAttribute("d")?.substring(0, 200));
+				delete this.elem._pathSegList;
+				t = this.elem.pathSegList;
+				n = t.numberOfItems;
+				console.log('[pathfinder] After re-parse numberOfItems:', n);
+			}
+			console.log('[pathfinder] Path.init() id:', this.elem.id, 'd:', this.elem.getAttribute('d')?.substring(0, 200), 'numberOfItems:', n);
 			this.segs = [], this.selected_pts = [], this.first_seg = null;
 			for (let e = 0; e < n; e++) {
 				let n = t.getItem(e), r = new d_(e, n);
 				r.path = this, this.segs.push(r);
 			}
 			let { segs: r } = this, i = null;
+			let gripCount = 0;
 			for (let e = 0; e < n; e++) {
 				let t = r[e], a = e + 1 >= n ? null : r[e + 1], o = e - 1 < 0 ? null : r[e - 1];
 				if (t.type === 2) {
 					if (o && o.type !== 1) {
 						let e = r[i];
-						e.next = r[i + 1], e.next.prev = e, e.addGrip();
+						e.next = r[i + 1], e.next.prev = e, e.addGrip(); gripCount++;
 					}
 					i = e;
-				} else if (a?.type === 1) t.next = r[i + 1], t.next.prev = t, t.mate = r[i], t.addGrip(), this.first_seg ||= t;
-				else if (a) t.type !== 1 && (t.addGrip(), a && a.type !== 2 && (t.next = a, t.next.prev = t));
+				} else if (a?.type === 1) t.next = r[i + 1], t.next.prev = t, t.mate = r[i], t.addGrip(), this.first_seg ||= t, gripCount++;
+				else if (a) t.type !== 1 && (t.addGrip(), gripCount++, a && a.type !== 2 && (t.next = a, t.next.prev = t));
 				else if (t.type !== 1) {
 					let e = r[i];
-					e.next = r[i + 1], e.next.prev = e, e.addGrip(), t.addGrip(), this.first_seg ||= r[i];
+					e.next = r[i + 1], e.next.prev = e, e.addGrip(), gripCount++, t.addGrip(), gripCount++, this.first_seg ||= r[i];
 				}
 			}
+			console.log('[pathfinder] Path.init() grips created:', gripCount);
 			return this;
 		}
 		eachSeg(e) {
@@ -38802,6 +38809,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}), this.addPtsToSelection(t);
 		}
 		show(e) {
+			console.log('[pathfinder] Path.show(', e, ') segs:', this.segs?.length, 'first_seg:', this.first_seg?.index);
 			return this.eachSeg(function() {
 				this.show(e);
 			}), e && this.selectAllPts(), this;
@@ -38861,14 +38869,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		}
 		update() {
 			let { elem: e } = this;
-			let tl = Mh(e);
-			if (Tg(e) || tl?.numberOfItems > 0) {
-				this.matrix = Rh(e);
-				this.imatrix = this.matrix.inverse();
-			} else {
-				this.matrix = null;
-				this.imatrix = null;
-			}
+			const contentMatrix = Qg.getSvgContent().getScreenCTM();
+			const elementMatrix = e.getScreenCTM();
+			this.matrix = contentMatrix && elementMatrix ? contentMatrix.inverse().multiply(elementMatrix) : Rh(e);
+			this.imatrix = this.matrix?.inverse();
 			return this.eachSeg(function(t) {
 				this.item = e.pathSegList.getItem(t), this.update();
 			}), this;
@@ -39072,18 +39076,11 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				}
 				return;
 			}
-			let mouseTarget = t || p_.getMouseTarget(e);
-			if (mouseTarget && (mouseTarget.id === "svgcanvas" || mouseTarget.id === "canvasBackground" || mouseTarget.id === "selectorParentGroup")) {
-				mouseTarget = null;
-			}
-			if (mouseTarget) {
-				while (mouseTarget && mouseTarget.parentNode && mouseTarget.parentNode.tagName === "g" && mouseTarget.parentNode.id !== "svgcontent" && mouseTarget.parentNode.id !== "canvasBackground") {
-					mouseTarget = mouseTarget.parentNode;
-				}
-				if (mouseTarget && mouseTarget.nodeName !== "path" && typeof p_.convertToPath === "function") {
-					let converted = p_.convertToPath(mouseTarget);
-					if (converted) mouseTarget = converted;
-				}
+			if (K && !K.elem.isConnected) K = null;
+			let mouseTarget = e.target;
+			if (!p_.getSvgContent().contains(mouseTarget) || !["path", "rect", "circle", "ellipse", "line", "polygon", "polyline"].includes(mouseTarget?.localName)) mouseTarget = null;
+			if (mouseTarget && mouseTarget.localName !== "path") {
+				mouseTarget = p_.convertToPath(mouseTarget) || null;
 			}
 			if (mouseTarget && mouseTarget.nodeName === "path" && (!K || K.elem !== mouseTarget)) {
 				__.toEditMode(mouseTarget);
@@ -39150,6 +39147,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					K.cur_pt = null;
 					K.dragging = [n, r];
 				} else {
+					this.marqueePoints = e.shiftKey ? [...K.selected_pts] : [];
+					if (!e.shiftKey) K.clearSelection();
 					let a = p_.getRubberBox();
 					a ||= p_.setRubberBox(p_.selectorManager.getRubberBandBox());
 					let t = p_.getZoom();
@@ -39231,6 +39230,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				let rBox = p_.getRubberBox();
 				if (rBox && rBox.getAttribute("display") !== "none") {
 					K.selected_pts = [];
+					const previous = this.marqueePoints || [];
 					K.eachSeg(function(e) {
 						let t = this;
 						if (!t.next && !t.prev) return;
@@ -39240,6 +39240,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 							width: 0,
 							height: 0
 						});
+						i ||= previous.includes(t.index);
 						this.select(i), i && K.selected_pts.push(t.index);
 					});
 				}
@@ -39264,9 +39265,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			this.#i = !1;
 		}
 		toEditMode(e) {
-			K = p_.getPath_(e), p_.setCurrentMode("pathedit"), p_.clearSelection(), K.setPathContext(), K.show(!0).update(), K.oldbbox = fg(K.elem), this.#e = !1;
+			normalizeEditablePath(e, h_);
+			K && K.show(!1);
+			K = p_.getPath_(e), K.setPathContext(), K.init(), p_.setCurrentMode("pathedit"), p_.clearSelection(), K.setPathContext(), K.show(!0).update(), K.oldbbox = fg(K.elem), this.#e = !1;
 		}
 		toSelectMode(e) {
+			if (K && !K.elem.isConnected) K = null;
 			e = e || K?.elem;
 			let t = e === K?.elem;
 			p_.setCurrentMode("select"), K && (K.setPathContext(), K.show(!1)), this.#r = !1, p_.clearSelection(), K?.matrix && p_.recalcRotatedPath(), t && (p_.call("selected", [e]), p_.addToSelection([e], !0));
@@ -39544,7 +39548,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		}
 	}, V_ = (e) => {
 		let t = T_[e.id];
-		return t ||= T_[e.id] = new f_(e), t;
+		if (!t || t.elem !== e) t = T_[e.id] = new f_(e);
+		return t;
 	}, H_ = (e) => {
 		e in T_ && delete T_[e];
 	}, J_ = (e, t) => {
@@ -40763,7 +40768,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					width: Math.abs(v - q.getRStartX()),
 					height: Math.abs(b - q.getRStartY())
 				}, 100);
-				let e = t.slice(), r = [], i = q.getIntersectionList();
+				let e = t.filter(el => !q.marqueeBaseSelection?.includes(el)), r = [], i = q.getIntersectionList();
 				for (d = i.length, a = 0; a < d; ++a) {
 					let n = i[a];
 					t.includes(n) || r.push(n);
@@ -40966,7 +40971,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 								}
 							}
 						});
-					} else p = e.target, t[0].nodeName === "path" && !t[1] ? q.pathActions.select(t[0]) : e.shiftKey && r !== p && q.removeFromSelection([p]);
+					} else p = q.getMouseTarget(e), e.shiftKey && r !== p && q.removeFromSelection([p]);
 					q.dragStartTransforms = null, q.hasDragStartTransform = !1;
 					let n = t[0];
 					n && (n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
@@ -41080,7 +41085,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			e && (u = e.keep || u, {element: l} = e, q.setStarted(e.started || q.getStarted()));
 		}), !u && l) {
 			for (q.getCurrentDrawing().releaseId(q.getId()), l.remove(), l = null, p = e.target; p?.parentNode?.parentNode?.tagName === "g";) p = p.parentNode;
-			(q.getCurrentMode() !== "path" || !q.getDrawnPath()) && p && p.parentNode?.id !== "selectorParentGroup" && p.id !== "svgcanvas" && p.id !== "svgroot" && (q.setMode("select"), q.selectOnly([p], !0));
+			!["rect", "square", "ellipse", "circle", "line", "fhrect", "fhellipse", "fhpath", "star", "polygon", "shapelib"].includes(q.getCurrentMode()) && (q.getCurrentMode() !== "path" || !q.getDrawnPath()) && p && p.parentNode?.id !== "selectorParentGroup" && p.id !== "svgcanvas" && p.id !== "svgroot" && (q.setMode("select"), q.selectOnly([p], !0));
 		} else if (l) {
 			q.addedNew = !0;
 			let t = .2, n, r = q.getStyle(), i = q.getOpacAni();
@@ -41090,20 +41095,14 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					n.beginElement();
 				} catch {}
 			} else t = 0;
+			const createdWithMode = q.getCurrentMode();
 			setTimeout(() => {
-				n && n.remove(), l.setAttribute("opacity", r.opacity), l.setAttribute("style", "pointer-events:inherit"), Ag(l), q.getCurrentMode() === "path" ? q.pathActions.toEditMode(l) : q.getCurConfig().selectNew && ([
-					"circle",
-					"ellipse",
-					"square",
-					"rect",
-					"fhpath",
-					"line",
-					"fhellipse",
-					"fhrect",
-					"star",
-					"polygon",
-					"shapelib"
-				].indexOf(q.getCurrentMode()) !== -1 && !e.altKey && q.setMode("select"), q.selectOnly([l], !0)), q.addCommandToHistory(new _y(l)), q.call("changed", [l]);
+				n && n.remove(), l.setAttribute("opacity", r.opacity), l.setAttribute("style", "pointer-events:inherit"), Ag(l);
+				if (q.getCurrentMode() === createdWithMode) {
+					if (createdWithMode === "path") q.pathActions.clear();
+					if (q.getCurConfig().selectNew) q.selectOnly([l], !0);
+				}
+				q.addCommandToHistory(new _y(l)), q.call("changed", [l]);
 			}, t * 1e3);
 		}
 		q.setStartTransform(null);
@@ -41186,7 +41185,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		}
 		switch (q.getCurrentMode()) {
 			case "select":
-				q.setStarted(!0), q.setCurrentResizeMode("none"), s && q.setStarted(!1), m === a ? s || (q.clearSelection(), q.setCurrentMode("multiselect"), q.getRubberBox() || q.setRubberBox(q.selectorManager.getRubberBandBox()), q.setRStartX(q.getRStartX() * r), q.setRStartY(q.getRStartY() * r), kg(q.getRubberBox(), {
+				q.setStarted(!0), q.setCurrentResizeMode("none"), s && q.setStarted(!1), m === a ? s || (q.marqueeBaseSelection = e.shiftKey ? n.filter(Boolean) : [], e.shiftKey || q.clearSelection(), q.setCurrentMode("multiselect"), q.getRubberBox() || q.setRubberBox(q.selectorManager.getRubberBandBox()), q.setRStartX(q.getRStartX() * r), q.setRStartY(q.getRStartY() * r), kg(q.getRubberBox(), {
 					x: q.getRStartX(),
 					y: q.getRStartY(),
 					width: 0,
@@ -41205,7 +41204,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				break;
 			case "resize": {
 				if (!_) break;
-				q.setStarted(!0), q.setStartX(f), q.setStartY(p), q.setInitBbox(fg(o("selectedBox0")));
+				q.setStarted(!0), q.setStartX(f), q.setStartY(p), q.setInitBbox(fg(q.selectorManager.requestSelector(m).selectorRect));
 				let e = {};
 				for (let [t, n] of Object.entries(q.getInitBbox())) e[t] = n / r;
 				q.setInitBbox(e);
@@ -64348,7 +64347,9 @@ ${y}`), [3, 7];
 			return this.currentMode;
 		}
 		setCurrentMode(e) {
-			return this.currentMode = e, this.currentMode;
+			this.currentMode = e;
+			this.modeEvent && document.dispatchEvent(this.modeEvent);
+			return this.currentMode;
 		}
 		getDrawnPath() {
 			return this.drawnPath;
@@ -68722,7 +68723,7 @@ var fz = () => {
 		}), this.workarea.addEventListener("dblclick", (e) => {
 			this.svgCanvas.getMode() === "ext-panning" && this.leftPanel.clickSelect();
 		}), document.addEventListener("keydown", (e) => {
-			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (this.svgCanvas.spaceKey = l = !0, e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
+			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (!l && (u = this.svgCanvas.getMode()), this.svgCanvas.spaceKey = l = !0, e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
 		}), this.workarea.addEventListener("wheel", (e) => {
 			if (e.altKey) {
 				e.preventDefault();
@@ -68919,6 +68920,9 @@ var fz = () => {
 	modeListener(e) {
 		let t = this.svgCanvas.getMode();
 		this.setCursorStyle(t);
+		const mode = { pathedit: "direct_select", textedit: "text", resize: "select", rotate: "select", multiselect: "select" }[t] || t;
+		const button = document.getElementById(t === "ext-panning" ? t : "tool_" + mode);
+		if (button) this.leftPanel.updateLeftPanel(button.id);
 	}
 	setCursorStyle(e) {
 		document.body?.setAttribute("data-mode", e);
@@ -68985,9 +68989,9 @@ var { $id: vz, $qa: yz, $click: bz } = JI, xz = class {
 		this.editor = e;
 	}
 	updateLeftPanel(e) {
-		return e.disabled ? !1 : (yz("#tools_left *[pressed]").forEach((e) => {
+		return !vz(e) || vz(e).disabled ? !1 : (yz("#tools_left *[pressed]").forEach((e) => {
 			e.pressed = !1;
-		}), vz(e).pressed = !0, !0);
+		}), vz(e).pressed = !0, vz(e).closest("se-flyingbutton") && (vz(e).closest("se-flyingbutton").pressed = !0), !0);
 	}
 	clickSelect() {
 		if (this.updateLeftPanel("tool_select")) {
@@ -68998,6 +69002,10 @@ var { $id: vz, $qa: yz, $click: bz } = JI, xz = class {
 		}
 	}
 	clickDirectSelect() {
+		if (this.editor.svgCanvas.getMode() === "pathedit") {
+			this.updateLeftPanel("tool_direct_select");
+			return;
+		}
 		if (this.updateLeftPanel("tool_direct_select")) {
 			let sel = this.editor.svgCanvas.getSelectedElements().filter(Boolean);
 			if (sel.length) {
@@ -69389,9 +69397,12 @@ var { $qa: Cz, $id: $, $click: wz, isValidUnit: Tz, getTypeMap: Ez, convertUnit:
 		t && (t.textContent = this.editor.title);
 	}
 	togglePathEditMode(e, t) {
-		e ? this.displayTool("path_node_panel") : this.hideTool("path_node_panel"), e ? ($("tool_path").pressed = !1, $("tool_select") && ($("tool_select").pressed = !1), $("tool_direct_select") && ($("tool_direct_select").pressed = !0), this.editor.multiselected = !1, t.length && (this.editor.selectedElement = t[0])) : setTimeout(() => {
-			$("tool_direct_select") && ($("tool_direct_select").pressed = !1);
-		}, 1e3);
+		e ? this.displayTool("path_node_panel") : this.hideTool("path_node_panel");
+		if (e) {
+			this.editor.multiselected = !1;
+			if (t.length) this.editor.selectedElement = t[0];
+		}
+		this.editor.modeListener();
 	}
 	init() {
 		let e = document.createElement("template"), { i18next: t } = this.editor;
@@ -69927,12 +69938,6 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 				}
 			},
 			{
-				key: "a",
-				fn: () => {
-					this.svgCanvas.selectAllInCurrentLayer();
-				}
-			},
-			{
 				key: [t + "a", !0],
 				fn: () => {
 					this.svgCanvas.selectAllInCurrentLayer();
@@ -69990,7 +69995,7 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 			}
 			return !0;
 		}), document.addEventListener("keydown", (t) => {
-			if (t.target.nodeName !== "BODY") return;
+			if (t.defaultPrevented || t.target.nodeName !== "BODY") return;
 			let n = `${t.altKey ? "alt+" : ""}${t.shiftKey ? "shift+" : ""}${t.metaKey ? "meta+" : ""}${t.ctrlKey ? "ctrl+" : ""}${t.key.toLowerCase()}`;
 			e[n] && (e[n].fn(), e[n].pd && t.preventDefault());
 		});
@@ -70155,24 +70160,23 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 		this.selectedElement && this.svgCanvas.moveUpDownSelected(e);
 	}
 	moveSelected(e, t) {
-		if (this.selectedElement || this.multiselected) {
-			if (this.configObj.curConfig.gridSnapping) {
-				let n = this.svgCanvas.getZoom() * this.configObj.curConfig.snappingStep;
-				e *= n, t *= n;
+		if (this.configObj.curConfig.gridSnapping) {
+			e *= this.configObj.curConfig.snappingStep;
+			t *= this.configObj.curConfig.snappingStep;
+		}
+		if (this.svgCanvas.getMode() === "pathedit") {
+			const path = this.svgCanvas.getPathObj?.();
+			if (path?.elem.isConnected && path.selected_pts.length) {
+				path.storeD();
+				// Keyboard increments are document units, independent of zoom.
+				const origin = this.svgCanvas.getPointFromGrip({ x: 0, y: 0 }, path);
+				const delta = this.svgCanvas.getPointFromGrip({ x: e * this.svgCanvas.getZoom(), y: t * this.svgCanvas.getZoom() }, path);
+				path.movePts(delta.x - origin.x, delta.y - origin.y);
+				path.update();
+				path.endChanges("Move path point(s)");
 			}
+		} else if (this.selectedElement || this.multiselected) {
 			this.svgCanvas.moveSelectedElements(e, t);
-		} else if (this.svgCanvas.getMode() === "pathedit") {
-			let K = this.svgCanvas.getPathObj?.();
-			if (K && K.selected_pts && K.selected_pts.length) {
-				if (this.configObj.curConfig.gridSnapping) {
-					let n = this.svgCanvas.getZoom() * this.configObj.curConfig.snappingStep;
-					e *= n, t *= n;
-				}
-				K.storeD();
-				K.movePts(e, t);
-				K.update();
-				K.endChanges("Move path point(s)");
-			}
 		}
 	}
 	selectNext() {

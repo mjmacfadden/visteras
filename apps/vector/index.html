@@ -168,6 +168,8 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js';
+    import { mountSelectionTools } from './js/visteras-selection.js';
+    import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
     import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js';
@@ -195,6 +197,7 @@
 
     await svgEditor.init();
     window.svgEditor = svgEditor;
+    mountSelectionTools(svgEditor);
 
     if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
       svgEditor.rulers.updateRulers();
@@ -318,14 +321,17 @@
           if (!paperPathItem) return null;
           const svgExport = paperPathItem.exportSVG({ asString: false });
           let d = '';
+          let fillRule = null;
           if (svgExport.tagName.toLowerCase() === 'path') {
             d = svgExport.getAttribute('d');
+            fillRule = svgExport.getAttribute('fill-rule');
           } else {
             const paths = svgExport.querySelectorAll('path');
             const dArr = [];
             paths.forEach(p => {
               const pd = p.getAttribute('d');
               if (pd) dArr.push(pd);
+              if (!fillRule) fillRule = p.getAttribute('fill-rule');
             });
             d = dArr.join(' ');
           }
@@ -334,8 +340,8 @@
           const pathEl = document.createElementNS(svgNS, 'path');
           pathEl.setAttribute('id', sc.getNextId());
           pathEl.setAttribute('d', d);
+          normalizeEditablePath(pathEl, el => sc.pathActions.convertPath(el));
           copyStyling(styleSourceElem, pathEl);
-          const fillRule = svgExport.getAttribute('fill-rule');
           if (fillRule) pathEl.setAttribute('fill-rule', fillRule);
           return pathEl;
         }
