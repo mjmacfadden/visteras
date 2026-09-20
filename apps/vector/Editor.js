@@ -20161,7 +20161,6 @@ var kr, Ar, jr, Mr = t((() => {
           background: #23232b !important;
           display: none;
           flex-direction: column;
-          margin-left: 36px;
           padding: 4px;
           border: 1px solid #3c3c46;
           border-radius: 6px;
@@ -20284,7 +20283,17 @@ var kr, Ar, jr, Mr = t((() => {
 							});
 							this.setAttribute("opened", "opened");
 							let rect = this.getBoundingClientRect();
+							let toolsLeft = this.closest("#tools_left");
+							let leftPos = toolsLeft ? toolsLeft.getBoundingClientRect().right + 2 : rect.right + 2;
+							this.$menu.style.left = leftPos + "px";
 							this.$menu.style.top = rect.top + "px";
+							requestAnimationFrame(() => {
+								let menuRect = this.$menu.getBoundingClientRect();
+								let maxTop = window.innerHeight - menuRect.height - 8;
+								if (rect.top > maxTop) {
+									this.$menu.style.top = Math.max(8, maxTop) + "px";
+								}
+							});
 						}
 						break;
 					default:
@@ -20310,7 +20319,17 @@ var kr, Ar, jr, Mr = t((() => {
 					});
 					this.setAttribute("opened", "opened");
 					let rect = this.getBoundingClientRect();
+					let toolsLeft = this.closest("#tools_left");
+					let leftPos = toolsLeft ? toolsLeft.getBoundingClientRect().right + 2 : rect.right + 2;
+					this.$menu.style.left = leftPos + "px";
 					this.$menu.style.top = rect.top + "px";
+					requestAnimationFrame(() => {
+						let menuRect = this.$menu.getBoundingClientRect();
+						let maxTop = window.innerHeight - menuRect.height - 8;
+						if (rect.top > maxTop) {
+							this.$menu.style.top = Math.max(8, maxTop) + "px";
+						}
+					});
 				}
 			};
 			this.addEventListener("contextmenu", onContext);
