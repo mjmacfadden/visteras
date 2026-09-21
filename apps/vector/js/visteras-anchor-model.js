@@ -99,7 +99,11 @@ export function deleteAnchors(segments, selected) {
     result.push({ type: 2, x: first.x, y: first.y });
     for (const index of remaining.slice(1)) result.push({ ...segments[index] });
     if (contour.closed && remaining.length > 1) {
-      const incoming = remaining[0] === contour.indices[0] ? segments[contour.closing] : first;
+      // If the deleted node was the original first anchor, the closing
+      // segment still connects the surviving contour. Otherwise the old
+      // segment at `first` belonged to the deleted node and must not be
+      // reused: doing so can turn a straight rectangle edge into a cubic.
+      const incoming = remaining[0] === contour.indices[0] ? segments[contour.closing] : null;
       result.push(incoming && incoming.type !== 2 ? { ...incoming } : { type: 4, x: first.x, y: first.y });
       result.push({ type: 1 });
     }

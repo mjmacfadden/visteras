@@ -1,3 +1,4 @@
+import { cutAnchors } from './visteras-pen-geometry.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
 import { anchors, readSegments, serializeSegments, moveAnchors, deleteAnchors, moveControl, convertAnchors } from './visteras-anchor-model.js';
 
@@ -116,12 +117,13 @@ export function mountDirectSelection(editor) {
           for (const [index, suffix] of [[anchor.incoming, '2'], [anchor.outgoing, '1']]) {
             const segment = rec.segments[index];
             if (!segment || segment['x' + suffix] === undefined) continue;
+            if (Math.hypot(segment['x'+suffix]-s.x,segment['y'+suffix]-s.y)<1e-7) continue;
             const c = point(segment['x' + suffix], segment['y' + suffix], m);
             create('line', { x1: p.x*zoom, y1: p.y*zoom, x2: c.x*zoom, y2: c.y*zoom, stroke: '#3f8ff7', 'pointer-events': 'none' });
             create('circle', { cx: c.x*zoom, cy: c.y*zoom, r: 3.5, fill: '#fff', stroke: '#3f8ff7', 'data-direct-record': recordIndex, 'data-direct-control': `${index}:${suffix}`, 'data-direct-anchor': anchor.index, style: 'cursor:crosshair' });
           }
         }
-        create('rect', { x: p.x*zoom-4, y: p.y*zoom-4, width: 8, height: 8, fill: selected ? '#3f8ff7' : '#fff', stroke: '#3f8ff7', 'data-direct-record': recordIndex, 'data-direct-anchor': anchor.index, style: 'cursor:move' });
+        create('rect', { x: p.x*zoom-4, y: p.y*zoom-4, width: 8, height: 8, fill: selected ? '#3f8ff7' : '#fff', stroke: '#3f8ff7', 'data-direct-record': recordIndex, 'data-direct-anchor': anchor.index, style: `cursor:url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M4 4L21 12H12V21Z" fill="black" stroke="white" stroke-width="1"/></svg>')}") 4 4,default` });
       }
     }
     if (gesture?.type === 'marquee') {
@@ -184,7 +186,7 @@ export function mountDirectSelection(editor) {
   function removeSelected() {
     const before = snapshot().filter(item => item.rec.selected.size);
     for (const item of before) {
-      const { rec } = item, next = deleteAnchors(item.segments, rec.selected);
+      const { rec } = item, next = cutAnchors(item.segments, rec.selected);
       if (!next.length) {
         item.removed = { parent: rec.el.parentNode, next: rec.el.nextSibling };
         rec.el.remove();
@@ -224,6 +226,19 @@ export function mountDirectSelection(editor) {
     // which makes Convert apply to the entire object instead of the point the
     // user clicked.
     tryActivate(elements) { return leaves(elements).length >= 1 ? activate(elements) : false; },
+    selectOnly(elements, index) {
+      activate(elements, false);
+      const target = leaves(elements)[0], rec = records.find(item => item.el === target);
+      if (rec) rec.selected = new Set([index]);
+      schedule();
+      return true;
+    },
+    selectObject(elements) {
+      activate(elements, false);
+      records.forEach(rec => rec.selected.clear());
+      schedule();
+      return true;
+    },
     removeSelected,
     convert(mode) {
       if (!active) {
@@ -259,6 +274,8 @@ export function mountDirectSelection(editor) {
         // Native SVGEdit represents the first anchor using the closing segment.
         const rec = records.find(r => r.el === native.elem);
         if (rec) rec.selected = new Set(anchors(rec.segments).filter(a => a.aliases.some(i => previous.has(i))).map(a => a.index));
+      } else if (artwork) {
+        activate([artwork], false);
       } else if (!artwork && !e.target.closest?.('#pathpointgrip_container')) {
         const previous = native?.elem.isConnected ? { elem: native.elem, points: [...native.selected_pts] } : null;
         activate(leaves([sc.getCurrentDrawing().getCurrentLayer()]), false);

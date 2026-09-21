@@ -168,9 +168,9 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js';
+    import { mountPenTools } from './js/visteras-pen-tools.js';
     import { mountSelectionTools } from './js/visteras-selection.js';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
-    import { readSegments, serializeSegments, insertAnchorAt } from './js/visteras-anchor-model.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
     import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js';
@@ -1710,96 +1710,7 @@
     applyStudioSkin();
     setupMenuBar();
     setupPropertiesPanel();
-    // Illustrator-style Pen tool flyout. SVGEdit's node clone/delete
-    // operations already provide the path mutations and history commands;
-    // expose them with the names and nesting users expect.
-    const penTool = document.getElementById('tool_path');
-    if (penTool && !document.getElementById('visteras_pen_subtools')) {
-      const flyout = document.createElement('se-flyingbutton');
-      flyout.id = 'visteras_pen_subtools';
-      flyout.title = 'Pen Tool';
-      penTool.setAttribute('src', 'pen_illustrator.svg');
-      flyout.innerHTML = '<se-button id="visteras_pen_primary" title="Pen Tool" src="pen_illustrator.svg" shortcut="P"></se-button><se-button id="visteras_add_anchor" title="Add Anchor Point Tool" src="pen_add_anchor.svg"></se-button><se-button id="visteras_delete_anchor" title="Delete Anchor Point Tool" src="pen_delete_anchor.svg"></se-button>';
-      penTool.parentNode.insertBefore(flyout, penTool);
-      // Replace the original standalone host with the flyout's primary
-      // button, retaining the canonical tool_path id for SVGEdit shortcuts.
-      const primaryPen = flyout.querySelector('#visteras_pen_primary');
-      primaryPen.id = 'tool_path';
-      penTool.remove();
-      document.getElementById('tool_path')?.addEventListener('click', event => {
-        event.preventDefault(); event.stopImmediatePropagation();
-        window.__visterasAnchorTool = null;
-        event.currentTarget.setAttribute('src', 'pen_illustrator.svg');
-        event.currentTarget.setAttribute('title', 'Pen Tool');
-        svgEditor.svgCanvas.setMode('path');
-      }, true);
-      document.getElementById('visteras_add_anchor')?.addEventListener('click', event => {
-        event.preventDefault(); event.stopImmediatePropagation();
-        window.__visterasAnchorTool = 'add';
-        const primary = document.getElementById('tool_path');
-        primary?.setAttribute('src', 'pen_add_anchor.svg');
-        primary?.setAttribute('title', 'Add Anchor Point Tool');
-        svgEditor.svgCanvas.setMode('pathedit');
-        const path = svgEditor.svgCanvas.getPathObj?.();
-        if (path?.selected_pts?.length) svgEditor.svgCanvas.pathActions?.clonePathNode?.();
-      }, true);
-      document.getElementById('visteras_delete_anchor')?.addEventListener('click', event => {
-        event.preventDefault(); event.stopImmediatePropagation();
-        window.__visterasAnchorTool = 'delete';
-        const primary = document.getElementById('tool_path');
-        primary?.setAttribute('src', 'pen_delete_anchor.svg');
-        primary?.setAttribute('title', 'Delete Anchor Point Tool');
-        svgEditor.svgCanvas.setMode('pathedit');
-        if (svgEditor.svgCanvas.directSelection?.active) svgEditor.svgCanvas.directSelection.removeSelected();
-        else if (svgEditor.svgCanvas.getPathObj?.()?.selected_pts?.length) svgEditor.svgCanvas.pathActions?.deletePathNode?.();
-      }, true);
-      document.addEventListener('mousedown', event => {
-        if (window.__visterasAnchorTool !== 'add' || event.button !== 0) return;
-        const path = event.target.closest?.('path,rect,circle,ellipse,polygon,polyline,line');
-        if (!path || !svgEditor.svgCanvas.getSvgContent().contains(path)) return;
-        event.preventDefault(); event.stopImmediatePropagation();
-        let editable = path;
-        if (editable.nodeName !== 'path') editable = svgEditor.svgCanvas.convertToPath?.(editable) || editable;
-        if (editable?.nodeName !== 'path') return;
-        svgEditor.svgCanvas.pathActions.toEditMode(editable);
-        const pathObj = svgEditor.svgCanvas.getPathObj?.();
-        if (pathObj) {
-          const ctm = editable.getScreenCTM?.();
-          let nearest = 1, distance = Infinity;
-          if (ctm && pathObj.segs) {
-            for (const [segmentIndex, segment] of pathObj.segs.entries()) {
-              const item = segment.item;
-              if (item?.x === undefined || item?.y === undefined) continue;
-              const point = new DOMPoint(item.x, item.y).matrixTransform(ctm);
-              const d = Math.hypot(point.x - event.clientX, point.y - event.clientY);
-              if (d < distance) { distance = d; nearest = segmentIndex; }
-            }
-          }
-          const source = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          source.setAttribute('d', svgEditor.svgCanvas.getPathDataForElement(editable) || editable.getAttribute('d') || '');
-          normalizeEditablePath(source, p => svgEditor.svgCanvas.pathActions.convertPath(p));
-          const segments = readSegments(source);
-          const target = segments[nearest];
-          const previous = segments[nearest - 1];
-          if (!target || !previous || target.type === 1 || target.type === 2) return;
-          const local = new DOMPoint(event.clientX, event.clientY).matrixTransform(editable.getScreenCTM().inverse());
-          const dx = target.x - previous.x, dy = target.y - previous.y;
-          const length = dx * dx + dy * dy || 1;
-          const t = Math.max(0, Math.min(1, ((local.x - previous.x) * dx + (local.y - previous.y) * dy) / length));
-          const point = { x: previous.x + dx * t, y: previous.y + dy * t };
-          const next = insertAnchorAt(segments, nearest, t, point.x, point.y);
-          const before = editable.getAttribute('d');
-          const pathObjBefore = svgEditor.svgCanvas.getPathObj?.();
-          pathObjBefore?.storeD?.();
-          editable.setAttribute('d', serializeSegments(next));
-          pathObjBefore?.init?.().show?.(true).update?.();
-          pathObjBefore?.endChanges?.('Add anchor point');
-          svgEditor.svgCanvas.call('changed', [editable]);
-        }
-        // Keep Add Anchor Point active for repeated clicks, matching
-        // Illustrator's persistent tool behavior.
-      }, true);
-    }
+    mountPenTools(svgEditor);
     document.getElementById('tool_node_clone')?.style.setProperty('display', 'none');
     document.getElementById('tool_node_delete')?.style.setProperty('display', 'none');
     // Use delegation because SVGEdit may rebuild contextual controls while

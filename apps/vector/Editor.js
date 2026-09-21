@@ -39264,6 +39264,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}
 			this.#i = !1;
 		}
+		resetDrawingState() {
+			this.#n = null; this.#t = null; this.#e = false;
+		}
 		toEditMode(e) {
 			normalizeEditablePath(e, h_);
 			K && K.show(!1);
