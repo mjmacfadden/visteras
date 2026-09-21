@@ -9,13 +9,13 @@ export class Add_layer_mask_action extends Base_action {
 	 *
 	 * @param {int} layer_id (optional)
 	 * @param {Boolean} reveal true = reveal all, false = hide all
-	 * @param {Boolean} use_selection restrict the mask by the current selection
+	 * @param {Boolean} use_selection restrict by selection; omitted uses any active selection
 	 */
 	constructor(layer_id, reveal, use_selection) {
 		super('add_layer_mask', 'Add Layer Mask');
 		this.layer_id = layer_id;
 		this.reveal = reveal !== false;
-		this.use_selection = use_selection === true;
+		this.use_selection = use_selection;
 		this.reference_layer = null;
 		this.old_mask = null;
 		this.old_mask_active = null;
@@ -34,7 +34,7 @@ export class Add_layer_mask_action extends Base_action {
 		}
 
 		var Mask = new Mask_class();
-		if (this.use_selection) {
+		if (this.use_selection === true || (this.use_selection == null && app.Layers.Base_selection?.has_selection)) {
 			this.reference_layer.mask = Mask.create_mask_from_selection(this.reference_layer, this.reveal);
 		}
 		else {
