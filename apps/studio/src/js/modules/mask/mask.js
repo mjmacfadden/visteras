@@ -206,7 +206,7 @@ class Mask_class {
 	}
 
 	/**
-	 * returns a mask object created from the active rectangular selection.
+	 * returns a mask object created from the active selection alpha channel.
 	 *
 	 * @param {object} layer
 	 * @param {Boolean} reveal true reveals the selected area, false hides it
@@ -215,37 +215,51 @@ class Mask_class {
 	create_mask_from_selection(layer, reveal) {
 		var mask = this.create_mask(layer, reveal);
 		var ctx = mask.link.getContext('2d');
-
-		if (reveal !== false) {
-			//reveal selection - black all around, white inside selection
-			ctx.fillStyle = '#000000';
-			ctx.fillRect(0, 0, mask.link.width, mask.link.height);
+		var alpha = this.selection_alpha_for_mask(layer, mask);
+		if (!alpha) return mask;
+		var pixels = alpha.getContext('2d').getImageData(0, 0, alpha.width, alpha.height);
+		for (var i = 0; i < pixels.data.length; i += 4) {
+			var value = reveal === false ? 255 - pixels.data[i + 3] : pixels.data[i + 3];
+			pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = value;
+			pixels.data[i + 3] = 255;
 		}
-		else {
-			//hide selection - white all around, black inside selection
-			ctx.fillStyle = '#ffffff';
-			ctx.fillRect(0, 0, mask.link.width, mask.link.height);
-		}
-
-		var selection = null;
-		if (typeof app.GUI.GUI_tools.tools_modules['selection'] != 'undefined') {
-			selection = app.GUI.GUI_tools.tools_modules['selection'].object.selection;
-		}
-		if (selection == null || selection.width == null || selection.height == null) {
-			return mask;
-		}
-
-		var selection_module = app.GUI.GUI_tools.tools_modules['selection'].object;
-
-		ctx.save();
-		ctx.translate(-mask.x, -mask.y);
-		ctx.beginPath();
-		selection_module.build_selection_path(ctx, selection);
-		ctx.fillStyle = (reveal === false) ? '#000000' : '#ffffff';
-		ctx.fill();
-		ctx.restore();
-
+		ctx.putImageData(pixels, 0, 0);
 		return mask;
+	}
+
+	// Sample the document selection in the mask's own bitmap coordinates.
+	// This also handles independently moved masks and rotated linked masks.
+	selection_alpha_for_mask(layer, mask = layer.mask) {
+		var selection = app.Layers.Base_selection;
+		if (!selection || !selection.has_selection) return null;
+		var target = { ...layer, mask };
+		var source = this.get_mask_source(target);
+		var canvas = document.createElement('canvas');
+		canvas.width = source.width;
+		canvas.height = source.height;
+		var ctx = canvas.getContext('2d');
+		var origin = this.world_to_mask(target, 0, 0);
+		var x = this.world_to_mask(target, 1, 0);
+		var y = this.world_to_mask(target, 0, 1);
+		ctx.setTransform(x.x-origin.x, x.y-origin.y, y.x-origin.x, y.y-origin.y, origin.x, origin.y);
+		ctx.drawImage(selection.mask_canvas, 0, 0);
+		return canvas;
+	}
+
+	// Always blend against the pre-stroke pixels, so soft selection edges
+	// aren't repeatedly attenuated as mouse events arrive.
+	constrain_mask_stroke() {
+		var stroke = this.stroke;
+		if (!stroke.selection) return;
+		var pixels = stroke.ctx.getImageData(0, 0, stroke.canvas.width, stroke.canvas.height);
+		for (var i = 0; i < pixels.data.length; i += 4) {
+			var amount = stroke.selection[i + 3] / 255;
+			for (var channel = 0; channel < 4; channel++) {
+				pixels.data[i + channel] = stroke.original[i + channel] +
+					(pixels.data[i + channel] - stroke.original[i + channel]) * amount;
+			}
+		}
+		stroke.output.getContext('2d').putImageData(pixels, 0, 0);
 	}
 
 	/**
@@ -764,7 +778,13 @@ class Mask_class {
 			painted: false,
 		};
 
-		layer.mask.link_canvas = canvas;
+		var selection = this.selection_alpha_for_mask(layer);
+		this.stroke.output = selection ? this.copy_mask_canvas(source) : canvas;
+		if (selection) {
+			this.stroke.selection = selection.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+			this.stroke.original = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+		}
+		layer.mask.link_canvas = this.stroke.output;
 		this.paint_point(tool, e, true);
 		this.request_mask_render(layer);
 	}
@@ -839,6 +859,7 @@ class Mask_class {
 		this.stroke.last_x = point.x;
 		this.stroke.last_y = point.y;
 		this.stroke.painted = true;
+		this.constrain_mask_stroke();
 		this.request_mask_render(config.layer);
 	}
 
@@ -873,6 +894,7 @@ class Mask_class {
 		this.stroke.last_x = point.x;
 		this.stroke.last_y = point.y;
 		this.stroke.painted = true;
+		this.constrain_mask_stroke();
 		this.request_mask_render(config.layer);
 	}
 
@@ -986,7 +1008,7 @@ class Mask_class {
 			if (stroke.painted === true) {
 				await app.State.do_action(
 					new app.Actions.Bundle_action('paint_mask', 'Paint Mask', [
-						new app.Actions.Update_layer_mask_image_action(stroke.canvas, layer.id),
+						new app.Actions.Update_layer_mask_image_action(stroke.output, layer.id),
 					])
 				);
 			}
@@ -997,6 +1019,8 @@ class Mask_class {
 			//decrease memory
 			stroke.canvas.width = 1;
 			stroke.canvas.height = 1;
+			stroke.output.width = 1;
+			stroke.output.height = 1;
 			this.request_mask_render(layer);
 		}
 	}

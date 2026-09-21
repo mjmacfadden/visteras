@@ -166,9 +166,9 @@ class GUI_layers_class {
 				var layer_id = parseInt(target.closest('.mask_thumb').dataset.id);
 				var mask_layer = app.Layers.get_layer(layer_id);
 				if (mask_layer != null && mask_layer.mask == null) {
-					//no mask yet - placeholder clicked, add reveal-all mask and start editing
+					//Reveal the selection when present, otherwise reveal the whole layer.
 					app.State.do_action(
-						new app.Actions.Add_layer_mask_action(layer_id, true, false)
+						new app.Actions.Add_layer_mask_action(layer_id, true)
 					).then(() => {
 						if (config.layer == null || config.layer.id != layer_id) {
 							return app.State.do_action(
