@@ -24,6 +24,28 @@ export function serializeSegments(segments) {
     }
   }).join(' ');
 }
+
+export function insertAnchorAt(segments, segmentIndex, t, x, y) {
+  const result = segments.map(s => ({ ...s }));
+  const segment = result[segmentIndex];
+  if (!segment || segment.type === 1 || segment.type === 2) return result;
+  const previous = segmentIndex > 0 ? result[segmentIndex - 1] : null;
+  const px = previous?.x ?? x, py = previous?.y ?? y;
+  const u = Math.max(0, Math.min(1, t));
+  if (segment.type === 6) {
+    const q0x = px + (segment.x1 - px) * u, q0y = py + (segment.y1 - py) * u;
+    const q1x = segment.x1 + (segment.x2 - segment.x1) * u, q1y = segment.y1 + (segment.y2 - segment.y1) * u;
+    const q2x = segment.x2 + (segment.x - segment.x2) * u, q2y = segment.y2 + (segment.y - segment.y2) * u;
+    const r0x = q0x + (q1x - q0x) * u, r0y = q0y + (q1y - q0y) * u;
+    const r1x = q1x + (q2x - q1x) * u, r1y = q1y + (q2y - q1y) * u;
+    const first = { type: 6, x1: q0x, y1: q0y, x2: r0x, y2: r0y, x, y };
+    const second = { type: 6, x1: r1x, y1: r1y, x2: segment.x2, y2: segment.y2, x: segment.x, y: segment.y };
+    result.splice(segmentIndex, 1, first, second);
+  } else {
+    result.splice(segmentIndex, 1, { type: 4, x, y }, { ...segment });
+  }
+  return result;
+}
 export function contours(segments) {
   const result = [];
   let contour;
@@ -90,22 +112,93 @@ export function moveControl(segments, anchorIndex, segmentIndex, suffix, dx, dy,
   const handle = result[segmentIndex];
   handle['x' + suffix] += dx;
   handle['y' + suffix] += dy;
-  if (unlink) return result;
   const anchor = anchors(segments).find(a => a.index === anchorIndex);
   if (!anchor) return result;
   const oppositeIndex = suffix === '1' ? anchor.incoming : anchor.outgoing;
   const oppositeSuffix = suffix === '1' ? '2' : '1';
   const opposite = result[oppositeIndex], original = segments[segmentIndex], center = segments[anchor.index];
   if (opposite?.['x' + oppositeSuffix] === undefined) return result;
+  // Alt/Option-drag permanently breaks the linkage at this anchor. Preserve
+  // the opposite handle exactly where it is and mark both sides independent.
+  if (unlink) {
+    result[segmentIndex]._unlinkedAnchor = anchorIndex;
+    opposite._unlinkedAnchor = anchorIndex;
+    return result;
+  }
+  if (original._unlinkedAnchor === anchorIndex || opposite._unlinkedAnchor === anchorIndex) return result;
+  const originalLength = Math.hypot(original['x' + suffix] - center.x, original['y' + suffix] - center.y);
+  const oppositeLength = Math.hypot(opposite['x' + oppositeSuffix] - center.x, opposite['y' + oppositeSuffix] - center.y);
+  // Link paired handles when they are already opposite/collinear. Smooth
+  // conversion establishes that relationship; corner handles remain free.
+  if (!originalLength || !oppositeLength) return result;
   const ax = original['x' + suffix] - center.x, ay = original['y' + suffix] - center.y;
   const bx = opposite['x' + oppositeSuffix] - center.x, by = opposite['y' + oppositeSuffix] - center.y;
-  const originalLength = Math.hypot(ax,ay), oppositeLength = Math.hypot(bx,by);
-  // Link only already-smooth handles. Corner anchors retain independent handles.
-  if (!originalLength || !oppositeLength || ax*bx+ay*by >= 0 || Math.abs(ax*by-ay*bx) > originalLength*oppositeLength*1e-4) return result;
+  if (ax * bx + ay * by >= 0 || Math.abs(ax * by - ay * bx) > originalLength * oppositeLength * 1e-2) return result;
   const vx = handle['x'+suffix]-center.x, vy = handle['y'+suffix]-center.y, length = Math.hypot(vx,vy);
   if (length) {
     opposite['x'+oppositeSuffix] = center.x-vx*oppositeLength/length;
     opposite['y'+oppositeSuffix] = center.y-vy*oppositeLength/length;
+  }
+  return result;
+}
+
+export function convertAnchors(segments, selected, mode) {
+  const result = segments.map(s => ({ ...s }));
+  const points = anchors(segments);
+  for (const anchor of points) {
+    if (!selected.has(anchor.index)) continue;
+    const target = result[anchor.index], prev = segments[anchor.incoming], next = segments[anchor.outgoing];
+    if (!target) continue;
+    if (mode === 'corner') {
+      // Collapse only this anchor's sides. Preserve the opposite control on
+      // shared cubic segments so neighboring anchors keep their handles.
+      const incoming = result[anchor.incoming], outgoing = result[anchor.outgoing];
+      if (incoming && [6, 8, 16].includes(incoming.type)) {
+        incoming.type = 6;
+        incoming.x2 = target.x; incoming.y2 = target.y;
+      }
+      if (outgoing && [6, 8, 16].includes(outgoing.type)) {
+        outgoing.type = 6;
+        outgoing.x1 = target.x; outgoing.y1 = target.y;
+      }
+    } else if (mode === 'smooth') {
+      const position = points.findIndex(point => point.index === anchor.index);
+      const previousAnchor = position > 0
+        ? points[position - 1]
+        // A closed contour stores its closing segment after the last visible
+        // anchor, so the first anchor's previous point wraps to the end.
+        : (anchor.incoming !== null && anchor.incoming > anchor.index ? points[points.length - 1] : null);
+      const nextAnchor = position >= 0 && position < points.length - 1 ? points[position + 1] : null;
+      const previousSegment = previousAnchor ? segments[previousAnchor.index] : prev;
+      const nextSegment = nextAnchor ? segments[nextAnchor.index] : next;
+      const px = previousSegment?.x ?? target.x, py = previousSegment?.y ?? target.y;
+      const nx = nextSegment?.x ?? target.x, ny = nextSegment?.y ?? target.y;
+      const dx = nx - px, dy = ny - py, length = Math.hypot(dx, dy) || 1;
+      const ux = dx / length, uy = dy / length;
+      const inLength = Math.hypot(target.x - px, target.y - py) / 3;
+      const outLength = Math.hypot(nx - target.x, ny - target.y) / 3;
+      const incoming = result[anchor.incoming], outgoing = result[anchor.outgoing];
+      // The handle arriving at this anchor is the incoming segment's x2/y2;
+      // the handle leaving it is the outgoing segment's x1/y1. Keep the
+      // neighboring controls at their endpoint positions so only the
+      // selected anchor receives the new smooth handles.
+      if (incoming && incoming.type !== 2 && incoming.type !== 1) Object.assign(incoming, {
+        type: 6,
+        x2: target.x - ux * inLength, y2: target.y - uy * inLength,
+        x: target.x, y: target.y
+      });
+      if (incoming && incoming.type === 6 && incoming.x1 === undefined) {
+        incoming.x1 = px; incoming.y1 = py;
+      }
+      if (outgoing && outgoing.type !== 1) Object.assign(outgoing, {
+        type: 6,
+        x1: target.x + ux * outLength, y1: target.y + uy * outLength,
+        x: outgoing.x, y: outgoing.y
+      });
+      if (outgoing && outgoing.type === 6 && outgoing.x2 === undefined) {
+        outgoing.x2 = nx; outgoing.y2 = ny;
+      }
+    }
   }
   return result;
 }

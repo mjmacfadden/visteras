@@ -1,5 +1,5 @@
 import { normalizeEditablePath } from './visteras-path-geometry.js';
-import { anchors, readSegments, serializeSegments, moveAnchors, deleteAnchors, moveControl } from './visteras-anchor-model.js';
+import { anchors, readSegments, serializeSegments, moveAnchors, deleteAnchors, moveControl, convertAnchors } from './visteras-anchor-model.js';
 
 const SHAPES = 'path,rect,circle,ellipse,line,polygon,polyline';
 export function mountDirectSelection(editor) {
@@ -25,7 +25,7 @@ export function mountDirectSelection(editor) {
     return el;
   };
   const style = document.createElement('style');
-  style.textContent = 'body[data-direct-multi] #pathpointgrip_container,body[data-direct-multi] #sec_path_node,body[data-direct-multi] #prop_empty_state,body[data-direct-multi] #prop_active_container {display:none!important} #visteras-anchor-status {padding:12px;color:#ccc;font:12px sans-serif;min-height:52px;box-sizing:border-box}';
+  style.textContent = 'body[data-direct-multi] #pathpointgrip_container,body[data-direct-multi] #prop_empty_state {display:none!important} #visteras-anchor-status {padding:12px;color:#ccc;font:12px sans-serif;min-height:52px;box-sizing:border-box}';
   document.head.append(style);
   const status = document.createElement('div');
   status.id = 'visteras-anchor-status';
@@ -91,6 +91,10 @@ export function mountDirectSelection(editor) {
     if (!status.isConnected) document.getElementById('properties_panel')?.append(status);
     status.hidden = !active;
     if (!active) { overlay.replaceChildren(); renderParent = null; reusable.clear(); return; }
+    const pathSection = document.getElementById('sec_path_node');
+    if (pathSection) pathSection.style.display = 'block';
+    const alignSection = document.getElementById('sec_align');
+    if (alignSection) alignSection.style.display = 'block';
     const zoom = sc.getZoom();
     let count = 0, paths = 0;
     for (const [recordIndex, rec] of records.entries()) {
@@ -215,8 +219,31 @@ export function mountDirectSelection(editor) {
   };
   sc.directSelection = {
     get active() { return active; },
-    tryActivate(elements) { return leaves(elements).length > 1 ? activate(elements) : false; },
-    removeSelected
+    // Use the same anchor overlay for single paths and compound selections.
+    // SVGEdit's native editor enters path mode with every point selected,
+    // which makes Convert apply to the entire object instead of the point the
+    // user clicked.
+    tryActivate(elements) { return leaves(elements).length >= 1 ? activate(elements) : false; },
+    removeSelected,
+    convert(mode) {
+      if (!active) {
+        const path = sc.getPathObj?.();
+        if (!path?.elem?.isConnected || !path.selected_pts?.length) return false;
+        const before = path.elem.getAttribute('d');
+        const next = convertAnchors(readGeometry(path.elem), new Set(path.selected_pts), mode);
+        path.storeD?.();
+        path.elem.setAttribute('d', serializeSegments(next));
+        path.init?.().show?.(true).update?.();
+        path.endChanges?.(`Convert anchors to ${mode}`);
+        sc.call('changed', [path.elem]);
+        schedule();
+        return path.elem.getAttribute('d') !== before;
+      }
+      const before = snapshot().filter(item => item.rec.selected.size);
+      for (const item of before) write(item, convertAnchors(item.segments, item.rec.selected, mode));
+      commit(before, `Convert anchors to ${mode}`);
+      schedule();
+    }
   };
   document.addEventListener('modeChange', schedule);
   new MutationObserver(schedule).observe(sc.getSvgContent(), { subtree: true, childList: true, attributes: true });

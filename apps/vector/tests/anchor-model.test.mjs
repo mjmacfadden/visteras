@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { anchors, moveAnchors, deleteAnchors, serializeSegments, moveControl } from '../js/visteras-anchor-model.js';
+import { anchors, moveAnchors, deleteAnchors, serializeSegments, moveControl, convertAnchors } from '../js/visteras-anchor-model.js';
 const M=(x,y)=>({type:2,x,y}), L=(x,y)=>({type:4,x,y}), Z=()=>({type:1});
 const rectangle=[M(10,20),L(50,20),L(50,60),L(10,60),L(10,20),Z()];
 test('closed contour has one logical anchor for its initial and closing endpoints',()=>{
@@ -57,4 +57,33 @@ test('corner direction handles remain independent',()=>{
   const data=[M(0,0),{type:6,x1:0,y1:10,x2:10,y2:20,x:20,y:20},{type:6,x1:20,y1:30,x2:40,y2:30,x:50,y:30}];
   const moved=moveControl(data,1,1,'2',0,10);
   assert.deepEqual(moved[2],data[2]);
+});
+test('Alt/Option control movement preserves and permanently unlinks the opposite handle',()=>{
+  const data=[M(0,0),{type:6,x1:8,y1:0,x2:22,y2:0,x:30,y:0},{type:6,x1:38,y1:0,x2:48,y2:0,x:60,y:0}];
+  const unlinked=moveControl(data,1,1,'2',0,10,true);
+  assert.equal(unlinked[1].x2,22); assert.equal(unlinked[1].y2,10);
+  assert.equal(unlinked[2].x1,38); assert.equal(unlinked[2].y1,0);
+  const movedAgain=moveControl(unlinked,1,1,'2',0,10,false);
+  assert.equal(movedAgain[2].x1,38); assert.equal(movedAgain[2].y1,0);
+});
+test('converting a selected line anchor to smooth creates tangent handles',()=>{
+  const data=[M(0,0),L(30,0),L(30,30)];
+  const smooth=convertAnchors(data,new Set([1]),'smooth');
+  assert.equal(smooth[1].type,6);
+  assert.ok(smooth[1].x2 < 30 && smooth[2].y1 > 0);
+  assert.ok(smooth[1].y2 < 0); assert.ok(smooth[2].x1 > 30);
+});
+test('converting a selected cubic anchor to corner removes its direction handles',()=>{
+  const data=[M(0,0),{type:6,x1:8,y1:0,x2:22,y2:4,x:30,y:0},L(30,30)];
+  const corner=convertAnchors(data,new Set([1]),'corner');
+  assert.equal(corner[1].type,6);
+  assert.equal(corner[1].x2,30); assert.equal(corner[1].y2,0);
+  assert.equal(corner[1].x1,8); assert.equal(corner[1].y1,0);
+});
+test('converting adjacent anchors preserves both sides of shared segments',()=>{
+  const data=[M(0,0),L(30,0),L(60,0)];
+  const smooth=convertAnchors(data,new Set([1,2]),'smooth');
+  assert.equal(smooth[1].type,6); assert.equal(smooth[2].type,6);
+  assert.notEqual(smooth[1].x2,smooth[1].x);
+  assert.notEqual(smooth[2].x1,smooth[2].x);
 });
