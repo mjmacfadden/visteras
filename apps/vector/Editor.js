@@ -39264,6 +39264,9 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}
 			this.#i = !1;
 		}
+		resetDrawingState() {
+			this.#n = null; this.#t = null; this.#e = false;
+		}
 		toEditMode(e) {
 			normalizeEditablePath(e, h_);
 			K && K.show(!1);
@@ -39326,9 +39329,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			p_.reorientGrads(e, n);
 		}
 		zoomChange() {
-			p_.getCurrentMode() === "pathedit" && K.update();
+			p_.getCurrentMode() === "pathedit" && K?.update();
 		}
 		getNodePoint() {
+			if (!K || !K.elem.isConnected || !K.segs.length) return null;
 			let e = K.selected_pts.length ? K.selected_pts[0] : 1, t = K.segs[e];
 			return {
 				x: t.item.x,
@@ -64762,6 +64766,9 @@ ${y}`), [3, 7];
 		randomizeIds(e) {
 			arguments.length > 0 && e === !1 ? gv(!1, this.getCurrentDrawing()) : gv(!0, this.getCurrentDrawing());
 		}
+		getPathDataForElement(e) {
+			return e.localName === "path" ? e.getAttribute("d") : mg(e);
+		}
 		convertToPath(e, t) {
 			if (!e) {
 				this.selectedElements.forEach((e) => {
@@ -69002,12 +69009,18 @@ var { $id: vz, $qa: yz, $click: bz } = JI, xz = class {
 		}
 	}
 	clickDirectSelect() {
+		if (this.editor.svgCanvas.directSelection?.active) {
+			this.editor.svgCanvas.setMode("pathedit");
+			this.updateLeftPanel("tool_direct_select");
+			return;
+		}
 		if (this.editor.svgCanvas.getMode() === "pathedit") {
 			this.updateLeftPanel("tool_direct_select");
 			return;
 		}
 		if (this.updateLeftPanel("tool_direct_select")) {
 			let sel = this.editor.svgCanvas.getSelectedElements().filter(Boolean);
+			if (this.editor.svgCanvas.directSelection?.tryActivate(sel)) return;
 			if (sel.length) {
 				let elem = sel[0];
 				if (elem.nodeName !== "path" && typeof this.editor.svgCanvas.convertToPath === "function") {

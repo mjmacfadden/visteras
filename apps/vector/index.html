@@ -168,6 +168,7 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js';
+    import { mountPenTools } from './js/visteras-pen-tools.js';
     import { mountSelectionTools } from './js/visteras-selection.js';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -1099,7 +1100,15 @@
               <div class="prop_section_body" id="sec_path_node_body">
                 <div class="prop_field_pair" id="slot_node_xy"></div>
                 <div class="prop_row">
-                  <div id="slot_seg_type" style="flex:1;"></div>
+                  <div class="prop_label" style="min-width:70px;">Convert:</div>
+                  <div class="prop_actions_flow" style="gap:4px;">
+                    <button type="button" class="prop_pathfinder_btn visteras_convert_btn" id="visteras_convert_corner" title="Convert selected anchor points to corners" aria-label="Convert selected anchor points to corners">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M6 3v18M6 7h4M6 7l12 12" stroke="#ccc" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+                    </button>
+                    <button type="button" class="prop_pathfinder_btn visteras_convert_btn" id="visteras_convert_smooth" title="Convert selected anchor points to smooth" aria-label="Convert selected anchor points to smooth">
+                      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true"><path d="M6 21c0-10 5-16 16-16M6 5v4M6 5h4" stroke="#ccc" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+                    </button>
+                  </div>
                   <div id="slot_node_link"></div>
                 </div>
                 <div class="prop_actions_flow" id="slot_node_btns"></div>
@@ -1351,8 +1360,13 @@
       // Relocate Path controls
       moveEl('path_node_x', 'slot_node_xy');
       moveEl('path_node_y', 'slot_node_xy');
-      moveEl('seg_type', 'slot_seg_type');
-      moveEl('tool_node_link', 'slot_node_link');
+      // The legacy curve/straight control is intentionally left in SVGEdit's
+      // hidden path toolbar. Direct Selection uses the explicit Convert
+      // corner/smooth controls above instead.
+      const legacySegmentType = document.getElementById('seg_type');
+      if (legacySegmentType) legacySegmentType.style.display = 'none';
+      const legacyNodeLink = document.getElementById('tool_node_link');
+      if (legacyNodeLink) legacyNodeLink.style.display = 'none';
       moveEl('tool_node_clone', 'slot_node_btns');
       moveEl('tool_node_delete', 'slot_node_btns');
       moveEl('tool_openclose_path', 'slot_node_btns');
@@ -1617,6 +1631,10 @@
         if (pathSec) {
           pathSec.style.display = isPathEdit ? 'block' : 'none';
         }
+        const alignSec = document.getElementById('sec_align');
+        if (alignSec) {
+          alignSec.style.display = (isPathEdit || selElems.length > 1) ? 'block' : 'none';
+        }
 
         // Pathfinder section (strictly visible when 2 objects are selected)
         const pathfinderSec = document.getElementById('sec_pathfinder');
@@ -1692,6 +1710,19 @@
     applyStudioSkin();
     setupMenuBar();
     setupPropertiesPanel();
+    mountPenTools(svgEditor);
+    document.getElementById('tool_node_clone')?.style.setProperty('display', 'none');
+    document.getElementById('tool_node_delete')?.style.setProperty('display', 'none');
+    // Use delegation because SVGEdit may rebuild contextual controls while
+    // changing modes. The Convert buttons must remain connected to the
+    // current direct-selection controller after those rebuilds.
+    document.addEventListener('click', event => {
+      const button = event.target.closest?.('#visteras_convert_corner,#visteras_convert_smooth');
+      if (!button) return;
+      event.preventDefault();
+      event.stopPropagation();
+      svgEditor.svgCanvas.directSelection?.convert(button.id.endsWith('smooth') ? 'smooth' : 'corner');
+    }, true);
 
     // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
     mountVisterasFontPicker({ svgEditor });

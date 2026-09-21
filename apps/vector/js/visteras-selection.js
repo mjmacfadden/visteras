@@ -1,5 +1,7 @@
+import { mountDirectSelection } from './visteras-direct-selection.js';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {
+  mountDirectSelection(editor);
   const sc = editor.svgCanvas;
   const ns = 'http://www.w3.org/2000/svg';
   let overlay, frame, drag;
