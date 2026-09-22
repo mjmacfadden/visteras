@@ -353,6 +353,10 @@ void main() {
 	}
 
 	vec4 src = texture2D(u_layerTexture, v_texCoord);
+	// Layer textures are filtered in premultiplied-alpha space so transparent
+	// black texels cannot darken white glyph edges. The compositor below uses
+	// straight color, so recover it before applying opacity and masks.
+	src.rgb = src.a > 0.0 ? src.rgb / src.a : vec3(0.0);
 	float maskA = mask_alpha_at(v_docPos);
 	src.a *= u_opacity * maskA;
 
@@ -1550,10 +1554,13 @@ class WebGL_renderer_class {
 				gl.activeTexture(gl.TEXTURE0);
 				gl.bindTexture(gl.TEXTURE_2D, cached.texture);
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+				gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 				return cached;
 			} catch (e) {
 				return null;
+			} finally {
+				gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 			}
 		}
 
@@ -1570,10 +1577,13 @@ class WebGL_renderer_class {
 		// Upload pixel data from canvas or image
 		try {
 			gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+			gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 			gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
 		} catch (e) {
 			gl.deleteTexture(texture);
 			return null;
+		} finally {
+			gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 		}
 
 		// Set texture parameters
@@ -1960,8 +1970,16 @@ class WebGL_renderer_class {
 							targetCtx.scale(SUPER, SUPER);
 							// Shift by pad so strokes at the bounding-box edge have room
 							targetCtx.translate(pad - (layer.x || 0), pad - (layer.y || 0));
-							_this._gui_tools_ref.tools_modules[render_class].object[render_function](targetCtx, layer, false);
-							targetCtx.restore();
+							// Rotation belongs to the GPU destination transform, not
+							// the bounded source texture (which would clip and rotate twice).
+							const rotation = layer.rotate;
+							try {
+								layer.rotate = 0;
+								_this._gui_tools_ref.tools_modules[render_class].object[render_function](targetCtx, layer, false);
+							} finally {
+								layer.rotate = rotation;
+								targetCtx.restore();
+							}
 						};
 
 						paint(ctx);

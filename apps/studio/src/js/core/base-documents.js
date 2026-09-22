@@ -354,7 +354,7 @@ class Base_documents_class {
 			app.GUI.GUI_preview.zoom_data = JSON.parse(JSON.stringify(doc.zoom_data));
 			this.Base_gui.prepare_canvas();
 		} else if (app.GUI && app.GUI.GUI_preview) {
-			await app.GUI.GUI_preview.zoom_auto(true);
+			await app.GUI.GUI_preview.zoom_auto();
 		}
 
 		this.Base_gui.check_canvas_offset();

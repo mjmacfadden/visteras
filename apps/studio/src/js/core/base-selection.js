@@ -1425,6 +1425,10 @@ class Base_selection_class {
 					}
 
 					this.current_angle = angle;
+					//keep the transform-box snapshot in sync so the box rotates
+					//with the object during the drag (find_settings() will not
+					//refresh data while mouse_lock === 'selected_object_actions')
+					settings.data.rotate = angle;
 					app.Layers.render_interactive_layer(settings.data.id);
 				}
 			}

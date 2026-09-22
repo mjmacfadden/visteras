@@ -38713,36 +38713,31 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			});
 			let t = this.elem.pathSegList, n = t.numberOfItems;
 			if (n === 0 && this.elem.getAttribute("d")) {
-				console.log('[pathfinder] Path.init() numberOfItems=0 but d exists, re-parsing:', this.elem.getAttribute("d")?.substring(0, 200));
 				delete this.elem._pathSegList;
 				t = this.elem.pathSegList;
 				n = t.numberOfItems;
-				console.log('[pathfinder] After re-parse numberOfItems:', n);
 			}
-			console.log('[pathfinder] Path.init() id:', this.elem.id, 'd:', this.elem.getAttribute('d')?.substring(0, 200), 'numberOfItems:', n);
 			this.segs = [], this.selected_pts = [], this.first_seg = null;
 			for (let e = 0; e < n; e++) {
 				let n = t.getItem(e), r = new d_(e, n);
 				r.path = this, this.segs.push(r);
 			}
 			let { segs: r } = this, i = null;
-			let gripCount = 0;
 			for (let e = 0; e < n; e++) {
 				let t = r[e], a = e + 1 >= n ? null : r[e + 1], o = e - 1 < 0 ? null : r[e - 1];
 				if (t.type === 2) {
 					if (o && o.type !== 1) {
 						let e = r[i];
-						e.next = r[i + 1], e.next.prev = e, e.addGrip(); gripCount++;
+						e.next = r[i + 1], e.next.prev = e, e.addGrip();
 					}
 					i = e;
-				} else if (a?.type === 1) t.next = r[i + 1], t.next.prev = t, t.mate = r[i], t.addGrip(), this.first_seg ||= t, gripCount++;
-				else if (a) t.type !== 1 && (t.addGrip(), gripCount++, a && a.type !== 2 && (t.next = a, t.next.prev = t));
+				} else if (a?.type === 1) t.next = r[i + 1], t.next.prev = t, t.mate = r[i], t.addGrip(), this.first_seg ||= t;
+				else if (a) t.type !== 1 && (t.addGrip(), a && a.type !== 2 && (t.next = a, t.next.prev = t));
 				else if (t.type !== 1) {
 					let e = r[i];
-					e.next = r[i + 1], e.next.prev = e, e.addGrip(), gripCount++, t.addGrip(), gripCount++, this.first_seg ||= r[i];
+					e.next = r[i + 1], e.next.prev = e, e.addGrip(), t.addGrip(), this.first_seg ||= r[i];
 				}
 			}
-			console.log('[pathfinder] Path.init() grips created:', gripCount);
 			return this;
 		}
 		eachSeg(e) {
@@ -38809,7 +38804,6 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}), this.addPtsToSelection(t);
 		}
 		show(e) {
-			console.log('[pathfinder] Path.show(', e, ') segs:', this.segs?.length, 'first_seg:', this.first_seg?.index);
 			return this.eachSeg(function() {
 				this.show(e);
 			}), e && this.selectAllPts(), this;

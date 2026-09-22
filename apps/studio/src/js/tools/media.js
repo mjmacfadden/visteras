@@ -6,6 +6,10 @@ import Tools_settings_class from './../modules/tools/settings.js';
 import Dialog_class from './../libs/popup.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 
+const mediaSearchSpinnerStyle = document.createElement('style');
+mediaSearchSpinnerStyle.textContent = '.media-search-spinner{display:inline-block;width:12px;height:12px;margin-right:6px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-2px;animation:media-search-spin .7s linear infinite}@keyframes media-search-spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(mediaSearchSpinnerStyle);
+
 class Media_class extends Base_tools_class {
 
 	constructor(ctx) {
@@ -16,7 +20,7 @@ class Media_class extends Base_tools_class {
 		this.name = 'media';
 		this.cache = [];
 		this.page = 1;
-		this.per_page = 50;
+		this.per_page = 48;
 	}
 
 	load() {
@@ -59,12 +63,26 @@ class Media_class extends Base_tools_class {
 		}
 
 		var settings = {
-			title: 'Search Media & Ephemera',
+			title: 'Search Images',
 			className: 'wide',
 			params: [
 				{name: "query", title: "Keyword:", value: query},
+				{name: "image_type", title: "Type:", type: "select", values: ["all", "photo", "illustration", "vector"], value: "all"},
+				{name: "orientation", title: "Orientation:", type: "select", values: ["all", "horizontal", "vertical"], value: "all"},
+				{name: "category", title: "Category:", type: "select", values: ["all", "backgrounds", "fashion", "nature", "science", "education", "feelings", "health", "people", "places", "animals", "industry", "computer", "food", "sports", "transportation", "travel"], value: "all"},
+				{name: "safe_search", title: "Safe search:", value: true},
 			],
 			on_load: function (params, popup) {
+				const searchButton = popup.el.querySelector('[data-id="popup_ok"]');
+				if (searchButton) {
+					searchButton.textContent = 'Search';
+					searchButton.dataset.defaultLabel = 'Search';
+			searchButton.addEventListener('click', () => {
+						if (searchButton.disabled) return;
+						searchButton.disabled = true;
+						searchButton.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
+					}, true);
+				}
 				// Handle Enter before the generic dialog's input/document
 				// handlers, which otherwise submit on both keydown and keyup.
 				const submitOnEnter = (event) => {
@@ -84,15 +102,24 @@ class Media_class extends Base_tools_class {
 				}
 			},
 			on_finish: async function (params) {
+				const searchButton = document.querySelector('[data-id="popup_ok"]');
+				const resetSearchButton = () => {
+					if (!searchButton) return;
+					searchButton.disabled = false;
+					searchButton.textContent = 'Search';
+				};
 				if (params.query == '')
+					{ resetSearchButton();
 					return false;
+					}
 
-				var cacheKey = _this.page + '|' + params.query;
+				var cacheKey = _this.page + '|' + params.query + '|' + params.image_type + '|' + params.orientation + '|' + params.category + '|' + params.safe_search;
 
 				if (_this.cache[cacheKey] != undefined) {
 					var data = _this.cache[cacheKey];
 					var pages = Math.ceil(data.totalHits / _this.per_page);
 					_this._updateResultsInPlace(data.hits, pages, params.query);
+					resetSearchButton();
 					return false;
 				}
 
@@ -113,13 +140,19 @@ class Media_class extends Base_tools_class {
 						URL = endpoint + (endpoint.includes('?') ? '&' : '?')
 							+ "page=" + _this.page
 							+ "&per_page=" + _this.per_page
-							+ "&safesearch=" + safe_search
+							+ (params.image_type && params.image_type !== 'all' ? "&image_type=" + params.image_type : '')
+							+ (params.orientation && params.orientation !== 'all' ? "&orientation=" + params.orientation : '')
+							+ (params.category && params.category !== 'all' ? "&category=" + params.category : '')
+							+ "&safesearch=" + (params.safe_search !== false ? 'true' : 'false')
 							+ "&q=" + encodeURIComponent(params.query);
 					} else {
 						URL = "https://pixabay.com/api/?key=" + encodeURIComponent(effectiveKey)
 							+ "&page=" + _this.page
 							+ "&per_page=" + _this.per_page
-							+ "&safesearch=" + safe_search
+							+ "&safesearch=" + (params.safe_search !== false ? 'true' : 'false')
+							+ (params.image_type && params.image_type !== 'all' ? "&image_type=" + params.image_type : '')
+							+ (params.orientation && params.orientation !== 'all' ? "&orientation=" + params.orientation : '')
+							+ (params.category && params.category !== 'all' ? "&category=" + params.category : '')
 							+ "&q="	+ encodeURIComponent(params.query);
 					}
 					var res = await fetch(URL);
@@ -144,6 +177,7 @@ class Media_class extends Base_tools_class {
 					console.error('Media search failed:', err);
 					alertify.error('Error connecting to Pixabay.');
 				}
+				resetSearchButton();
 				return false;
 			},
 		};
@@ -184,7 +218,7 @@ class Media_class extends Base_tools_class {
 	_appendResults(popupEl, html, params) {
 		var _this = this;
 		var node = document.createElement("div");
-		node.classList.add('flex-container');
+		node.classList.add('flex-container', 'media-results-grid');
 		node.innerHTML = html;
 		popupEl.querySelector('.dialog_content').appendChild(node);
 		this._bindResultEvents(popupEl, params);
@@ -201,7 +235,7 @@ class Media_class extends Base_tools_class {
 
 		var html = this._buildResultsHtml(data, pages);
 		var node = document.createElement("div");
-		node.classList.add('flex-container');
+		node.classList.add('flex-container', 'media-results-grid');
 		node.innerHTML = html;
 		dialogContent.appendChild(node);
 

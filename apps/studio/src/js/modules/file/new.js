@@ -728,7 +728,7 @@ class File_new_class {
 		await new Promise(r => setTimeout(r, 10));
 
 		if (this.Base_gui && this.Base_gui.GUI_preview) {
-			await this.Base_gui.GUI_preview.zoom_auto(true);
+			await this.Base_gui.GUI_preview.zoom_auto();
 		}
 
 		if (app.GUI && app.GUI.GUI_information) {
@@ -829,7 +829,7 @@ class File_new_class {
 
 		await new Promise(r => setTimeout(r, 20));
 		if (this.Base_gui && this.Base_gui.GUI_preview) {
-			this.Base_gui.GUI_preview.zoom_auto(true);
+			this.Base_gui.GUI_preview.zoom_auto();
 		}
 
 		if (img_w && img_h) {

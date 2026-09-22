@@ -2140,6 +2140,13 @@ class Text_editor_class {
 				ctx.scale(layerScaleX, layerScaleY);
 				ctx.translate(-layer.x, -layer.y);
 			}
+			if (is_box_text(layer) && layer.width > 0 && layer.height > 0) {
+				// Clip overflowing paragraph text inside the box. Applied after
+				// the rotate/scale transforms so the clip follows the rotated box.
+				ctx.beginPath();
+				ctx.rect(layer.x, layer.y, layer.width, layer.height);
+				ctx.clip();
+			}
 			for (let line of this.lineRenderInfo.lines) {
 				let lineLetterCount = 0;
 				for (let [localWrapIndex, wrap] of line.wraps.entries()) {
@@ -4075,6 +4082,9 @@ class Text_class extends Base_tools_class {
 						{ merge_with_history: 'new_text_layer' }
 					);
 				}
+				// Saving the initial data reloads the editor and resets its selection.
+				// Select the placeholder only after all creation actions have finished.
+				this.select_all_text(this.get_editor(config.layer));
 			}
 			this.focus_textarea();
 		}
@@ -5141,7 +5151,7 @@ class Text_class extends Base_tools_class {
 		// During Move-handle scaling, the drag owns width/height.
 		if (this._point_resize_snapshot) return;
 		// During Select-tool moving, the drag owns layer position.
-		if (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'] && app.GUI.GUI_tools.tools_modules['select'].object && app.GUI.GUI_tools.tools_modules['select'].object.moving) {
+		if (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'] && app.GUI.GUI_tools.tools_modules['select'].object && (app.GUI.GUI_tools.tools_modules['select'].object.moving || app.GUI.GUI_tools.tools_modules['select'].object.resizing)) {
 			return;
 		}
 		if (layer && layer.type === 'text' && is_point_text(layer) && editor) {
@@ -5219,12 +5229,6 @@ class Text_class extends Base_tools_class {
 		// Caret for point & paragraph while active and editing with Type tool
 		editor.selection.set_cursor_visible(isActiveLayerAndTextTool && isEditing);
 		ctx.save();
-		if (isBoxBoundary && layer.width > 0 && layer.height > 0) {
-			// Clip overflowing paragraph text inside the box
-			ctx.beginPath();
-			ctx.rect(layer.x, layer.y, layer.width, layer.height);
-			ctx.clip();
-		}
 		editor._pointTransforming = pointTransforming;
 		editor.render(ctx, layer);
 		editor._pointTransforming = false;

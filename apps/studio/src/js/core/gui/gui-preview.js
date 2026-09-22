@@ -472,11 +472,12 @@ class GUI_preview_class {
 		return true;
 	}
 
-	async zoom_auto(only_increase) {
+	async zoom_auto() {
 		var container = document.getElementById('main_wrapper');
 		if (!container) return false;
 		var page_w = container.clientWidth;
 		var page_h = container.clientHeight;
+		if (page_w <= 0 || page_h <= 0 || config.WIDTH <= 0 || config.HEIGHT <= 0) return false;
 
 		// Leave a 32px margin around canvas for visual breathing room and proper centering
 		var margin = 32;
@@ -486,10 +487,6 @@ class GUI_preview_class {
 		var best_width = avail_w / config.WIDTH;
 		var best_height = avail_h / config.HEIGHT;
 		var best_zoom = Math.min(best_width, best_height);
-
-		if (only_increase != undefined && best_zoom > 1) {
-			return false;
-		}
 
 		if (zoomView && typeof zoomView.reset === 'function') {
 			zoomView.reset(best_zoom);

@@ -69,6 +69,13 @@ class Layer_duplicate_class {
 		if (params.type == 'image' && source.link) {
 			params.link = source.link.cloneNode(true);
 		}
+		if (source.link_canvas) {
+			const canvas = document.createElement('canvas');
+			canvas.width = source.link_canvas.width;
+			canvas.height = source.link_canvas.height;
+			canvas.getContext('2d').drawImage(source.link_canvas, 0, 0);
+			params.link_canvas = canvas;
+		}
 
 		if (source.mask != null) {
 			var msource = this.Mask.get_mask_source(source);

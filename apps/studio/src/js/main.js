@@ -68,6 +68,9 @@ window.addEventListener('load', function (e) {
 
 	// Render all
 	GUI.init();
+	// Measure after toolbars and saved panel visibility have been applied.
+	GUI.autodetect_dimensions();
+	GUI.prepare_canvas();
 	Layers.init();
 	Documents.init();
 	FontManager.init();
