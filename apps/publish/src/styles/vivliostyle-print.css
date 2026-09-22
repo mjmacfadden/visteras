@@ -111,6 +111,13 @@ a[href]::after {
   width: 100%;
 }
 
+.flow-block.rss-source-block,
+.flow-block.custom-feed-block {
+  break-inside: auto;
+  page-break-inside: auto;
+  -webkit-column-break-inside: auto;
+}
+
 .flow-block:empty {
   display: none;
   margin: 0;
