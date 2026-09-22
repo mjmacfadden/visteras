@@ -82,9 +82,9 @@ class Bezier_Curve_class extends Base_tools_class {
 			}
 		}
 
-		const data_clone = JSON.parse(JSON.stringify(config.layer.data));
+		const data_clone = config.layer ? JSON.parse(JSON.stringify(config.layer.data)) : null;
 
-		if (config.layer.type != this.name || params_hash != this.params_hash
+		if (!config.layer || config.layer.type != this.name || params_hash != this.params_hash
 			|| (data_clone != null && data_clone.cp2.x !== null)) {
 			//register new object - current layer is not ours or params changed
 			this.layer = {
@@ -324,7 +324,7 @@ class Bezier_Curve_class extends Base_tools_class {
 	}
 
 	selected_object_actions(e) {
-		if(config.TOOL.name != 'select' || config.layer.type != this.name || config.layer.status == 'draft'){
+		if(!config.TOOL || config.TOOL.name != 'select' || !config.layer || config.layer.type != this.name || config.layer.status == 'draft'){
 			return;
 		}
 

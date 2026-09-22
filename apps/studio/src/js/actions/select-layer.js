@@ -16,7 +16,8 @@ export class Select_layer_action extends Base_action {
 	constructor(layer_id, ignore_same_selection = false, selection = null) {
 		super('select_layer', 'Select Layer');
 		this.reset_selection_action = null;
-		this.layer_id = parseInt(layer_id);
+		// null explicitly clears selection; it must not become a NaN lookup.
+		this.layer_id = layer_id == null ? null : parseInt(layer_id, 10);
 		this.ignore_same_selection = ignore_same_selection;
 		this.selection = selection;
 		this.old_layer = null;
@@ -29,7 +30,7 @@ export class Select_layer_action extends Base_action {
 		super.do();
 
 		let old_layer = config.layer;
-		let new_layer = app.Layers.get_layer(this.layer_id);
+		let new_layer = this.layer_id === null ? null : app.Layers.get_layer(this.layer_id);
 		this.old_layer = old_layer;
 
 		if (old_layer !== new_layer) {

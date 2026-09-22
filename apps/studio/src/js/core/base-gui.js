@@ -653,26 +653,11 @@ class Base_gui_class {
 		var wrapper = document.getElementById('main_wrapper');
 		var page_w = wrapper.clientWidth;
 		var page_h = wrapper.clientHeight;
-		var auto_size = false;
-
-		//use largest possible
-		for (var i = this.common_dimensions.length - 1; i >= 0; i--) {
-			if (this.common_dimensions[i][0] > page_w
-				|| this.common_dimensions[i][1] > page_h) {
-				//browser size is too small
-				continue;
-			}
-			config.WIDTH = parseInt(this.common_dimensions[i][0]);
-			config.HEIGHT = parseInt(this.common_dimensions[i][1]);
-			auto_size = true;
-			break;
-		}
-
-		if (auto_size == false) {
-			//screen size is smaller then 400x300
-			config.WIDTH = parseInt(page_w) - 15;
-			config.HEIGHT = parseInt(page_h) - 10;
-		}
+		// The initial document uses workspace pixels at 100%, not a preset.
+		// Presets remain explicit choices in the New Document dialog.
+		config.WIDTH = Math.max(1, Math.floor(page_w - 64));
+		config.HEIGHT = Math.max(1, Math.floor(page_h - 64));
+		config.ZOOM = 1;
 	}
 
 	render_canvas_background(canvas_id, gap) {

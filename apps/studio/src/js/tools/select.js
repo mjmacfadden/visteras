@@ -6,6 +6,7 @@ import Base_selection_class from './../core/base-selection.js';
 import Helper_class from './../libs/helpers.js';
 import Mask_class from './../modules/mask/mask.js';
 import Dialog_class from './../libs/popup.js';
+import Layer_duplicate_class from './../modules/layer/duplicate.js';
 import { is_box_text, is_point_text } from './text.js';
 import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tree.js';
 import { get_layer_content_bounds, get_selection_content_bounds } from './../libs/layer-bounds.js';
@@ -76,7 +77,11 @@ class Select_tool_class extends Base_tools_class {
 			sel.enable_borders = settings.value;
 			sel.enable_controls = settings.value;
 			sel.enable_rotation = settings.value;
-			this.Base_layers.render_interactive_layer(config.layer.id);
+			if (config.layer) {
+				this.Base_layers.render_interactive_layer(config.layer.id);
+			} else {
+				this.Base_layers.render();
+			}
 		}
 	}
 
@@ -134,6 +139,10 @@ class Select_tool_class extends Base_tools_class {
 					let y = l.y;
 					l.x = start_pos.x;
 					l.y = start_pos.y;
+					if (is_point_text(l)) {
+						if (start_pos.anchor_x != null) l.params.anchor_x = start_pos.anchor_x;
+						if (start_pos.anchor_y != null) l.params.anchor_y = start_pos.anchor_y;
+					}
 
 					if (l.type === 'vector') {
 						const dx = start_pos.x - x;
@@ -210,6 +219,7 @@ class Select_tool_class extends Base_tools_class {
 		}
 
 		this.rotate_initial = config.layer ? config.layer.rotate : null;
+		this.duplicate_drag = !!e.altKey;
 
 		// Hit test selection handles and rotation zone first
 		this.Base_selection.selected_object_actions(e);
@@ -232,6 +242,17 @@ class Select_tool_class extends Base_tools_class {
 		}
 		else {
 			this.resizing = false;
+			const hit = this.Base_layers.get_sorted_layers().some(layer => {
+				if (!this.marquee_layer_eligible(layer)) return false;
+				const canvas = this.Base_layers.convert_layer_to_canvas(layer.id, null, false);
+				return this.check_hit_region(e, canvas.getContext('2d'), layer);
+			});
+			if (!hit) {
+				this.moving = false;
+				this.marquee = { x: mouse.x, y: mouse.y, endX: mouse.x, endY: mouse.y,
+					ids: e.shiftKey ? [...(config.selected_layer_ids || [])] : [] };
+				return;
+			}
 			this.moving = true;
 			await this.auto_select_object(e);
 			const movable_layers = this.get_movable_layers();
@@ -239,6 +260,19 @@ class Select_tool_class extends Base_tools_class {
 				//locked layers can be selected but not moved or resized
 				this.moving = false;
 				return;
+			}
+			if (this.duplicate_drag) {
+				this.moving = false;
+				const duplicator = new Layer_duplicate_class();
+				const inserts = movable_layers.map(layer => {
+					const copy = duplicator._clone_layer_params(layer);
+					copy.x = layer.x;
+					copy.y = layer.y;
+					return new app.Actions.Insert_layer_action(copy, false);
+				});
+				await app.State.do_action(new app.Actions.Bundle_action('duplicate_drag', 'Duplicate Layers', inserts));
+				config.selected_layer_ids = inserts.map(action => action.inserted_layer_id);
+				this.moving = true;
 			}
 			const aspect_lock = (config.aspect_lock !== undefined) ? config.aspect_lock : true;
 			this.Base_selection.find_settings().keep_ratio = aspect_lock;
@@ -259,6 +293,7 @@ class Select_tool_class extends Base_tools_class {
 				height: l.height,
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
+				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
 				mask: l.mask ? {
 					x: l.mask.x,
 					y: l.mask.y,
@@ -322,6 +357,12 @@ class Select_tool_class extends Base_tools_class {
 
 		this.Base_selection.selected_object_actions(e);
 
+		if (this.marquee) {
+			this.marquee.endX = mouse.x;
+			this.marquee.endY = mouse.y;
+			this.Base_layers.render();
+			return;
+		}
 		if (this.resizing) {
 
 			//also handle rotation
@@ -348,23 +389,19 @@ class Select_tool_class extends Base_tools_class {
 							layer.x = Math.round(s.data.x + (init_pos.x - this.mousedown_content_bounds.x) * scale_x);
 							layer.y = Math.round(s.data.y + (init_pos.y - this.mousedown_content_bounds.y) * scale_y);
 
+							if (init_pos.text_params) {
+								layer.params.scale_x = (init_pos.text_params.scale_x ?? 1) * scale_x;
+								layer.params.scale_y = (init_pos.text_params.scale_y ?? 1) * scale_y;
+								if (init_pos.anchor_x != null) layer.params.anchor_x = s.data.x + (init_pos.anchor_x - this.mousedown_content_bounds.x) * scale_x;
+								if (init_pos.anchor_y != null) layer.params.anchor_y = s.data.y + (init_pos.anchor_y - this.mousedown_content_bounds.y) * scale_y;
+							}
+
 							this.Mask.preview_linked_mask_transform(layer, init_pos, layer);
 						}
 					}
 				}
 			}
 
-			// Point text: geometric scale_x/y from drag-start snapshot (do not bake font size)
-			if (this._resizing_point_text && config.layer && config.layer.type === 'text') {
-				try {
-					const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
-						&& app.GUI.GUI_tools.tools_modules['text']
-						&& app.GUI.GUI_tools.tools_modules['text'].object;
-					if (textTool && typeof textTool.apply_point_text_resize === 'function') {
-						textTool.apply_point_text_resize(config.layer, config.layer.width, config.layer.height);
-					}
-				} catch (e) { /* ignore */ }
-			}
 
 			if (this.Base_layers.render_interactive_layer && config.layer) {
 				this.Base_layers.render_interactive_layer(config.layer.id);
@@ -443,6 +480,29 @@ class Select_tool_class extends Base_tools_class {
 
 	async mouseup(e) {
 		var mouse = this.get_mouse_info(e);
+		if (this.marquee) {
+			const box = this.marquee;
+			this.marquee = null;
+			const x = Math.max(0, Math.floor(Math.min(box.x, mouse.x)));
+			const y = Math.max(0, Math.floor(Math.min(box.y, mouse.y)));
+			const right = Math.min(config.WIDTH, Math.ceil(Math.max(box.x, mouse.x)));
+			const bottom = Math.min(config.HEIGHT, Math.ceil(Math.max(box.y, mouse.y)));
+			const ids = new Set(box.ids);
+			if (right > x && bottom > y) {
+				for (const layer of this.Base_layers.get_sorted_layers()) {
+					if (!this.marquee_layer_eligible(layer)) continue;
+					const canvas = this.Base_layers.convert_layer_to_canvas(layer.id, null, false);
+					const pixels = canvas.getContext('2d').getImageData(x, y, right - x, bottom - y).data;
+					for (let i = 3; i < pixels.length; i += 4) {
+						if (pixels[i]) { ids.add(layer.id); break; }
+					}
+				}
+			}
+			const selected = [...ids];
+			await app.State.do_action(new app.Actions.Select_layer_action(selected[0] || null, true, { ids: selected }));
+			this.Base_layers.render();
+			return;
+		}
 		// Base_tools set_mouse_info() clears config.mouse.click_valid on pointerup *before*
 		// tools see mouseup. An in-progress Move resize/move was already validated on
 		// mousedown — must still run commit (point-text bake via commit_point_text_resize).
@@ -483,6 +543,7 @@ class Select_tool_class extends Base_tools_class {
 						layer.y = init_pos.y;
 						layer.width = init_pos.width;
 						layer.height = init_pos.height;
+						if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
 						if (init_pos.mask && layer.mask) {
 							Object.assign(layer.mask, init_pos.mask);
 						}
@@ -511,7 +572,7 @@ class Select_tool_class extends Base_tools_class {
 						};
 
 						// Point text: bake font size into history
-						if (resizingPointText && layer.id === config.layer?.id && init_pos.width > 0 && !is_box_text(layer)) {
+						if (is_point_text(layer) && init_pos.width > 0) {
 							try {
 								const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
 									&& app.GUI.GUI_tools.tools_modules['text']
@@ -519,8 +580,6 @@ class Select_tool_class extends Base_tools_class {
 								if (textTool && typeof textTool.commit_point_text_resize === 'function') {
 									const preData = layer.data ? JSON.parse(JSON.stringify(layer.data)) : null;
 									const preParams = layer.params ? JSON.parse(JSON.stringify(layer.params)) : {};
-									if (textTool._point_resize_base_scale_x != null) preParams.scale_x = textTool._point_resize_base_scale_x;
-									if (textTool._point_resize_base_scale_y != null) preParams.scale_y = textTool._point_resize_base_scale_y;
 									layer.x = init_pos.x;
 									layer.y = init_pos.y;
 									layer.width = init_pos.width;
@@ -533,6 +592,8 @@ class Select_tool_class extends Base_tools_class {
 										height: init_pos.height,
 										boundary: preParams.boundary || 'dynamic'
 									};
+									textTool.end_point_text_resize();
+									textTool.begin_point_text_resize(layer);
 									const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height, {
 										x: finalPos.x,
 										y: finalPos.y
@@ -702,7 +763,8 @@ class Select_tool_class extends Base_tools_class {
 
 					if (move_actions.length > 0) {
 						await app.State.do_action(
-							new app.Actions.Bundle_action('move_layers', 'Move Layers', move_actions)
+							new app.Actions.Bundle_action('move_layers', 'Move Layers', move_actions),
+							this.duplicate_drag ? { merge_with_history: 'duplicate_drag' } : {}
 						);
 					}
 				}
@@ -710,6 +772,7 @@ class Select_tool_class extends Base_tools_class {
 		}
 		this.moving = false;
 		this.resizing = false;
+		this.duplicate_drag = false;
 		this.mousedown_mask_dimensions = null;
 		this.mousedown_multi_positions = null;
 
@@ -718,7 +781,23 @@ class Select_tool_class extends Base_tools_class {
 		}
 	}
 
+	marquee_layer_eligible(layer) {
+		return layer && layer.visible !== false && !is_group(layer) && !this.is_layer_locked(layer)
+			&& layer.type !== 'adjustment' && !get_ancestors(layer.id, config.layers).some(parent => parent.visible === false);
+	}
+
 	render_overlay(ctx){
+		if (this.marquee) {
+			const box = this.marquee;
+			ctx.save();
+			ctx.strokeStyle = '#438dff';
+			ctx.fillStyle = 'rgba(67,141,255,0.12)';
+			ctx.lineWidth = 1 / config.ZOOM;
+			ctx.fillRect(box.x, box.y, box.endX - box.x, box.endY - box.y);
+			ctx.strokeRect(box.x, box.y, box.endX - box.x, box.endY - box.y);
+			ctx.restore();
+			return;
+		}
 		var ctx = this.Base_layers.ctx;
 		var mouse = this.get_mouse_info(event);
 
@@ -992,15 +1071,14 @@ class Select_tool_class extends Base_tools_class {
 					x: l.x,
 					y: l.y,
 					width: l.width,
-					height: l.height
+					height: l.height,
+					anchor_x: l.params ? l.params.anchor_x : null,
+					anchor_y: l.params ? l.params.anchor_y : null
 				});
 			}
 		}
-		var power = 10;
-		if (event.ctrlKey == true || event.metaKey)
-			power = 50;
-		if (event.shiftKey == true)
-			power = 1;
+		event.preventDefault();
+		const power = event.shiftKey ? 10 : 1;
 
 		const offset_x = direction_x * power;
 		const offset_y = direction_y * power;
@@ -1010,6 +1088,10 @@ class Select_tool_class extends Base_tools_class {
 			const prevY = l.y;
 			l.x += offset_x;
 			l.y += offset_y;
+			if (is_point_text(l)) {
+				if (l.params.anchor_x != null) l.params.anchor_x += offset_x;
+				if (l.params.anchor_y != null) l.params.anchor_y += offset_y;
+			}
 			if (l.type === 'vector') {
 				const dx = l.x - prevX;
 				const dy = l.y - prevY;
