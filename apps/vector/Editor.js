@@ -40831,23 +40831,27 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			case "image": {
 				let t = q.getCurrentMode() === "square" || q.getCurrentMode() === "image" && !e.shiftKey || q.getCurrentMode() !== "image" && e.shiftKey, n = Math.abs(y - q.getStartX()), r = Math.abs(x - q.getStartY()), i, a;
 				t ? (n = r = Math.max(n, r), i = q.getStartX() < y ? q.getStartX() : q.getStartX() - n, a = q.getStartY() < x ? q.getStartY() : q.getStartY() - r) : (i = Math.min(q.getStartX(), y), a = Math.min(q.getStartY(), x)), q.getCurConfig().gridSnapping && (n = jg(n), r = jg(r), i = jg(i), a = jg(a)), kg(_, {
-					width: n,
-					height: r,
-					x: i,
-					y: a
+					width: e.altKey ? n * 2 : n,
+					height: e.altKey ? r * 2 : r,
+					x: e.altKey ? q.getStartX() - n : i,
+					y: e.altKey ? q.getStartY() - r : a
 				}, 1e3);
 				break;
 			}
-			case "circle": {
-				s = Number(_.getAttribute("cx")), c = Number(_.getAttribute("cy"));
-				let e = Math.sqrt((y - s) * (y - s) + (x - c) * (x - c));
-				q.getCurConfig().gridSnapping && (e = jg(e)), _.setAttribute("r", e);
-				break;
-			}
+			case "circle":
 			case "ellipse": {
-				s = Number(_.getAttribute("cx")), c = Number(_.getAttribute("cy")), q.getCurConfig().gridSnapping && (y = jg(y), s = jg(s), x = jg(x), c = jg(c)), _.setAttribute("rx", Math.abs(y - s));
-				let t = Math.abs(e.shiftKey ? y - s : x - c);
-				_.setAttribute("ry", t);
+				let sx = q.getStartX(), sy = q.getStartY();
+				if (q.getCurConfig().gridSnapping) { y = jg(y); x = jg(x); sx = jg(sx); sy = jg(sy); }
+				let dx = y - sx, dy = x - sy;
+				const circle = q.getCurrentMode() === "circle";
+				if (circle || e.shiftKey) {
+					const size = Math.max(Math.abs(dx), Math.abs(dy));
+					dx = (dx < 0 ? -1 : 1) * size;
+					dy = (dy < 0 ? -1 : 1) * size;
+				}
+				const rx = Math.abs(dx) / (e.altKey ? 1 : 2), ry = Math.abs(dy) / (e.altKey ? 1 : 2);
+				kg(_, { cx: e.altKey ? sx : sx + dx / 2, cy: e.altKey ? sy : sy + dy / 2,
+					...(circle ? { r: rx } : { rx, ry }) }, 1e3);
 				break;
 			}
 			case "fhellipse":
@@ -41104,7 +41108,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				n && n.remove(), l.setAttribute("opacity", r.opacity), l.setAttribute("style", "pointer-events:inherit"), Ag(l);
 				if (q.getCurrentMode() === createdWithMode) {
 					if (createdWithMode === "path") q.pathActions.clear();
-					if (q.getCurConfig().selectNew) q.selectOnly([l], !0);
+					if (q.getCurConfig().selectNew || ["rect", "square", "ellipse", "circle", "line", "fhrect", "fhellipse", "star", "polygon", "shapelib"].includes(createdWithMode)) q.selectOnly([l], !0);
 				}
 				q.addCommandToHistory(new _y(l)), q.call("changed", [l]);
 			}, t * 1e3);
@@ -41131,7 +41135,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let t = q.getDataStorage(), n = q.getSelectedElements(), r = q.getZoom(), i = q.getStyle(), a = q.getSvgRoot(), { $id: o } = q;
 		if (q.spaceKey || e.button === 1) return;
 		let s = e.button === 2;
-		e.altKey && q.cloneSelectedElements(0, 0);
+		e.altKey && q.getCurrentMode() === "select" && q.cloneSelectedElements(0, 0);
 		let c = (o("svgcontent")?.querySelector("g"))?.getScreenCTM?.();
 		if (!c) return;
 		q.setRootSctm(c.inverse());
