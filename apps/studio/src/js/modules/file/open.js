@@ -200,10 +200,25 @@ class File_open_class {
 					order: order,
 					_exif: _this.extract_exif(this.file),
 				};
-				// Insert as layer WITHOUT autoresize (can_automate = false)
-				app.State.do_action(
-					new app.Actions.Insert_layer_action(new_layer, false)
-				);
+				// Fit the placed image to the first canvas boundary without
+				// resizing its source bitmap or the document.
+				var image = new Image();
+				image.onload = function () {
+					var scale = Math.min(config.WIDTH / image.naturalWidth, config.HEIGHT / image.naturalHeight);
+					new_layer.width = image.naturalWidth * scale;
+					new_layer.height = image.naturalHeight * scale;
+					new_layer.width_original = image.naturalWidth;
+					new_layer.height_original = image.naturalHeight;
+					new_layer.x = (config.WIDTH - new_layer.width) / 2;
+					new_layer.y = (config.HEIGHT - new_layer.height) / 2;
+					app.State.do_action(
+						new app.Actions.Insert_layer_action(new_layer, false)
+					);
+				};
+				image.onerror = function () {
+					alertify.error('Sorry, image could not be loaded.');
+				};
+				image.src = new_layer.data;
 			};
 			FR.readAsDataURL(f);
 
@@ -401,6 +416,17 @@ class File_open_class {
 		var height = opts.height || 0;
 		var name = opts.name || 'Photo';
 		var data = opts.data;
+		if (opts.fitToCanvas && (!width || !height)) {
+			var image = new Image();
+			image.crossOrigin = 'Anonymous';
+			await new Promise((resolve, reject) => {
+				image.onload = resolve;
+				image.onerror = () => reject(new Error('Unable to load image.'));
+				image.src = data;
+			});
+			width = image.naturalWidth;
+			height = image.naturalHeight;
+		}
 		var displayW = width;
 		var displayH = height;
 
@@ -412,12 +438,18 @@ class File_open_class {
 			}
 		}
 
+		if (opts.fitToCanvas && width > 0 && height > 0) {
+			var scale = Math.min(config.WIDTH / width, config.HEIGHT / height);
+			displayW = width * scale;
+			displayH = height * scale;
+		}
+
 		var new_layer = {
 			name: name,
 			type: 'image',
 			data: data,
-			x: 0,
-			y: 0,
+			x: opts.fitToCanvas ? (config.WIDTH - displayW) / 2 : 0,
+			y: opts.fitToCanvas ? (config.HEIGHT - displayH) / 2 : 0,
 		};
 		if (displayW > 0) {
 			new_layer.width = displayW;
@@ -841,15 +873,11 @@ class File_open_class {
 				const dataUrl = reader.result;
 
 				if (as_layer) {
-					// Insert directly into the active document as a new layer without creating a new tab
-					const new_layer = {
+					await _this.insert_image_as_layer({
 						name: layer_name,
-						type: 'image',
 						data: dataUrl,
-					};
-					app.State.do_action(
-						new app.Actions.Insert_layer_action(new_layer, false)
-					);
+						fitToCanvas: true,
+					});
 					alertify.success(`Added "${layer_name}" as layer.`);
 				} else if (app.Documents) {
 					await app.Documents.create_document_from_image({
@@ -887,19 +915,13 @@ class File_open_class {
 			img.crossOrigin = "Anonymous";
 			img.onload = async function () {
 				if (as_layer) {
-					var new_layer = {
+					await _this.insert_image_as_layer({
 						name: layer_name,
-						type: 'image',
-						link: img,
 						data: url,
 						width: img.width,
 						height: img.height,
-						width_original: img.width,
-						height_original: img.height,
-					};
-					app.State.do_action(
-						new app.Actions.Insert_layer_action(new_layer, false)
-					);
+						fitToCanvas: true,
+					});
 					alertify.success(`Added "${layer_name}" as layer.`);
 				} else if (app.Documents) {
 					await app.Documents.create_document_from_image({
@@ -1166,4 +1188,3 @@ class File_open_class {
 }
 
 export default File_open_class;
-

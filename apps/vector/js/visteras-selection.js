@@ -4,6 +4,12 @@ export function mountSelectionTools(editor) {
   mountDirectSelection(editor);
   const sc = editor.svgCanvas;
   const ns = 'http://www.w3.org/2000/svg';
+  // SVGEdit still uses selectors internally for hit testing and geometry.
+  // Their visual controls are retired; the shared overlay owns all handles.
+  const style = document.createElement('style');
+  style.textContent = '#selectorParentGroup > g[id^="selectorGroup"], #selectorParentGroup [id^="selectorGrip_"] { display:none !important; }';
+  document.head.append(style);
+  const shapeModes = new Set(['rect', 'square', 'ellipse', 'circle', 'line', 'fhrect', 'fhellipse', 'star', 'polygon', 'shapelib']);
   let overlay, frame, drag;
   const create = (name, attrs, parent) => {
     const el = document.createElementNS(ns, name);
@@ -21,6 +27,14 @@ export function mountSelectionTools(editor) {
     return m;
   };
   const point = (x, y, m) => new DOMPoint(x, y).matrixTransform(m);
+  const rotationCursor = "url('../studio/images/icons/rotate.svg') 12 12, default";
+  let compoundFrame;
+  const selectionFrame = elements => {
+    if (elements.length === 1) return { b: elements[0].getBBox(), m: matrix(elements[0]) };
+    const signature = elements.map(el => el.getAttribute('transform'));
+    if (compoundFrame && elements.every((el,i) => el === compoundFrame.elements[i] && signature[i] === compoundFrame.signature[i]) && elements.length === compoundFrame.elements.length) return compoundFrame;
+    return { b: bounds(elements), m: new DOMMatrix() };
+  };
   const bounds = elements => {
     const points = elements.flatMap(el => {
       const b = el.getBBox(), m = matrix(el);
@@ -37,31 +51,31 @@ export function mountSelectionTools(editor) {
     if (!overlay?.isConnected) overlay = create('g', { id: 'visteras-selection-box' }, manager.selectorParentGroup);
     overlay.replaceChildren();
     const elements = selected(), mode = sc.getMode();
-    const show = ['select', 'resize', 'rotate', 'multiselect'].includes(mode);
+    const shapeMode = shapeModes.has(mode);
+    const show = ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
     for (const selector of manager.selectors) {
-      if (!selector.locked || !selector.selectedElement) continue;
-      selector.selectorGroup.setAttribute('display', show ? 'inline' : 'none');
+      selector.selectorGroup.setAttribute('display', 'none');
     }
     if (!show || !elements.length) {
       manager.selectorGripsGroup.setAttribute('display', 'none');
       return;
     }
-    if (elements.length === 1) {
-      const selector = manager.requestSelector(elements[0]);
-      selector.resize();
-      selector.showGrips(true);
-      return;
-    }
     manager.selectorGripsGroup.setAttribute('display', 'none');
-    const b = bounds(elements), zoom = sc.getZoom();
-    const x = b.x * zoom, y = b.y * zoom, w = b.width * zoom, h = b.height * zoom;
-    create('rect', { x, y, width: w, height: h, fill: 'none', stroke: '#3f8ff7', 'stroke-width': 1, 'pointer-events': 'none' }, overlay);
+    const {b,m} = drag?.visualFrame || selectionFrame(elements), zoom = sc.getZoom();
+    const x = b.x, y = b.y, w = b.width, h = b.height;
+    const screen = (x,y) => { const p = point(x,y,m); return [p.x*zoom,p.y*zoom]; };
+    const corners = [[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(p=>screen(...p));
+    create('polygon', { points: corners.map(p=>p.join(',')).join(' '), fill: 'none', stroke: '#3f8ff7', 'stroke-width': 1, 'pointer-events': 'none' }, overlay);
     const grips = { nw: [x, y], n: [x+w/2, y], ne: [x+w, y], e: [x+w, y+h/2], se: [x+w, y+h], s: [x+w/2, y+h], sw: [x, y+h], w: [x, y+h/2] };
-    create('line', { x1: x+w/2, y1: y, x2: x+w/2, y2: y-24, stroke: '#3f8ff7', 'pointer-events': 'none' }, overlay);
-    for (const [dir, [cx, cy]] of Object.entries(grips)) {
+    const center = screen(x+w/2,y+h/2);
+    for (const [cx,cy] of corners) {
+      const dx=cx-center[0], dy=cy-center[1], length=Math.hypot(dx,dy)||1;
+      create('circle', { cx:cx+dx/length*13, cy:cy+dy/length*13, r:10, fill:'transparent', 'pointer-events':'all', 'data-selection-handle':'rotate', style:`cursor:${rotationCursor}` }, overlay);
+    }
+    for (const [dir, p] of Object.entries(grips)) {
+      const [cx,cy] = screen(...p);
       create('rect', { x: cx-4, y: cy-4, width: 8, height: 8, fill: 'white', stroke: '#3f8ff7', 'data-selection-handle': dir, style: `cursor:${dir}-resize` }, overlay);
     }
-    create('circle', { cx: x+w/2, cy: y-24, r: 5, fill: 'white', stroke: '#3f8ff7', 'data-selection-handle': 'rotate', style: 'cursor:crosshair' }, overlay);
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(refresh);
@@ -81,24 +95,27 @@ export function mountSelectionTools(editor) {
     const dir = e.target.getAttribute?.('data-selection-handle');
     if (!dir || e.button !== 0) return;
     const elements = selected();
-    if (elements.length < 2) return;
+    if (!elements.length) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const b = bounds(elements);
-    drag = { dir, b, start: position(e), moved: false, items: elements.map(el => ({ el, original: el.getAttribute('transform'), local: localMatrix(el), parent: matrix(el.parentNode) })) };
+    const {b,m} = selectionFrame(elements);
+    drag = { dir, b, basis:m, start: position(e), moved: false, items: elements.map(el => ({ el, original: el.getAttribute('transform'), local: localMatrix(el), parent: matrix(el.parentNode) })) };
   }, true);
   document.addEventListener('mousemove', e => {
     if (!drag) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const { dir, b, start } = drag, p = position(e);
+    const { dir, b, basis } = drag;
+    let start = drag.start, p = position(e);
     let transform = new DOMMatrix();
     if (dir === 'rotate') {
-      const cx = b.x + b.width/2, cy = b.y + b.height/2;
+      const {x:cx,y:cy} = point(b.x+b.width/2,b.y+b.height/2,basis);
       let angle = (Math.atan2(p.y-cy, p.x-cx) - Math.atan2(start.y-cy, start.x-cx)) * 180 / Math.PI;
       if (e.shiftKey) angle = Math.round(angle / 45) * 45;
       transform = transform.translate(cx, cy).rotate(angle).translate(-cx, -cy);
     } else {
+      start = point(start.x,start.y,basis.inverse());
+      p = point(p.x,p.y,basis.inverse());
       const ax = e.altKey ? b.x+b.width/2 : dir.includes('w') ? b.x+b.width : b.x;
       const ay = e.altKey ? b.y+b.height/2 : dir.includes('n') ? b.y+b.height : b.y;
       let sx = /[ew]/.test(dir) && Math.abs(start.x-ax) > 1e-8 ? (p.x-ax)/(start.x-ax) : 1;
@@ -111,21 +128,24 @@ export function mountSelectionTools(editor) {
       if (Math.abs(sx) < 1e-6) sx = 1e-6;
       if (Math.abs(sy) < 1e-6) sy = 1e-6;
       transform = transform.translate(ax, ay).scale(sx, sy).translate(-ax, -ay);
+      transform = basis.multiply(transform).multiply(basis.inverse());
     }
     for (const item of drag.items) {
       const m = item.parent.inverse().multiply(transform).multiply(item.parent).multiply(item.local);
       item.el.setAttribute('transform', `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`);
     }
     drag.moved = true;
+    drag.visualFrame = {b,m:transform.multiply(basis)};
     schedule();
   }, true);
   function finish(cancel = false) {
     if (!drag) return;
-    const { items, moved } = drag;
+    const { items, moved, visualFrame } = drag;
     drag = null;
     if (cancel || !moved) {
       for (const { el, original } of items) original === null ? el.removeAttribute('transform') : el.setAttribute('transform', original);
     } else {
+      if (items.length > 1) compoundFrame = { ...visualFrame, elements:items.map(i=>i.el), signature:items.map(i=>i.el.getAttribute('transform')) };
       const { BatchCommand, ChangeElementCommand } = sc.history;
       const command = new BatchCommand('Transform selection');
       for (const { el, original } of items) command.addSubCommand(new ChangeElementCommand(el, { transform: original }));

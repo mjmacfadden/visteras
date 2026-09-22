@@ -65,6 +65,20 @@ class Media_class extends Base_tools_class {
 				{name: "query", title: "Keyword:", value: query},
 			],
 			on_load: function (params, popup) {
+				// Handle Enter before the generic dialog's input/document
+				// handlers, which otherwise submit on both keydown and keyup.
+				const submitOnEnter = (event) => {
+					if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+					if (event.target.tagName === 'TEXTAREA' || event.target.isContentEditable ||
+						event.target.hasAttribute('data-prevent-submission')) return;
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					if (event.type === 'keydown' && !event.repeat) {
+						popup.el.querySelector('[data-id="popup_ok"]').click();
+					}
+				};
+				popup.el.addEventListener('keydown', submitOnEnter, true);
+				popup.el.addEventListener('keyup', submitOnEnter, true);
 				if (html) {
 					_this._appendResults(popup.el, html, params);
 				}

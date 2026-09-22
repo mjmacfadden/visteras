@@ -374,6 +374,10 @@ const menuDefinition = [
 				target: 'layer/new.new'
 			},
 			{
+				name: 'New from Visible',
+				target: 'layer/flatten.new_from_visible'
+			},
+			{
 				name: 'New from Selection',
 				target: 'layer/new.new_selection'
 			},
