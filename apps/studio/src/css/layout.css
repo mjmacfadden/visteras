@@ -500,12 +500,12 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
 .sidebar_left .gradient:after{
-	/* PS-like bordered spectrum ramp; idle is non-blue (no always-on #2f6fae) */
+	/* Idle: gray outline + transparent→#cccccc ramp (matches invert(0.8) toolbar gray) */
 	background-image: url('../images/icons/gradient.svg');
 	background-size: 14px 9px;
 	filter: none;
 }
-/* Selected: blue border chrome via active asset; keep filter:none so ramp stays readable */
+/* Active: Studio blue #2f6fae outline + transparent→blue ramp; filter:none so ramp stays readable */
 .sidebar_left .item.active.gradient:not(.marquee_fill):after,
 .sidebar_left .item.active.gradient.marquee_gradient:after{
 	background-image: url('../images/icons/gradient-active.svg');

@@ -1665,6 +1665,31 @@ button img{
 .timeline_add_frame_card:active {
 	transform: scale(0.96);
 }
+
+/* No-color swatch (white square + red slash) in Color Picker dialog */
+.ui_none_color_btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	margin: 0;
+	width: 28px;
+	height: 28px;
+	border: 1px solid #4a4a4a;
+	border-radius: 2px;
+	background: #2a2a2a;
+	cursor: pointer;
+}
+.ui_none_color_btn:hover {
+	border-color: #2f6fae;
+}
+.ui_none_color_btn img {
+	display: block;
+	width: 24px;
+	height: 24px;
+	pointer-events: none;
+}
+
 .wrapper{
 	display: -ms-grid;
 	display: grid;
@@ -2167,12 +2192,12 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
 .sidebar_left .gradient:after{
-	/* PS-like bordered spectrum ramp; idle is non-blue (no always-on #2f6fae) */
+	/* Idle: gray outline + transparent→#cccccc ramp (matches invert(0.8) toolbar gray) */
 	background-image: url('../images/icons/gradient.svg');
 	background-size: 14px 9px;
 	filter: none;
 }
-/* Selected: blue border chrome via active asset; keep filter:none so ramp stays readable */
+/* Active: Studio blue #2f6fae outline + transparent→blue ramp; filter:none so ramp stays readable */
 .sidebar_left .item.active.gradient:not(.marquee_fill):after,
 .sidebar_left .item.active.gradient.marquee_gradient:after{
 	background-image: url('../images/icons/gradient-active.svg');

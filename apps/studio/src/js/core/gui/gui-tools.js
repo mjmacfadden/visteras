@@ -1017,8 +1017,10 @@ class GUI_tools_class {
 				itemDom.appendChild(elementTitle);
 				itemDom.appendChild(selectList);
 			}
-			else if (typeof item == 'string' && item[0] == '#') {
-				//color
+			else if (typeof item == 'string' && (item[0] == '#' || item === 'none' || item === 'transparent')) {
+				//color — 'none'/'transparent' = no color (set via picker none swatch)
+				const isNone = (item === 'none' || item === 'transparent');
+				const displayColor = isNone ? '#00000000' : item;
 
 				var elementTitle = document.createElement('label');
 				elementTitle.innerHTML = title + ':';
@@ -1032,15 +1034,21 @@ class GUI_tools_class {
 						id: k,
 						inputId: k + '_input',
 						name: k,
-						value: item
+						value: displayColor,
+						allowNone: (k === 'color_1' || k === 'color_2')
 					})
 					.on('change', () => {
 						let value = $colorInput.uiColorInput('get_value');
 						const id = $colorInput.uiColorInput('get_id');
 						const actionData = this.action_data();
+						// Fully transparent hex from the picker = no color
+						if (value === 'none' || value === 'transparent'
+							|| (typeof value === 'string' && /^#[0-9A-Fa-f]{8}$/.test(value)
+								&& value.slice(7, 9).toLowerCase() === '00')) {
+							value = 'none';
+						}
 						actionData.attributes[id] = value;
 						if (actionData.on_update != undefined) {
-							//send event
 							var moduleKey = actionData.name;
 							var functionName = actionData.on_update;
 							this.tools_modules[moduleKey].object[functionName]({ key: id, value: value });

@@ -31,13 +31,20 @@ const Helper = new Helper_class();
 	const on_click_color_input = (event) => {
 		event.preventDefault();
 		const $el = $(event.target.closest('.ui_color_input'));
-		const { value } = $el.data();
+		const { value, allowNone } = $el.data();
 		const POP = new Dialog_class();
 		let colorsDialog = new GUI_colors_class();
 		var settings = {
 			title: 'Color Picker',
 			on_finish() {
-				set_value($el, colorsDialog.COLOR + (colorsDialog.ALPHA < 255 ? colorsDialog.ALPHA.toString(16).padStart(2, '0') : ''));
+				let next;
+				if (colorsDialog.NONE === true || colorsDialog.ALPHA <= 0) {
+					next = allowNone ? 'none' : (colorsDialog.COLOR + '00');
+				} else {
+					next = colorsDialog.COLOR + (colorsDialog.ALPHA < 255
+						? colorsDialog.ALPHA.toString(16).padStart(2, '0') : '');
+				}
+				set_value($el, next);
 				$el.trigger('input');
 				$el.trigger('change');
 				colorsDialog = null;
@@ -53,10 +60,16 @@ const Helper = new Helper_class();
 		};
 		let colorValue;
 		let alpha = 255;
-		if (/^\#[0-9A-F]{8}$/gi.test(value)) {
+		let startNone = false;
+		if (value === 'none' || value === 'transparent') {
+			colorValue = '#ffffff';
+			alpha = 0;
+			startNone = true;
+		} else if (/^\#[0-9A-F]{8}$/gi.test(value)) {
 			// Hex with alpha
 			colorValue = value.slice(0, 7);
 			alpha = parseInt(value.slice(7, 9), 16);
+			startNone = (alpha === 0);
 		} else if (/^\#[0-9A-F]{6}$/gi.test(value)) {
 			// Hex without alpha
 			colorValue = value;
@@ -64,18 +77,30 @@ const Helper = new Helper_class();
 			colorValue = '#000000';
 		}
 		POP.show(settings);
-		colorsDialog.render_main_colors('dialog');
+		colorsDialog.render_main_colors('dialog', { allowNone: !!allowNone });
 		colorsDialog.set_color({ hex: colorValue, a: alpha });
+		if (startNone && allowNone) {
+			colorsDialog.set_none(true);
+		}
 	};
 
 	const set_value = ($el, value) => {
 		const trimmedValue = (value + '').trim();
 		let colorValue;
 		let opacity = 0;
-		if (/^\#[0-9A-F]{8}$/gi.test(trimmedValue)) {
+		let storedValue = trimmedValue;
+		if (trimmedValue === 'none' || trimmedValue === 'transparent') {
+			colorValue = '#ffffff';
+			opacity = 1; // full checkerboard overlay = no color
+			storedValue = 'none';
+		} else if (/^\#[0-9A-F]{8}$/gi.test(trimmedValue)) {
 			// Hex with alpha
 			colorValue = trimmedValue.slice(0, 7);
-			opacity = 1 - (parseInt(value.slice(7, 9), 16) * (1 / 255));
+			opacity = 1 - (parseInt(trimmedValue.slice(7, 9), 16) * (1 / 255));
+			if (trimmedValue.slice(7, 9).toLowerCase() === '00' && $el.data('allowNone')) {
+				storedValue = 'none';
+				opacity = 1;
+			}
 		} else if (/^\#[0-9A-F]{6}$/gi.test(trimmedValue)) {
 			// Hex without alpha
 			colorValue = trimmedValue;
@@ -85,7 +110,7 @@ const Helper = new Helper_class();
 		const { input, overlay } = $el.data();
 		overlay.style.opacity = opacity;
 		input.value = colorValue;
-        $el.data('value', trimmedValue);
+		$el.data('value', storedValue);
 	};
 
 	const set_disabled = ($el, disabled) => {
@@ -112,6 +137,7 @@ const Helper = new Helper_class();
 				const inputId = definition.inputId || '';
 				const disabled = definition.disabled != null ? definition.disabled : el.hasAttribute('disabled') ? true : false;
 				const value = definition.value != null ? definition.value : el.value || 0;
+				const allowNone = definition.allowNone === true;
 				const ariaLabeledBy = el.getAttribute('aria-labelledby');
 
 				let $el;
@@ -153,7 +179,8 @@ const Helper = new Helper_class();
 					id,
 					input,
 					overlay,
-					value
+					value,
+					allowNone
 				});
 
 				$(input)

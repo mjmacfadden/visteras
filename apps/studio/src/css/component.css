@@ -1351,3 +1351,27 @@ button img{
 .timeline_add_frame_card:active {
 	transform: scale(0.96);
 }
+
+/* No-color swatch (white square + red slash) in Color Picker dialog */
+.ui_none_color_btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	margin: 0;
+	width: 28px;
+	height: 28px;
+	border: 1px solid #4a4a4a;
+	border-radius: 2px;
+	background: #2a2a2a;
+	cursor: pointer;
+}
+.ui_none_color_btn:hover {
+	border-color: #2f6fae;
+}
+.ui_none_color_btn img {
+	display: block;
+	width: 24px;
+	height: 24px;
+	pointer-events: none;
+}

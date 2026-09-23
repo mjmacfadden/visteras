@@ -1261,8 +1261,22 @@ class Mask_class {
 			? this.world_to_mask(layer, click_x, click_y)
 			: start_native;
 
-		var c1 = this.Helper.hexToRgb(params.color_1 || config.COLOR || '#000000');
-		var c2 = this.Helper.hexToRgb(params.color_2 || config.COLOR_BG || '#ffffff');
+		var isNone = function (v) {
+			if (v === 'none' || v === 'transparent') return true;
+			if (typeof v === 'string' && /^#[0-9A-Fa-f]{8}$/.test(v)
+				&& v.slice(7, 9).toLowerCase() === '00') return true;
+			return false;
+		};
+		var raw1 = params.color_1;
+		var raw2 = params.color_2;
+		var none1 = isNone(raw1);
+		var none2 = isNone(raw2);
+		var c1 = this.Helper.hexToRgb(
+			none1 ? '#000000' : (raw1 || config.COLOR || '#000000')
+		);
+		var c2 = this.Helper.hexToRgb(
+			none2 ? '#000000' : (raw2 || config.COLOR_BG || '#ffffff')
+		);
 		var g1 = Math.round(0.2126 * c1.r + 0.7152 * c1.g + 0.0722 * c1.b);
 		var g2 = Math.round(0.2126 * c2.r + 0.7152 * c2.g + 0.0722 * c2.b);
 		var a1 = Math.max(0, Math.min(100, Number(params.alpha_1 != null ? params.alpha_1 : 100))) / 100;
@@ -1270,6 +1284,9 @@ class Mask_class {
 			params.alpha_2 != null ? params.alpha_2
 				: (params.alpha != null ? params.alpha : 100)
 		))) / 100;
+		// Explicit "no color" → fully transparent stop (do not snap to opaque)
+		if (none1) a1 = 0;
+		if (none2) a2 = 0;
 		if (params.reverse) {
 			var tg = g1; g1 = g2; g2 = tg;
 			var ta = a1; a1 = a2; a2 = ta;

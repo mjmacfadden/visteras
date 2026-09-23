@@ -78,8 +78,13 @@ class Gradient_class extends Base_tools_class {
 		const params = this.getParams();
 		const c1 = this._attr_color(params.color_1, config.COLOR || '#000000');
 		const c2 = this._attr_color(params.color_2, config.COLOR_BG || '#ffffff');
-		config.COLOR = c1;
-		config.COLOR_BG = c2;
+		// Do not push "none" into FG/BG (would snap other tools to black/white)
+		if (!this._is_none_color(c1)) {
+			config.COLOR = c1;
+		}
+		if (!this._is_none_color(c2)) {
+			config.COLOR_BG = c2;
+		}
 		if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_toolbar_swatches === 'function') {
 			app.GUI.GUI_tools.update_toolbar_swatches();
 		}
@@ -104,8 +109,8 @@ class Gradient_class extends Base_tools_class {
 		const radial = this._is_radial(p);
 		tool.attributes.style = tool.attributes.style || { title: 'Style', value: 'Linear', values: ['Linear', 'Radial'] };
 		tool.attributes.style.value = radial ? 'Radial' : 'Linear';
-		tool.attributes.color_1 = p.color_1 || config.COLOR || '#000000';
-		tool.attributes.color_2 = p.color_2 || config.COLOR_BG || '#ffffff';
+		tool.attributes.color_1 = this._is_none_color(p.color_1) ? 'none' : (p.color_1 || config.COLOR || '#000000');
+		tool.attributes.color_2 = this._is_none_color(p.color_2) ? 'none' : (p.color_2 || config.COLOR_BG || '#ffffff');
 
 		if (tool.attributes.alpha_1 && typeof tool.attributes.alpha_1 === 'object') {
 			tool.attributes.alpha_1.value = this._opacity_value(p, 'alpha_1', 100);
@@ -459,6 +464,8 @@ class Gradient_class extends Base_tools_class {
 		let c2 = params.color_2;
 		let a1 = Math.max(0, Math.min(100, this._number_value(params.alpha_1, 100))) / 100;
 		let a2 = Math.max(0, Math.min(100, this._number_value(params.alpha_2, 100))) / 100;
+		if (this._is_none_color(c1)) { c1 = 'none'; a1 = 0; }
+		if (this._is_none_color(c2)) { c2 = 'none'; a2 = 0; }
 		if (params.reverse) {
 			const tc = c1; c1 = c2; c2 = tc;
 			const ta = a1; a1 = a2; a2 = ta;
@@ -509,9 +516,30 @@ class Gradient_class extends Base_tools_class {
 		return attr;
 	}
 
+	_is_none_color(v) {
+		if (v == null) return false;
+		if (v === 'none' || v === 'transparent') return true;
+		if (typeof v === 'string' && /^#[0-9A-Fa-f]{8}$/.test(v)
+			&& v.slice(7, 9).toLowerCase() === '00') {
+			return true;
+		}
+		return false;
+	}
+
 	_attr_color(attr, fallback) {
 		const v = this._attr_value(attr, fallback);
-		return (typeof v === 'string' && v[0] === '#') ? v : fallback;
+		if (this._is_none_color(v)) {
+			return 'none';
+		}
+		if (typeof v === 'string' && v[0] === '#') {
+			// Prefer opaque #RRGGBB; strip alpha channel if present (alpha lives on alpha_1/2)
+			return v.length >= 7 ? v.slice(0, 7) : v;
+		}
+		// Missing/invalid: keep fallback, but never invent a color when attr was explicitly empty
+		if (v === '' || v === false) {
+			return 'none';
+		}
+		return fallback;
 	}
 
 	_number_value(val, fallback) {
@@ -564,8 +592,8 @@ class Gradient_class extends Base_tools_class {
 		return {
 			style: radial ? 'Radial' : 'Linear',
 			radial: radial,
-			color_1: params.color_1 || '#000000',
-			color_2: params.color_2 || '#ffffff',
+			color_1: this._is_none_color(params.color_1) ? 'none' : (params.color_1 || '#000000'),
+			color_2: this._is_none_color(params.color_2) ? 'none' : (params.color_2 || '#ffffff'),
 			alpha_1: this._opacity_value(params, 'alpha_1', 100),
 			alpha_2: this._opacity_value(params, 'alpha_2', 100),
 			reverse: !!params.reverse,
@@ -578,6 +606,9 @@ class Gradient_class extends Base_tools_class {
 		let c2 = params.color_2;
 		let a1 = Math.max(0, Math.min(100, this._number_value(params.alpha_1, 100))) / 100;
 		let a2 = Math.max(0, Math.min(100, this._number_value(params.alpha_2, 100))) / 100;
+		// Explicit "no color" → fully transparent stop (do not snap to opaque black/white)
+		if (this._is_none_color(c1)) { c1 = 'none'; a1 = 0; }
+		if (this._is_none_color(c2)) { c2 = 'none'; a2 = 0; }
 		if (params.reverse) {
 			const tc = c1; c1 = c2; c2 = tc;
 			const ta = a1; a1 = a2; a2 = ta;
@@ -589,6 +620,9 @@ class Gradient_class extends Base_tools_class {
 	}
 
 	_rgba_string(hex, alpha) {
+		if (this._is_none_color(hex) || alpha <= 0) {
+			return 'rgba(0, 0, 0, 0)';
+		}
 		const rgb = this.Helper.hexToRgb(hex || '#000000');
 		return 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', ' + alpha + ')';
 	}

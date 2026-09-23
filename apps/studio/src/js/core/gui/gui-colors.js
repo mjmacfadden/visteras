@@ -106,6 +106,12 @@ const dialogTemplate = `
 						<label class="label_width_medium trn">Previous</label>
 						<div id="dialog_previous_color_sample" class="ui_color_sample"></div>
 					</div>
+					<div class="ui_input_group" id="dialog_none_color_row" hidden>
+						<label class="label_width_medium trn">None</label>
+						<button type="button" id="dialog_none_color_btn" class="ui_none_color_btn" title="No color (transparent)" aria-label="No color">
+							<img src="images/icons/no_color.svg" width="24" height="24" alt="No color" />
+						</button>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -169,6 +175,8 @@ class GUI_colors_class {
 		this.el = null;
 		this.COLOR = '#000000';
 		this.ALPHA = 255;
+		this.NONE = false;
+		this.allowNone = false;
 		this.colorNotSet = true;
 		this.uiType = null;
 		this.butons = null;
@@ -178,8 +186,10 @@ class GUI_colors_class {
 		this.Tools_translate = new Tools_translate_class();
 	}
 
-	render_main_colors(uiType) {
+	render_main_colors(uiType, options = {}) {
 		this.uiType = uiType || 'sidebar';
+		this.allowNone = !!(options && options.allowNone);
+		this.NONE = false;
 		if (this.uiType === 'dialog') {
 			this.el = document.getElementById('dialog_color_picker');
 			this.el.innerHTML = dialogTemplate;
@@ -385,8 +395,40 @@ class GUI_colors_class {
 				})
 		}
 
+		// Optional "no color" swatch (white + red slash) — Gradient Color 1/2, etc.
+		const noneRow = $('#dialog_none_color_row', this.el);
+		const noneBtn = $('#dialog_none_color_btn', this.el);
+		if (this.uiType === 'dialog' && this.allowNone && noneRow.length && noneBtn.length) {
+			noneRow.prop('hidden', false);
+			noneBtn.on('click', () => {
+				this.set_none(true);
+			});
+		}
+
 		// Update all inputs from config.COLOR
 		this.render_selected_color();
+	}
+
+	/**
+	 * Mark current dialog color as none / transparent (Vector-style no_color swatch).
+	 */
+	set_none(enabled = true) {
+		this.NONE = !!enabled;
+		if (enabled) {
+			this.ALPHA = 0;
+			// Keep RGB for re-enable; sample shows none affordance via alpha
+			this.render_selected_color();
+			if (this.inputs.sample && this.inputs.sample.length > 0) {
+				this.inputs.sample.css({
+					background: 'transparent',
+					backgroundImage: "url('images/icons/no_color.svg')",
+					backgroundSize: 'cover'
+				});
+			}
+		} else {
+			if (this.ALPHA <= 0) this.ALPHA = 255;
+			this.render_selected_color();
+		}
 	}
 
 	/**
@@ -449,6 +491,12 @@ class GUI_colors_class {
 			if (this.uiType === 'dialog') {
 				this.COLOR = newColor != null ? newColor : this.COLOR;
 				this.ALPHA = newAlpha != null ? newAlpha : this.ALPHA;
+				// Picking a visible color clears the none state
+				if (this.ALPHA > 0) {
+					this.NONE = false;
+				} else if (this.allowNone && this.ALPHA <= 0) {
+					this.NONE = true;
+				}
 				if (this.colorNotSet) {
 					this.colorNotSet = false;
 					$('#dialog_previous_color_sample', this.el)[0].style.background = this.COLOR;
@@ -489,7 +537,19 @@ class GUI_colors_class {
 		const ALPHA = this.uiType === 'dialog' ? this.ALPHA : config.ALPHA;
 
 		if (this.inputs.sample && this.inputs.sample.length > 0) {
-			this.inputs.sample.css('background', COLOR);
+			if (this.NONE || ALPHA <= 0) {
+				this.inputs.sample.css({
+					backgroundColor: 'transparent',
+					backgroundImage: "url('images/icons/no_color.svg')",
+					backgroundSize: 'cover',
+					backgroundRepeat: 'no-repeat'
+				});
+			} else {
+				this.inputs.sample.css({
+					backgroundColor: COLOR,
+					backgroundImage: 'none'
+				});
+			}
 		}
 
 		if (this.uiType !== 'dialog') {
