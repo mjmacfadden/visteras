@@ -219,8 +219,57 @@ export function mountDirectSelection(editor) {
     if (active && ['changed','selected','zoomed','sourcechanged'].includes(event)) schedule();
     return result;
   };
+  // Paint/appearance must reach Direct Selection targets even though we clear
+  // SVG-Edit's selection (so Selection grips stay out of the way).
+  function paintLeaves(elements) {
+    const out = [];
+    for (const el of elements) {
+      if (!el) continue;
+      if (el.tagName === 'g') {
+        for (const child of el.querySelectorAll('*')) {
+          if (child.nodeName !== 'g') out.push(child);
+        }
+      } else out.push(el);
+    }
+    return out;
+  }
+  function applyPaintWhileActive(attr, value, { noUndo = false, skipTags = [] } = {}) {
+    if (!active) return false;
+    let elems = paintLeaves(selectedElements()).filter((el) => !skipTags.includes(el.tagName));
+    if (!elems.length) return false;
+    if (noUndo) sc.changeSelectedAttributeNoUndo(attr, value, elems);
+    else {
+      sc.changeSelectedAttribute(attr, value, elems);
+      sc.call('changed', elems);
+    }
+    return true;
+  }
+  const origSetColor = sc.setColor.bind(sc);
+  sc.setColor = function (type, val, preventUndo) {
+    const result = origSetColor(type, val, preventUndo);
+    applyPaintWhileActive(type, val, {
+      noUndo: !!preventUndo,
+      skipTags: type === 'fill' ? ['polyline', 'line'] : [],
+    });
+    return result;
+  };
+  const origSetStrokeWidth = sc.setStrokeWidth.bind(sc);
+  sc.setStrokeWidth = function (val) {
+    const result = origSetStrokeWidth(val);
+    // Yy already no-ops on empty SVG selection; apply to DS targets.
+    applyPaintWhileActive('stroke-width', val, { noUndo: false });
+    return result;
+  };
+  const origSetPaintOpacity = sc.setPaintOpacity.bind(sc);
+  sc.setPaintOpacity = function (type, val, preventUndo) {
+    const result = origSetPaintOpacity(type, val, preventUndo);
+    applyPaintWhileActive(`${type}-opacity`, val, { noUndo: !!preventUndo });
+    return result;
+  };
+
   sc.directSelection = {
     get active() { return active; },
+    getSelectedElements: () => selectedElements(),
     // Use the same anchor overlay for single paths and compound selections.
     // SVGEdit's native editor enters path mode with every point selected,
     // which makes Convert apply to the entire object instead of the point the

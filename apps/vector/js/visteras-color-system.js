@@ -1194,19 +1194,85 @@ function mountAppearanceColors(ctrl, svgEditor) {
     return 1;
   }
 
-  function writeStrokeWidth(value) {
+  // Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → …
+  function stepStrokeWeight(value, dir) {
+    const n = Math.max(0, Number(value) || 0);
+    const quarters = [0, 0.25, 0.5, 0.75, 1];
+    if (dir > 0) {
+      for (const s of quarters) {
+        if (n < s - 1e-9) return s;
+      }
+      return Math.floor(n + 1e-9) + 1;
+    }
+    if (n > 1 + 1e-9) {
+      const floored = Math.floor(n + 1e-9);
+      return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
+    }
+    for (let i = quarters.length - 1; i >= 0; i--) {
+      if (n > quarters[i] + 1e-9) return quarters[i];
+    }
+    return 0;
+  }
+
+  function formatStrokeWeight(n) {
+    const v = Math.max(0, Number(n) || 0);
+    if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+    return String(Math.round(v * 100) / 100);
+  }
+
+  function resolveStrokeTargets() {
+    const selected = (typeof sc?.getSelectedElements === 'function'
+      ? sc.getSelectedElements()
+      : [])?.filter(Boolean) || [];
+    if (selected.length) return selected;
+    const ds = sc?.directSelection;
+    if (ds?.active && typeof ds.getSelectedElements === 'function') {
+      const els = ds.getSelectedElements();
+      if (els?.length) return els;
+    }
+    const path = sc?.getPathObj?.();
+    if (path?.elem?.isConnected) return [path.elem];
+    return [];
+  }
+
+  function flattenStrokeTargets(elements) {
+    const out = [];
+    for (const el of elements) {
+      if (!el) continue;
+      if (el.tagName === 'g') {
+        for (const child of el.querySelectorAll('*')) {
+          if (child.nodeName !== 'g') out.push(child);
+        }
+      } else out.push(el);
+    }
+    return out;
+  }
+
+  function writeStrokeWidth(value, { live = false } = {}) {
     const n = Math.max(0, Number(value));
     if (Number.isNaN(n)) return;
-    const native = document.getElementById('stroke_width');
-    if (native) {
-      // Prefer SVG-Edit's changeStrokeWidth path (undo + UI sync).
-      native.value = String(n);
-      native.dispatchEvent(new Event('change', { bubbles: true }));
+    // Keep SVG-Edit "current style" in sync for newly drawn shapes.
+    if (typeof sc?.setCurProperties === 'function') sc.setCurProperties('stroke_width', n);
+    else if (sc?.curProperties) sc.curProperties.stroke_width = n;
+    if (sc?.curShape) sc.curShape.stroke_width = n;
+
+    const elems = flattenStrokeTargets(resolveStrokeTargets());
+    if (elems.length && typeof sc?.changeSelectedAttribute === 'function') {
+      if (live && typeof sc.changeSelectedAttributeNoUndo === 'function') {
+        sc.changeSelectedAttributeNoUndo('stroke-width', n, elems);
+      } else {
+        sc.changeSelectedAttribute('stroke-width', n, elems);
+      }
+      sc.call?.('changed', elems);
     } else if (typeof sc?.setStrokeWidth === 'function') {
+      // No explicit targets — fall back to canvas API (Selection tool path).
       sc.setStrokeWidth(n);
     }
+
+    const native = document.getElementById('stroke_width');
+    if (native && document.activeElement !== native) native.value = formatStrokeWeight(n);
     if (weightInput && document.activeElement !== weightInput) {
-      weightInput.value = String(n);
+      weightInput.value = formatStrokeWeight(n);
     }
   }
 
@@ -1221,7 +1287,7 @@ function mountAppearanceColors(ctrl, svgEditor) {
     fillTarget?.classList.toggle('active', active === 'fill');
     strokeTarget?.classList.toggle('active', active === 'stroke');
     if (weightInput && document.activeElement !== weightInput) {
-      weightInput.value = String(readStrokeWidth());
+      weightInput.value = formatStrokeWeight(readStrokeWidth());
     }
   }
 
@@ -1242,15 +1308,68 @@ function mountAppearanceColors(ctrl, svgEditor) {
   });
 
   if (weightInput) {
-    const applyWeight = () => writeStrokeWidth(weightInput.value);
-    weightInput.addEventListener('change', applyWeight);
+    weightInput.setAttribute('step', 'any');
+    weightInput.setAttribute('min', '0');
+    let lastWeight = Number(weightInput.value) || readStrokeWidth() || 0;
+
+    const applyCommit = () => {
+      const n = Math.max(0, Number(weightInput.value));
+      if (!Number.isNaN(n)) weightInput.value = formatStrokeWeight(n);
+      lastWeight = Number(weightInput.value) || 0;
+      writeStrokeWidth(weightInput.value, { live: false });
+    };
+
+    weightInput.addEventListener('input', (e) => {
+      const raw = Number(weightInput.value);
+      if (!Number.isFinite(raw)) return;
+      const inputType = e instanceof InputEvent ? e.inputType : null;
+      const isTyping = !!inputType && (
+        inputType.startsWith('insert')
+        || inputType.startsWith('delete')
+        || inputType === 'historyUndo'
+        || inputType === 'historyRedo'
+      );
+      if (isTyping) {
+        lastWeight = raw;
+        writeStrokeWidth(raw, { live: true });
+        return;
+      }
+      // Spinner / non-typing step: map through 0→0.25→…→1→2→…
+      const dir = raw > lastWeight + 1e-9 ? 1 : raw < lastWeight - 1e-9 ? -1 : 0;
+      if (dir) {
+        const next = stepStrokeWeight(lastWeight, dir);
+        weightInput.value = formatStrokeWeight(next);
+        lastWeight = next;
+        writeStrokeWidth(next, { live: true });
+      } else {
+        lastWeight = raw;
+        writeStrokeWidth(raw, { live: true });
+      }
+    });
+    weightInput.addEventListener('change', applyCommit);
     weightInput.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = stepStrokeWeight(weightInput.value, e.key === 'ArrowUp' ? 1 : -1);
+        weightInput.value = formatStrokeWeight(next);
+        lastWeight = next;
+        writeStrokeWidth(next, { live: true });
+        return;
+      }
       if (e.key === 'Enter') {
         e.preventDefault();
-        applyWeight();
+        applyCommit();
         weightInput.blur();
       }
     });
+    weightInput.addEventListener('wheel', (e) => {
+      if (document.activeElement !== weightInput) return;
+      e.preventDefault();
+      const next = stepStrokeWeight(weightInput.value, e.deltaY < 0 ? 1 : -1);
+      weightInput.value = formatStrokeWeight(next);
+      lastWeight = next;
+      writeStrokeWidth(next, { live: true });
+    }, { passive: false });
   }
 
   ctrl.subscribe(refresh);
