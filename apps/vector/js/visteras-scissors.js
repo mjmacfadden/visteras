@@ -1,17 +1,13 @@
 /**
  * Visteras Vector — Scissors tool (Illustrator-like).
- * Click a path/shape to split at that point:
+ * Click a cuttable anchor point to split:
  * - Closed path → opens at the cut (one open path, coincident endpoints).
  * - Open path → becomes two separate path objects.
+ * Mid-segment / empty-canvas clicks do nothing.
  */
 import { readSegments, serializeSegments, anchors, contours } from './visteras-anchor-model.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
-import {
-  hitSegment,
-  splitSegment,
-  simplifyStraightSegments,
-  evaluateSegment,
-} from './visteras-pen-geometry.js';
+import { simplifyStraightSegments } from './visteras-pen-geometry.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const MODE = 'scissors';
@@ -42,9 +38,34 @@ function copyPresentation(fromEl, toEl) {
   }
 }
 
+/** Segment that arrives at `index` (closing seg when index is the contour M). */
+function segmentArrivingAt(segments, contour, index) {
+  if (contour.closing != null && index === contour.indices[0]) {
+    return segments[contour.closing];
+  }
+  return segments[index];
+}
+
+/**
+ * Copy the on-path segment for `index`, substituting the closing segment when
+ * the original M appears mid-path so Bézier handles into the start are kept.
+ */
+function copyContourSegment(segments, contour, index) {
+  const arriving = segmentArrivingAt(segments, contour, index);
+  const seg = { ...arriving };
+  const pt = segments[index];
+  if (pt?.x !== undefined) {
+    seg.x = pt.x;
+    seg.y = pt.y;
+  }
+  if (seg.type === 2) seg.type = 4;
+  return seg;
+}
+
 /**
  * After ensuring a vertex exists at cutIndex, open a closed contour or split an open one.
  * Returns an array of segment arrays (1 for open-closed, 2 for split-open).
+ * Preserves in/out handle geometry on the cut node and neighbors.
  */
 function breakContourAt(segments, cutIndex) {
   const cs = contours(segments);
@@ -81,17 +102,10 @@ function breakContourAt(segments, cutIndex) {
     const rotated = [...order.slice(pos), ...order.slice(0, pos)];
     const open = [{ type: 2, x: cutPt.x, y: cutPt.y }];
     for (let i = 1; i < rotated.length; i++) {
-      const seg = { ...segments[rotated[i]] };
-      // Original contour M must become a line when it appears mid-path.
-      if (seg.type === 2) seg.type = 4;
-      open.push(seg);
+      open.push(copyContourSegment(segments, target, rotated[i]));
     }
-    // Final segment returns to the cut point (open path with coincident ends).
-    const closingSeg = { ...segments[cutIndex] };
-    if (closingSeg.type === 2) closingSeg.type = 4;
-    closingSeg.x = cutPt.x;
-    closingSeg.y = cutPt.y;
-    open.push(closingSeg);
+    // Final segment returns to the cut point with the same incoming handles.
+    open.push(copyContourSegment(segments, target, cutIndex));
     return attachOthers(open);
   }
 
@@ -101,18 +115,14 @@ function breakContourAt(segments, cutIndex) {
   if (leftOrder.length) {
     left.push({ type: 2, x: segments[leftOrder[0]].x, y: segments[leftOrder[0]].y });
     for (let i = 1; i < leftOrder.length; i++) {
-      const seg = { ...segments[leftOrder[i]] };
-      if (seg.type === 2) seg.type = 4;
-      left.push(seg);
+      left.push(copyContourSegment(segments, target, leftOrder[i]));
     }
   }
   const right = [];
   if (rightOrder.length) {
     right.push({ type: 2, x: cutPt.x, y: cutPt.y });
     for (let i = 1; i < rightOrder.length; i++) {
-      const seg = { ...segments[rightOrder[i]] };
-      if (seg.type === 2) seg.type = 4;
-      right.push(seg);
+      right.push(copyContourSegment(segments, target, rightOrder[i]));
     }
   }
 
@@ -170,34 +180,33 @@ export function mountScissorsTool(editor) {
     hoverLayer?.replaceChildren();
   }
 
-  function showHover(el, event) {
+  /** Pink "anchor" + black X — mirrors Type-on-Path / Add-Anchor "path" HUD. */
+  function showAnchorHud(hit) {
     const layer = ensureHover();
     layer.replaceChildren();
-    if (!el || sc.getMode() !== MODE) return;
-    const matrix = el.getScreenCTM();
+    if (!hit || sc.getMode() !== MODE) return;
+    const matrix = hit.el.getScreenCTM();
     if (!matrix) return;
-    const transform = (p) => new DOMPoint(p.x, p.y).matrixTransform(matrix);
-    const data = geometry(sc, el);
-    const anchorHit = nearestAnchorHit(data, event.clientX, event.clientY, transform);
-    const segHit = hitSegment(data, { x: event.clientX, y: event.clientY }, transform, 8);
-    const hit = anchorHit && (!segHit || anchorHit.distance <= Math.sqrt(segHit.distance))
-      ? { ...anchorHit, point: data[anchorHit.index] }
-      : segHit
-        ? { ...segHit, point: evaluateSegment(data[segHit.index - 1], data[segHit.index], segHit.t) }
-        : null;
-    if (!hit?.point) return;
+    const point = hit.segments[hit.index];
+    if (!point || point.x === undefined) return;
     const overlayMatrix = sc.selectorManager.selectorParentGroup.getScreenCTM().inverse();
-    const p = new DOMPoint(hit.point.x, hit.point.y).matrixTransform(matrix).matrixTransform(overlayMatrix);
-    const mark = document.createElementNS(SVG_NS, 'circle');
-    mark.setAttribute('cx', p.x);
-    mark.setAttribute('cy', p.y);
-    mark.setAttribute('r', '3.5');
-    mark.setAttribute('fill', '#fff');
-    mark.setAttribute('stroke', '#111');
-    mark.setAttribute('stroke-width', '1.25');
-    layer.append(mark);
+    const p = new DOMPoint(point.x, point.y).matrixTransform(matrix).matrixTransform(overlayMatrix);
+    const ring = document.createElementNS(SVG_NS, 'path');
+    ring.setAttribute('d', `M${p.x - 4} ${p.y - 4}L${p.x + 4} ${p.y + 4}M${p.x + 4} ${p.y - 4}L${p.x - 4} ${p.y + 4}`);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', '#111');
+    ring.setAttribute('stroke-width', '1.5');
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.textContent = 'anchor';
+    label.setAttribute('x', p.x + 7);
+    label.setAttribute('y', p.y - 6);
+    label.setAttribute('fill', '#ff2bb5');
+    label.setAttribute('font-size', '10');
+    label.setAttribute('font-family', 'sans-serif');
+    layer.append(ring, label);
   }
 
+  /** Anchor-only hit test — never mid-segment or empty canvas. */
   function findBestHit(clientX, clientY) {
     let best = null;
     for (const el of candidates(sc).reverse()) {
@@ -206,14 +215,16 @@ export function mountScissorsTool(editor) {
       const transform = (p) => new DOMPoint(p.x, p.y).matrixTransform(matrix);
       const segments = geometry(sc, el);
       const anchorHit = nearestAnchorHit(segments, clientX, clientY, transform);
-      const segHit = hitSegment(segments, { x: clientX, y: clientY }, transform, 8);
-      let hit = null;
-      if (anchorHit && (!segHit || anchorHit.distance <= Math.sqrt(segHit.distance))) {
-        hit = { el, segments, index: anchorHit.index, t: null, atAnchor: true, distance: anchorHit.distance ** 2 };
-      } else if (segHit) {
-        hit = { el, segments, index: segHit.index, t: segHit.t, atAnchor: false, distance: segHit.distance };
-      }
-      if (hit && (!best || hit.distance < best.distance)) best = hit;
+      if (!anchorHit) continue;
+      const hit = {
+        el,
+        segments,
+        index: anchorHit.index,
+        t: null,
+        atAnchor: true,
+        distance: anchorHit.distance,
+      };
+      if (!best || hit.distance < best.distance) best = hit;
     }
     return best;
   }
@@ -222,13 +233,8 @@ export function mountScissorsTool(editor) {
     const { BatchCommand, ChangeElementCommand, InsertElementCommand, RemoveElementCommand } = sc.history;
     const command = new BatchCommand('Scissors cut');
 
-    let segments = hit.segments.map((s) => ({ ...s }));
-    let cutIndex = hit.index;
-
-    if (!hit.atAnchor && hit.t != null) {
-      segments = splitSegment(segments, hit.index, hit.t);
-      cutIndex = hit.index; // left half ends at the new vertex
-    }
+    const segments = hit.segments.map((s) => ({ ...s }));
+    const cutIndex = hit.index;
 
     const parts = breakContourAt(segments, cutIndex)
       .filter((part) => part.filter((s) => s.type !== 1).length >= 2);
@@ -266,8 +272,8 @@ export function mountScissorsTool(editor) {
       clearHover();
       return;
     }
-    const el = e.target.closest?.('path,rect,circle,ellipse,line,polygon,polyline');
-    if (el && sc.getSvgContent().contains(el)) showHover(el, e);
+    const hit = findBestHit(e.clientX, e.clientY);
+    if (hit) showAnchorHud(hit);
     else clearHover();
   }, true);
 
@@ -277,7 +283,7 @@ export function mountScissorsTool(editor) {
     if (e.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) return;
 
     const hit = findBestHit(e.clientX, e.clientY);
-    if (!hit) return;
+    if (!hit) return; // mid-segment / empty canvas — no cut
     e.preventDefault();
     e.stopImmediatePropagation();
     consumed = true;
