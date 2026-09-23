@@ -754,7 +754,7 @@ class Base_layers_class {
 	 * @param {boolean} is_preview
 	 */
 	render_object(ctx, object, is_preview) {
-		if (object.visible == false || object.type == null) return;
+		if (object.visible == false || object.type == null || is_group(object)) return;
 
 		if (object.type === 'adjustment') {
 			this.render_adjustment(ctx, object);
@@ -805,12 +805,16 @@ class Base_layers_class {
 					object.height
 				);
 				bctx.restore();
-			} else {
+			} else if (object.render_function) {
 				//call render function from other module
 				var render_class = object.render_function[0];
 				var render_function = object.render_function[1];
 				if (
-					typeof this.Base_gui.GUI_tools.tools_modules[render_class] !=
+					this.Base_gui.GUI_tools &&
+					this.Base_gui.GUI_tools.tools_modules[render_class] &&
+					typeof this.Base_gui.GUI_tools.tools_modules[render_class].object[
+						render_function
+					] !=
 					"undefined"
 				) {
 					this.Base_gui.GUI_tools.tools_modules[render_class].object[
@@ -854,12 +858,16 @@ class Base_layers_class {
 				);
 
 				ctx.restore();
-			} else {
+			} else if (object.render_function) {
 				//call render function from other module
 				var render_class = object.render_function[0];
 				var render_function = object.render_function[1];
 				if (
-					typeof this.Base_gui.GUI_tools.tools_modules[render_class] !=
+					this.Base_gui.GUI_tools &&
+					this.Base_gui.GUI_tools.tools_modules[render_class] &&
+					typeof this.Base_gui.GUI_tools.tools_modules[render_class].object[
+						render_function
+					] !=
 					"undefined"
 				) {
 					this.Base_gui.GUI_tools.tools_modules[render_class].object[
@@ -1507,8 +1515,16 @@ class Base_layers_class {
 	 */
 	convert_layer_to_canvas(layer_id, actual_area = false, can_trim) {
 		if (actual_area == null) actual_area = false;
-		if (layer_id == null) layer_id = config.layer.id;
+		if (layer_id == null) layer_id = config.layer ? config.layer.id : null;
 		var link = this.get_layer(layer_id);
+		if (!link || is_group(link) || link.type == null) {
+			var emptyCanvas = document.createElement("canvas");
+			emptyCanvas.width = 1;
+			emptyCanvas.height = 1;
+			emptyCanvas.dataset.x = "0";
+			emptyCanvas.dataset.y = "0";
+			return emptyCanvas;
+		}
 		var offset_x = 0;
 		var offset_y = 0;
 
@@ -1519,8 +1535,8 @@ class Base_layers_class {
 			canvas.height = link.height_original;
 			can_trim = false;
 		} else {
-			canvas.width = Math.max(link.width, config.WIDTH);
-			canvas.height = Math.max(link.height, config.HEIGHT);
+			canvas.width = Math.max(link.width || 0, config.WIDTH || 1);
+			canvas.height = Math.max(link.height || 0, config.HEIGHT || 1);
 		}
 
 		//add data

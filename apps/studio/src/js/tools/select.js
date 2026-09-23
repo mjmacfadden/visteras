@@ -30,8 +30,11 @@ class Select_tool_class extends Base_tools_class {
 		this.keyboard_move_start_positions = null;
 		this.moving = false;
 		this.resizing = false;
+		this.is_rotating = false;
 		this.snap_line_info = {x: null, y: null};
 		this.rotate_initial = null;
+		this.selection_transform_box = null;
+		this.last_selection_signature = null;
 
 		var sel_config = {
 			enable_background: false,
@@ -54,6 +57,63 @@ class Select_tool_class extends Base_tools_class {
 					}
 				}
 				const movable_layers = this.get_movable_layers();
+				if (movable_layers.length === 0) {
+					this.selection_transform_box = null;
+					this.last_selection_signature = null;
+					return null;
+				}
+
+				const current_signature = this.get_selection_signature();
+				const isMultiOrGroup = movable_layers.length > 1 || (config.layer && is_group(config.layer))
+					|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id))));
+
+				if (isMultiOrGroup) {
+					if (this.selection_transform_box && this.last_selection_signature === current_signature) {
+						return {
+							...config.layer,
+							x: this.selection_transform_box.x,
+							y: this.selection_transform_box.y,
+							width: this.selection_transform_box.width,
+							height: this.selection_transform_box.height,
+							rotate: this.selection_transform_box.rotate || 0,
+						};
+					}
+
+					// Fresh selection: compute initial axis-aligned bounding box
+					const bounds = get_selection_content_bounds(movable_layers);
+					if (!bounds) {
+						this.selection_transform_box = null;
+						this.last_selection_signature = current_signature;
+						return null;
+					}
+
+					this.selection_transform_box = {
+						x: bounds.x,
+						y: bounds.y,
+						width: bounds.width,
+						height: bounds.height,
+						rotate: 0,
+						center: {
+							x: bounds.x + bounds.width / 2,
+							y: bounds.y + bounds.height / 2,
+						},
+					};
+					this.last_selection_signature = current_signature;
+
+					return {
+						...config.layer,
+						x: this.selection_transform_box.x,
+						y: this.selection_transform_box.y,
+						width: this.selection_transform_box.width,
+						height: this.selection_transform_box.height,
+						rotate: 0,
+					};
+				}
+
+				// Single regular layer
+				this.selection_transform_box = null;
+				this.last_selection_signature = current_signature;
+
 				const bounds = get_selection_content_bounds(movable_layers);
 				if (!bounds) {
 					return null;
@@ -64,7 +124,7 @@ class Select_tool_class extends Base_tools_class {
 					y: bounds.y,
 					width: bounds.width,
 					height: bounds.height,
-					rotate: bounds.rotate || (config.layer ? config.layer.rotate : 0)
+					rotate: (bounds.rotate != null) ? bounds.rotate : (config.layer ? config.layer.rotate : 0)
 				};
 			},
 		};
@@ -219,6 +279,9 @@ class Select_tool_class extends Base_tools_class {
 		}
 
 		this.rotate_initial = config.layer ? config.layer.rotate : null;
+		// For multi-layer rotation, we need the bounding box's initial rotation
+		// (which is 0 for multi-selection) to compute the correct delta.
+		this.rotate_initial_bounds = null;
 		this.duplicate_drag = !!e.altKey;
 
 		// Hit test selection handles and rotation zone first
@@ -227,6 +290,7 @@ class Select_tool_class extends Base_tools_class {
 		if (this.Base_selection.mouse_lock != null) {
 			this.resizing = true;
 			this.moving = false;
+			this.is_rotating = (this.Base_selection.selected_object_drag_type === 'rotate');
 			const aspect_lock = (config.aspect_lock !== undefined) ? config.aspect_lock : true;
 			this.Base_selection.find_settings().keep_ratio = aspect_lock;
 			this.mousedown_content_bounds = this.Base_selection.click_details
@@ -242,6 +306,7 @@ class Select_tool_class extends Base_tools_class {
 		}
 		else {
 			this.resizing = false;
+			this.is_rotating = false;
 			const hit = this.Base_layers.get_sorted_layers().some(layer => {
 				if (!this.marquee_layer_eligible(layer)) return false;
 				const canvas = this.Base_layers.convert_layer_to_canvas(layer.id, null, false);
@@ -291,6 +356,7 @@ class Select_tool_class extends Base_tools_class {
 				y: Math.round(l.y),
 				width: l.width,
 				height: l.height,
+				rotate: l.rotate || 0,
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
 				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
@@ -303,6 +369,43 @@ class Select_tool_class extends Base_tools_class {
 				} : null
 			});
 		}
+
+		// Capture the multi-selection / group center for rotation pivot
+		const isAnyGroup = (config.layer && is_group(config.layer))
+			|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id))));
+		if (movable_layers.length > 1 || (movable_layers.length > 0 && isAnyGroup)) {
+			if (this.selection_transform_box) {
+				this.mousedown_group_center = {
+					x: this.selection_transform_box.center.x,
+					y: this.selection_transform_box.center.y,
+				};
+				this.rotate_initial_bounds = this.selection_transform_box.rotate || 0;
+			} else {
+				const bounds = get_selection_content_bounds(movable_layers);
+				if (bounds) {
+					this.mousedown_group_center = {
+						x: bounds.x + bounds.width / 2,
+						y: bounds.y + bounds.height / 2,
+					};
+					this.rotate_initial_bounds = (bounds.rotate != null) ? bounds.rotate : 0;
+				} else {
+					this.mousedown_group_center = null;
+					this.rotate_initial_bounds = null;
+				}
+			}
+		} else {
+			this.mousedown_group_center = null;
+			this.rotate_initial_bounds = null;
+		}
+
+		this.mousedown_transform_box = this.selection_transform_box ? {
+			x: this.selection_transform_box.x,
+			y: this.selection_transform_box.y,
+			width: this.selection_transform_box.width,
+			height: this.selection_transform_box.height,
+			rotate: this.selection_transform_box.rotate || 0,
+			center: { ...this.selection_transform_box.center },
+		} : null;
 
 		this.mousedown_dimensions = (config.layer && config.layer.x != null) ? {
 			x: Math.round(config.layer.x),
@@ -364,14 +467,54 @@ class Select_tool_class extends Base_tools_class {
 			return;
 		}
 		if (this.resizing) {
+			if (this.is_rotating) {
+				//handle rotation
+				let rotate = this.Base_selection.current_angle;
+				if(rotate !== null){
+					if (this.mousedown_group_center && this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
+						// Multi-layer or group rotation: rotate each layer's position
+						// around the group center and update each layer's own rotation.
+						// This matches Photoshop's behavior where all selected layers
+						// rotate as a unit around the selection's center.
+						const initialGroupRotate = (this.rotate_initial_bounds != null) ? this.rotate_initial_bounds : (this.rotate_initial || 0);
+						const deltaRotate = rotate - initialGroupRotate;
+						const cx = this.mousedown_group_center.x;
+						const cy = this.mousedown_group_center.y;
+						const rad = deltaRotate * Math.PI / 180;
+						const cosA = Math.cos(rad);
+						const sinA = Math.sin(rad);
 
-			//also handle rotation
-			let rotate = this.Base_selection.current_angle;
-			if(config.layer && config.layer.rotate != rotate && rotate !== null){
-				config.layer.rotate = rotate;
-			}
+						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+							const layer = app.Layers.get_layer(layer_id);
+							if (!layer) continue;
 
-			if (this.Base_selection.selected_object_drag_type !== 'rotate') {
+							// Rotate position around group center
+							const lcx = init_pos.x + init_pos.width / 2;
+							const lcy = init_pos.y + init_pos.height / 2;
+							const dx = lcx - cx;
+							const dy = lcy - cy;
+							const newCx = cx + dx * cosA - dy * sinA;
+							const newCy = cy + dx * sinA + dy * cosA;
+							layer.x = Math.round(newCx - init_pos.width / 2);
+							layer.y = Math.round(newCy - init_pos.height / 2);
+
+							// Update individual layer rotation
+							let newRot = Math.round((init_pos.rotate + deltaRotate) % 360);
+							if (newRot < 0) newRot += 360;
+							layer.rotate = newRot;
+						}
+						if (this.selection_transform_box && this.mousedown_transform_box) {
+							let boxRot = Math.round((this.mousedown_transform_box.rotate + deltaRotate) % 360);
+							if (boxRot < 0) boxRot += 360;
+							this.selection_transform_box.rotate = boxRot;
+						}
+					} else if(config.layer && config.layer.rotate != rotate){
+						let newRot = Math.round(rotate % 360);
+						if (newRot < 0) newRot += 360;
+						config.layer.rotate = newRot;
+					}
+				}
+			} else {
 				const s = this.Base_selection.find_settings();
 				if (s && s.data && this.mousedown_content_bounds && this.mousedown_content_bounds.width > 0 && this.mousedown_content_bounds.height > 0) {
 					const origW = this.mousedown_content_bounds.width;
@@ -469,6 +612,12 @@ class Select_tool_class extends Base_tools_class {
 						}
 					}
 				}
+				if (this.selection_transform_box && this.mousedown_transform_box) {
+					this.selection_transform_box.center.x = this.mousedown_transform_box.center.x + delta_x;
+					this.selection_transform_box.center.y = this.mousedown_transform_box.center.y + delta_y;
+					this.selection_transform_box.x = this.selection_transform_box.center.x - this.selection_transform_box.width / 2;
+					this.selection_transform_box.y = this.selection_transform_box.center.y - this.selection_transform_box.height / 2;
+				}
 			}
 
 			if (this.Base_layers.render_interactive_layer && config.layer) {
@@ -514,165 +663,237 @@ class Select_tool_class extends Base_tools_class {
 		this.Base_selection.selected_object_actions(e);
 
 		if (this.resizing) {
-			const resizingPointText = config.layer && config.layer.type === 'text'
-				&& !is_box_text(config.layer)
-				&& (!!this._resizing_point_text || is_point_text(config.layer));
+			if (this.is_rotating) {
+				this.is_rotating = false;
+				this.resizing = false;
 
-			// Record final live sizes/positions
-			const finalPositions = new Map();
-			if (this.mousedown_multi_positions) {
-				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-					const layer = app.Layers.get_layer(layer_id);
-					if (layer) {
-						finalPositions.set(layer_id, {
-							x: layer.x,
-							y: layer.y,
-							width: layer.width,
-							height: layer.height
-						});
+				let rotate = this.Base_selection.current_angle;
+				const initialGroupRotate = (this.rotate_initial_bounds != null) ? this.rotate_initial_bounds : (this.rotate_initial || 0);
+				if (rotate !== null && rotate !== initialGroupRotate) {
+					if (this.mousedown_group_center && this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
+						// Multi-layer / group rotation: commit position + rotation for all layers
+						const deltaRotate = rotate - initialGroupRotate;
+						const cx = this.mousedown_group_center.x;
+						const cy = this.mousedown_group_center.y;
+						const rad = deltaRotate * Math.PI / 180;
+						const cosA = Math.cos(rad);
+						const sinA = Math.sin(rad);
+
+						let rotate_actions = [];
+						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+							const layer = app.Layers.get_layer(layer_id);
+							if (!layer) continue;
+
+							// Reset to initial state so Update_layer_action captures correct old values
+							layer.x = init_pos.x;
+							layer.y = init_pos.y;
+							layer.rotate = init_pos.rotate;
+
+							// Calculate final position
+							const lcx = init_pos.x + init_pos.width / 2;
+							const lcy = init_pos.y + init_pos.height / 2;
+							const dx = lcx - cx;
+							const dy = lcy - cy;
+							const newCx = cx + dx * cosA - dy * sinA;
+							const newCy = cy + dx * sinA + dy * cosA;
+
+							let newRotate = Math.round((init_pos.rotate + deltaRotate) % 360);
+							if (newRotate < 0) newRotate += 360;
+
+							rotate_actions.push(
+								new app.Actions.Update_layer_action(layer_id, {
+									x: Math.round(newCx - init_pos.width / 2),
+									y: Math.round(newCy - init_pos.height / 2),
+									rotate: newRotate,
+								})
+							);
+						}
+						if (rotate_actions.length > 0) {
+							await app.State.do_action(
+								new app.Actions.Bundle_action('rotate_layers', 'Rotate Layers', rotate_actions)
+							);
+							if (this.selection_transform_box && this.mousedown_transform_box) {
+								let boxRot = Math.round((this.mousedown_transform_box.rotate + deltaRotate) % 360);
+								if (boxRot < 0) boxRot += 360;
+								this.selection_transform_box.rotate = boxRot;
+							}
+						}
+					} else if (config.layer) {
+						config.layer.rotate = this.rotate_initial;
+						let newRotate = Math.round(rotate % 360);
+						if (newRotate < 0) newRotate += 360;
+						await app.State.do_action(
+							new app.Actions.Bundle_action('rotate_layer', 'Rotate Layer', [
+								new app.Actions.Update_layer_action(config.layer.id, {
+									rotate: newRotate
+								})
+							])
+						);
+					}
+				} else {
+					// No rotation change: restore initial positions
+					if (this.mousedown_multi_positions) {
+						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+							const layer = app.Layers.get_layer(layer_id);
+							if (layer) {
+								layer.x = init_pos.x;
+								layer.y = init_pos.y;
+								layer.rotate = init_pos.rotate;
+							}
+						}
+					} else if (config.layer) {
+						config.layer.rotate = this.rotate_initial;
 					}
 				}
-			}
+			} else {
+				const resizingPointText = config.layer && config.layer.type === 'text'
+					&& !is_box_text(config.layer)
+					&& (!!this._resizing_point_text || is_point_text(config.layer));
 
-			// Reset to mousedown values so Update_layer_action captures correct previous state
-			if (this.mousedown_multi_positions) {
-				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-					const layer = app.Layers.get_layer(layer_id);
-					if (layer) {
-						layer.x = init_pos.x;
-						layer.y = init_pos.y;
-						layer.width = init_pos.width;
-						layer.height = init_pos.height;
-						if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
-						if (init_pos.mask && layer.mask) {
-							Object.assign(layer.mask, init_pos.mask);
+				// Record final live sizes/positions
+				const finalPositions = new Map();
+				if (this.mousedown_multi_positions) {
+					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+						const layer = app.Layers.get_layer(layer_id);
+						if (layer) {
+							finalPositions.set(layer_id, {
+								x: layer.x,
+								y: layer.y,
+								width: layer.width,
+								height: layer.height
+							});
 						}
 					}
 				}
-			}
 
-			this.resizing = false;
-			this._resizing_point_text = false;
-
-			let resize_actions = [];
-			if (this.mousedown_multi_positions) {
-				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-					const finalPos = finalPositions.get(layer_id);
-					if (!finalPos) continue;
-
-					if (init_pos.x !== finalPos.x || init_pos.y !== finalPos.y ||
-						init_pos.width !== finalPos.width || init_pos.height !== finalPos.height
-					) {
+				// Reset to mousedown values so Update_layer_action captures correct previous state
+				if (this.mousedown_multi_positions) {
+					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
 						const layer = app.Layers.get_layer(layer_id);
-						let layerUpdate = {
-							x: finalPos.x,
-							y: finalPos.y,
-							width: finalPos.width,
-							height: finalPos.height
-						};
+						if (layer) {
+							layer.x = init_pos.x;
+							layer.y = init_pos.y;
+							layer.width = init_pos.width;
+							layer.height = init_pos.height;
+							if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
+							if (init_pos.mask && layer.mask) {
+								Object.assign(layer.mask, init_pos.mask);
+							}
+						}
+					}
+				}
 
-						// Point text: bake font size into history
-						if (is_point_text(layer) && init_pos.width > 0) {
-							try {
-								const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
-									&& app.GUI.GUI_tools.tools_modules['text']
-									&& app.GUI.GUI_tools.tools_modules['text'].object;
-								if (textTool && typeof textTool.commit_point_text_resize === 'function') {
-									const preData = layer.data ? JSON.parse(JSON.stringify(layer.data)) : null;
-									const preParams = layer.params ? JSON.parse(JSON.stringify(layer.params)) : {};
-									layer.x = init_pos.x;
-									layer.y = init_pos.y;
-									layer.width = init_pos.width;
-									layer.height = init_pos.height;
-									layer.params = JSON.parse(JSON.stringify(preParams));
-									textTool.mousedownBounds = {
-										x: init_pos.x,
-										y: init_pos.y,
-										width: init_pos.width,
-										height: init_pos.height,
-										boundary: preParams.boundary || 'dynamic'
-									};
-									textTool.end_point_text_resize();
-									textTool.begin_point_text_resize(layer);
-									const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height, {
-										x: finalPos.x,
-										y: finalPos.y
-									});
-									if (committed) {
-										layerUpdate.x = committed.x;
-										layerUpdate.y = committed.y;
-										layerUpdate.width = committed.width;
-										layerUpdate.height = committed.height;
-										layerUpdate.params = committed.params;
-										layerUpdate.data = committed.data;
-									}
-									layer.x = init_pos.x;
-									layer.y = init_pos.y;
-									layer.width = init_pos.width;
-									layer.height = init_pos.height;
-									layer.params = JSON.parse(JSON.stringify(preParams));
-									if (preData) {
-										layer.data = preData;
-										if (typeof textTool.get_editor === 'function') {
-											const ed = textTool.get_editor(layer);
-											if (ed && ed.set_lines) {
-												ed.set_lines(JSON.parse(JSON.stringify(preData)), true);
-												ed.hasValueChanged = true;
+				this.resizing = false;
+				this._resizing_point_text = false;
+
+				let resize_actions = [];
+				if (this.mousedown_multi_positions) {
+					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
+						const finalPos = finalPositions.get(layer_id);
+						if (!finalPos) continue;
+
+						if (init_pos.x !== finalPos.x || init_pos.y !== finalPos.y ||
+							init_pos.width !== finalPos.width || init_pos.height !== finalPos.height
+						) {
+							const layer = app.Layers.get_layer(layer_id);
+							let layerUpdate = {
+								x: finalPos.x,
+								y: finalPos.y,
+								width: finalPos.width,
+								height: finalPos.height
+							};
+
+							// Point text: bake font size into history
+							if (is_point_text(layer) && init_pos.width > 0) {
+								try {
+									const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
+										&& app.GUI.GUI_tools.tools_modules['text']
+										&& app.GUI.GUI_tools.tools_modules['text'].object;
+									if (textTool && typeof textTool.commit_point_text_resize === 'function') {
+										const preData = layer.data ? JSON.parse(JSON.stringify(layer.data)) : null;
+										const preParams = layer.params ? JSON.parse(JSON.stringify(layer.params)) : {};
+										layer.x = init_pos.x;
+										layer.y = init_pos.y;
+										layer.width = init_pos.width;
+										layer.height = init_pos.height;
+										layer.params = JSON.parse(JSON.stringify(preParams));
+										textTool.mousedownBounds = {
+											x: init_pos.x,
+											y: init_pos.y,
+											width: init_pos.width,
+											height: init_pos.height,
+											boundary: preParams.boundary || 'dynamic'
+										};
+										textTool.end_point_text_resize();
+										textTool.begin_point_text_resize(layer);
+										const committed = textTool.commit_point_text_resize(layer, finalPos.width, finalPos.height, {
+											x: finalPos.x,
+											y: finalPos.y
+										});
+										if (committed) {
+											layerUpdate.x = committed.x;
+											layerUpdate.y = committed.y;
+											layerUpdate.width = committed.width;
+											layerUpdate.height = committed.height;
+											layerUpdate.params = committed.params;
+											layerUpdate.data = committed.data;
+										}
+										layer.x = init_pos.x;
+										layer.y = init_pos.y;
+										layer.width = init_pos.width;
+										layer.height = init_pos.height;
+										layer.params = JSON.parse(JSON.stringify(preParams));
+										if (preData) {
+											layer.data = preData;
+											if (typeof textTool.get_editor === 'function') {
+												const ed = textTool.get_editor(layer);
+												if (ed && ed.set_lines) {
+													ed.set_lines(JSON.parse(JSON.stringify(preData)), true);
+													ed.hasValueChanged = true;
+												}
 											}
 										}
 									}
-								}
-							} catch (e) { console.warn('point text scale failed', e); }
-						}
+								} catch (e) { console.warn('point text scale failed', e); }
+							}
 
-						resize_actions.push(
-							new app.Actions.Update_layer_action(layer.id, layerUpdate)
-						);
-						resize_actions = resize_actions.concat(
-							this.Mask.get_linked_mask_actions(layer, init_pos, layerUpdate)
-						);
+							resize_actions.push(
+								new app.Actions.Update_layer_action(layer.id, layerUpdate)
+							);
+							resize_actions = resize_actions.concat(
+								this.Mask.get_linked_mask_actions(layer, init_pos, layerUpdate)
+							);
+						}
 					}
 				}
-			}
 
-			if (resize_actions.length > 0) {
-				await app.State.do_action(
-					new app.Actions.Bundle_action('resize_layer', 'Resize Layer', resize_actions)
-				);
-				if (resizingPointText && config.layer && config.layer.type === 'text') {
+				if (resize_actions.length > 0) {
+					await app.State.do_action(
+						new app.Actions.Bundle_action('resize_layer', 'Resize Layer', resize_actions)
+					);
+					if (resizingPointText && config.layer && config.layer.type === 'text') {
+						try {
+							const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
+								&& app.GUI.GUI_tools.tools_modules['text']
+								&& app.GUI.GUI_tools.tools_modules['text'].object;
+							if (textTool && typeof textTool.sync_size_from_layer === 'function') {
+								textTool.sync_size_from_layer(config.layer);
+							}
+						} catch (e) { /* ignore */ }
+					}
+				} else if (resizingPointText) {
 					try {
 						const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
 							&& app.GUI.GUI_tools.tools_modules['text']
 							&& app.GUI.GUI_tools.tools_modules['text'].object;
-						if (textTool && typeof textTool.sync_size_from_layer === 'function') {
-							textTool.sync_size_from_layer(config.layer);
+						if (textTool && typeof textTool.end_point_text_resize === 'function') {
+							textTool.end_point_text_resize();
 						}
 					} catch (e) { /* ignore */ }
 				}
-			} else if (resizingPointText) {
-				try {
-					const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
-						&& app.GUI.GUI_tools.tools_modules['text']
-						&& app.GUI.GUI_tools.tools_modules['text'].object;
-					if (textTool && typeof textTool.end_point_text_resize === 'function') {
-						textTool.end_point_text_resize();
-					}
-				} catch (e) { /* ignore */ }
-			}
-
-			//also handle rotation
-			let rotate = this.Base_selection.current_angle;
-			if(this.rotate_initial != rotate && rotate !== null){
-				config.layer.rotate = this.rotate_initial;
-				await app.State.do_action(
-					new app.Actions.Bundle_action('resize_layer', 'Resize Layer', [
-						new app.Actions.Update_layer_action(config.layer.id, {
-							rotate
-						})
-					])
-				);
 			}
 			this.resizing = false;
+			this.is_rotating = false;
 		}
 		else if (this.moving) {
 			if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
@@ -766,6 +987,12 @@ class Select_tool_class extends Base_tools_class {
 							new app.Actions.Bundle_action('move_layers', 'Move Layers', move_actions),
 							this.duplicate_drag ? { merge_with_history: 'duplicate_drag' } : {}
 						);
+						if (this.selection_transform_box && this.mousedown_transform_box) {
+							this.selection_transform_box.center.x = this.mousedown_transform_box.center.x + delta_x;
+							this.selection_transform_box.center.y = this.mousedown_transform_box.center.y + delta_y;
+							this.selection_transform_box.x = this.selection_transform_box.center.x - this.selection_transform_box.width / 2;
+							this.selection_transform_box.y = this.selection_transform_box.center.y - this.selection_transform_box.height / 2;
+						}
 					}
 				}
 			}
@@ -775,6 +1002,9 @@ class Select_tool_class extends Base_tools_class {
 		this.duplicate_drag = false;
 		this.mousedown_mask_dimensions = null;
 		this.mousedown_multi_positions = null;
+		this.mousedown_transform_box = null;
+		this.mousedown_group_center = null;
+		this.rotate_initial_bounds = null;
 
 		if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_transform_indicators === 'function') {
 			app.GUI.GUI_tools.update_transform_indicators();
@@ -1023,6 +1253,13 @@ class Select_tool_class extends Base_tools_class {
 		return false;
 	}
 
+	get_selection_signature() {
+		const ids = (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.length > 0)
+			? config.selected_layer_ids.map(id => parseInt(id, 10)).sort((a, b) => a - b).join(',')
+			: (config.layer ? String(config.layer.id) : '');
+		return ids;
+	}
+
 	get_movable_layers() {
 		const selected_ids = (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.length > 0)
 			? config.selected_layer_ids
@@ -1083,6 +1320,13 @@ class Select_tool_class extends Base_tools_class {
 		const offset_x = direction_x * power;
 		const offset_y = direction_y * power;
 
+		if (this.selection_transform_box) {
+			this.selection_transform_box.center.x += offset_x;
+			this.selection_transform_box.center.y += offset_y;
+			this.selection_transform_box.x += offset_x;
+			this.selection_transform_box.y += offset_y;
+		}
+
 		for (const l of movable_layers) {
 			const prevX = l.x;
 			const prevY = l.y;
@@ -1126,7 +1370,7 @@ class Select_tool_class extends Base_tools_class {
 		//render main canvas
 		for (var i = 0; i < layers_sorted.length; i++) {
 			var value = layers_sorted[i];
-			if (value.visible === false) continue;
+			if (value.visible === false || is_group(value) || value.type === 'adjustment') continue;
 			var canvas = this.Base_layers.convert_layer_to_canvas(value.id, null, false);
 
 			if (this.check_hit_region(e, canvas.getContext("2d"), value) == true) {
