@@ -57,7 +57,7 @@ var template = `
 					<option value="xor">XOR</option>
 				</optgroup>
 			</select>
-			<div class="layer_opacity_group" title="Layer Opacity">
+			<div class="layer_opacity_group" title="Layer Opacity — fades layer and effects">
 				<span class="layer_opacity_label">Opacity:</span>
 				<div class="layer_opacity_input_wrapper">
 					<input type="number" class="layer_opacity_number" id="layer_opacity_number" min="0" max="100" value="100" />
@@ -66,6 +66,17 @@ var template = `
 				</div>
 				<div class="layer_opacity_slider_popup hidden" id="layer_opacity_slider_popup">
 					<input type="range" class="layer_opacity_range" id="layer_opacity_range" min="0" max="100" value="100" data-default="100" title="Double-click to reset" />
+				</div>
+			</div>
+			<div class="layer_opacity_group layer_fill_group" title="Fill Opacity — fades pixels only; layer effects stay visible">
+				<span class="layer_opacity_label">Fill:</span>
+				<div class="layer_opacity_input_wrapper">
+					<input type="number" class="layer_opacity_number" id="layer_fill_number" min="0" max="100" value="100" />
+					<span class="layer_opacity_symbol">%</span>
+					<button type="button" class="layer_opacity_popup_btn" id="layer_fill_popup_btn" title="Adjust Fill Opacity">▾</button>
+				</div>
+				<div class="layer_opacity_slider_popup hidden" id="layer_fill_slider_popup">
+					<input type="range" class="layer_opacity_range" id="layer_fill_range" min="0" max="100" value="100" data-default="100" title="Double-click to reset" />
 				</div>
 			</div>
 		</div>
@@ -364,6 +375,101 @@ class GUI_layers_class {
 			});
 		}
 
+		// Header Fill Opacity (pixels only — FX remain)
+		var fillNumber = document.getElementById('layer_fill_number');
+		var fillRange = document.getElementById('layer_fill_range');
+		var fillPopupBtn = document.getElementById('layer_fill_popup_btn');
+		var fillPopup = document.getElementById('layer_fill_slider_popup');
+
+		if (fillPopupBtn && fillPopup) {
+			fillPopupBtn.addEventListener('click', function (e) {
+				e.stopPropagation();
+				fillPopup.classList.toggle('hidden');
+				if (opPopup) opPopup.classList.add('hidden');
+			});
+		}
+		if (opPopupBtn && opPopup) {
+			// Hide fill popup when opening opacity popup
+			opPopupBtn.addEventListener('click', function () {
+				if (fillPopup) fillPopup.classList.add('hidden');
+			});
+		}
+
+		var focus_fill = null;
+		if (fillNumber) {
+			fillNumber.addEventListener('focus', function () {
+				focus_fill = (config.layer && config.layer.fillOpacity != null) ? Math.round(config.layer.fillOpacity) : 100;
+			});
+			fillNumber.addEventListener('input', function () {
+				if (!config.layer || config.layer.id == null) return;
+				var val = parseInt(this.value);
+				if (isNaN(val)) return;
+				val = Math.max(0, Math.min(100, val));
+				config.layer.fillOpacity = val;
+				if (fillRange) fillRange.value = val;
+				app.Layers.invalidate({ document: true });
+				app.Layers.render(true);
+			});
+			fillNumber.addEventListener('blur', function () {
+				if (!config.layer || config.layer.id == null) return;
+				var val = parseInt(this.value);
+				if (isNaN(val)) val = 100;
+				val = Math.max(0, Math.min(100, val));
+				this.value = val;
+				if (fillRange) fillRange.value = val;
+				if (focus_fill !== val) {
+					config.layer.fillOpacity = focus_fill;
+					app.State.do_action(
+						new app.Actions.Update_layer_action(config.layer.id, {
+							fillOpacity: val
+						})
+					);
+				}
+			});
+		}
+
+		var range_start_fill = null;
+		if (fillRange) {
+			fillRange.addEventListener('mousedown', function () {
+				range_start_fill = (config.layer && config.layer.fillOpacity != null) ? Math.round(config.layer.fillOpacity) : 100;
+			});
+			fillRange.addEventListener('input', function () {
+				if (!config.layer || config.layer.id == null) return;
+				var val = parseInt(this.value);
+				config.layer.fillOpacity = val;
+				if (fillNumber) fillNumber.value = val;
+				app.Layers.invalidate({ document: true });
+				app.Layers.render(true);
+			});
+			fillRange.addEventListener('change', function () {
+				if (!config.layer || config.layer.id == null) return;
+				var val = parseInt(this.value);
+				if (range_start_fill !== val) {
+					config.layer.fillOpacity = range_start_fill;
+					app.State.do_action(
+						new app.Actions.Update_layer_action(config.layer.id, {
+							fillOpacity: val
+						})
+					);
+				}
+			});
+			fillRange.addEventListener('dblclick', function (e) {
+				e.preventDefault();
+				if (!config.layer || config.layer.id == null) return;
+				var defVal = parseInt(this.getAttribute('data-default') || '100', 10);
+				if (isNaN(defVal)) defVal = 100;
+				var prev = (config.layer.fillOpacity != null) ? Math.round(config.layer.fillOpacity) : 100;
+				if (prev === defVal) return;
+				this.value = defVal;
+				if (fillNumber) fillNumber.value = defVal;
+				app.State.do_action(
+					new app.Actions.Update_layer_action(config.layer.id, {
+						fillOpacity: defVal
+					})
+				);
+			});
+		}
+
 		document.getElementById('layers_base').addEventListener('dblclick', function (event) {
 			var target = event.target;
 			var item = target.closest('.item');
@@ -449,10 +555,16 @@ class GUI_layers_class {
 					_this.hide_adj_menu();
 				}
 			}
+			var fillPopupEl = document.getElementById('layer_fill_slider_popup');
+			var target = event.target;
 			if (opPopup && !opPopup.classList.contains('hidden')) {
-				var target = event.target;
 				if (!target.closest('#layer_opacity_slider_popup') && !target.closest('#layer_opacity_popup_btn')) {
 					opPopup.classList.add('hidden');
+				}
+			}
+			if (fillPopupEl && !fillPopupEl.classList.contains('hidden')) {
+				if (!target.closest('#layer_fill_slider_popup') && !target.closest('#layer_fill_popup_btn')) {
+					fillPopupEl.classList.add('hidden');
 				}
 			}
 		});
@@ -1312,6 +1424,8 @@ class GUI_layers_class {
 		var blendSelect = document.getElementById('layer_blend_select');
 		var opNumber = document.getElementById('layer_opacity_number');
 		var opRange = document.getElementById('layer_opacity_range');
+		var fillNumber = document.getElementById('layer_fill_number');
+		var fillRange = document.getElementById('layer_fill_range');
 
 		if (config.layer && config.layer.id != null) {
 			var comp = config.layer.composition || 'source-over';
@@ -1320,6 +1434,7 @@ class GUI_layers_class {
 				comp = 'source-over';
 			}
 			var opacity = (config.layer.opacity != null) ? Math.round(config.layer.opacity) : 100;
+			var fillOpacity = (config.layer.fillOpacity != null) ? Math.round(config.layer.fillOpacity) : 100;
 
 			if (blendSelect) {
 				// If value is missing from the select (e.g. exotic Porter-Duff), fall back visually
@@ -1338,6 +1453,14 @@ class GUI_layers_class {
 				opRange.value = opacity;
 				opRange.disabled = false;
 			}
+			if (fillNumber) {
+				fillNumber.value = fillOpacity;
+				fillNumber.disabled = false;
+			}
+			if (fillRange) {
+				fillRange.value = fillOpacity;
+				fillRange.disabled = false;
+			}
 		} else {
 			if (blendSelect) {
 				blendSelect.value = 'source-over';
@@ -1350,6 +1473,14 @@ class GUI_layers_class {
 			if (opRange) {
 				opRange.value = 100;
 				opRange.disabled = true;
+			}
+			if (fillNumber) {
+				fillNumber.value = 100;
+				fillNumber.disabled = true;
+			}
+			if (fillRange) {
+				fillRange.value = 100;
+				fillRange.disabled = true;
 			}
 		}
 	}

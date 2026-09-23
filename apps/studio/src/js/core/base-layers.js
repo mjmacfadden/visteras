@@ -753,6 +753,87 @@ class Base_layers_class {
 	 * @param {object} object
 	 * @param {boolean} is_preview
 	 */
+
+	/**
+	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
+	 */
+	_draw_layer_content(ctx, object, is_preview) {
+		if (object.type == "image") {
+			ctx.save();
+			ctx.translate(object.x + object.width / 2, object.y + object.height / 2);
+			ctx.rotate((object.rotate * Math.PI) / 180);
+			ctx.drawImage(
+				object.link_canvas != null ? object.link_canvas : object.link,
+				-object.width / 2,
+				-object.height / 2,
+				object.width,
+				object.height
+			);
+			ctx.restore();
+		} else if (object.render_function) {
+			var render_class = object.render_function[0];
+			var render_function = object.render_function[1];
+			if (
+				this.Base_gui.GUI_tools &&
+				this.Base_gui.GUI_tools.tools_modules[render_class] &&
+				typeof this.Base_gui.GUI_tools.tools_modules[render_class].object[
+					render_function
+				] !=
+				"undefined"
+			) {
+				this.Base_gui.GUI_tools.tools_modules[render_class].object[
+					render_function
+				](ctx, object, is_preview);
+			}
+		}
+	}
+
+	/**
+	 * True when layer has style FX that should remain visible at Fill Opacity < 100.
+	 */
+	_layer_has_style_fx(object) {
+		var filters = object && object.filters;
+		if (!filters || !filters.length) return false;
+		var styleNames = {
+			shadow: 1, 'drop-shadow': 1, outer_glow: 1, stroke: 1,
+			inner_glow: 1, color_overlay: 1
+		};
+		for (var i = 0; i < filters.length; i++) {
+			var f = filters[i];
+			if (!f || f.disabled === true || f.visible === false) continue;
+			if (Array.isArray(this.disabled_filter_id)) {
+				if (this.disabled_filter_id.includes(f.id) || this.disabled_filter_id.includes(f.name)
+					|| (f.name === 'drop-shadow' && this.disabled_filter_id.includes('shadow'))) {
+					continue;
+				}
+			} else if (f.id == this.disabled_filter_id || f.name == this.disabled_filter_id) {
+				continue;
+			}
+			if (styleNames[f.name]) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * After CSS drop-shadow / outer_glow were drawn with the content, punch the
+	 * content footprint and redraw it at fillOpacity so FX stay full-strength
+	 * (Photoshop Fill Opacity).
+	 */
+	_apply_fill_opacity_punch(ctx, object, fill, is_preview) {
+		if (fill >= 0.999) return;
+		ctx.save();
+		ctx.filter = 'none';
+		// Remove full-strength content; leave shadow/glow that CSS filter added outside.
+		ctx.globalCompositeOperation = 'destination-out';
+		ctx.globalAlpha = 1;
+		this._draw_layer_content(ctx, object, is_preview);
+		// Redraw content at fill (caller already applied layer opacity via globalAlpha).
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = fill;
+		this._draw_layer_content(ctx, object, is_preview);
+		ctx.restore();
+	}
+
 	render_object(ctx, object, is_preview) {
 		if (object.visible == false || object.type == null || is_group(object)) return;
 
@@ -761,8 +842,66 @@ class Base_layers_class {
 			return;
 		}
 
-		this.pre_render_object(ctx, object);
+		var fillOpacity = (object.fillOpacity != null) ? Number(object.fillOpacity) : 100;
+		if (!isFinite(fillOpacity)) fillOpacity = 100;
+		fillOpacity = Math.max(0, Math.min(100, fillOpacity));
+		var fill = fillOpacity / 100;
+		var hasStyleFx = this._layer_has_style_fx(object);
 
+		// Photoshop Fill: fade pixels only. With style FX, render offscreen so we can
+		// punch content without erasing other layers, then blit under layer opacity.
+		if (fill < 0.999 && hasStyleFx) {
+			var layerAlpha = ctx.globalAlpha;
+			var canvas = this.create_new_canvas(ctx);
+			var bctx = canvas.getContext("2d");
+			var t = null;
+			if (typeof ctx.getTransform == "function")
+				t = ctx.getTransform();
+			bctx.setTransform(
+				t ? t.a : 1,
+				t ? t.b : 0,
+				t ? t.c : 0,
+				t ? t.d : 1,
+				t ? t.e : 0,
+				t ? t.f : 0
+			);
+			bctx.globalAlpha = 1;
+			bctx.globalCompositeOperation = 'source-over';
+
+			this.pre_render_object(bctx, object);
+			this._render_object_body(bctx, object, is_preview);
+			this._apply_fill_opacity_punch(bctx, object, fill, is_preview);
+			this.after_render_object(bctx, object);
+
+			ctx.save();
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.filter = 'none';
+			ctx.globalAlpha = layerAlpha;
+			ctx.drawImage(canvas, 0, 0);
+			ctx.restore();
+			canvas.width = 1;
+			canvas.height = 1;
+			return;
+		}
+
+		if (fill < 0.999 && !hasStyleFx) {
+			ctx.save();
+			ctx.globalAlpha = ctx.globalAlpha * fill;
+		}
+
+		this.pre_render_object(ctx, object);
+		this._render_object_body(ctx, object, is_preview);
+		this.after_render_object(ctx, object);
+
+		if (fill < 0.999 && !hasStyleFx) {
+			ctx.restore();
+		}
+	}
+
+	/**
+	 * Shared content draw used by render_object (mask + image / render_function).
+	 */
+	_render_object_body(ctx, object, is_preview) {
 		var masked = object.mask != null && object.mask.enabled !== false;
 
 		if (masked === true) {
@@ -790,41 +929,7 @@ class Base_layers_class {
 			bctx.filter = ctx.filter;
 
 			//draw the object into the buffer
-			if (object.type == "image") {
-				bctx.save();
-				bctx.translate(
-					object.x + object.width / 2,
-					object.y + object.height / 2
-				);
-				bctx.rotate((object.rotate * Math.PI) / 180);
-				bctx.drawImage(
-					object.link_canvas != null ? object.link_canvas : object.link,
-					-object.width / 2,
-					-object.height / 2,
-					object.width,
-					object.height
-				);
-				bctx.restore();
-			} else if (object.render_function) {
-				//call render function from other module
-				var render_class = object.render_function[0];
-				var render_function = object.render_function[1];
-				if (
-					this.Base_gui.GUI_tools &&
-					this.Base_gui.GUI_tools.tools_modules[render_class] &&
-					typeof this.Base_gui.GUI_tools.tools_modules[render_class].object[
-						render_function
-					] !=
-					"undefined"
-				) {
-					this.Base_gui.GUI_tools.tools_modules[render_class].object[
-						render_function
-					](bctx, object, is_preview);
-				} else {
-					this.render_success = false;
-					console.log("Error: unknown layer type: " + object.type);
-				}
-			}
+			this._draw_layer_content(bctx, object, is_preview);
 
 			//apply the mask (alpha multiply) on the buffer content
 			bctx.filter = "none";
@@ -840,47 +945,8 @@ class Base_layers_class {
 			canvas.width = 1;
 			canvas.height = 1;
 		} else {
-			//example with canvas object - other types should overwrite this method
-			if (object.type == "image") {
-				//image - default behavior
-				ctx.save();
-
-				ctx.translate(object.x + object.width / 2, object.y + object.height / 2);
-				ctx.rotate((object.rotate * Math.PI) / 180);
-				// TODO - Not sure why the check should be with null,
-				// if nothing will break, then better to check if it's just truthy
-				ctx.drawImage(
-					object.link_canvas != null ? object.link_canvas : object.link,
-					-object.width / 2,
-					-object.height / 2,
-					object.width,
-					object.height
-				);
-
-				ctx.restore();
-			} else if (object.render_function) {
-				//call render function from other module
-				var render_class = object.render_function[0];
-				var render_function = object.render_function[1];
-				if (
-					this.Base_gui.GUI_tools &&
-					this.Base_gui.GUI_tools.tools_modules[render_class] &&
-					typeof this.Base_gui.GUI_tools.tools_modules[render_class].object[
-						render_function
-					] !=
-					"undefined"
-				) {
-					this.Base_gui.GUI_tools.tools_modules[render_class].object[
-						render_function
-					](ctx, object, is_preview);
-				} else {
-					this.render_success = false;
-					console.log("Error: unknown layer type: " + object.type);
-				}
-			}
+			this._draw_layer_content(ctx, object, is_preview);
 		}
-
-		this.after_render_object(ctx, object);
 	}
 
 	/**
