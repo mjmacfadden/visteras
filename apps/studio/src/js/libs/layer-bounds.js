@@ -3,6 +3,48 @@ import config from './../config.js';
 import { is_group, get_descendant_ids } from './layer-tree.js';
 
 /**
+ * Calculates the axis-aligned bounding box of a bounds object that may be rotated.
+ * @param {{ x: number, y: number, width: number, height: number, rotate?: number }} b
+ * @returns {{ minX: number, minY: number, maxX: number, maxY: number }}
+ */
+function get_bounds_aabb(b) {
+	if (!b) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+	const rot = b.rotate || 0;
+	if (rot === 0) {
+		return {
+			minX: b.x,
+			minY: b.y,
+			maxX: b.x + b.width,
+			maxY: b.y + b.height,
+		};
+	}
+	const cx = b.x + b.width / 2;
+	const cy = b.y + b.height / 2;
+	const hw = b.width / 2;
+	const hh = b.height / 2;
+	const rad = rot * Math.PI / 180;
+	const cosA = Math.cos(rad);
+	const sinA = Math.sin(rad);
+
+	const corners = [
+		{ dx: -hw, dy: -hh },
+		{ dx: hw, dy: -hh },
+		{ dx: hw, dy: hh },
+		{ dx: -hw, dy: hh },
+	];
+	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	for (const c of corners) {
+		const x = cx + c.dx * cosA - c.dy * sinA;
+		const y = cy + c.dx * sinA + c.dy * cosA;
+		if (x < minX) minX = x;
+		if (y < minY) minY = y;
+		if (x > maxX) maxX = x;
+		if (y > maxY) maxY = y;
+	}
+	return { minX, minY, maxX, maxY };
+}
+
+/**
  * Calculates the tight non-transparent pixel content bounds of a layer in world canvas coordinates.
  * Returns null if the layer is empty, completely transparent, or has no visible geometry.
  *
@@ -81,19 +123,20 @@ export function get_layer_content_bounds(layer) {
 				const cb = get_layer_content_bounds(child);
 				if (cb && cb.width > 0 && cb.height > 0) {
 					found = true;
-					if (cb.x < minX) minX = cb.x;
-					if (cb.y < minY) minY = cb.y;
-					if (cb.x + cb.width > maxX) maxX = cb.x + cb.width;
-					if (cb.y + cb.height > maxY) maxY = cb.y + cb.height;
+					const aabb = get_bounds_aabb(cb);
+					if (aabb.minX < minX) minX = aabb.minX;
+					if (aabb.minY < minY) minY = aabb.minY;
+					if (aabb.maxX > maxX) maxX = aabb.maxX;
+					if (aabb.maxY > maxY) maxY = aabb.maxY;
 				}
 			}
 		}
 		if (found && maxX > minX && maxY > minY) {
 			return {
-				x: minX,
-				y: minY,
-				width: maxX - minX,
-				height: maxY - minY,
+				x: Math.round(minX),
+				y: Math.round(minY),
+				width: Math.round(maxX - minX),
+				height: Math.round(maxY - minY),
 				rotate: 0,
 			};
 		}
@@ -200,20 +243,21 @@ export function get_selection_content_bounds(layers) {
 		const b = get_layer_content_bounds(layer);
 		if (b && b.width > 0 && b.height > 0) {
 			found = true;
-			if (b.x < minX) minX = b.x;
-			if (b.y < minY) minY = b.y;
-			if (b.x + b.width > maxX) maxX = b.x + b.width;
-			if (b.y + b.height > maxY) maxY = b.y + b.height;
+			const aabb = get_bounds_aabb(b);
+			if (aabb.minX < minX) minX = aabb.minX;
+			if (aabb.minY < minY) minY = aabb.minY;
+			if (aabb.maxX > maxX) maxX = aabb.maxX;
+			if (aabb.maxY > maxY) maxY = aabb.maxY;
 		}
 	}
 
 	if (!found || maxX <= minX || maxY <= minY) return null;
 
 	return {
-		x: minX,
-		y: minY,
-		width: maxX - minX,
-		height: maxY - minY,
+		x: Math.round(minX),
+		y: Math.round(minY),
+		width: Math.round(maxX - minX),
+		height: Math.round(maxY - minY),
 		rotate: 0,
 	};
 }
