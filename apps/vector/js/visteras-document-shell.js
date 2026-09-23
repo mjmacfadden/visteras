@@ -187,6 +187,27 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     return { w: width, h: height };
   }
 
+
+  /** Full canvas reset that recreates Layer 1 (bare content clear alone breaks tools). */
+  function resetCanvas(width, height) {
+    try {
+      if (typeof sc.clear === 'function') {
+        sc.clear();
+      } else {
+        console.warn('[visteras-document-shell] svgCanvas.clear missing; refusing bare content clear');
+      }
+    } catch (err) {
+      console.warn('[visteras-document-shell] clear failed', err);
+    }
+    if (width && height) setResolution(width, height);
+    else {
+      try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
+    }
+    try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
+    try { svgEditor.topPanel?.updateContextPanel?.(); } catch { /* ignore */ }
+    updateRulers();
+  }
+
   function captureSvg() {
     try { return sc.getSvgString?.() || EMPTY_SVG; } catch { return EMPTY_SVG; }
   }
@@ -194,15 +215,20 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   function loadSvg(svgString, width, height) {
     state.suppressDirty = true;
     try {
-      if (width && height) setResolution(width, height);
-      if (svgString) {
-        const ok = sc.setSvgString?.(svgString);
-        if (ok === false) sc.clearSvgContentElement?.();
+      const empty = !svgString || svgString === EMPTY_SVG || !svgHasUserContent(svgString);
+      if (empty) {
+        resetCanvas(width, height);
       } else {
-        sc.clearSvgContentElement?.();
+        if (width && height) setResolution(width, height);
+        const ok = sc.setSvgString?.(svgString);
+        if (ok === false) {
+          resetCanvas(width, height);
+        } else {
+          try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
+          try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
+          updateRulers();
+        }
       }
-      try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
-      updateRulers();
     } finally {
       setTimeout(() => { state.suppressDirty = false; }, 60);
     }
@@ -381,8 +407,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       const { w, h } = computePaddedWorkspaceSize();
       state.suppressDirty = true;
       try {
-        sc.clearSvgContentElement?.();
-        setResolution(w, h);
+        resetCanvas(w, h);
       } finally {
         setTimeout(() => { state.suppressDirty = false; }, 50);
       }
@@ -417,8 +442,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       const doc = getActiveDoc();
       state.suppressDirty = true;
       try {
-        sc.clearSvgContentElement?.();
-        setResolution(width, height);
+        resetCanvas(width, height);
       } finally {
         setTimeout(() => { state.suppressDirty = false; }, 50);
       }
@@ -450,8 +474,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     state.activeId = newDoc.id;
     state.suppressDirty = true;
     try {
-      sc.clearSvgContentElement?.();
-      setResolution(width, height);
+      resetCanvas(width, height);
       newDoc.svg = captureSvg();
     } finally {
       setTimeout(() => { state.suppressDirty = false; }, 50);
@@ -871,10 +894,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         const { w, h } = computePaddedWorkspaceSize();
         state.suppressDirty = true;
         try {
+          // Fit artboard only. Never strip svgcontent here — that drops Layer 1
+          // / current_drawing_ and drawing tools stop rendering on the artboard.
           setResolution(w, h);
-          if (!svgHasUserContent(captureSvg())) {
-            sc.clearSvgContentElement?.();
-          }
         } finally {
           setTimeout(() => { state.suppressDirty = false; }, 80);
         }

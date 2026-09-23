@@ -3,12 +3,13 @@
  * Matches Studio layout patterns with Vector orange accent (#fa7c1b).
  */
 
-/* Insert document tabs row under options bar */
+/* Document tabs under options bar, in workspace columns only (Studio-like).
+   Left toolbar stays in the left column — tabs must NOT sit above/over tools. */
 .svg_editor {
   grid-template-rows: 45px 28px 16px 1fr 24px !important;
   grid-template-areas:
     "top top top top"
-    "tabs tabs tabs tabs"
+    "left tabs tabs side"
     "left corner rulerX side"
     "left rulerY workarea side"
     "bottom bottom bottom bottom" !important;
