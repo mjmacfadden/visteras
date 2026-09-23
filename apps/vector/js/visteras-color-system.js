@@ -1977,6 +1977,30 @@ function mountAppearanceColors(ctrl, svgEditor) {
       lastWeight = next;
       writeStrokeWidth(next, { live: true });
     }, { passive: false });
+
+    const spinRoot = weightInput.closest('.vcs-appearance-weight')
+      ?.querySelector('.vcs-appearance-weight-spin');
+    if (spinRoot) {
+      const nudge = (dir) => {
+        const next = stepStrokeWeight(weightInput.value, dir);
+        weightInput.value = formatStrokeWeight(next);
+        lastWeight = next;
+        writeStrokeWidth(next, { live: true });
+      };
+      for (const btn of spinRoot.querySelectorAll('.vcs-appearance-weight-spin-btn')) {
+        btn.addEventListener('mousedown', (e) => {
+          // Keep focus on the weight field; avoid label stealing default.
+          e.preventDefault();
+          e.stopPropagation();
+        });
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const dir = Number(btn.dataset.dir) || 0;
+          if (dir) nudge(dir);
+        });
+      }
+    }
   }
 
   for (const btn of alignBtns) {

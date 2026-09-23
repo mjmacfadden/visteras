@@ -988,20 +988,30 @@
   text-transform: uppercase !important;
 }
 
+.vcs-appearance-weight-control {
+  display: inline-flex !important;
+  align-items: stretch !important;
+  flex-shrink: 0 !important;
+  border: 1px solid #444 !important;
+  border-radius: 2px !important;
+  background: #242424 !important;
+  overflow: hidden !important;
+}
+
 .vcs-appearance-weight input {
   /* ~3 digits / values like 0.75–100; keep compact in Appearance stroke row */
   width: 4ch !important;
   min-width: 4ch !important;
   max-width: 4.5ch !important;
-  background: #242424 !important;
-  border: 1px solid #444 !important;
+  background: transparent !important;
+  border: none !important;
   color: #eee !important;
-  border-radius: 2px !important;
+  border-radius: 0 !important;
   padding: 2px 2px !important;
   font-size: 11px !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
   box-sizing: border-box !important;
-  /* Native spinners inflate width; wheel/arrows handled in JS */
+  /* Native spinners inflate width; compact custom ↑↓ sit beside the field */
   -moz-appearance: textfield !important;
   appearance: textfield !important;
 }
@@ -1013,7 +1023,51 @@
 
 .vcs-appearance-weight input:focus {
   outline: none !important;
+}
+
+.vcs-appearance-weight-control:focus-within {
   border-color: #fa7c1b !important;
+}
+
+.vcs-appearance-weight-spin {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 11px !important;
+  min-width: 11px !important;
+  border-left: 1px solid #444 !important;
+  flex-shrink: 0 !important;
+}
+
+.vcs-appearance-weight-spin-btn {
+  flex: 1 1 50% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: #2a2a2a !important;
+  color: #aaa !important;
+  font-size: 6px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  user-select: none !important;
+}
+
+.vcs-appearance-weight-spin-btn + .vcs-appearance-weight-spin-btn {
+  border-top: 1px solid #444 !important;
+}
+
+.vcs-appearance-weight-spin-btn:hover {
+  background: #3a3a3a !important;
+  color: #fa7c1b !important;
+}
+
+.vcs-appearance-weight-spin-btn:active {
+  background: #444 !important;
+  color: #fff !important;
 }
 
 /* Stroke alignment segmented control (Center / Inside / Outside) */
