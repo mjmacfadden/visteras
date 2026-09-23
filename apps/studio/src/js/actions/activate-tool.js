@@ -97,6 +97,8 @@ export class Activate_tool_action extends Base_action {
 				defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
 			} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 				defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
+			} else if (config.TOOL && config.TOOL.name === 'fill') {
+				defaultCursor = "url('images/icons/cursor-fill.svg') 8 22, crosshair";
 			}
 
 			if (mainWrapper && mainWrapper.style.cursor != defaultCursor) {
@@ -277,6 +279,8 @@ export class Activate_tool_action extends Base_action {
 			defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 			defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
+		} else if (config.TOOL && config.TOOL.name === 'fill') {
+			defaultCursor = "url('images/icons/cursor-fill.svg') 8 22, crosshair";
 		}
 
 		if (mainWrapper && mainWrapper.style.cursor != defaultCursor) {

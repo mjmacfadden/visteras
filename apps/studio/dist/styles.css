@@ -3278,6 +3278,10 @@ crop handles) win over the default crosshair - not !important so inline styles a
 .middle_area.tool-pen #main_wrapper * {
 	cursor: url('../images/icons/cursor-pen.svg') 1 1, crosshair !important;
 }
+.middle_area.tool-fill #main_wrapper,
+.middle_area.tool-fill #main_wrapper * {
+	cursor: url('../images/icons/cursor-fill.svg') 8 22, crosshair !important;
+}
 .middle_area.tool-direct_select #main_wrapper,
 .middle_area.tool-direct_select #main_wrapper * {
 	cursor: url('../images/icons/cursor-direct-select.svg') 1 1, default !important;
