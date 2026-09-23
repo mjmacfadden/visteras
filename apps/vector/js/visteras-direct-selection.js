@@ -219,8 +219,114 @@ export function mountDirectSelection(editor) {
     if (active && ['changed','selected','zoomed','sourcechanged'].includes(event)) schedule();
     return result;
   };
+  // Paint/appearance must reach Direct Selection targets even though we clear
+  // SVG-Edit's selection (so Selection grips stay out of the way).
+  function paintLeaves(elements) {
+    const out = [];
+    for (const el of elements) {
+      if (!el) continue;
+      if (el.tagName === 'g') {
+        for (const child of el.querySelectorAll('*')) {
+          if (child.nodeName !== 'g') out.push(child);
+        }
+      } else out.push(el);
+    }
+    return out;
+  }
+  function applyPaintWhileActive(attr, value, { noUndo = false, skipTags = [] } = {}) {
+    if (!active) return false;
+    const targets = selectedElements().length
+      ? selectedElements()
+      : records.filter((r) => r.el?.isConnected).map((r) => r.el);
+    let elems = paintLeaves(targets).filter((el) => !skipTags.includes(el.tagName));
+    if (!elems.length) return false;
+    // Never call changeSelectedAttribute here — under pathedit it invokes
+    // pathActions.moveNode and throws when native path K is null.
+    const next = value == null || value === '' ? null : String(value);
+    const { ChangeElementCommand, BatchCommand } = sc.history || {};
+    const batch = (!noUndo && BatchCommand && ChangeElementCommand)
+      ? new BatchCommand(`Change ${attr}`)
+      : null;
+    const changed = [];
+    for (const el of elems) {
+      if (!el?.isConnected) continue;
+      const prev = el.getAttribute(attr);
+      if ((prev == null ? null : String(prev)) === next) continue;
+      if (batch) batch.addSubCommand(new ChangeElementCommand(el, { [attr]: prev }));
+      if (next == null) el.removeAttribute(attr);
+      else el.setAttribute(attr, next);
+      changed.push(el);
+    }
+    if (batch && changed.length) {
+      try { sc.addCommandToHistory?.(batch); } catch { /* ignore */ }
+    }
+    if (changed.length) sc.call('changed', changed);
+    return changed.length > 0;
+  }
+  // Keep cur-style updates from stock APIs, but never let them run the broken
+  // pathedit changeSelectedAttribute path for empty SVG selection.
+  const origSetColor = sc.setColor.bind(sc);
+  sc.setColor = function (type, val, preventUndo) {
+    try {
+      // Prefer cur-style only when DS owns the selection (SVG selection empty).
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (typeof sc.setCurShape === 'function') sc.setCurShape(type, val);
+        if (typeof sc.setCurProperties === 'function') {
+          sc.setCurProperties(`${type}_paint`, { type: 'solidColor' });
+        }
+        if (sc.curProperties) sc.curProperties[type] = val;
+        if (sc.curShape) sc.curShape[type] = val;
+      } else {
+        origSetColor(type, val, preventUndo);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setColor cur-style failed', err);
+    }
+    applyPaintWhileActive(type, val, {
+      noUndo: !!preventUndo,
+      skipTags: type === 'fill' ? ['polyline', 'line'] : [],
+    });
+  };
+  const origSetStrokeWidth = sc.setStrokeWidth.bind(sc);
+  sc.setStrokeWidth = function (val) {
+    try {
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (typeof sc.setCurProperties === 'function') sc.setCurProperties('stroke_width', val);
+        if (sc.curProperties) sc.curProperties.stroke_width = val;
+        if (sc.curShape) sc.curShape.stroke_width = val;
+      } else {
+        origSetStrokeWidth(val);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setStrokeWidth cur-style failed', err);
+    }
+    applyPaintWhileActive('stroke-width', val, { noUndo: false });
+  };
+  const origSetPaintOpacity = sc.setPaintOpacity.bind(sc);
+  sc.setPaintOpacity = function (type, val, preventUndo) {
+    try {
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (sc.curShape) sc.curShape[`${type}_opacity`] = val;
+      } else {
+        origSetPaintOpacity(type, val, preventUndo);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setPaintOpacity cur-style failed', err);
+    }
+    applyPaintWhileActive(`${type}-opacity`, val, { noUndo: !!preventUndo });
+  };
+
   sc.directSelection = {
     get active() { return active; },
+    getSelectedElements: () => selectedElements(),
+    // Paint targets: prefer elems with selected anchors; if none, all paths in the
+    // current DS session (so Appearance fill/stroke still hit the edited object).
+    getPaintTargets() {
+      const selected = selectedElements();
+      if (selected.length) return selected;
+      if (!active) return [];
+      return records.filter((r) => r.el?.isConnected).map((r) => r.el);
+    },
     // Use the same anchor overlay for single paths and compound selections.
     // SVGEdit's native editor enters path mode with every point selected,
     // which makes Convert apply to the entire object instead of the point the
@@ -353,7 +459,10 @@ export function mountDirectSelection(editor) {
       schedule(); return;
     }
     if (!active) return;
-    if (key === 'escape') { stop(e); if (gesture) finish(true); else clearPoints(); schedule(); }
+    if (key === 'escape') {
+      if (document.getElementById('vcs_picker_modal')?.classList.contains('open')) return;
+      stop(e); if (gesture) finish(true); else clearPoints(); schedule();
+    }
     else if (!command && !e.altKey && ['backspace','delete'].includes(key)) { stop(e); removeSelected(); }
     else if (!command && !e.altKey && ['arrowleft','arrowright','arrowup','arrowdown'].includes(key)) {
       stop(e);

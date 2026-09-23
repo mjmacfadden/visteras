@@ -28,14 +28,6 @@ function ensureStyles() {
       outline: 1px dashed rgba(250, 124, 27, 0.45);
       outline-offset: 2px;
     }
-    #prop_selection_type {
-      font-size: 11px;
-      font-weight: 600;
-      color: #fa7c1b;
-      letter-spacing: 0.02em;
-      margin: 0 0 8px;
-      padding: 4px 0;
-    }
     .prop_check_row {
       display: flex;
       align-items: center;
@@ -308,20 +300,12 @@ function getActiveImage(svgEditor) {
 function syncRefControls(svgEditor) {
   const sc = svgEditor.svgCanvas;
   const sel = (sc && typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements().filter(Boolean) : [];
-  const el = svgEditor.selectedElement || (sel.length === 1 ? sel[0] : null);
-  const typeEl = document.getElementById('prop_selection_type');
   const refGroup = document.getElementById('prop_image_ref_group');
   const refCb = document.getElementById('ref_as_reference');
   const lockCb = document.getElementById('ref_lock');
   const imgEl = getActiveImage(svgEditor);
   const isImg = !!imgEl && (sel.length <= 1);
 
-  if (typeEl) {
-    if (isImg) typeEl.textContent = 'Image';
-    else if (el) typeEl.textContent = el.nodeName || el.tagName || '';
-    else typeEl.textContent = '';
-    typeEl.style.display = el ? 'block' : 'none';
-  }
   if (refGroup) refGroup.style.display = isImg ? 'block' : 'none';
   if (!isImg || !refCb || !lockCb || !imgEl) return;
 
@@ -445,13 +429,8 @@ function wireRefControls(svgEditor) {
 
 function injectPropChrome() {
   const active = document.getElementById('prop_active_container');
-  if (!active || document.getElementById('prop_selection_type')) return;
-
-  const type = document.createElement('div');
-  type.id = 'prop_selection_type';
-  type.className = 'prop_selection_type';
-  type.style.display = 'none';
-  active.insertBefore(type, active.firstChild);
+  // Idempotent: image ref controls are the chrome we inject (type label removed).
+  if (!active || document.getElementById('prop_image_ref_group')) return;
 
   const imgGroup = document.getElementById('prop_image_group');
   const refGroup = document.createElement('div');

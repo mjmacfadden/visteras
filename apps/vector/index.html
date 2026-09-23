@@ -19,8 +19,9 @@
   <link href="./svgedit.css" rel="stylesheet" media="all">
 
   <!-- Visteras Studio Companion Theme -->
-  <link href="./css/visteras-theme.css" rel="stylesheet" media="all">
+  <link href="./css/visteras-theme.css?v=smoke-68-9" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css" rel="stylesheet" media="all">
+  <link href="./css/visteras-color-system.css?v=smoke-68-9" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -87,7 +88,7 @@
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
             <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">⌘Y</span></div>
             <div class="menu_dropdown_separator"></div>
@@ -170,16 +171,17 @@
   <script type="module">
     import Editor from './Editor.js?v=shape-transform-controls-3';
     import { mountPenTools } from './js/visteras-pen-tools.js';
-    import { mountSelectionTools } from './js/visteras-selection.js?v=studio-rotation-cursor-7';
+    import { mountSelectionTools } from './js/visteras-selection.js?v=smoke-68-9';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
-    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js';
+    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=smoke-68-9';
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=smoke-68-9';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -647,7 +649,10 @@
       });
 
       document.getElementById('action_toggle_rulers')?.addEventListener('click', () => {
-        document.getElementById('view_rulers')?.click();
+        // SVG-Edit has no #view_rulers control — document shell owns ruler toggle.
+        if (window.__visterasDocumentShell?.toggleRulers) {
+          window.__visterasDocumentShell.toggleRulers();
+        }
       });
 
       document.getElementById('action_source')?.addEventListener('click', () => {
@@ -854,11 +859,15 @@
             return;
           }
 
-          // Command/Ctrl + R: Toggle Rulers
-          if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+          // Command/Ctrl + R: Toggle Rulers (metaKey mac + ctrlKey win/linux).
+          // #view_rulers does not exist in this SVG-Edit build — route through shell.
+          if (!e.shiftKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
             e.preventDefault();
             e.stopPropagation();
-            document.getElementById('view_rulers')?.click();
+            e.stopImmediatePropagation();
+            if (window.__visterasDocumentShell?.toggleRulers) {
+              window.__visterasDocumentShell.toggleRulers();
+            }
             return;
           }
 
@@ -977,6 +986,40 @@
                 <span class="prop_section_title">Appearance</span>
               </div>
               <div class="prop_section_body" id="sec_appearance_body">
+                <div class="prop_row vcs-appearance-colors" id="prop_appearance_colors">
+                  <div class="vcs-appearance-row" data-target="fill">
+                    <button type="button" class="vcs-appearance-chip" id="vcs_app_fill_chip" title="Fill color (click to edit)" aria-label="Fill color"></button>
+                    <button type="button" class="vcs-appearance-target" id="vcs_app_fill_target" data-target="fill" title="Edit fill color">Fill</button>
+                    <button type="button" class="vcs-appearance-none" id="vcs_app_fill_none" title="No fill (/)" aria-label="No fill">⌀</button>
+                  </div>
+                  <div class="vcs-appearance-row vcs-appearance-row-stroke" data-target="stroke">
+                    <button type="button" class="vcs-appearance-chip vcs-appearance-chip-stroke" id="vcs_app_stroke_chip" title="Stroke color (click to edit)" aria-label="Stroke color">
+                      <span class="vcs-appearance-stroke-hole" id="vcs_app_stroke_hole"></span>
+                    </button>
+                    <button type="button" class="vcs-appearance-target" id="vcs_app_stroke_target" data-target="stroke" title="Edit stroke color">Stroke</button>
+                    <label class="vcs-appearance-weight" title="Stroke weight">
+                      <span class="vcs-appearance-weight-label">W</span>
+                      <span class="vcs-appearance-weight-control">
+                        <input type="number" id="vcs_app_stroke_weight" min="0" max="999" step="any" value="1" aria-label="Stroke weight" />
+                        <span class="vcs-appearance-weight-spin" role="group" aria-label="Stroke weight steppers">
+                          <button type="button" class="vcs-appearance-weight-spin-btn" data-dir="1" tabindex="-1" title="Increase stroke weight" aria-label="Increase stroke weight">▲</button>
+                          <button type="button" class="vcs-appearance-weight-spin-btn" data-dir="-1" tabindex="-1" title="Decrease stroke weight" aria-label="Decrease stroke weight">▼</button>
+                        </span>
+                      </span>
+                    </label>
+                    <div class="vcs-stroke-align" id="vcs_app_stroke_align" role="group" aria-label="Stroke alignment">
+                      <button type="button" class="vcs-stroke-align-btn active" data-align="center" title="Align stroke to center of path" aria-label="Center stroke" aria-pressed="true">
+                        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="3"/></svg>
+                      </button>
+                      <button type="button" class="vcs-stroke-align-btn" data-align="inside" title="Align stroke inside path" aria-label="Inside stroke" aria-pressed="false">
+                        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1"/><rect x="4.5" y="4.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+                      </button>
+                      <button type="button" class="vcs-stroke-align-btn" data-align="outside" title="Align stroke outside path" aria-label="Outside stroke" aria-pressed="false">
+                        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><rect x="2.5" y="2.5" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <div class="prop_row">
                   <div id="slot_opacity" style="flex:1;"></div>
                   <div id="slot_blur" style="flex:1;"></div>
@@ -1099,7 +1142,6 @@
                 <span class="prop_section_title">Path & Nodes</span>
               </div>
               <div class="prop_section_body" id="sec_path_node_body">
-                <div class="prop_field_pair" id="slot_node_xy"></div>
                 <div class="prop_row">
                   <div class="prop_label" style="min-width:70px;">Convert:</div>
                   <div class="prop_actions_flow" style="gap:4px;">
@@ -1359,8 +1401,13 @@
       moveEl('tool_word_spacing', 'slot_word_spacing');
 
       // Relocate Path controls
-      moveEl('path_node_x', 'slot_node_xy');
-      moveEl('path_node_y', 'slot_node_xy');
+      // path_node_x / path_node_y removed from Properties (Mike smoke): SVG-Edit
+      // attrChanger wiring exists but the relocated X/Y spins were not a compelling,
+      // reliable node-edit UX — hide legacy inputs; keep Convert + node actions.
+      for (const id of ['path_node_x', 'path_node_y']) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      }
       // The legacy curve/straight control is intentionally left in SVGEdit's
       // hidden path toolbar. Direct Selection uses the explicit Convert
       // corner/smooth controls above instead.
@@ -1736,6 +1783,9 @@
 
     // Document shell: tabs, New Document modal, fit artboard, status bar, rulers/units
     mountVisterasDocumentShell({ svgEditor });
+
+    // Color system: Color|Swatches tabs, picker modal, toolbar + Appearance fill/stroke
+    mountVisterasColorSystem({ svgEditor });
   </script>
 </body>
 </html>

@@ -441,3 +441,50 @@
   color: #888888;
   font-size: 12px;
 }
+
+/* Ruler right-click unit menu (Studio parity, Vector orange accent) */
+.vector-ruler-context-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 150px;
+  padding: 4px 0;
+  background: #262626;
+  color: #e0e0e0;
+  border: 1px solid #444444;
+  border-radius: 5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+  user-select: none;
+}
+
+.vector-ruler-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 14px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: #e0e0e0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.vector-ruler-context-item:hover {
+  background: #fa7c1b;
+  color: #111111;
+}
+
+.vector-ruler-context-item:hover .vector-ruler-context-check {
+  color: #111111;
+}
+
+.vector-ruler-context-check {
+  width: 12px;
+  font-weight: 700;
+  color: #fa7c1b;
+  flex-shrink: 0;
+}
