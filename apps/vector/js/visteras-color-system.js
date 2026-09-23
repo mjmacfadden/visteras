@@ -1239,10 +1239,13 @@ function mountToolbarColorSwatches(svgEditor, ctrl) {
 
   const sc = svgEditor.svgCanvas;
   if (sc && typeof sc.bind === 'function') {
-    sc.bind('selectedChanged', () => { ctrl.syncFromCanvas(); updateSwatches(); });
-    sc.bind('elementChanged', () => { ctrl.syncFromCanvas(); updateSwatches(); });
-    sc.bind('changed', () => { ctrl.syncFromCanvas(); updateSwatches(); });
-    sc.bind('transition', updateSwatches);
+    const syncSwatches = () => { ctrl.syncFromCanvas(); updateSwatches(); };
+    // Chain — svgCanvas.bind replaces; do not drop Properties / Appearance listeners.
+    chainCanvasEvent(sc, 'selected', syncSwatches);
+    chainCanvasEvent(sc, 'selectedChanged', syncSwatches);
+    chainCanvasEvent(sc, 'elementChanged', syncSwatches);
+    chainCanvasEvent(sc, 'changed', syncSwatches);
+    chainCanvasEvent(sc, 'transition', updateSwatches);
   }
   document.getElementById('fill_color')?.addEventListener('change', () => { ctrl.syncFromCanvas(); updateSwatches(); });
   document.getElementById('stroke_color')?.addEventListener('change', () => { ctrl.syncFromCanvas(); updateSwatches(); });
@@ -1363,7 +1366,9 @@ function ensureColorSwatchesBlock() {
   if (!block) {
     block = document.createElement('div');
     block.id = 'vcs_colors_block';
-    block.className = 'sidebar_block vcs-block vcs-colors-block';
+    // Collapsed by default on load; Properties stays expanded. User can still
+    // expand via the arrow or by clicking a Color/Swatches tab.
+    block.className = 'sidebar_block vcs-block vcs-colors-block collapsed';
     propPanel.parentNode?.insertBefore(block, propPanel);
   }
 
@@ -1398,6 +1403,9 @@ function ensureColorSwatchesBlock() {
   try { saved = localStorage.getItem(VCS_TAB_STORAGE) || 'color'; } catch { /* ignore */ }
   if (saved === 'properties') saved = 'color';
   activateVcsTab(saved);
+  // activateVcsTab expands the block (for user tab clicks). Re-collapse for the
+  // initial mount so Color/Swatches start closed; later toggles are untouched.
+  block.classList.add('collapsed');
   return block;
 }
 
@@ -1721,6 +1729,20 @@ function mountColorSwatchesTabs(ctrl, svgEditor) {
   return block;
 }
 
+
+/**
+ * SVG-Edit's svgCanvas.bind() stores a single handler per event name (replaces).
+ * Always chain so Appearance / Color sync cannot clobber Properties visibility,
+ * Editor selectedChanged, or other Visteras listeners.
+ */
+function chainCanvasEvent(sc, name, fn) {
+  if (!sc || typeof sc.bind !== 'function' || typeof fn !== 'function') return;
+  const prev = sc.bind(name, (win, arg) => {
+    try { if (typeof prev === 'function') prev(win, arg); } catch { /* ignore */ }
+    try { fn(win, arg); } catch { /* ignore */ }
+  });
+}
+
 function mountAppearanceColors(ctrl, svgEditor) {
   const fillChip = document.getElementById('vcs_app_fill_chip');
   const strokeChip = document.getElementById('vcs_app_stroke_chip');
@@ -1971,24 +1993,55 @@ function mountAppearanceColors(ctrl, svgEditor) {
   document.getElementById('fill_color')?.addEventListener('change', refresh);
   document.getElementById('stroke_color')?.addEventListener('change', refresh);
   document.getElementById('stroke_width')?.addEventListener('change', refresh);
-  // Re-sync alignment UI (and geometry clips) when selection changes.
+
+  // Re-sync Appearance + Properties when selection / geometry changes.
+  // Shape tools (rect/ellipse/path/…) select the new object in a post-mouseup
+  // timeout via selectOnly → call("selected") + call("changed"). Without chaining
+  // these handlers, Properties stays on the empty state until deselect/reselect.
   let alignSyncing = false;
-  try {
-    sc?.bind?.('selected', refresh);
-    sc?.bind?.('changed', () => {
-      if (alignSyncing) return;
-      alignSyncing = true;
-      try {
-        const targets = flattenPaintTargets(resolvePaintTargets(sc));
-        for (const el of targets) {
-          try { syncStrokeAlignRendering(el, sc); } catch { /* ignore */ }
-        }
-        refresh();
-      } finally {
-        alignSyncing = false;
+  const syncSelectionUi = () => {
+    try { ctrl.syncFromCanvas(); } catch { /* ignore */ }
+    try { window.__visterasUpdateSwatches?.(); } catch { /* ignore */ }
+    refresh();
+    try { window.__updatePropertiesVisibility?.(); } catch { /* ignore */ }
+  };
+  const onChanged = () => {
+    if (alignSyncing) return;
+    alignSyncing = true;
+    try {
+      const targets = flattenPaintTargets(resolvePaintTargets(sc));
+      for (const el of targets) {
+        try { syncStrokeAlignRendering(el, sc); } catch { /* ignore */ }
       }
-    });
+      syncSelectionUi();
+    } finally {
+      alignSyncing = false;
+    }
+  };
+  try {
+    chainCanvasEvent(sc, 'selected', syncSelectionUi);
+    // selectedChanged is used by some Visteras callers / extensions; canvas itself
+    // fires "selected", but keep both so create/select paths stay covered.
+    chainCanvasEvent(sc, 'selectedChanged', syncSelectionUi);
+    chainCanvasEvent(sc, 'elementChanged', syncSelectionUi);
+    chainCanvasEvent(sc, 'changed', onChanged);
   } catch { /* ignore */ }
+
+  // When SVG-Edit refreshes the context panel (select / create), keep Appearance
+  // chips in lockstep — covers paths that update topPanel without re-firing bind.
+  try {
+    const top = svgEditor?.topPanel;
+    if (top && typeof top.updateContextPanel === 'function' && !top.__vcsAppearanceHooked) {
+      const prevUpdate = top.updateContextPanel.bind(top);
+      top.updateContextPanel = function vcsAppearanceUpdateContextPanel(...args) {
+        const ret = prevUpdate(...args);
+        try { syncSelectionUi(); } catch { /* ignore */ }
+        return ret;
+      };
+      top.__vcsAppearanceHooked = true;
+    }
+  } catch { /* ignore */ }
+
   refresh();
 }
 

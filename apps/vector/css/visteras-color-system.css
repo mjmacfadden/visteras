@@ -989,15 +989,26 @@
 }
 
 .vcs-appearance-weight input {
-  width: 36px !important;
+  /* ~3 digits / values like 0.75–100; keep compact in Appearance stroke row */
+  width: 4ch !important;
+  min-width: 4ch !important;
+  max-width: 4.5ch !important;
   background: #242424 !important;
   border: 1px solid #444 !important;
   color: #eee !important;
   border-radius: 2px !important;
-  padding: 2px 4px !important;
+  padding: 2px 2px !important;
   font-size: 11px !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
   box-sizing: border-box !important;
+  /* Native spinners inflate width; wheel/arrows handled in JS */
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+.vcs-appearance-weight input::-webkit-outer-spin-button,
+.vcs-appearance-weight input::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
 }
 
 .vcs-appearance-weight input:focus {
