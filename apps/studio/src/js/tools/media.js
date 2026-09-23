@@ -77,22 +77,26 @@ class Media_class extends Base_tools_class {
 				if (searchButton) {
 					searchButton.textContent = 'Search';
 					searchButton.dataset.defaultLabel = 'Search';
-			searchButton.addEventListener('click', () => {
-						if (searchButton.disabled) return;
+					searchButton.addEventListener('click', () => {
 						searchButton.disabled = true;
 						searchButton.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
-					}, true);
+					});
 				}
 				// Handle Enter before the generic dialog's input/document
 				// handlers, which otherwise submit on both keydown and keyup.
 				const submitOnEnter = (event) => {
-					if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+					if (!event.key || event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
 					if (event.target.tagName === 'TEXTAREA' || event.target.isContentEditable ||
 						event.target.hasAttribute('data-prevent-submission')) return;
 					event.preventDefault();
 					event.stopImmediatePropagation();
 					if (event.type === 'keydown' && !event.repeat) {
-						popup.el.querySelector('[data-id="popup_ok"]').click();
+						const btn = popup.el.querySelector('[data-id="popup_ok"]');
+						if (btn) {
+							btn.disabled = true;
+							btn.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
+						}
+						_this.POP.save();
 					}
 				};
 				popup.el.addEventListener('keydown', submitOnEnter, true);
@@ -102,16 +106,24 @@ class Media_class extends Base_tools_class {
 				}
 			},
 			on_finish: async function (params) {
-				const searchButton = document.querySelector('[data-id="popup_ok"]');
-				const resetSearchButton = () => {
+				const setSearchingState = (loading) => {
+					const searchButton = (_this.POP && _this.POP.el ? _this.POP.el : document).querySelector('[data-id="popup_ok"]');
 					if (!searchButton) return;
-					searchButton.disabled = false;
-					searchButton.textContent = 'Search';
-				};
-				if (params.query == '')
-					{ resetSearchButton();
-					return false;
+					if (loading) {
+						searchButton.disabled = true;
+						searchButton.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
+					} else {
+						searchButton.disabled = false;
+						searchButton.textContent = 'Search';
 					}
+				};
+
+				if (!params.query || params.query.trim() === '') {
+					setSearchingState(false);
+					return false;
+				}
+
+				setSearchingState(true);
 
 				var cacheKey = _this.page + '|' + params.query + '|' + params.image_type + '|' + params.orientation + '|' + params.category + '|' + params.safe_search;
 
@@ -119,7 +131,7 @@ class Media_class extends Base_tools_class {
 					var data = _this.cache[cacheKey];
 					var pages = Math.ceil(data.totalHits / _this.per_page);
 					_this._updateResultsInPlace(data.hits, pages, params.query);
-					resetSearchButton();
+					setSearchingState(false);
 					return false;
 				}
 
@@ -133,6 +145,7 @@ class Media_class extends Base_tools_class {
 
 					if (!effectiveKey && !endpoint) {
 						alertify.error('No Pixabay API key configured.');
+						setSearchingState(false);
 						return false;
 					}
 					var URL = '';
@@ -176,8 +189,9 @@ class Media_class extends Base_tools_class {
 				} catch (err) {
 					console.error('Media search failed:', err);
 					alertify.error('Error connecting to Pixabay.');
+				} finally {
+					setSearchingState(false);
 				}
-				resetSearchButton();
 				return false;
 			},
 		};

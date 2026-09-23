@@ -160,6 +160,7 @@ class Base_selection_class {
 		// update cursor on Alt key state changes
 		const onAltKey = (e) => {
 			if (e.key === 'Alt' || e.key === 'AltGraph' || e.code === 'AltLeft' || e.code === 'AltRight' || e.keyCode === 18) {
+				e.preventDefault();
 				if (config.TOOL && config.TOOL.name === 'select') {
 					this.selected_object_actions(e);
 				}
@@ -167,6 +168,8 @@ class Base_selection_class {
 		};
 		window.addEventListener('keydown', onAltKey);
 		window.addEventListener('keyup', onAltKey);
+		document.addEventListener('keydown', onAltKey);
+		document.addEventListener('keyup', onAltKey);
 	}
 
 	set_selection(x, y, width, height) {
@@ -1640,8 +1643,11 @@ class Base_selection_class {
 				? (testX > -w / 2 && testX < w / 2 && testY > -h / 2 && testY < h / 2)
 				: (mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h);
 
+			const is_alt = (e && e.altKey === true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down === true)
+				|| (e && (e.key === 'Alt' || e.key === 'AltGraph' || e.code === 'AltLeft' || e.code === 'AltRight' || e.keyCode === 18) && e.type !== 'keyup');
+
 			if ((settings.enable_move || settings.crop_shield === true) && inBody) {
-				mainWrapper.style.cursor = "move";
+				mainWrapper.style.cursor = (is_alt && config.TOOL && config.TOOL.name === 'select') ? "copy" : "move";
 			}
 
 			if (this.ctx) {
@@ -1661,7 +1667,7 @@ class Base_selection_class {
 							this.selected_object_drag_type = current_drag_type;
 						}
 					}
-					if (event_type == 'mousemove') {
+					if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
 						mainWrapper.style.cursor = position.cursor;
 					}
 				}
@@ -1707,7 +1713,7 @@ class Base_selection_class {
 							};
 						}
 					}
-					if (event_type == 'mousemove') {
+					if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
 						mainWrapper.style.cursor = ROTATE_CURSOR;
 					}
 				}

@@ -164,6 +164,14 @@ class Select_tool_class extends Base_tools_class {
 	keydown(event) {
 		var k = event.key;
 
+		if (k === 'Alt' || k === 'AltGraph' || event.code === 'AltLeft' || event.code === 'AltRight' || event.keyCode === 18) {
+			event.preventDefault();
+			if (this.Base_selection) {
+				this.Base_selection.selected_object_actions(event);
+			}
+			return;
+		}
+
 		if (k == "ArrowUp") {
 			this.move(0, -1, event);
 		}
@@ -186,6 +194,13 @@ class Select_tool_class extends Base_tools_class {
 
 	keyup(event) {
 		var k = event.key;
+		if (k === 'Alt' || k === 'AltGraph' || event.code === 'AltLeft' || event.code === 'AltRight' || event.keyCode === 18) {
+			event.preventDefault();
+			if (this.Base_selection) {
+				this.Base_selection.selected_object_actions(event);
+			}
+			return;
+		}
 		if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) {
 			if (this.keyboard_move_start_positions && this.keyboard_move_start_positions.size > 0) {
 				const movable_layers = this.get_movable_layers();
@@ -542,6 +557,16 @@ class Select_tool_class extends Base_tools_class {
 							this.Mask.preview_linked_mask_transform(layer, init_pos, layer);
 						}
 					}
+					if (this.selection_transform_box) {
+						this.selection_transform_box.x = s.data.x;
+						this.selection_transform_box.y = s.data.y;
+						this.selection_transform_box.width = s.data.width;
+						this.selection_transform_box.height = s.data.height;
+						this.selection_transform_box.center = {
+							x: s.data.x + s.data.width / 2,
+							y: s.data.y + s.data.height / 2,
+						};
+					}
 				}
 			}
 
@@ -871,6 +896,31 @@ class Select_tool_class extends Base_tools_class {
 					await app.State.do_action(
 						new app.Actions.Bundle_action('resize_layer', 'Resize Layer', resize_actions)
 					);
+					const s = this.Base_selection.find_settings();
+					if (s && s.data) {
+						if (this.selection_transform_box) {
+							this.selection_transform_box.x = s.data.x;
+							this.selection_transform_box.y = s.data.y;
+							this.selection_transform_box.width = s.data.width;
+							this.selection_transform_box.height = s.data.height;
+							this.selection_transform_box.center = {
+								x: s.data.x + s.data.width / 2,
+								y: s.data.y + s.data.height / 2,
+							};
+						} else {
+							this.selection_transform_box = {
+								x: s.data.x,
+								y: s.data.y,
+								width: s.data.width,
+								height: s.data.height,
+								rotate: s.data.rotate || 0,
+								center: {
+									x: s.data.x + s.data.width / 2,
+									y: s.data.y + s.data.height / 2,
+								},
+							};
+						}
+					}
 					if (resizingPointText && config.layer && config.layer.type === 'text') {
 						try {
 							const textTool = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules

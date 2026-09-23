@@ -53,6 +53,8 @@ class GUI_shortcuts_class {
 		};
 		window.addEventListener('keydown', preventAltFocus, { capture: true, passive: false });
 		window.addEventListener('keyup', preventAltFocus, { capture: true, passive: false });
+		document.addEventListener('keydown', preventAltFocus, { capture: true, passive: false });
+		document.addEventListener('keyup', preventAltFocus, { capture: true, passive: false });
 
 		const updateModifierState = (event, isDown) => {
 			const key = event.key;
@@ -411,7 +413,7 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			if (event.ctrlKey || event.metaKey || event.altKey) return;
+			if (event.ctrlKey || event.metaKey || event.altKey || !event.key) return;
 
 			const key = event.key.toLowerCase();
 
