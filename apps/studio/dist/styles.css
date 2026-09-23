@@ -2470,13 +2470,90 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 	line-height: 1.2;
 }
 .properties_range{
+	-webkit-appearance: none;
+	appearance: none;
 	width: 100%;
 	margin: 0;
 	padding: 0;
 	height: 18px;
 	cursor: pointer;
-	accent-color: #3b82f6;
 	background: transparent;
+	accent-color: transparent;
+}
+.properties_range:focus {
+	outline: none;
+}
+.properties_range::-webkit-slider-runnable-track {
+	height: 2px;
+	background: #4a4a4a;
+	border-radius: 1px;
+}
+.properties_range::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 10px;
+	height: 10px;
+	margin-top: -4px;
+	border-radius: 50%;
+	background: #c8c8c8;
+	border: 0;
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+.properties_range:hover::-webkit-slider-thumb {
+	background: #6ea8fe;
+}
+.properties_range::-moz-range-track {
+	height: 2px;
+	background: #4a4a4a;
+	border-radius: 1px;
+	border: 0;
+}
+.properties_range::-moz-range-thumb {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: #c8c8c8;
+	border: 0;
+	box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+.properties_range:hover::-moz-range-thumb {
+	background: #6ea8fe;
+}
+/* Photoshop-style colored tracks (visual only; behavior unchanged) */
+.properties_range[name="hue"]::-webkit-slider-runnable-track,
+[data-adj-type="hue-rotate"] .properties_range::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+}
+.properties_range[name="hue"]::-moz-range-track,
+[data-adj-type="hue-rotate"] .properties_range::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+}
+.properties_range[name="saturation"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #808080, #e11d48);
+}
+.properties_range[name="saturation"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #808080, #e11d48);
+}
+.properties_range[name="lightness"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #000000, #ffffff);
+}
+.properties_range[name="lightness"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #000000, #ffffff);
 }
 .properties_number{
 	width: 100%;
