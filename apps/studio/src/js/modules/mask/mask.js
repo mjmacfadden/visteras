@@ -1125,30 +1125,13 @@ class Mask_class {
 	}
 
 	/**
-	 * draws a linear or radial gradient into the mask.
-	 * The gradient goes from the foreground color (gray) to transparent.
+	 * Mask gradient: B/W (FG→BG luminance) or FG→transparent fade.
+	 * Live preview while dragging; never opaque-white wipe.
 	 */
 	gradient_start(tool, e) {
 		var mouse = tool.get_mouse_info(e);
 		if (mouse.click_valid == false)
 			return;
-		this.gradient_start = { x: mouse.x, y: mouse.y };
-	}
-
-	async gradient_end(tool, e) {
-		if (this.gradient_start == null)
-			return;
-
-		var mouse = tool.get_mouse_info(e);
-		var start = this.gradient_start;
-		this.gradient_start = null;
-
-		var width = mouse.x - start.x;
-		var height = mouse.y - start.y;
-		if (width == 0 && height == 0) {
-			config.need_render = true;
-			return;
-		}
 
 		var layer = config.layer;
 		var source = this.get_mask_source(layer);
@@ -1157,47 +1140,175 @@ class Mask_class {
 			return;
 		}
 
-		var canvas = this.copy_mask_canvas(source);
-		var ctx = canvas.getContext('2d');
+		var click = { x: mouse.x, y: mouse.y };
+		if (tool && typeof tool._constrain_point === 'function') {
+			click = tool._constrain_point(e, mouse.x, mouse.y, mouse.x, mouse.y);
+		}
 
-		var params = tool.getParams();
-		var color = this.Helper.hexToRgb(params.color_1);
-		var gray = Math.round(0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b);
+		var base = this.copy_mask_canvas(source);
+		var preview = this.copy_mask_canvas(source);
+		this.gradient_start = {
+			x: click.x,
+			y: click.y,
+			base: base,
+			preview: preview,
+		};
+		layer.mask.link_canvas = preview;
+		this.request_mask_render(layer);
+	}
 
-		var start_native = this.world_to_mask(layer, start.x, start.y);
-		var end_native = this.world_to_mask(layer, mouse.x, mouse.y);
-		var power = params.radial_power != null ? Math.min(99, params.radial_power) : 50;
+	gradient_move(tool, e) {
+		if (this.gradient_start == null)
+			return;
+		var mouse = tool.get_mouse_info(e);
+		if (mouse.is_drag == false || mouse.click_valid == false)
+			return;
 
-		if (params.radial === true) {
+		var layer = config.layer;
+		if (layer == null || layer.mask == null)
+			return;
+
+		this._paint_mask_gradient_preview(tool, e, mouse, false);
+		layer.mask.link_canvas = this.gradient_start.preview;
+		this.request_mask_render(layer);
+	}
+
+	async gradient_end(tool, e) {
+		if (this.gradient_start == null)
+			return;
+
+		var mouse = tool.get_mouse_info(e);
+		var session = this.gradient_start;
+		var layer = config.layer;
+		var width = mouse.x - session.x;
+		var height = mouse.y - session.y;
+
+		try {
+			if (width == 0 && height == 0) {
+				return;
+			}
+			if (layer == null || this.get_mask_source(layer) == null) {
+				alertify.error('This layer does not have a mask.');
+				return;
+			}
+
+			// Keep session attached while painting the commit canvas
+			var canvas = this._paint_mask_gradient_preview(tool, e, mouse, true);
+			if (canvas == null)
+				return;
+
+			await app.State.do_action(
+				new app.Actions.Bundle_action('gradient_mask', 'Gradient Mask', [
+					new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
+				])
+			);
+		} finally {
+			this.gradient_start = null;
+			if (layer != null && layer.mask != null) {
+				delete layer.mask.link_canvas;
+			}
+			if (session.base) {
+				session.base.width = 1;
+				session.base.height = 1;
+			}
+			if (session.preview) {
+				session.preview.width = 1;
+				session.preview.height = 1;
+			}
+			this.request_mask_render(layer);
+		}
+	}
+
+	/**
+	 * Rebuilds the mask gradient preview onto session.preview (or a fresh canvas
+	 * when commit=true). Supports Linear/Radial, Shift 45°, Alt from-center,
+	 * Reverse, and FG→BG vs FG→transparent (via alpha_2).
+	 */
+	_paint_mask_gradient_preview(tool, e, mouse, commit) {
+		var session = this.gradient_start;
+		if (session == null)
+			return null;
+
+		var layer = config.layer;
+		var params = (tool && typeof tool._normalized_params === 'function')
+			? tool._normalized_params()
+			: (tool.getParams ? tool.getParams() : {});
+
+		var click_x = session.x;
+		var click_y = session.y;
+		var end = { x: mouse.x, y: mouse.y };
+		if (tool && typeof tool._constrain_point === 'function') {
+			end = tool._constrain_point(e, mouse.x, mouse.y, click_x, click_y);
+		}
+
+		var x1 = click_x;
+		var y1 = click_y;
+		var x2 = end.x;
+		var y2 = end.y;
+		var radial = params.radial === true
+			|| (params.style && String(params.style).toLowerCase() === 'radial');
+
+		if (!radial && e && e.altKey) {
+			var dx = x2 - click_x;
+			var dy = y2 - click_y;
+			x1 = click_x - dx;
+			y1 = click_y - dy;
+		}
+
+		var start_native = this.world_to_mask(layer, x1, y1);
+		var end_native = this.world_to_mask(layer, x2, y2);
+		var center_native = radial
+			? this.world_to_mask(layer, click_x, click_y)
+			: start_native;
+
+		var c1 = this.Helper.hexToRgb(params.color_1 || config.COLOR || '#000000');
+		var c2 = this.Helper.hexToRgb(params.color_2 || config.COLOR_BG || '#ffffff');
+		var g1 = Math.round(0.2126 * c1.r + 0.7152 * c1.g + 0.0722 * c1.b);
+		var g2 = Math.round(0.2126 * c2.r + 0.7152 * c2.g + 0.0722 * c2.b);
+		var a1 = Math.max(0, Math.min(100, Number(params.alpha_1 != null ? params.alpha_1 : 100))) / 100;
+		var a2 = Math.max(0, Math.min(100, Number(
+			params.alpha_2 != null ? params.alpha_2
+				: (params.alpha != null ? params.alpha : 100)
+		))) / 100;
+		if (params.reverse) {
+			var tg = g1; g1 = g2; g2 = tg;
+			var ta = a1; a1 = a2; a2 = ta;
+		}
+
+		var power = params.radial_power != null ? Math.min(99, Number(params.radial_power)) : 50;
+		if (!Number.isFinite(power)) power = 50;
+
+		var target = commit ? this.copy_mask_canvas(session.base) : session.preview;
+		var ctx = target.getContext('2d');
+		ctx.clearRect(0, 0, target.width, target.height);
+		ctx.drawImage(session.base, 0, 0);
+
+		var gradient;
+		if (radial) {
 			var distance = Math.sqrt(
-				(end_native.x - start_native.x) * (end_native.x - start_native.x)
-				+ (end_native.y - start_native.y) * (end_native.y - start_native.y)
+				(end_native.x - center_native.x) * (end_native.x - center_native.x)
+				+ (end_native.y - center_native.y) * (end_native.y - center_native.y)
 			);
-			var gradient = ctx.createRadialGradient(
-				start_native.x, start_native.y, distance * power / 100,
-				start_native.x, start_native.y, Math.max(distance, 1)
+			gradient = ctx.createRadialGradient(
+				center_native.x, center_native.y, Math.max(0, distance * power / 100),
+				center_native.x, center_native.y, Math.max(distance, 1)
 			);
-			gradient.addColorStop(0, 'rgb(' + gray + ', ' + gray + ', ' + gray + ')');
-			gradient.addColorStop(1, 'rgb(255, 255, 255)');
-			ctx.fillStyle = gradient;
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
 		}
 		else {
-			var gradient = ctx.createLinearGradient(
+			gradient = ctx.createLinearGradient(
 				start_native.x, start_native.y,
 				end_native.x, end_native.y
 			);
-			gradient.addColorStop(0, 'rgb(' + gray + ', ' + gray + ', ' + gray + ')');
-			gradient.addColorStop(1, 'rgb(255, 255, 255)');
-			ctx.fillStyle = gradient;
-			ctx.fillRect(0, 0, canvas.width, canvas.height);
 		}
 
-		await app.State.do_action(
-			new app.Actions.Bundle_action('gradient_mask', 'Gradient Mask', [
-				new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
-			])
-		);
+		// FG→transparent when end opacity is 0: fade paint, leave underlying mask.
+		// Otherwise B/W (or tinted gray) FG→BG across the mask.
+		gradient.addColorStop(0, 'rgba(' + g1 + ', ' + g1 + ', ' + g1 + ', ' + a1 + ')');
+		gradient.addColorStop(1, 'rgba(' + g2 + ', ' + g2 + ', ' + g2 + ', ' + a2 + ')');
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, target.width, target.height);
+
+		return target;
 	}
 
 	/**

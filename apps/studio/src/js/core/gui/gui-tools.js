@@ -1480,6 +1480,11 @@ class GUI_tools_class {
 			&& typeof this.tools_modules['text'].object.sync_fill_from_foreground === 'function') {
 			this.tools_modules['text'].object.sync_fill_from_foreground();
 		}
+		// Gradient Color 1/2 ↔ FG/BG (X / D)
+		if (config.TOOL && config.TOOL.name === 'gradient' && this.tools_modules['gradient'] && this.tools_modules['gradient'].object
+			&& typeof this.tools_modules['gradient'].object.sync_colors_from_fg_bg === 'function') {
+			this.tools_modules['gradient'].object.sync_colors_from_fg_bg({ rebuild: true });
+		}
 	}
 
 }

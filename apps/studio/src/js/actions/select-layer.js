@@ -73,6 +73,14 @@ export class Select_layer_action extends Base_action {
 					}
 				}
 			}
+			if (new_layer && new_layer.type === 'gradient'
+				&& config.TOOL && config.TOOL.name === 'gradient'
+				&& app.GUI && app.GUI.GUI_tools) {
+				const gradTool = app.GUI.GUI_tools.tools_modules['gradient']?.object;
+				if (gradTool && typeof gradTool.sync_options_from_layer === 'function') {
+					gradTool.sync_options_from_layer(new_layer, { rebuild: true });
+				}
+			}
 		} else if (!this.ignore_same_selection) {
 			throw new Error('Aborted - Layer already selected');
 		}
@@ -133,6 +141,14 @@ export class Select_layer_action extends Base_action {
 					activeToolObj.sync_vector_options_bar();
 					app.GUI.GUI_tools.show_action_attributes();
 				}
+			}
+		}
+		if (this.old_layer && this.old_layer.type === 'gradient'
+			&& config.TOOL && config.TOOL.name === 'gradient'
+			&& app.GUI && app.GUI.GUI_tools) {
+			const gradTool = app.GUI.GUI_tools.tools_modules['gradient']?.object;
+			if (gradTool && typeof gradTool.sync_options_from_layer === 'function') {
+				gradTool.sync_options_from_layer(this.old_layer, { rebuild: true });
 			}
 		}
 		this.old_layer = null;

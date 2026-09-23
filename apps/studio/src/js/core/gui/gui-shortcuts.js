@@ -21,6 +21,9 @@ class GUI_shortcuts_class {
 		this.is_alt_down = false;
 		this.is_shift_down = false;
 
+		// Tool keymap (Photoshop/Illustrator hybrid).
+		// Gradient has no single-letter binding: A = Direct Select (vector), G = Fill.
+		// Help → Keyboard Shortcuts documents this; do not claim A = Gradient.
 		this.keymap = {
 			'v': 'select',
 			'b': 'brush',

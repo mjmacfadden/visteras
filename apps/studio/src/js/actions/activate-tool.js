@@ -149,6 +149,21 @@ export class Activate_tool_action extends Base_action {
 				}
 			}
 
+			if (key === 'gradient') {
+				const gradTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['gradient'])
+					? app.GUI.GUI_tools.tools_modules['gradient'].object
+					: null;
+				if (gradTool) {
+					if (typeof gradTool.sync_colors_from_fg_bg === 'function') {
+						gradTool.sync_colors_from_fg_bg({ rebuild: false });
+					}
+					if (config.layer && config.layer.type === 'gradient'
+						&& typeof gradTool.sync_options_from_layer === 'function') {
+						gradTool.sync_options_from_layer(config.layer, { rebuild: false });
+					}
+				}
+			}
+
 			// Leave the previous tool's options bar mounted during temporary hot-swaps
 			// (Alt→eyedropper, Space→pan) so attrs don't flash to pan/eyedropper.
 			if (!this.hot_swap) {
