@@ -165,6 +165,64 @@ function saveRecent(list) {
   } catch { /* ignore */ }
 }
 
+/**
+ * Resolve elements that should receive fill/stroke/stroke-width.
+ * Direct Selection clears SVG-Edit's selection, so fall back to DS paint targets
+ * (and native path-edit elem) — same strategy for color and stroke weight.
+ */
+function resolvePaintTargets(sc) {
+  if (!sc) return [];
+  const selected = (typeof sc.getSelectedElements === 'function'
+    ? sc.getSelectedElements()
+    : [])?.filter(Boolean) || [];
+  if (selected.length) return selected;
+  const ds = sc.directSelection;
+  if (ds?.active) {
+    const els = (typeof ds.getPaintTargets === 'function'
+      ? ds.getPaintTargets()
+      : typeof ds.getSelectedElements === 'function'
+        ? ds.getSelectedElements()
+        : []) || [];
+    if (els.length) return els;
+  }
+  const path = sc.getPathObj?.();
+  if (path?.elem?.isConnected) return [path.elem];
+  return [];
+}
+
+function flattenPaintTargets(elements, { attr = null } = {}) {
+  const out = [];
+  const skipFill = attr === 'fill';
+  for (const el of elements) {
+    if (!el) continue;
+    if (el.tagName === 'g') {
+      for (const child of el.querySelectorAll('*')) {
+        if (child.nodeName === 'g') continue;
+        if (skipFill && (child.tagName === 'polyline' || child.tagName === 'line')) continue;
+        out.push(child);
+      }
+    } else if (skipFill && (el.tagName === 'polyline' || el.tagName === 'line')) {
+      continue;
+    } else {
+      out.push(el);
+    }
+  }
+  return out;
+}
+
+function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
+  if (!sc || typeof sc.changeSelectedAttribute !== 'function') return false;
+  const elems = flattenPaintTargets(resolvePaintTargets(sc), { attr });
+  if (!elems.length) return false;
+  if (noUndo && typeof sc.changeSelectedAttributeNoUndo === 'function') {
+    sc.changeSelectedAttributeNoUndo(attr, value, elems);
+  } else {
+    sc.changeSelectedAttribute(attr, value, elems);
+  }
+  sc.call?.('changed', elems);
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Shared color controller
 // ---------------------------------------------------------------------------
@@ -223,8 +281,14 @@ function createColorController(svgEditor) {
         state.workingNone = true;
         if (apply && sc) {
           state.suppressSync = true;
+          // Stock setColor updates cur style (+ Selection targets). Direct Selection
+          // clears SVG-Edit selection, so also paint DS targets explicitly — same
+          // pattern as live stroke width.
           sc.setColor(state.activeTarget, 'none', noUndo);
+          applyPaintAttribute(sc, state.activeTarget, 'none', { noUndo });
           if (!noUndo) svgEditor.bottomPanel?.updateColorpickers?.(true);
+          // Picker sync can clobber DS elems; re-assert paint without a second undo.
+          applyPaintAttribute(sc, state.activeTarget, 'none', { noUndo: true });
           state.suppressSync = false;
         }
         api.emit();
@@ -238,7 +302,9 @@ function createColorController(svgEditor) {
       if (apply && sc) {
         state.suppressSync = true;
         sc.setColor(state.activeTarget, hex, noUndo);
+        applyPaintAttribute(sc, state.activeTarget, hex, { noUndo });
         if (!noUndo) svgEditor.bottomPanel?.updateColorpickers?.(true);
+        applyPaintAttribute(sc, state.activeTarget, hex, { noUndo: true });
         state.suppressSync = false;
       }
       if (recordRecent && apply && !noUndo) api.pushRecent(hex);
@@ -329,7 +395,11 @@ function createColorController(svgEditor) {
       state.suppressSync = true;
       sc.setColor('fill', curStroke);
       sc.setColor('stroke', curFill);
+      applyPaintAttribute(sc, 'fill', curStroke);
+      applyPaintAttribute(sc, 'stroke', curFill);
       svgEditor.bottomPanel?.updateColorpickers?.(true);
+      applyPaintAttribute(sc, 'fill', curStroke, { noUndo: true });
+      applyPaintAttribute(sc, 'stroke', curFill, { noUndo: true });
       state.suppressSync = false;
       api.syncFromCanvas();
       window.__visterasUpdateSwatches?.();
@@ -341,10 +411,15 @@ function createColorController(svgEditor) {
       state.suppressSync = true;
       sc.setColor('fill', '#cccccc');
       sc.setColor('stroke', '#000000');
+      applyPaintAttribute(sc, 'fill', '#cccccc');
+      applyPaintAttribute(sc, 'stroke', '#000000');
       if (typeof sc.setStrokeWidth === 'function') sc.setStrokeWidth(1);
+      applyPaintAttribute(sc, 'stroke-width', 1);
       const strokeWidthInput = document.getElementById('stroke_width');
       if (strokeWidthInput) strokeWidthInput.value = '1';
       svgEditor.bottomPanel?.updateColorpickers?.(true);
+      applyPaintAttribute(sc, 'fill', '#cccccc', { noUndo: true });
+      applyPaintAttribute(sc, 'stroke', '#000000', { noUndo: true });
       state.suppressSync = false;
       api.setActiveTarget('fill', { syncColor: true });
       window.__visterasUpdateSwatches?.();
@@ -1220,34 +1295,6 @@ function mountAppearanceColors(ctrl, svgEditor) {
     return String(Math.round(v * 100) / 100);
   }
 
-  function resolveStrokeTargets() {
-    const selected = (typeof sc?.getSelectedElements === 'function'
-      ? sc.getSelectedElements()
-      : [])?.filter(Boolean) || [];
-    if (selected.length) return selected;
-    const ds = sc?.directSelection;
-    if (ds?.active && typeof ds.getSelectedElements === 'function') {
-      const els = ds.getSelectedElements();
-      if (els?.length) return els;
-    }
-    const path = sc?.getPathObj?.();
-    if (path?.elem?.isConnected) return [path.elem];
-    return [];
-  }
-
-  function flattenStrokeTargets(elements) {
-    const out = [];
-    for (const el of elements) {
-      if (!el) continue;
-      if (el.tagName === 'g') {
-        for (const child of el.querySelectorAll('*')) {
-          if (child.nodeName !== 'g') out.push(child);
-        }
-      } else out.push(el);
-    }
-    return out;
-  }
-
   function writeStrokeWidth(value, { live = false } = {}) {
     const n = Math.max(0, Number(value));
     if (Number.isNaN(n)) return;
@@ -1256,15 +1303,8 @@ function mountAppearanceColors(ctrl, svgEditor) {
     else if (sc?.curProperties) sc.curProperties.stroke_width = n;
     if (sc?.curShape) sc.curShape.stroke_width = n;
 
-    const elems = flattenStrokeTargets(resolveStrokeTargets());
-    if (elems.length && typeof sc?.changeSelectedAttribute === 'function') {
-      if (live && typeof sc.changeSelectedAttributeNoUndo === 'function') {
-        sc.changeSelectedAttributeNoUndo('stroke-width', n, elems);
-      } else {
-        sc.changeSelectedAttribute('stroke-width', n, elems);
-      }
-      sc.call?.('changed', elems);
-    } else if (typeof sc?.setStrokeWidth === 'function') {
+    const applied = applyPaintAttribute(sc, 'stroke-width', n, { noUndo: !!live });
+    if (!applied && typeof sc?.setStrokeWidth === 'function') {
       // No explicit targets — fall back to canvas API (Selection tool path).
       sc.setStrokeWidth(n);
     }

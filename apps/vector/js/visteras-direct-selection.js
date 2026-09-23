@@ -235,7 +235,10 @@ export function mountDirectSelection(editor) {
   }
   function applyPaintWhileActive(attr, value, { noUndo = false, skipTags = [] } = {}) {
     if (!active) return false;
-    let elems = paintLeaves(selectedElements()).filter((el) => !skipTags.includes(el.tagName));
+    const targets = selectedElements().length
+      ? selectedElements()
+      : records.filter((r) => r.el?.isConnected).map((r) => r.el);
+    let elems = paintLeaves(targets).filter((el) => !skipTags.includes(el.tagName));
     if (!elems.length) return false;
     if (noUndo) sc.changeSelectedAttributeNoUndo(attr, value, elems);
     else {
@@ -270,6 +273,14 @@ export function mountDirectSelection(editor) {
   sc.directSelection = {
     get active() { return active; },
     getSelectedElements: () => selectedElements(),
+    // Paint targets: prefer elems with selected anchors; if none, all paths in the
+    // current DS session (so Appearance fill/stroke still hit the edited object).
+    getPaintTargets() {
+      const selected = selectedElements();
+      if (selected.length) return selected;
+      if (!active) return [];
+      return records.filter((r) => r.el?.isConnected).map((r) => r.el);
+    },
     // Use the same anchor overlay for single paths and compound selections.
     // SVGEdit's native editor enters path mode with every point selected,
     // which makes Convert apply to the entire object instead of the point the
