@@ -15,6 +15,9 @@ const Helper = new Helper_class();
 		<div class="ui_color_input" tabindex="-1">
 			<input type="color">
 			<div class="alpha_overlay"></div>
+			<div class="none_slash" aria-hidden="true">
+				<img src="images/icons/no_color.svg" width="24" height="24" alt="" />
+			</div>
 		</div>
 	`;
 
@@ -89,10 +92,12 @@ const Helper = new Helper_class();
 		let colorValue;
 		let opacity = 0;
 		let storedValue = trimmedValue;
+		let isNone = false;
 		if (trimmedValue === 'none' || trimmedValue === 'transparent') {
 			colorValue = '#ffffff';
-			opacity = 1; // full checkerboard overlay = no color
+			opacity = 1; // checker under red slash
 			storedValue = 'none';
+			isNone = true;
 		} else if (/^\#[0-9A-F]{8}$/gi.test(trimmedValue)) {
 			// Hex with alpha
 			colorValue = trimmedValue.slice(0, 7);
@@ -100,6 +105,8 @@ const Helper = new Helper_class();
 			if (trimmedValue.slice(7, 9).toLowerCase() === '00' && $el.data('allowNone')) {
 				storedValue = 'none';
 				opacity = 1;
+				isNone = true;
+				colorValue = '#ffffff';
 			}
 		} else if (/^\#[0-9A-F]{6}$/gi.test(trimmedValue)) {
 			// Hex without alpha
@@ -111,6 +118,12 @@ const Helper = new Helper_class();
 		overlay.style.opacity = opacity;
 		input.value = colorValue;
 		$el.data('value', storedValue);
+		// Options Color chips: show white/checker + red slash when stop is none
+		if (isNone && $el.data('allowNone')) {
+			$el.addClass('is_none');
+		} else {
+			$el.removeClass('is_none');
+		}
 	};
 
 	const set_disabled = ($el, disabled) => {

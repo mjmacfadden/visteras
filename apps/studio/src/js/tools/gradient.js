@@ -66,7 +66,12 @@ class Gradient_class extends Base_tools_class {
 		const fg = config.COLOR || '#000000';
 		const bg = config.COLOR_BG || '#ffffff';
 		tool.attributes.color_1 = fg;
-		tool.attributes.color_2 = bg;
+		// Color 2 may be explicitly 'none' (FG→transparent). Do not snap it
+		// back to opaque BG on activate / X·D — only sync when it is a real color.
+		const c2 = tool.attributes.color_2;
+		if (!this._is_none_color(c2)) {
+			tool.attributes.color_2 = bg;
+		}
 
 		if (options.rebuild !== false && app.GUI && app.GUI.GUI_tools
 			&& config.TOOL && config.TOOL.name === this.name) {

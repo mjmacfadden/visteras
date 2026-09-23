@@ -1020,7 +1020,9 @@ class GUI_tools_class {
 			else if (typeof item == 'string' && (item[0] == '#' || item === 'none' || item === 'transparent')) {
 				//color — 'none'/'transparent' = no color (set via picker none swatch)
 				const isNone = (item === 'none' || item === 'transparent');
-				const displayColor = isNone ? '#00000000' : item;
+				// Pass 'none' through so the chip renders white/checker + red slash
+				// (not a black/#00000000 solid under the overlay).
+				const displayColor = isNone ? 'none' : item;
 
 				var elementTitle = document.createElement('label');
 				elementTitle.innerHTML = title + ':';

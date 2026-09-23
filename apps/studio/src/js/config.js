@@ -840,7 +840,7 @@ config.TOOLS = [
 				values: ['Linear', 'Radial'],
 			},
 			color_1: '#000000',
-			color_2: '#ffffff',
+			color_2: 'none',
 			alpha_1: {
 				title: 'Opacity 1',
 				value: 100,
