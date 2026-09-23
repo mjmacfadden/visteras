@@ -230,14 +230,6 @@ config.TOOLS = [
 		},
 	},
 	{
-		name: 'fill',
-		attributes: {
-			power: 5,
-			anti_aliasing: false,
-			contiguous: false,
-		},
-	},
-	{
 		name: 'rectangle',
 		title: 'Rectangle Tool [U]',
 		on_activate: 'on_activate',
@@ -838,6 +830,7 @@ config.TOOLS = [
 	},
 	{
 		name: 'gradient',
+		title: 'Gradient Tool',
 		on_activate: 'on_activate',
 		on_update: 'on_params_update',
 		attributes: {
@@ -873,6 +866,35 @@ config.TOOLS = [
 				step: 1,
 				slider: true,
 			},
+		},
+		// Paint Bucket nested under Gradient (Photoshop-style). Gradient is the
+		// default face of the slot; Shift+G cycles. fill stays registered but hidden.
+		tool_group: {
+			label: 'Fill Tools',
+			hidden: false,
+			items: [
+				{
+					shape: 'gradient',
+					title: 'Gradient Tool',
+					icon: 'gradient',
+				},
+				{
+					shape: 'fill',
+					title: 'Paint Bucket Tool',
+					icon: 'fill',
+					tool: 'fill',
+				},
+			],
+		},
+	},
+	{
+		name: 'fill',
+		title: 'Paint Bucket Tool',
+		visible: false,
+		attributes: {
+			power: 5,
+			anti_aliasing: false,
+			contiguous: false,
 		},
 	},
 	{

@@ -2167,6 +2167,11 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
 .sidebar_left .gradient:after{ background-image: url('../images/icons/gradient.png'); background-size: 14px 9px; filter: none; }
+/* Keep multicolor gradient ramp readable when selected (skip blue SVG tint wash) */
+.sidebar_left .item.active.gradient:after,
+.sidebar_left .item.active.gradient.marquee_gradient:after{
+	filter: none;
+}
 .sidebar_left .clone:after{ background-image: url('../images/icons/clone.svg'); }
 .sidebar_left .spot_heal:after{ background-image: url('../images/icons/spot_heal.svg'); }
 .sidebar_left .crop:after{ background-image: url('../images/icons/crop.svg'); }
@@ -2194,6 +2199,19 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .sidebar_left .item.selection.marquee_ellipse:after{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .sidebar_left .item.selection.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .item.brush.marquee_pencil:after{ background-image: url('../images/icons/pencil.svg'); }
+.sidebar_left .item.gradient.marquee_fill:after{
+	background-image: url('../images/icons/fill.svg');
+	background-size: 15px 15px;
+	filter: var(--menu-icons-filter);
+}
+/* Bucket (mono SVG) still gets the active blue tint */
+.sidebar_left .item.active.gradient.marquee_fill:after{
+	filter: brightness(0) saturate(100%) invert(39%) sepia(47%) saturate(1012%) hue-rotate(174deg) brightness(92%) contrast(88%);
+}
+.sidebar_left .item.gradient.marquee_gradient:after{
+	background-image: url('../images/icons/gradient.png');
+	background-size: 14px 9px;
+}
 .sidebar_left .item.rectangle.marquee_rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
 .sidebar_left .item.rectangle.marquee_ellipse:after{ background-image: url('../images/icons/ellipse.svg'); }
 .sidebar_left .item.rectangle.marquee_polygon:after{ background-image: url('../images/icons/polygon.svg'); }
@@ -2256,6 +2274,12 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.polygon{ background-image: url('../images/icons/polygon.svg'); }
 .tg_icon.star{ background-image: url('../images/icons/star.svg'); }
 .tg_icon.custom_shape{ background-image: url('../images/icons/custom_shape.svg'); }
+.tg_icon.fill{ background-image: url('../images/icons/fill.svg'); }
+.tg_icon.gradient{
+	background-image: url('../images/icons/gradient.png');
+	background-size: 14px 9px;
+	filter: none;
+}
 
 @media screen and (max-width:550px){
 	#sidebar_left{
