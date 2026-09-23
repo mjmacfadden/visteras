@@ -50,6 +50,7 @@ class File_save_class {
 
 	set_events() {
 		document.addEventListener('keydown', (event) => {
+			if (!event.key) return;
 			var code = event.key.toLowerCase();
 			if (this.Helper.is_input(event.target))
 				return;

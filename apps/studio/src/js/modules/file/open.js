@@ -57,6 +57,7 @@ class File_open_class {
 			e.preventDefault();
 		};
 		document.addEventListener('keydown', (event) => {
+			if (!event.key) return;
 			var code = event.key.toLowerCase();
 			if (this.Helper.is_input(event.target))
 				return;

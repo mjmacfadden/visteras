@@ -28,6 +28,7 @@ class Copy_class {
 		this.File_save = new File_save_class();
 
 		document.addEventListener('keydown', (event) => {
+			if (!event.key) return;
 			var code = event.key.toLowerCase();
 			var ctrlDown = event.ctrlKey || event.metaKey;
 			if (this.Helper.is_input(event.target))

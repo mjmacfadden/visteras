@@ -6229,3 +6229,19 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	font-size: 12px;
 }
 
+.media-search-spinner {
+	display: inline-block !important;
+	width: 15px !important;
+	height: 15px !important;
+	box-sizing: border-box !important;
+	margin-right: 6px !important;
+	border: 2px solid currentColor !important;
+	border-right-color: transparent !important;
+	border-radius: 50% !important;
+	vertical-align: -2px !important;
+	animation: media-search-spin .7s linear infinite !important;
+}
+@keyframes media-search-spin {
+	to { transform: rotate(360deg); }
+}
+
