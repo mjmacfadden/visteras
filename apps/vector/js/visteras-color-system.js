@@ -2,7 +2,8 @@
  * Visteras Vector — Color System
  *
  * Color + Swatches panels stacked above Properties (Studio parity layout),
- * Appearance fill/stroke wells, and a usable spectrum picker modal.
+ * Appearance fill/stroke wells (left-aligned), stroke alignment
+ * (center/inside/outside), and a usable spectrum picker modal.
  * Swatch presets reuse Studio's SWATCH_CATEGORIES (copied to
  * ./visteras-swatches-data.js). Replaces jGraduate as the primary UX while
  * leaving SVG-Edit color pickers in the DOM for internal sync.
@@ -195,6 +196,7 @@ function flattenPaintTargets(elements, { attr = null } = {}) {
   const skipFill = attr === 'fill';
   for (const el of elements) {
     if (!el) continue;
+    if (el.getAttribute?.('data-visteras-stroke-align-helper')) continue;
     if (el.tagName === 'g') {
       for (const child of el.querySelectorAll('*')) {
         if (child.nodeName === 'g') continue;
@@ -238,6 +240,11 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
       sc.changeSelectedAttribute(attr, next, elems);
       sc.call?.('changed', elems);
     }
+    if (attr === 'stroke' || attr === 'stroke-width' || attr === 'd' || attr === 'points') {
+      for (const el of elems) {
+        try { syncStrokeAlignRendering(el, sc); } catch { /* ignore */ }
+      }
+    }
     return true;
   }
 
@@ -269,7 +276,413 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
     } catch { /* ignore history failures */ }
   }
   if (changed.length) sc.call?.('changed', changed);
+  // Keep inside/outside stroke alignment in sync when stroke paint or width changes.
+  if (changed.length && (attr === 'stroke' || attr === 'stroke-width' || attr === 'd' || attr === 'points')) {
+    for (const el of changed) {
+      try { syncStrokeAlignRendering(el, sc); } catch { /* ignore */ }
+    }
+  }
   return changed.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Stroke alignment (Center / Inside / Outside)
+// SVG has no native Illustrator-style stroke alignment. We approximate:
+//   center  — default SVG stroke (centered on path)
+//   inside  — 2× stroke-width + clipPath to the path geometry (closed shapes)
+//   outside — 2× stroke on a non-selectable helper path + mask punching the
+//             interior so the main element keeps its fill
+// Open paths, lines, polylines, text, images: fall back to center rendering
+// (attribute is still stored; UI may show the choice).
+// ---------------------------------------------------------------------------
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const STROKE_ALIGN_ATTR = 'data-visteras-stroke-align';
+const STROKE_WEIGHT_ATTR = 'data-visteras-stroke-weight';
+const STROKE_CLIP_ATTR = 'data-visteras-sa-clip';
+const STROKE_MASK_ATTR = 'data-visteras-sa-mask';
+const STROKE_HELPER_ATTR = 'data-visteras-stroke-align-helper';
+const STROKE_HELPER_FOR_ATTR = 'data-visteras-helper-for';
+const STROKE_PAINT_ATTR = 'data-visteras-stroke-paint';
+
+const STROKE_ALIGN_GEOM_ATTRS = {
+  path: ['d', 'transform'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'transform'],
+  circle: ['cx', 'cy', 'r', 'transform'],
+  ellipse: ['cx', 'cy', 'rx', 'ry', 'transform'],
+  polygon: ['points', 'transform'],
+  polyline: ['points', 'transform'],
+};
+
+function getSvgContent(sc) {
+  return (typeof sc?.getContentElem === 'function' && sc.getContentElem())
+    || document.getElementById('svgcontent')
+    || null;
+}
+
+function getSvgDefs(sc) {
+  if (typeof sc?.findDefs === 'function') {
+    try {
+      const d = sc.findDefs();
+      if (d) return d;
+    } catch { /* fall through */ }
+  }
+  const root = getSvgContent(sc);
+  if (!root) return null;
+  let defs = root.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS(SVG_NS, 'defs');
+    root.insertBefore(defs, root.firstChild);
+  }
+  return defs;
+}
+
+function nextSvgId(sc, prefix) {
+  if (typeof sc?.getNextId === 'function') {
+    try { return sc.getNextId(); } catch { /* fall through */ }
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function ensureElementId(el, sc) {
+  if (el.id) return el.id;
+  const id = nextSvgId(sc, 'svg_');
+  el.setAttribute('id', id);
+  return id;
+}
+
+function isStrokeAlignHelper(el) {
+  return !!el?.getAttribute?.(STROKE_HELPER_ATTR);
+}
+
+function isClosedStrokeTarget(el) {
+  if (!el || isStrokeAlignHelper(el)) return false;
+  const tag = el.tagName?.toLowerCase?.() || '';
+  if (tag === 'rect' || tag === 'circle' || tag === 'ellipse' || tag === 'polygon') return true;
+  if (tag === 'path') {
+    const d = (el.getAttribute('d') || '').trim();
+    // Any closepath command — open subpaths still get best-effort clip.
+    return /[zZ]/.test(d);
+  }
+  return false;
+}
+
+function cloneStrokeGeometry(el) {
+  const tag = el.tagName.toLowerCase();
+  const clone = document.createElementNS(el.namespaceURI || SVG_NS, tag);
+  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+    const v = el.getAttribute(a);
+    if (v != null) clone.setAttribute(a, v);
+  }
+  return clone;
+}
+
+function findStrokeAlignHelper(el) {
+  if (!el?.id) return null;
+  const parent = el.parentNode;
+  if (!parent) return null;
+  for (const child of parent.children) {
+    if (child.getAttribute?.(STROKE_HELPER_FOR_ATTR) === el.id) return child;
+  }
+  return null;
+}
+
+function removeStrokeAlignHelper(el) {
+  const helper = findStrokeAlignHelper(el);
+  if (helper?.parentNode) helper.parentNode.removeChild(helper);
+}
+
+function removeDefsResource(sc, attrName, el) {
+  const id = el.getAttribute(attrName);
+  if (!id) return;
+  const defs = getSvgDefs(sc);
+  const node = defs?.getElementById?.(id) || document.getElementById(id);
+  if (node?.parentNode) node.parentNode.removeChild(node);
+  el.removeAttribute(attrName);
+}
+
+function clearStrokeAlignRendering(el, sc) {
+  if (!el) return;
+  removeStrokeAlignHelper(el);
+  // Clear clip/mask presentation attrs we own
+  const clipId = el.getAttribute(STROKE_CLIP_ATTR);
+  if (clipId) {
+    el.removeAttribute('clip-path');
+    removeDefsResource(sc, STROKE_CLIP_ATTR, el);
+  } else if ((el.getAttribute('clip-path') || '').includes('visteras-sa-clip')) {
+    el.removeAttribute('clip-path');
+  }
+  const maskId = el.getAttribute(STROKE_MASK_ATTR);
+  if (maskId) {
+    el.removeAttribute('mask');
+    removeDefsResource(sc, STROKE_MASK_ATTR, el);
+  }
+  // Restore user stroke-width if we had doubled it
+  const userW = el.getAttribute(STROKE_WEIGHT_ATTR);
+  if (userW != null && userW !== '') {
+    el.setAttribute('stroke-width', userW);
+  }
+  // Restore stroke paint if outside mode hid it on the main element
+  const paint = el.getAttribute(STROKE_PAINT_ATTR);
+  if (paint != null) {
+    if (paint === '') el.removeAttribute('stroke');
+    else el.setAttribute('stroke', paint);
+    el.removeAttribute(STROKE_PAINT_ATTR);
+  }
+}
+
+function ensureClipForInside(el, sc) {
+  const defs = getSvgDefs(sc);
+  if (!defs) return null;
+  let clipId = el.getAttribute(STROKE_CLIP_ATTR);
+  let clip = clipId ? (defs.getElementById?.(clipId) || document.getElementById(clipId)) : null;
+  if (!clip) {
+    clipId = nextSvgId(sc, 'visteras-sa-clip');
+    clip = document.createElementNS(SVG_NS, 'clipPath');
+    clip.setAttribute('id', clipId);
+    clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    defs.appendChild(clip);
+    el.setAttribute(STROKE_CLIP_ATTR, clipId);
+  }
+  while (clip.firstChild) clip.removeChild(clip.firstChild);
+  clip.appendChild(cloneStrokeGeometry(el));
+  el.setAttribute('clip-path', `url(#${clipId})`);
+  return clipId;
+}
+
+function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
+  const defs = getSvgDefs(sc);
+  if (!defs) return null;
+  let maskId = helper.getAttribute(STROKE_MASK_ATTR);
+  let mask = maskId ? (defs.getElementById?.(maskId) || document.getElementById(maskId)) : null;
+  if (!mask) {
+    maskId = nextSvgId(sc, 'visteras-sa-mask');
+    mask = document.createElementNS(SVG_NS, 'mask');
+    mask.setAttribute('id', maskId);
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    defs.appendChild(mask);
+    helper.setAttribute(STROKE_MASK_ATTR, maskId);
+  }
+  while (mask.firstChild) mask.removeChild(mask.firstChild);
+
+  let bbox = null;
+  try { bbox = shapeEl.getBBox(); } catch { bbox = null; }
+  const p = Math.max(2, Number(pad) || 2);
+  if (bbox && Number.isFinite(bbox.width) && Number.isFinite(bbox.height)) {
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', String(bbox.x - p));
+    bg.setAttribute('y', String(bbox.y - p));
+    bg.setAttribute('width', String(Math.max(1, bbox.width + p * 2)));
+    bg.setAttribute('height', String(Math.max(1, bbox.height + p * 2)));
+    bg.setAttribute('fill', '#ffffff');
+    mask.appendChild(bg);
+  } else {
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', '-50000');
+    bg.setAttribute('y', '-50000');
+    bg.setAttribute('width', '100000');
+    bg.setAttribute('height', '100000');
+    bg.setAttribute('fill', '#ffffff');
+    mask.appendChild(bg);
+  }
+  const hole = cloneStrokeGeometry(shapeEl);
+  hole.setAttribute('fill', '#000000');
+  hole.setAttribute('stroke', 'none');
+  mask.appendChild(hole);
+  helper.setAttribute('mask', `url(#${maskId})`);
+  return maskId;
+}
+
+function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
+  const id = ensureElementId(el, sc);
+  let helper = findStrokeAlignHelper(el);
+  const tag = el.tagName.toLowerCase();
+  if (!helper) {
+    helper = document.createElementNS(el.namespaceURI || SVG_NS, tag);
+    helper.setAttribute(STROKE_HELPER_ATTR, '1');
+    helper.setAttribute(STROKE_HELPER_FOR_ATTR, id);
+    helper.setAttribute('pointer-events', 'none');
+    helper.classList.add('visteras-stroke-align-helper');
+    el.parentNode?.insertBefore(helper, el);
+  }
+  // Refresh geometry
+  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+    const v = el.getAttribute(a);
+    if (v == null) helper.removeAttribute(a);
+    else helper.setAttribute(a, v);
+  }
+  helper.setAttribute('fill', 'none');
+  helper.setAttribute('stroke', strokePaint && strokePaint !== 'none' ? strokePaint : '#000000');
+  helper.setAttribute('stroke-width', String(Math.max(0, userWidth) * 2));
+  // Copy common stroke presentation
+  for (const a of ['stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray', 'stroke-opacity', 'opacity']) {
+    const v = el.getAttribute(a);
+    if (v == null) helper.removeAttribute(a);
+    else helper.setAttribute(a, v);
+  }
+  ensureMaskForOutsideHelper(helper, el, sc, userWidth * 2 + 4);
+  return helper;
+}
+
+/**
+ * Apply or refresh stroke-align rendering for one element.
+ * @param {Element} el
+ * @param {object} sc svgCanvas
+ * @param {{ align?: string, userWidth?: number }} [opts]
+ */
+function applyStrokeAlignToElement(el, sc, opts = {}) {
+  if (!el || isStrokeAlignHelper(el)) return { applied: 'center', closed: false };
+
+  const alignRaw = (opts.align ?? el.getAttribute(STROKE_ALIGN_ATTR) ?? 'center').toLowerCase();
+  const align = (alignRaw === 'inside' || alignRaw === 'outside') ? alignRaw : 'center';
+  const closed = isClosedStrokeTarget(el);
+
+  // Resolve user-facing weight (never treat a doubled inside width as the user value).
+  let userWidth = opts.userWidth;
+  if (userWidth == null || Number.isNaN(Number(userWidth))) {
+    userWidth = readElementStrokeWeight(el);
+    if (userWidth == null) userWidth = 1;
+  }
+  userWidth = Math.max(0, Number(userWidth) || 0);
+
+  // Always persist the requested align (even if we fall back visually).
+  el.setAttribute(STROKE_ALIGN_ATTR, align);
+
+  // Open / unsupported → center rendering, keep attribute for UI.
+  if (!closed || align === 'center' || userWidth <= 0) {
+    clearStrokeAlignRendering(el, sc);
+    if (align === 'center') {
+      el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
+      el.setAttribute('stroke-width', String(userWidth));
+    } else {
+      // Requested inside/outside but unsupported: still store intent + center paint.
+      el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
+      el.setAttribute('stroke-width', String(userWidth));
+    }
+    return { applied: 'center', closed, requested: align };
+  }
+
+  if (align === 'inside') {
+    removeStrokeAlignHelper(el);
+    // Restore any paint hidden by a prior outside mode
+    const paint = el.getAttribute(STROKE_PAINT_ATTR);
+    if (paint != null) {
+      if (paint === '') el.removeAttribute('stroke');
+      else el.setAttribute('stroke', paint);
+      el.removeAttribute(STROKE_PAINT_ATTR);
+    }
+    el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
+    el.setAttribute('stroke-width', String(userWidth * 2));
+    ensureClipForInside(el, sc);
+    return { applied: 'inside', closed, requested: align };
+  }
+
+  // outside
+  const currentStroke = el.getAttribute('stroke');
+  // If paint just landed on the element (not yet hidden), capture it; otherwise
+  // keep the stored outside paint used by the helper ring.
+  let paint;
+  if (currentStroke != null && currentStroke !== 'none') {
+    paint = currentStroke;
+    el.setAttribute(STROKE_PAINT_ATTR, currentStroke);
+  } else {
+    paint = el.getAttribute(STROKE_PAINT_ATTR) || '#000000';
+    if (!el.hasAttribute(STROKE_PAINT_ATTR)) el.setAttribute(STROKE_PAINT_ATTR, paint);
+  }
+  // Hide stroke on main element so fill stays; helper draws the outside ring.
+  el.setAttribute('stroke', 'none');
+  el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
+  // Keep stroke-width as user width for SVG-Edit inspectors / new ops.
+  el.setAttribute('stroke-width', String(userWidth));
+  // Drop inside clip if any
+  if (el.getAttribute(STROKE_CLIP_ATTR) || el.getAttribute('clip-path')) {
+    el.removeAttribute('clip-path');
+    removeDefsResource(sc, STROKE_CLIP_ATTR, el);
+  }
+  upsertOutsideHelper(el, sc, userWidth, el.getAttribute(STROKE_PAINT_ATTR) || paint);
+  return { applied: 'outside', closed, requested: align };
+}
+
+function syncStrokeAlignRendering(el, sc) {
+  if (!el || isStrokeAlignHelper(el)) return;
+  const align = (el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  if (align === 'center' || !el.hasAttribute(STROKE_ALIGN_ATTR)) {
+    // Still refresh helper cleanup if a stale helper exists
+    if (findStrokeAlignHelper(el)) clearStrokeAlignRendering(el, sc);
+    return;
+  }
+  applyStrokeAlignToElement(el, sc, { align });
+}
+
+function readElementStrokeAlign(el) {
+  if (!el) return 'center';
+  const a = (el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  return (a === 'inside' || a === 'outside') ? a : 'center';
+}
+
+function readElementStrokeWeight(el) {
+  if (!el) return null;
+  const stored = el.getAttribute(STROKE_WEIGHT_ATTR);
+  if (stored != null && stored !== '') {
+    const n = Number(stored);
+    if (!Number.isNaN(n)) return n;
+  }
+  const w = el.getAttribute('stroke-width');
+  if (w != null && w !== '') {
+    const n = Number(w);
+    if (!Number.isNaN(n)) {
+      // If inside align with doubled width and no stored weight, half it.
+      if ((el.getAttribute(STROKE_ALIGN_ATTR) || '') === 'inside' && !el.hasAttribute(STROKE_WEIGHT_ATTR)) {
+        return n / 2;
+      }
+      return n;
+    }
+  }
+  return null;
+}
+
+function applyStrokeAlignToTargets(sc, align, { noUndo = false, userWidth = null } = {}) {
+  if (!sc) return false;
+  const elems = flattenPaintTargets(resolvePaintTargets(sc))
+    .filter((el) => el && !isStrokeAlignHelper(el));
+  if (!elems.length) {
+    // Still store as current preference on canvas if possible
+    try { sc.curShape && (sc.curShape._visterasStrokeAlign = align); } catch { /* ignore */ }
+    return false;
+  }
+
+  const { ChangeElementCommand, BatchCommand } = sc.history || {};
+  const batch = (!noUndo && BatchCommand && ChangeElementCommand)
+    ? new BatchCommand(`Stroke align ${align}`)
+    : null;
+
+  for (const el of elems) {
+    const before = {
+      [STROKE_ALIGN_ATTR]: el.getAttribute(STROKE_ALIGN_ATTR),
+      [STROKE_WEIGHT_ATTR]: el.getAttribute(STROKE_WEIGHT_ATTR),
+      [STROKE_PAINT_ATTR]: el.getAttribute(STROKE_PAINT_ATTR),
+      'stroke-width': el.getAttribute('stroke-width'),
+      stroke: el.getAttribute('stroke'),
+      'clip-path': el.getAttribute('clip-path'),
+      mask: el.getAttribute('mask'),
+    };
+    const w = userWidth != null ? userWidth : (readElementStrokeWeight(el) ?? 1);
+    applyStrokeAlignToElement(el, sc, { align, userWidth: w });
+    if (batch) {
+      batch.addSubCommand(new ChangeElementCommand(el, before));
+    }
+  }
+  if (batch) {
+    try {
+      if (typeof batch.isEmpty === 'function') {
+        if (!batch.isEmpty()) sc.addCommandToHistory?.(batch);
+      } else {
+        sc.addCommandToHistory?.(batch);
+      }
+    } catch { /* ignore */ }
+  }
+  sc.call?.('changed', elems);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -852,15 +1265,37 @@ const VCS_TAB_STORAGE = 'visteras-vector-color-tab';
 
 function readCanvasPaint(svgEditor, which) {
   const sc = svgEditor?.svgCanvas;
+  const fallbackHex = which === 'fill' ? '#cccccc' : '#000000';
+
+  // Prefer live DOM on the current paint targets (DS + outside-align helpers).
+  try {
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    for (const el of targets) {
+      if (!el) continue;
+      let raw = el.getAttribute(which);
+      if (which === 'stroke') {
+        const align = (el.getAttribute(STROKE_ALIGN_ATTR) || '').toLowerCase();
+        if (align === 'outside') {
+          const stored = el.getAttribute(STROKE_PAINT_ATTR);
+          if (stored != null) raw = stored;
+        }
+      }
+      if (raw == null || raw === '') continue;
+      if (raw === 'none' || raw === 'transparent') return { none: true, hex: fallbackHex };
+      const hex = normalizeHex(raw);
+      if (hex && hex !== 'none') return { none: false, hex };
+    }
+  } catch { /* fall through */ }
+
   if (!sc || typeof sc.getColor !== 'function') {
-    return { none: false, hex: which === 'fill' ? '#cccccc' : '#000000' };
+    return { none: false, hex: fallbackHex };
   }
   const raw = sc.getColor(which);
   if (!raw || raw === 'none' || raw === 'transparent') {
-    return { none: true, hex: which === 'fill' ? '#cccccc' : '#000000' };
+    return { none: true, hex: fallbackHex };
   }
   const hex = normalizeHex(raw);
-  if (!hex || hex === 'none') return { none: true, hex: which === 'fill' ? '#cccccc' : '#000000' };
+  if (!hex || hex === 'none') return { none: true, hex: fallbackHex };
   return { none: false, hex };
 }
 
@@ -1297,6 +1732,10 @@ function mountAppearanceColors(ctrl, svgEditor) {
   const strokeTarget = document.getElementById('vcs_app_stroke_target');
   const fillNone = document.getElementById('vcs_app_fill_none');
   const weightInput = document.getElementById('vcs_app_stroke_weight');
+  const alignGroup = document.getElementById('vcs_app_stroke_align');
+  const alignBtns = alignGroup
+    ? Array.from(alignGroup.querySelectorAll('.vcs-stroke-align-btn[data-align]'))
+    : [];
   const rowFill = fillChip.closest('.vcs-appearance-row');
   const rowStroke = strokeChip.closest('.vcs-appearance-row');
   const sc = svgEditor?.svgCanvas;
@@ -1312,6 +1751,11 @@ function mountAppearanceColors(ctrl, svgEditor) {
   }
 
   function readStrokeWidth() {
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    for (const el of targets) {
+      const w = readElementStrokeWeight(el);
+      if (w != null) return w;
+    }
     if (typeof sc?.getStrokeWidth === 'function') {
       const w = sc.getStrokeWidth();
       if (w != null && w !== '') return Number(w);
@@ -1319,6 +1763,23 @@ function mountAppearanceColors(ctrl, svgEditor) {
     const native = document.getElementById('stroke_width');
     if (native?.value != null && native.value !== '') return Number(native.value);
     return 1;
+  }
+
+  function readStrokeAlign() {
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    for (const el of targets) {
+      if (el?.hasAttribute?.(STROKE_ALIGN_ATTR)) return readElementStrokeAlign(el);
+    }
+    return 'center';
+  }
+
+  function setAlignButtons(align) {
+    const a = (align === 'inside' || align === 'outside') ? align : 'center';
+    for (const btn of alignBtns) {
+      const on = btn.dataset.align === a;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
   }
 
   // Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → …
@@ -1355,10 +1816,31 @@ function mountAppearanceColors(ctrl, svgEditor) {
     else if (sc?.curProperties) sc.curProperties.stroke_width = n;
     if (sc?.curShape) sc.curShape.stroke_width = n;
 
-    const applied = applyPaintAttribute(sc, 'stroke-width', n, { noUndo: !!live });
-    if (!applied && typeof sc?.setStrokeWidth === 'function') {
-      // No explicit targets — fall back to canvas API (Selection tool path).
-      sc.setStrokeWidth(n);
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    if (targets.length) {
+      // Always store the user-facing weight on targets first.
+      for (const el of targets) el.setAttribute(STROKE_WEIGHT_ATTR, String(n));
+
+      const needsAlign = targets.some((el) => {
+        const a = readElementStrokeAlign(el);
+        return a === 'inside' || a === 'outside';
+      });
+
+      if (needsAlign) {
+        for (const el of targets) {
+          const align = readElementStrokeAlign(el);
+          applyStrokeAlignToElement(el, sc, { align, userWidth: n });
+        }
+        sc.call?.('changed', targets);
+      } else {
+        const applied = applyPaintAttribute(sc, 'stroke-width', n, { noUndo: !!live });
+        if (!applied && typeof sc?.setStrokeWidth === 'function') sc.setStrokeWidth(n);
+      }
+    } else {
+      const applied = applyPaintAttribute(sc, 'stroke-width', n, { noUndo: !!live });
+      if (!applied && typeof sc?.setStrokeWidth === 'function') {
+        sc.setStrokeWidth(n);
+      }
     }
 
     const native = document.getElementById('stroke_width');
@@ -1366,6 +1848,16 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (weightInput && document.activeElement !== weightInput) {
       weightInput.value = formatStrokeWeight(n);
     }
+  }
+
+  function writeStrokeAlign(align) {
+    const a = (align === 'inside' || align === 'outside') ? align : 'center';
+    const w = readStrokeWidth();
+    applyStrokeAlignToTargets(sc, a, { userWidth: w, noUndo: false });
+    setAlignButtons(a);
+    // Keep SVG-Edit current style weight as user weight
+    if (typeof sc?.setCurProperties === 'function') sc.setCurProperties('stroke_width', w);
+    else if (sc?.curProperties) sc.curProperties.stroke_width = w;
   }
 
   function refresh() {
@@ -1381,6 +1873,7 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (weightInput && document.activeElement !== weightInput) {
       weightInput.value = formatStrokeWeight(readStrokeWidth());
     }
+    setAlignButtons(readStrokeAlign());
   }
 
   const openFor = (target) => {
@@ -1464,10 +1957,38 @@ function mountAppearanceColors(ctrl, svgEditor) {
     }, { passive: false });
   }
 
+  for (const btn of alignBtns) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const align = btn.dataset.align || 'center';
+      ctrl.setActiveTarget('stroke', { syncColor: false });
+      writeStrokeAlign(align);
+      refresh();
+    });
+  }
+
   ctrl.subscribe(refresh);
   document.getElementById('fill_color')?.addEventListener('change', refresh);
   document.getElementById('stroke_color')?.addEventListener('change', refresh);
   document.getElementById('stroke_width')?.addEventListener('change', refresh);
+  // Re-sync alignment UI (and geometry clips) when selection changes.
+  let alignSyncing = false;
+  try {
+    sc?.bind?.('selected', refresh);
+    sc?.bind?.('changed', () => {
+      if (alignSyncing) return;
+      alignSyncing = true;
+      try {
+        const targets = flattenPaintTargets(resolvePaintTargets(sc));
+        for (const el of targets) {
+          try { syncStrokeAlignRendering(el, sc); } catch { /* ignore */ }
+        }
+        refresh();
+      } finally {
+        alignSyncing = false;
+      }
+    });
+  } catch { /* ignore */ }
   refresh();
 }
 
