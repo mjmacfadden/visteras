@@ -21,6 +21,7 @@
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css" rel="stylesheet" media="all">
+  <link href="./css/visteras-color-system.css" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -180,6 +181,7 @@
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1736,6 +1738,9 @@
 
     // Document shell: tabs, New Document modal, fit artboard, status bar, rulers/units
     mountVisterasDocumentShell({ svgEditor });
+
+    // Color system: Color + Swatches panels, picker modal, toolbar fill/stroke
+    mountVisterasColorSystem({ svgEditor });
   </script>
 </body>
 </html>
