@@ -20,6 +20,7 @@
 
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css" rel="stylesheet" media="all">
+  <link href="./css/visteras-document-shell.css" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -178,6 +179,7 @@
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
+    import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -473,10 +475,9 @@
       // Actions wiring
       const sc = svgEditor.svgCanvas;
 
+      // File → New is handled by mountVisterasDocumentShell (New Document modal)
       document.getElementById('action_new')?.addEventListener('click', () => {
-        if (confirm('Create a new vector document? Unsaved changes will be cleared.')) {
-          sc.clearSvgContentElement();
-        }
+        window.__visterasDocumentShell?.openNewModal?.();
       });
 
       document.getElementById('action_open')?.addEventListener('click', () => {
@@ -1732,6 +1733,9 @@
     mountVisterasReferenceImages({ svgEditor });
     mountVisterasImageTrace({ svgEditor });
     installVisterasClipboardBridge({ svgEditor });
+
+    // Document shell: tabs, New Document modal, fit artboard, status bar, rulers/units
+    mountVisterasDocumentShell({ svgEditor });
   </script>
 </body>
 </html>
