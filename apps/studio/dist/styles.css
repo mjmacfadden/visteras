@@ -1677,17 +1677,28 @@ button img{
 	height: 28px;
 	border: 1px solid #4a4a4a;
 	border-radius: 2px;
-	background: #2a2a2a;
+	background: #ffffff;
 	cursor: pointer;
 }
 .ui_none_color_btn:hover {
 	border-color: #2f6fae;
 }
+/* Override global `button img { filter: var(--menu-icons-filter) }` (invert)
+   which turned the white square dark and the red slash cyan. */
 .ui_none_color_btn img {
 	display: block;
 	width: 24px;
 	height: 24px;
 	pointer-events: none;
+	filter: none !important;
+}
+
+/* Current sample when stop is none/transparent — checker, not zoomed slash icon */
+.ui_color_sample.is_none {
+	background-color: transparent !important;
+	background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAABhWlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw1AUhU9bRdGKiBlERDJUJwuiIo5ahSJUCLVCqw4mL/2DJg1Jiouj4Fpw8Gex6uDirKuDqyAI/oA4OTopukiJ9yWFFjFeeLyP8+45vHcfEKyVmGa1jQOabpvJeExMZ1bFjld0YxgBCOiTmWXMSVICvvV1T51Ud1Ge5d/3Z/WoWYsBAZF4lhmmTbxBPL1pG5z3iQVWkFXic+Ixky5I/Mh1xeM3znmXgzxTMFPJeWKBWMy3sNLCrGBqxFPEEVXTKT+Y9ljlvMVZK1VY4578heGsvrLMdVpDiGMRS5AgQkEFRZRgI0q7ToqFJJ3HfPyDrl8il0KuIhg5FlCGBtn1g//B79lauckJLykcA9pfHOdjBOjYBepVx/k+dpz6CRB6Bq70pr9cA2Y+Sa82tcgR0LsNXFw3NWUPuNwBBp4M2ZRdKUQrmMsB72f0TRmg/xboWvPm1jjH6QOQolklboCDQ2A0T9nrPu/ubJ3bvz2N+f0AL+pyjMZuudYAAAAJcEhZcwAALiMAAC4jAXilP3YAAAAHdElNRQfkCx4BHwaj7CMVAAAAGXRFWHRDb21tZW50AENyZWF0ZWQgd2l0aCBHSU1QV4EOFwAAAC5JREFUOMtjfPfuHQNuICgoiEeWiYECMKp5ZGhm/P//Px7p9+/fjwbYqGZKNAMAANAI7r7rfkQAAAAASUVORK5CYII=') !important;
+	background-size: 100% 100% !important;
+	background-repeat: no-repeat !important;
 }
 
 .wrapper{

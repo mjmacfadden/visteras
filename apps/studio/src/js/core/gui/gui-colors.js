@@ -416,15 +416,8 @@ class GUI_colors_class {
 		this.NONE = !!enabled;
 		if (enabled) {
 			this.ALPHA = 0;
-			// Keep RGB for re-enable; sample shows none affordance via alpha
+			// Keep RGB for re-enable; Current sample shows checker (not slash icon)
 			this.render_selected_color();
-			if (this.inputs.sample && this.inputs.sample.length > 0) {
-				this.inputs.sample.css({
-					background: 'transparent',
-					backgroundImage: "url('images/icons/no_color.svg')",
-					backgroundSize: 'cover'
-				});
-			}
 		} else {
 			if (this.ALPHA <= 0) this.ALPHA = 255;
 			this.render_selected_color();
@@ -538,13 +531,14 @@ class GUI_colors_class {
 
 		if (this.inputs.sample && this.inputs.sample.length > 0) {
 			if (this.NONE || ALPHA <= 0) {
+				// Checker pattern (same as alpha overlay) — not the slash icon
+				this.inputs.sample.addClass('is_none');
 				this.inputs.sample.css({
 					backgroundColor: 'transparent',
-					backgroundImage: "url('images/icons/no_color.svg')",
-					backgroundSize: 'cover',
-					backgroundRepeat: 'no-repeat'
+					backgroundImage: '',
 				});
 			} else {
+				this.inputs.sample.removeClass('is_none');
 				this.inputs.sample.css({
 					backgroundColor: COLOR,
 					backgroundImage: 'none'

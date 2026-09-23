@@ -253,45 +253,54 @@ class Gradient_class extends Base_tools_class {
 		this.Base_layers.render();
 	}
 
-	mouseup(e) {
+	async mouseup(e) {
 		var mouse = this.get_mouse_info(e);
 		if (!this.started) {
 			return;
 		}
 
 		if (config.mask_active === true && config.layer && config.layer.mask != null) {
-			this.Mask.gradient_end(this, e);
+			await this.Mask.gradient_end(this, e);
 			this._clear_session({ keep_link: false });
 			return;
 		}
 
-		if (mouse.click_valid == false) {
-			this._abort_paint();
-			return;
-		}
-
+		// Base_tools set_mouse_info() clears click_valid on pointerup *before*
+		// tools see mouseup. Paint was already validated on mousedown via
+		// this.started — do not abort (that left preview discarded / no undo).
 		const geom = this._geometry_from_drag(e, mouse);
 		if (geom.empty) {
 			this._abort_paint();
 			return;
 		}
 
-		if (this.tmpCanvas && config.layer && config.layer.type === 'image') {
+		const layer = config.layer;
+		const canvas = this.tmpCanvas;
+		if (canvas && layer && layer.type === 'image') {
 			this._paint_gradient_preview(e, mouse);
-			const canvas = this.tmpCanvas;
-			const layer_id = config.layer.id;
-			// Hand canvas to history; Update_layer_image_action clears link_canvas on decode.
-			app.State.do_action(
-				new app.Actions.Bundle_action('gradient_tool', 'Gradient Tool', [
-					new app.Actions.Update_layer_image_action(canvas, layer_id)
-				])
-			);
+			const layer_id = layer.id;
+			// Drop interactive refs before await; keep link_canvas bridge until
+			// Update_layer_image_action clears it on Image.onload (same as brush).
 			this.tmpCanvas = null;
 			this.tmpCanvasCtx = null;
+			this._clear_session({ keep_link: true });
+			try {
+				await app.State.do_action(
+					new app.Actions.Bundle_action('gradient_tool', 'Gradient Tool', [
+						new app.Actions.Update_layer_image_action(canvas, layer_id)
+					])
+				);
+			} catch (err) {
+				if (layer.link_canvas === canvas) {
+					delete layer.link_canvas;
+				}
+				throw err;
+			}
+			this.Base_layers.render();
+			return;
 		}
 
-		this._clear_session({ keep_link: true });
-		this.Base_layers.render();
+		this._abort_paint();
 	}
 
 	/**
