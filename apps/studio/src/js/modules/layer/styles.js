@@ -10,6 +10,8 @@ import Effects_inner_glow_class from '../effects/common/inner_glow.js';
 import Effects_stroke_class from '../effects/common/stroke.js';
 import Effects_color_overlay_class from '../effects/common/color_overlay.js';
 
+const STYLE_FILTER_NAMES = ['stroke', 'color_overlay', 'inner_glow', 'outer_glow', 'shadow', 'drop-shadow'];
+
 class Layer_styles_class {
 
 	constructor() {
@@ -26,6 +28,31 @@ class Layer_styles_class {
 		this.activeTab = 'shadow';
 		this.layer_id = null;
 		this.styles = {};
+		this._snapshot = null;
+	}
+
+	/**
+	 * Photoshop-like light angle → shadow offset.
+	 * Angle 0° = light from the right; shadow casts opposite.
+	 * Canvas Y grows downward, so +sin pushes the shadow down.
+	 */
+	static offset_from_angle_distance(angleDeg, distance) {
+		const rad = (Number(angleDeg) || 0) * Math.PI / 180;
+		const d = Number(distance) || 0;
+		return {
+			x: Math.round(-Math.cos(rad) * d),
+			y: Math.round(Math.sin(rad) * d),
+		};
+	}
+
+	static angle_distance_from_offset(x, y) {
+		const ox = Number(x) || 0;
+		const oy = Number(y) || 0;
+		const distance = Math.round(Math.sqrt(ox * ox + oy * oy));
+		let angle = Math.atan2(oy, -ox) * 180 / Math.PI;
+		if (angle < 0) angle += 360;
+		angle = Math.round(angle) % 360;
+		return { angle, distance };
 	}
 
 	open(initialEffect = 'shadow', filter_id = null) {
@@ -37,7 +64,17 @@ class Layer_styles_class {
 		this.layer_id = config.layer.id;
 		this.activeTab = initialEffect || 'shadow';
 
-		// Load or initialize each style configuration from current layer
+		// Snapshot for Cancel restore; OK restores then commits via undoable action
+		try {
+			this._snapshot = {
+				filters: JSON.parse(JSON.stringify(config.layer.filters || [])),
+			};
+		} catch (e) {
+			this._snapshot = {
+				filters: (config.layer.filters || []).slice(),
+			};
+		}
+
 		this.styles = {
 			stroke: {
 				name: 'Stroke',
@@ -71,8 +108,6 @@ class Layer_styles_class {
 			}
 		};
 
-		// Always load ALL existing style filters so siblings survive save when
-		// reopening Layer Style for a single effect (filter_id / initialEffect).
 		if (config.layer.filters) {
 			for (const f of config.layer.filters) {
 				const filterName = f.name === 'drop-shadow' ? 'shadow' : f.name;
@@ -84,7 +119,6 @@ class Layer_styles_class {
 			}
 		}
 
-		// filter_id / initialEffect only select the active tab; ensure it is on
 		if (filter_id != null && config.layer.filters) {
 			for (const f of config.layer.filters) {
 				if (f.id == filter_id) {
@@ -105,34 +139,31 @@ class Layer_styles_class {
 
 	show_dialog() {
 		const _this = this;
-		const preview_padding = 20;
 
 		const settings = {
 			title: 'Layer Style',
-			preview: true,
-			preview_padding: preview_padding,
+			// No mini pop_pre/pop_post pane — draft live on the main canvas only.
+			preview: false,
 			className: 'layer_style_dialog wide',
 			params: [
 				{
 					html: this.generate_dialog_html()
 				}
 			],
-			on_load: function(params) {
+			on_load: function() {
 				_this.bind_dialog_events();
-				_this.update_preview();
+				_this.apply_live_canvas();
 			},
-			on_change: function(params, canvas_preview, w, h) {
-				_this.render_combined_preview(canvas_preview, preview_padding);
+			on_finish: function() {
+				_this.commit_styles();
 			},
-			on_finish: function(params) {
-				_this.save_styles();
+			on_cancel: function() {
+				_this.restore_snapshot();
+				_this.request_render();
 			}
 		};
 
-		// Disable existing style filters while capturing clean preview base canvas
-		this.Base_layers.disable_filter(['stroke', 'color_overlay', 'inner_glow', 'outer_glow', 'shadow', 'drop-shadow']);
 		this.POP.show(settings);
-		this.Base_layers.disable_filter(null);
 	}
 
 	generate_dialog_html() {
@@ -298,19 +329,22 @@ class Layer_styles_class {
 		} else if (effectKey === 'shadow') {
 			const x = style.params.x ?? 5;
 			const y = style.params.y ?? 5;
+			const ad = Layer_styles_class.angle_distance_from_offset(x, y);
+			const angle = ad.angle;
+			const distance = ad.distance;
 			const val = style.params.value ?? 10;
 			const opacity = style.params.opacity ?? 25;
 			fields = `
 				<div class="ls_row">
-					<span class="ls_label">Offset X:</span>
-					<input type="range" class="ls_range" id="ls_shadow_x" min="-100" max="100" value="${x}" data-default="5" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_x" min="-100" max="100" value="${x}" data-default="5" title="Double-click to reset" />
-					<span class="ls_unit">px</span>
+					<span class="ls_label">Angle:</span>
+					<input type="range" class="ls_range" id="ls_shadow_angle" min="0" max="360" value="${angle}" data-default="135" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_angle" min="0" max="360" value="${angle}" data-default="135" title="Double-click to reset" />
+					<span class="ls_unit">°</span>
 				</div>
 				<div class="ls_row">
-					<span class="ls_label">Offset Y:</span>
-					<input type="range" class="ls_range" id="ls_shadow_y" min="-100" max="100" value="${y}" data-default="5" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_y" min="-100" max="100" value="${y}" data-default="5" title="Double-click to reset" />
+					<span class="ls_label">Distance:</span>
+					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" data-default="7" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" data-default="7" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
@@ -342,7 +376,6 @@ class Layer_styles_class {
 		const popup = this.POP.el || document.querySelector('#popups .popup');
 		if (!popup) return;
 
-		// Sidebar item selection & checkbox toggling
 		const sidebarItems = popup.querySelectorAll('.layer_style_item');
 		sidebarItems.forEach(item => {
 			const effectKey = item.dataset.effect;
@@ -356,7 +389,7 @@ class Layer_styles_class {
 					this.styles[effectKey].enabled = true;
 				}
 				this.refresh_tabs();
-				this.update_preview();
+				this.apply_live_canvas();
 			});
 
 			if (checkbox) {
@@ -366,7 +399,7 @@ class Layer_styles_class {
 					this.styles[effectKey].enabled = checkbox.checked;
 					this.activeTab = effectKey;
 					this.refresh_tabs();
-					this.update_preview();
+					this.apply_live_canvas();
 				});
 			}
 		});
@@ -381,7 +414,6 @@ class Layer_styles_class {
 		const controls = popup.querySelector('#layer_style_controls');
 		if (!controls) return;
 
-		// Link range inputs with number inputs bidirectionally
 		const ranges = controls.querySelectorAll('input[type="range"]');
 		const resetRangePair = (el) => {
 			const defRaw = el.getAttribute('data-default');
@@ -395,7 +427,7 @@ class Layer_styles_class {
 			if (rangeInput) rangeInput.value = defVal;
 			if (numInput) numInput.value = defVal;
 			this.read_current_controls();
-			this.update_preview();
+			this.apply_live_canvas();
 		};
 
 		ranges.forEach(range => {
@@ -404,12 +436,12 @@ class Layer_styles_class {
 			range.addEventListener('input', () => {
 				if (numInput) numInput.value = range.value;
 				this.read_current_controls();
-				this.update_preview();
+				this.apply_live_canvas();
 			});
 			range.addEventListener('change', () => {
 				if (numInput) numInput.value = range.value;
 				this.read_current_controls();
-				this.update_preview();
+				this.apply_live_canvas();
 			});
 			range.addEventListener('dblclick', (e) => {
 				e.preventDefault();
@@ -431,7 +463,7 @@ class Layer_styles_class {
 					rangeInput.value = val;
 				}
 				this.read_current_controls();
-				this.update_preview();
+				this.apply_live_canvas();
 			};
 			num.addEventListener('input', syncFromNumber);
 			num.addEventListener('change', syncFromNumber);
@@ -445,11 +477,11 @@ class Layer_styles_class {
 		otherInputs.forEach(el => {
 			el.addEventListener('input', () => {
 				this.read_current_controls();
-				this.update_preview();
+				this.apply_live_canvas();
 			});
 			el.addEventListener('change', () => {
 				this.read_current_controls();
-				this.update_preview();
+				this.apply_live_canvas();
 			});
 		});
 	}
@@ -537,145 +569,38 @@ class Layer_styles_class {
 				style.params = { value, opacity, color };
 			}
 		} else if (k === 'shadow') {
-			const xEl = popup.querySelector('#ls_shadow_x');
-			const numXEl = popup.querySelector('#ls_num_shadow_x');
-			const yEl = popup.querySelector('#ls_shadow_y');
-			const numYEl = popup.querySelector('#ls_num_shadow_y');
+			const angleEl = popup.querySelector('#ls_shadow_angle');
+			const numAngleEl = popup.querySelector('#ls_num_shadow_angle');
+			const distEl = popup.querySelector('#ls_shadow_distance');
+			const numDistEl = popup.querySelector('#ls_num_shadow_distance');
 			const valueEl = popup.querySelector('#ls_shadow_value');
 			const numValueEl = popup.querySelector('#ls_num_shadow_value');
 			const opacityEl = popup.querySelector('#ls_shadow_opacity');
 			const numOpacityEl = popup.querySelector('#ls_num_shadow_opacity');
 			const colorEl = popup.querySelector('#ls_shadow_color');
-			if ((xEl || numXEl) && (yEl || numYEl) && (valueEl || numValueEl)) {
-				const x = parseInt((numXEl ? numXEl.value : xEl?.value) ?? 5);
-				const y = parseInt((numYEl ? numYEl.value : yEl?.value) ?? 5);
+			if ((angleEl || numAngleEl) && (distEl || numDistEl) && (valueEl || numValueEl)) {
+				const angle = parseInt((numAngleEl ? numAngleEl.value : angleEl?.value) ?? 135);
+				const distance = parseInt((numDistEl ? numDistEl.value : distEl?.value) ?? 7);
+				const offset = Layer_styles_class.offset_from_angle_distance(angle, distance);
 				const value = parseInt((numValueEl ? numValueEl.value : valueEl?.value) ?? 10);
 				const opacity = parseInt((numOpacityEl ? numOpacityEl.value : opacityEl?.value) ?? 25);
 				const color = colorEl?.value || '#000000';
-				style.params = { x, y, value, opacity, color };
+				style.params = { x: offset.x, y: offset.y, value, opacity, color };
 			}
 		}
 	}
 
-	update_preview() {
-		const popup = this.POP.el || document.querySelector('#popups .popup');
-		if (!popup) return;
-		const canvas_preview = popup.querySelector('[data-id="pop_post"]');
-		if (!canvas_preview) return;
-		const ctx = canvas_preview.getContext('2d');
-		this.render_combined_preview(ctx, 20);
-	}
-
-	/**
-	 * Build the Layer Style dialog preview:
-	 * - Full document composition (all layers)
-	 * - FX from this.styles applied only to the target layer
-	 * - Aspect ratio preserved (letterbox / pillarbox in the preview box)
-	 */
-	render_combined_preview(ctx, padding = 20) {
-		if (!ctx) return;
-		const w = ctx.canvas ? ctx.canvas.width : (this.POP.width_mini || 225);
-		const h = ctx.canvas ? ctx.canvas.height : (this.POP.height_mini || 200);
-		ctx.clearRect(0, 0, w, h);
-
-		const docW = Math.max(1, config.WIDTH || 1);
-		const docH = Math.max(1, config.HEIGHT || 1);
-		const maxW = Math.max(1, w - padding * 2);
-		const maxH = Math.max(1, h - padding * 2);
-		const fit = Math.min(maxW / docW, maxH / docH);
-		const drawW = Math.max(1, Math.round(docW * fit));
-		const drawH = Math.max(1, Math.round(docH * fit));
-		const ox = Math.floor((w - drawW) / 2);
-		const oy = Math.floor((h - drawH) / 2);
-
-		const layer = (this.layer_id != null)
-			? this.Base_layers.get_layer(this.layer_id)
-			: config.layer;
-		if (!layer) return;
-
-		const styleNames = ['stroke', 'color_overlay', 'inner_glow', 'outer_glow', 'shadow', 'drop-shadow'];
-		const originalFilters = layer.filters;
-		const nonStyle = (originalFilters || []).filter((f) => {
+	build_draft_filters(baseFilters) {
+		const nonStyle = (baseFilters || []).filter((f) => {
 			if (!f) return false;
 			const n = f.name === 'drop-shadow' ? 'shadow' : f.name;
-			return !styleNames.includes(n);
+			return !STYLE_FILTER_NAMES.includes(n) && !STYLE_FILTER_NAMES.includes(f.name);
 		});
-		const previewFilters = nonStyle.slice();
+		const draft = nonStyle.slice();
 		for (const name of ['color_overlay', 'stroke', 'inner_glow', 'outer_glow', 'shadow']) {
 			const style = this.styles[name];
 			if (style && style.enabled) {
-				previewFilters.push({
-					id: style.id || ('preview_' + name),
-					name: name,
-					disabled: false,
-					params: { ...style.params }
-				});
-			}
-		}
-
-		// Render at document pixel size (letterbox when blitting). Cap long edge
-		// for large docs so slider previews stay responsive.
-		const maxEdge = 768;
-		const rs = Math.min(1, maxEdge / Math.max(docW, docH));
-		const rw = Math.max(1, Math.round(docW * rs));
-		const rh = Math.max(1, Math.round(docH * rs));
-
-		const docCanvas = document.createElement('canvas');
-		docCanvas.width = rw;
-		docCanvas.height = rh;
-		const docCtx = docCanvas.getContext('2d');
-
-		// When downscaling, draw layers into a full-size buffer then squash once —
-		// avoids fighting render_objects' identity-space clearRect/drawImage.
-		const fullCanvas = (rs < 1) ? document.createElement('canvas') : docCanvas;
-		if (rs < 1) {
-			fullCanvas.width = docW;
-			fullCanvas.height = docH;
-		}
-		const fullCtx = fullCanvas.getContext('2d');
-		const tempCanvas = this.Base_layers.create_new_canvas(null, fullCanvas.width, fullCanvas.height);
-
-		const layers = this.Base_layers.get_sorted_layers();
-		const prevDisabled = this.Base_layers.disabled_filter_id;
-		this.Base_layers.disabled_filter_id = null;
-		layer.filters = previewFilters;
-		try {
-			this.Base_layers.render_objects(fullCtx, tempCanvas, layers, () => {
-				fullCtx.save();
-			});
-		} finally {
-			layer.filters = originalFilters;
-			this.Base_layers.disabled_filter_id = prevDisabled;
-		}
-
-		if (rs < 1) {
-			docCtx.drawImage(fullCanvas, 0, 0, rw, rh);
-		}
-
-		ctx.drawImage(docCanvas, ox, oy, drawW, drawH);
-	}
-
-	save_styles() {
-		this.read_current_controls();
-		var targetLayer = (this.layer_id != null) ? this.Base_layers.get_layer(this.layer_id) : config.layer;
-		if (!targetLayer) {
-			targetLayer = config.layer;
-		}
-		if (!targetLayer) return;
-
-		// List of layer style filter names
-		const styleNames = ['color_overlay', 'stroke', 'inner_glow', 'outer_glow', 'shadow'];
-
-		// Remove existing layer style filters
-		let newFilters = (targetLayer.filters || []).filter(
-			f => !styleNames.includes(f.name === 'drop-shadow' ? 'shadow' : f.name)
-		);
-
-		// Add enabled filters in order
-		for (const name of styleNames) {
-			const style = this.styles[name];
-			if (style && style.enabled) {
-				newFilters.push({
+				draft.push({
 					id: style.id || (Math.floor(Math.random() * 999999999) + 1),
 					name: name,
 					disabled: false,
@@ -683,12 +608,79 @@ class Layer_styles_class {
 				});
 			}
 		}
+		return draft;
+	}
+
+	restore_snapshot() {
+		const layer = (this.layer_id != null)
+			? this.Base_layers.get_layer(this.layer_id)
+			: config.layer;
+		if (!layer || !this._snapshot) return;
+		try {
+			layer.filters = JSON.parse(JSON.stringify(this._snapshot.filters || []));
+		} catch (e) {
+			layer.filters = (this._snapshot.filters || []).slice();
+		}
+	}
+
+	request_render() {
+		config.need_render = true;
+		if (app.Layers && typeof app.Layers.render === 'function') {
+			try {
+				if (app.Layers.invalidate) {
+					app.Layers.invalidate({ document: true, preview: true });
+				}
+				app.Layers.render(true);
+			} catch (e) {
+				// need_render is enough
+			}
+		}
+	}
+
+	/**
+	 * Draft FX onto the real layer/canvas while the dialog is open.
+	 * Mutates without State history — OK commits via Update_layer_action.
+	 */
+	apply_live_canvas() {
+		const layer = (this.layer_id != null)
+			? this.Base_layers.get_layer(this.layer_id)
+			: config.layer;
+		if (!layer) return;
+
+		const base = this._snapshot ? this._snapshot.filters : (layer.filters || []);
+		layer.filters = this.build_draft_filters(base);
+		this.request_render();
+	}
+
+	/**
+	 * OK: restore snapshot then commit draft via undoable Update_layer_action.
+	 */
+	commit_styles() {
+		this.read_current_controls();
+		var targetLayer = (this.layer_id != null) ? this.Base_layers.get_layer(this.layer_id) : config.layer;
+		if (!targetLayer) {
+			targetLayer = config.layer;
+		}
+		if (!targetLayer) return;
+
+		const baseFilters = this._snapshot ? this._snapshot.filters : (targetLayer.filters || []);
+		const newFilters = this.build_draft_filters(baseFilters);
+
+		// Restore pre-dialog filters so Update_layer_action records correct undo delta
+		this.restore_snapshot();
 
 		app.State.do_action(
 			new app.Actions.Update_layer_action(targetLayer.id, {
 				filters: newFilters
 			})
 		);
+
+		this._snapshot = null;
+	}
+
+	/** @deprecated use commit_styles */
+	save_styles() {
+		this.commit_styles();
 	}
 
 }

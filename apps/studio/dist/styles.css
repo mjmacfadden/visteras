@@ -2644,6 +2644,7 @@ button.ui_icon_button img[src*="align-"]{
 	margin-bottom: 4px;
 }
 .layers_header_row {
+	flex-wrap: wrap;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -2764,6 +2765,15 @@ button.ui_icon_button img[src*="align-"]{
 	cursor: pointer;
 	margin: 0;
 }
+
+.layer_fill_group .layer_opacity_label {
+	min-width: 28px;
+}
+.layers_header_controls,
+.layers_top_controls {
+	flex-wrap: wrap;
+}
+
 .layers_list{
 	margin-top: 4px;
 }
@@ -6350,5 +6360,15 @@ body.canvas-only-mode .canvas_wrapper canvas {
 }
 @keyframes media-search-spin {
 	to { transform: rotate(360deg); }
+}
+
+
+/* Layer Style: no mini preview pane — draft lives on the main canvas */
+#popups .popup.layer_style_dialog [data-id="preview_content"]:empty,
+#popups .popup.layer_style_dialog .preview_container {
+	display: none !important;
+}
+#popups .popup.layer_style_dialog .dialog_content {
+	display: block;
 }
 

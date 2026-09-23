@@ -468,6 +468,7 @@ class Base_documents_class {
 					order: 1,
 					visible: true,
 					opacity: 100,
+					fillOpacity: 100,
 					locked: false,
 					width: w,
 					height: h,
@@ -676,6 +677,7 @@ class Base_documents_class {
 			// Ensure layer has essential default properties
 			if (l.visible === undefined || l.visible === null) l.visible = true;
 			if (l.opacity === undefined || l.opacity === null) l.opacity = 100;
+			if (l.fillOpacity === undefined || l.fillOpacity === null) l.fillOpacity = 100;
 			if (l.composition === undefined || l.composition === null) l.composition = 'source-over';
 			if (l.rotate === undefined || l.rotate === null) l.rotate = 0;
 			if (l.locked === undefined || l.locked === null) l.locked = false;

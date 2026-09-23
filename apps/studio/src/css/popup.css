@@ -475,3 +475,13 @@
 }
 
 @import './new-document-modal.css';
+
+
+/* Layer Style: no mini preview pane — draft lives on the main canvas */
+#popups .popup.layer_style_dialog [data-id="preview_content"]:empty,
+#popups .popup.layer_style_dialog .preview_container {
+	display: none !important;
+}
+#popups .popup.layer_style_dialog .dialog_content {
+	display: block;
+}

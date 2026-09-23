@@ -1504,17 +1504,28 @@ class WebGL_renderer_class {
 		var superScale = source._super || (layer.render_function ? 2 : 1);
 		var filterInfo = this._layer_filters_css(layer, null, superScale);
 		var effectInfo = this._layer_effect_filters(layer, null);
+		var fillOpacity = (layer.fillOpacity != null) ? Number(layer.fillOpacity) : 100;
+		if (!isFinite(fillOpacity)) fillOpacity = 100;
+		fillOpacity = Math.max(0, Math.min(100, fillOpacity));
 		var filterSig = (filterInfo ? filterInfo.signature : '') +
 			(effectInfo ? ('#' + effectInfo.signature) : '') +
-			('@' + superScale);
+			('@' + superScale) +
+			('|f' + fillOpacity);
 		var filterPad = filterInfo && filterInfo.pad ? filterInfo.pad : 0;
 		var effectPad = effectInfo && effectInfo.pad ? effectInfo.pad : 0;
+		var sourceFull = source;
 		if (filterInfo && filterInfo.css && filterInfo.css !== 'none') {
 			source = this._bake_css_filter(source, filterInfo.css, layer, filterPad);
 			if (!source) return null;
 		}
+		// Fill Opacity: fade baked content pixels; keep CSS shadow/glow outside the footprint.
+		if (fillOpacity < 99.9) {
+			source = this._apply_fill_opacity_to_baked(source, sourceFull, fillOpacity / 100, filterPad);
+			if (!source) return null;
+		}
+		// Effect filters (stroke / inner_glow / color_overlay) use full silhouette from sourceFull
 		if (effectInfo && effectInfo.effects && effectInfo.effects.length) {
-			source = this._bake_effect_filters(source, effectInfo.effects, layer, effectPad);
+			source = this._bake_effect_filters(source, effectInfo.effects, layer, effectPad, sourceFull);
 			if (!source) return null;
 		}
 
@@ -1663,6 +1674,79 @@ class WebGL_renderer_class {
 	}
 
 	/**
+	 * Apply Photoshop-like Fill Opacity to a (possibly CSS-filtered) bake canvas:
+	 * punch the original content footprint, then redraw content at `fill` so
+	 * drop-shadow / outer-glow outside the footprint stay at full strength.
+	 * @param {HTMLCanvasElement} baked
+	 * @param {HTMLCanvasElement|HTMLImageElement} contentSource full-opacity content
+	 * @param {number} fill 0-1
+	 * @param {number} [filterPad] logical pad already in baked (CSS spatial)
+	 * @returns {HTMLCanvasElement|null}
+	 */
+	_apply_fill_opacity_to_baked(baked, contentSource, fill, filterPad) {
+		if (!baked || fill >= 0.999) return baked;
+		var superScale = baked._super || contentSource._super || 1;
+		var srcPad = (contentSource && contentSource._pad) ? contentSource._pad : 0;
+		var spatialPad = Math.max(0, filterPad || 0);
+		var spatialPadPx = Math.round((srcPad + spatialPad) * superScale);
+		// If baked already includes pad, content is offset by spatialPadPx of the CSS bake.
+		var padPx = baked._pad != null ? Math.round((baked._pad) * superScale) : spatialPadPx;
+		// Prefer matching draw offset used in _bake_css_filter (spatialPad of THIS bake step).
+		var drawPad = Math.round(spatialPad * superScale);
+
+		var outW = baked.width;
+		var outH = baked.height;
+		if (!this._fillBakeCanvas) {
+			this._fillBakeCanvas = document.createElement('canvas');
+		}
+		var canvas = this._fillBakeCanvas;
+		if (canvas.width !== outW || canvas.height !== outH) {
+			canvas.width = outW;
+			canvas.height = outH;
+		}
+		var ctx = canvas.getContext('2d');
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, outW, outH);
+		try {
+			ctx.drawImage(baked, 0, 0);
+		} catch (e) {
+			return null;
+		}
+
+		// If there was no CSS bake, baked === content dimensions without extra pad.
+		var ox = 0;
+		var oy = 0;
+		if (baked.width > (contentSource.naturalWidth || contentSource.width || 0) ||
+			baked.height > (contentSource.naturalHeight || contentSource.height || 0)) {
+			ox = drawPad;
+			oy = drawPad;
+		}
+
+		ctx.save();
+		ctx.globalCompositeOperation = 'destination-out';
+		ctx.globalAlpha = 1;
+		try {
+			ctx.drawImage(contentSource, ox, oy);
+		} catch (e) {
+			ctx.restore();
+			return null;
+		}
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.globalAlpha = Math.max(0, Math.min(1, fill));
+		try {
+			ctx.drawImage(contentSource, ox, oy);
+		} catch (e) {
+			ctx.restore();
+			return null;
+		}
+		ctx.restore();
+
+		canvas._pad = baked._pad || 0;
+		canvas._super = superScale;
+		return canvas;
+	}
+
+	/**
 	 * Bake stroke / inner_glow / color_overlay onto a layer-local source so the WebGL stack
 	 * can keep compositing. Algorithms mirror Effects_stroke / Effects_inner_glow
 	 * but operate in texture space (no document x/y).
@@ -1672,7 +1756,7 @@ class WebGL_renderer_class {
 	 * @param {number} [pad]
 	 * @returns {HTMLCanvasElement|null}
 	 */
-	_bake_effect_filters(source, effects, layer, pad) {
+	_bake_effect_filters(source, effects, layer, pad, silhouetteSource) {
 		var superScale = source._super || (layer && layer.render_function ? 2 : 1);
 		var w = source.naturalWidth || source.width || ((layer ? layer.width : 0) * superScale) || 0;
 		var h = source.naturalHeight || source.height || ((layer ? layer.height : 0) * superScale) || 0;
@@ -1701,11 +1785,23 @@ class WebGL_renderer_class {
 			return null;
 		}
 
+		// Prefer full-opacity silhouette so Fill Opacity does not weaken stroke/glow/overlay.
+		var silSrc = silhouetteSource || source;
 		var sil = document.createElement('canvas');
 		sil.width = outW;
 		sil.height = outH;
 		var sctx = sil.getContext('2d');
-		sctx.drawImage(canvas, 0, 0);
+		try {
+			var silPad = 0;
+			var sw = silSrc.naturalWidth || silSrc.width || 0;
+			var sh = silSrc.naturalHeight || silSrc.height || 0;
+			if (sw && sh && (outW > sw || outH > sh)) {
+				silPad = Math.round((outW - sw) / 2);
+			}
+			sctx.drawImage(silSrc, silPad, silPad);
+		} catch (e) {
+			sctx.drawImage(canvas, 0, 0);
+		}
 
 		for (var i = 0; i < effects.length; i++) {
 			var filter = effects[i];
