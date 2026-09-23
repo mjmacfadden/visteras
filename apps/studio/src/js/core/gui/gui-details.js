@@ -11,6 +11,7 @@ import Base_layers_class from "../base-layers";
 import Tools_settings_class from './../../modules/tools/settings.js';
 import Helper_class from './../../libs/helpers.js';
 import Tools_translate_class from './../../modules/tools/translate.js';
+import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
 
 var template = `
 	<div class="row">
@@ -736,6 +737,53 @@ class GUI_details_class {
 				$colorInput.uiColorInput('set_value', config.layer.params[k]);
 
 				item_row.appendChild($colorInput[0]);
+			}
+			else if (typeof item == 'object' && item && item.values) {
+				//select (e.g. gradient Style: Linear / Radial)
+				const elementSelect = document.createElement('select');
+				elementSelect.id = 'detail_param_more_' + k;
+				elementSelect.name = 'detail_param_more_' + k;
+				elementSelect.dataset.key = k;
+				item_title.htmlFor = elementSelect.id;
+
+				const values = typeof item.values === 'function' ? item.values() : item.values;
+				let current = config.layer.params[k];
+				if (current != null && typeof current === 'object' && current.value != null) {
+					current = current.value;
+				}
+				if (current == null) {
+					current = item.value;
+				}
+
+				for (let j in values) {
+					const option = document.createElement('option');
+					option.className = 'trn';
+					option.value = values[j];
+					option.text = values[j];
+					if (current == values[j]) {
+						option.selected = true;
+					}
+					elementSelect.appendChild(option);
+				}
+
+				elementSelect.addEventListener('change', function () {
+					const layer = config.layer;
+					const key = this.dataset.key;
+					const new_value = this.value;
+					const params = JSON.parse(JSON.stringify(config.layer.params || {}));
+					params[key] = new_value;
+					// Keep gradient radial flag in sync with Style select
+					if (key === 'style') {
+						params.radial = String(new_value).toLowerCase() === 'radial';
+					}
+					app.State.do_action(
+						new app.Actions.Update_layer_action(layer.id, {
+							params: params
+						})
+					);
+				});
+
+				item_row.appendChild(elementSelect);
 			}
 			else if (typeof item == 'string') {
 				//plain string (non-color) - read-only label

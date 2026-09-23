@@ -21,12 +21,15 @@ class GUI_shortcuts_class {
 		this.is_alt_down = false;
 		this.is_shift_down = false;
 
+		// Tool keymap (Photoshop/Illustrator hybrid).
+		// G = Gradient / Paint Bucket group (Gradient default face). Shift+G cycles.
+		// A stays Direct Select (vector). Help → Keyboard Shortcuts documents this.
 		this.keymap = {
 			'v': 'select',
 			'b': 'brush',
 			'e': 'erase',
 			'i': 'pick_color',
-			'g': 'fill',
+			'g': 'gradient',
 			't': 'text',
 			'p': 'pen',
 			'c': 'crop',
@@ -465,6 +468,18 @@ class GUI_shortcuts_class {
 				} else if (targetTool === 'rectangle') {
 					if (app.GUI && app.GUI.GUI_tools) {
 						app.GUI.GUI_tools.cycle_tool_group('rectangle');
+					}
+				} else if (targetTool === 'gradient') {
+					// G activates last-used in Gradient/Bucket group; Shift+G cycles.
+					if (app.GUI && app.GUI.GUI_tools) {
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('gradient');
+						} else {
+							var gResolved = (typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
+								? app.GUI.GUI_tools.get_active_tool_for_group('gradient')
+								: 'gradient';
+							app.GUI.GUI_tools.activate_tool(gResolved);
+						}
 					}
 				} else {
 					var resolved = (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')

@@ -499,7 +499,19 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .pen:after{ background-image: url('../images/icons/pen.svg'); }
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
-.sidebar_left .gradient:after{ background-image: url('../images/icons/gradient.png'); background-size: 14px 9px; filter: none; }
+.sidebar_left .gradient:after{
+	/* Idle: gray outline + transparent→#cccccc ramp (matches invert(0.8) toolbar gray) */
+	background-image: url('../images/icons/gradient.svg');
+	background-size: 14px 9px;
+	filter: none;
+}
+/* Active: Studio blue #2f6fae outline + transparent→blue ramp; filter:none so ramp stays readable */
+.sidebar_left .item.active.gradient:not(.marquee_fill):after,
+.sidebar_left .item.active.gradient.marquee_gradient:after{
+	background-image: url('../images/icons/gradient-active.svg');
+	background-size: 14px 9px;
+	filter: none;
+}
 .sidebar_left .clone:after{ background-image: url('../images/icons/clone.svg'); }
 .sidebar_left .spot_heal:after{ background-image: url('../images/icons/spot_heal.svg'); }
 .sidebar_left .crop:after{ background-image: url('../images/icons/crop.svg'); }
@@ -527,6 +539,19 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .sidebar_left .item.selection.marquee_ellipse:after{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .sidebar_left .item.selection.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .item.brush.marquee_pencil:after{ background-image: url('../images/icons/pencil.svg'); }
+.sidebar_left .item.gradient.marquee_fill:after{
+	background-image: url('../images/icons/fill.svg');
+	background-size: 15px 15px;
+	filter: var(--menu-icons-filter);
+}
+/* Bucket (mono SVG) still gets the active blue tint */
+.sidebar_left .item.active.gradient.marquee_fill:after{
+	filter: brightness(0) saturate(100%) invert(39%) sepia(47%) saturate(1012%) hue-rotate(174deg) brightness(92%) contrast(88%);
+}
+.sidebar_left .item.gradient.marquee_gradient:after{
+	background-image: url('../images/icons/gradient.svg');
+	background-size: 14px 9px;
+}
 .sidebar_left .item.rectangle.marquee_rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
 .sidebar_left .item.rectangle.marquee_ellipse:after{ background-image: url('../images/icons/ellipse.svg'); }
 .sidebar_left .item.rectangle.marquee_polygon:after{ background-image: url('../images/icons/polygon.svg'); }
@@ -589,6 +614,15 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.polygon{ background-image: url('../images/icons/polygon.svg'); }
 .tg_icon.star{ background-image: url('../images/icons/star.svg'); }
 .tg_icon.custom_shape{ background-image: url('../images/icons/custom_shape.svg'); }
+.tg_icon.fill{ background-image: url('../images/icons/fill.svg'); }
+.tg_icon.gradient{
+	background-image: url('../images/icons/gradient.svg');
+	background-size: 14px 9px;
+	filter: none;
+}
+.tool_group_item.active .tg_icon.gradient{
+	background-image: url('../images/icons/gradient-active.svg');
+}
 
 @media screen and (max-width:550px){
 	#sidebar_left{
@@ -1586,6 +1620,10 @@ crop handles) win over the default crosshair - not !important so inline styles a
 .middle_area.tool-pen #main_wrapper,
 .middle_area.tool-pen #main_wrapper * {
 	cursor: url('../images/icons/cursor-pen.svg') 1 1, crosshair !important;
+}
+.middle_area.tool-fill #main_wrapper,
+.middle_area.tool-fill #main_wrapper * {
+	cursor: url('../images/icons/cursor-fill.svg') 8 22, crosshair !important;
 }
 .middle_area.tool-direct_select #main_wrapper,
 .middle_area.tool-direct_select #main_wrapper * {

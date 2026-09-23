@@ -97,6 +97,8 @@ export class Activate_tool_action extends Base_action {
 				defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
 			} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 				defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
+			} else if (config.TOOL && config.TOOL.name === 'fill') {
+				defaultCursor = "url('images/icons/cursor-fill.svg') 8 22, crosshair";
 			}
 
 			if (mainWrapper && mainWrapper.style.cursor != defaultCursor) {
@@ -146,6 +148,21 @@ export class Activate_tool_action extends Base_action {
 					: null;
 				if (toolObj && typeof toolObj.sync_vector_options_bar === 'function') {
 					toolObj.sync_vector_options_bar();
+				}
+			}
+
+			if (key === 'gradient') {
+				const gradTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['gradient'])
+					? app.GUI.GUI_tools.tools_modules['gradient'].object
+					: null;
+				if (gradTool) {
+					if (typeof gradTool.sync_colors_from_fg_bg === 'function') {
+						gradTool.sync_colors_from_fg_bg({ rebuild: false });
+					}
+					if (config.layer && config.layer.type === 'gradient'
+						&& typeof gradTool.sync_options_from_layer === 'function') {
+						gradTool.sync_options_from_layer(config.layer, { rebuild: false });
+					}
 				}
 			}
 
@@ -262,6 +279,8 @@ export class Activate_tool_action extends Base_action {
 			defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 			defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
+		} else if (config.TOOL && config.TOOL.name === 'fill') {
+			defaultCursor = "url('images/icons/cursor-fill.svg') 8 22, crosshair";
 		}
 
 		if (mainWrapper && mainWrapper.style.cursor != defaultCursor) {

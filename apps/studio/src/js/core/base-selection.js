@@ -1356,6 +1356,14 @@ class Base_selection_class {
 			defaultCursor = 'text';
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
+		} else if (config.TOOL && config.TOOL.name === 'fill') {
+			defaultCursor = "url('images/icons/cursor-fill.svg') 8 22, crosshair";
+		} else if (config.TOOL && config.TOOL.name === 'pick_color') {
+			defaultCursor = "url('images/icons/cursor-eyedropper.svg') 2 22, crosshair";
+		} else if (config.TOOL && config.TOOL.name === 'pen') {
+			defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
+		} else if (config.TOOL && config.TOOL.name === 'direct_select') {
+			defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
 		}
 
 		if (mainWrapper && mainWrapper.style.cursor != defaultCursor) {
