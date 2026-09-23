@@ -824,6 +824,8 @@
 /* ==========================================================================
    Appearance fill / stroke wells (Properties → Appearance)
    Left-aligned (Rham): pack controls to the start — no centered/spread row.
+   Stroke row (color + weight + align) must stay inside the rounded chrome
+   at typical Properties (~240px) width — tighten first, wrap only if needed.
    ========================================================================== */
 
 .prop_row.vcs-appearance-colors,
@@ -835,6 +837,9 @@
   gap: 6px !important;
   margin-bottom: 8px !important;
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
 }
 
 .vcs-appearance-row {
@@ -842,13 +847,22 @@
   align-items: center !important;
   justify-content: flex-start !important;
   flex-wrap: nowrap !important;
-  gap: 6px !important;
-  padding: 4px 6px !important;
+  gap: 5px !important;
+  padding: 3px 5px !important;
   border-radius: 4px !important;
   border: 1px solid transparent !important;
   background: #2a2a2a !important;
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   box-sizing: border-box !important;
+}
+
+/* Stroke: color + weight + Center/Inside/Outside — prefer one row; wrap cleanly */
+.vcs-appearance-row-stroke {
+  flex-wrap: wrap !important;
+  column-gap: 4px !important;
+  row-gap: 4px !important;
 }
 
 .vcs-appearance-row.active {
@@ -938,6 +952,27 @@
   outline-offset: 1px;
 }
 
+.vcs-appearance-row-stroke .vcs-appearance-target {
+  font-size: 10px !important;
+  letter-spacing: 0.2px !important;
+  padding: 2px 0 !important;
+}
+
+.vcs-appearance-row-stroke .vcs-appearance-chip {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.vcs-appearance-row-stroke .vcs-appearance-stroke-hole {
+  width: 9px !important;
+  height: 9px !important;
+}
+
+.vcs-appearance-row-stroke .vcs-stroke-align-btn svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
 .vcs-appearance-weight {
   display: flex !important;
   align-items: center !important;
@@ -954,7 +989,7 @@
 }
 
 .vcs-appearance-weight input {
-  width: 44px !important;
+  width: 36px !important;
   background: #242424 !important;
   border: 1px solid #444 !important;
   color: #eee !important;
@@ -975,7 +1010,7 @@
   display: inline-flex !important;
   align-items: center !important;
   flex-shrink: 0 !important;
-  margin-left: 2px !important;
+  margin-left: 0 !important;
   border: 1px solid #444 !important;
   border-radius: 3px !important;
   overflow: hidden !important;
@@ -983,8 +1018,8 @@
 }
 
 .vcs-stroke-align-btn {
-  width: 22px !important;
-  height: 22px !important;
+  width: 20px !important;
+  height: 20px !important;
   padding: 0 !important;
   margin: 0 !important;
   border: none !important;
