@@ -203,13 +203,19 @@ export function mountDirectSelection(editor) {
   };
   const setMode = sc.setMode;
   sc.setMode = function (mode) {
-    if (!active || switching || mode === 'pathedit' || mode === 'ext-panning') return setMode.call(this, mode);
+    // Keep DS anchor chrome while Scissors is active so cuttable nodes stay visible
+    // (DS mouse handlers already no-op unless mode === pathedit).
+    if (!active || switching || mode === 'pathedit' || mode === 'ext-panning' || mode === 'scissors') {
+      if (active && mode === 'scissors') finish(true);
+      return setMode.call(this, mode);
+    }
     finish(true);
     const elements = selectedElements();
+    const fallback = records.filter((r) => r.el?.isConnected).map((r) => r.el);
     active = false;
     document.body.removeAttribute('data-direct-multi');
     const result = setMode.call(this, mode);
-    sc.selectOnly(elements, true);
+    sc.selectOnly(elements.length ? elements : fallback, true);
     schedule();
     return result;
   };
@@ -316,6 +322,21 @@ export function mountDirectSelection(editor) {
     applyPaintWhileActive(`${type}-opacity`, val, { noUndo: !!preventUndo });
   };
 
+  /** Show DS-style anchor chrome without switching tool mode (e.g. Scissors). */
+  function showAnchors(elements, selectAll = false) {
+    const targets = leaves(elements);
+    if (!targets.length) return false;
+    finish(true);
+    active = true;
+    document.body.setAttribute('data-direct-multi', '');
+    records = [];
+    for (const el of targets) {
+      const rec = prepare(el);
+      if (rec && selectAll) rec.selected = new Set(anchors(rec.segments).map((a) => a.index));
+    }
+    schedule();
+    return true;
+  }
   sc.directSelection = {
     get active() { return active; },
     getSelectedElements: () => selectedElements(),
@@ -331,6 +352,7 @@ export function mountDirectSelection(editor) {
     // SVGEdit's native editor enters path mode with every point selected,
     // which makes Convert apply to the entire object instead of the point the
     // user clicked.
+    showAnchors,
     tryActivate(elements) { return leaves(elements).length >= 1 ? activate(elements) : false; },
     selectOnly(elements, index) {
       activate(elements, false);

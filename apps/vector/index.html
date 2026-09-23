@@ -19,9 +19,9 @@
   <link href="./svgedit.css" rel="stylesheet" media="all">
 
   <!-- Visteras Studio Companion Theme -->
-  <link href="./css/visteras-theme.css?v=smoke-68-9" rel="stylesheet" media="all">
+  <link href="./css/visteras-theme.css?v=smoke-69-3" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css" rel="stylesheet" media="all">
-  <link href="./css/visteras-color-system.css?v=smoke-68-9" rel="stylesheet" media="all">
+  <link href="./css/visteras-color-system.css?v=smoke-69-3" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -171,17 +171,18 @@
   <script type="module">
     import Editor from './Editor.js?v=shape-transform-controls-3';
     import { mountPenTools } from './js/visteras-pen-tools.js';
-    import { mountSelectionTools } from './js/visteras-selection.js?v=smoke-68-9';
+    import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
+    import { mountSelectionTools } from './js/visteras-selection.js?v=smoke-69-3';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
-    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=smoke-68-9';
+    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=smoke-69-3';
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=smoke-68-9';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=smoke-69-3';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -490,7 +491,19 @@
           const file = e.target.files[0];
           if (file) {
             const reader = new FileReader();
-            reader.onload = (re) => sc.setSvgString(re.target.result);
+            reader.onload = (re) => {
+              sc.setSvgString(re.target.result);
+              const base = (file.name || 'untitled.svg').replace(/\.svg$/i, '');
+              if (base) svgEditor.title = base;
+              // Opened file becomes the clean baseline (Studio parity).
+              setTimeout(() => {
+                const shell = window.__visterasDocumentShell;
+                const doc = shell?.getActiveDoc?.();
+                if (doc && base) doc.title = base;
+                shell?.clearActiveDirty?.();
+                shell?.updateStatusBar?.();
+              }, 80);
+            };
             reader.readAsText(file);
           }
         };
@@ -508,6 +521,9 @@
         a.href = URL.createObjectURL(blob);
         a.download = (svgEditor.title || 'untitled') + '.svg';
         a.click();
+        // Download started — clear dirty like Studio after save.
+        window.__visterasDocumentShell?.clearActiveDirty?.();
+        if (svgEditor) svgEditor.showSaveWarning = false;
       });
 
       document.getElementById('action_export_png')?.addEventListener('click', () => {
@@ -851,6 +867,14 @@
             return;
           }
 
+          // Command/Ctrl + S: Save SVG (clears dirty via action_save handler)
+          if (!e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('action_save')?.click();
+            return;
+          }
+
           // Command/Ctrl + D: Duplicate / Transform Again
           if (!e.shiftKey && (e.key === 'd' || e.key === 'D')) {
             e.preventDefault();
@@ -1128,6 +1152,22 @@
                     <option value="middle">Center</option>
                     <option value="end">End</option>
                   </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Align to Path</div>
+                  <select id="top_align_path" style="box-sizing:border-box;width:100%;height:26px;background:#1e1e1e;border:1px solid #444;color:#eee;border-radius:4px;padding:0 6px;font-size:12px;">
+                    <option value="baseline">Baseline</option>
+                    <option value="ascender">Ascender</option>
+                    <option value="center">Center</option>
+                    <option value="descender">Descender</option>
+                  </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                    <span style="font-size:11px;color:#aaa;">Tracking</span>
+                    <span id="top_tracking_val" style="font-size:11px;color:#fa7c1b;font-weight:600;">0</span>
+                  </div>
+                  <input id="top_tracking" type="range" min="-100" max="200" value="0" style="width:100%;accent-color:#fa7c1b;cursor:pointer;" />
                 </div>
                 <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;font-size:11px;color:#ccc;">
                   <input type="checkbox" id="top_reverse" style="accent-color:#fa7c1b;" /> Reverse Path Direction
@@ -1759,6 +1799,7 @@
     setupMenuBar();
     setupPropertiesPanel();
     mountPenTools(svgEditor);
+    mountScissorsTool(svgEditor);
     document.getElementById('tool_node_clone')?.style.setProperty('display', 'none');
     document.getElementById('tool_node_delete')?.style.setProperty('display', 'none');
     // Use delegation because SVGEdit may rebuild contextual controls while

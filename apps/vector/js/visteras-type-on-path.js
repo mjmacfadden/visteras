@@ -1,6 +1,7 @@
 /**
  * Visteras Vector — Type on Path (Illustrator-style textPath).
  * Client-side: binds editable <text>/<textPath> to a selected path or shape.
+ * Illustrator-leaning controls: offset, align, reverse, align-to-path, tracking.
  */
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XLINK_NS = 'http://www.w3.org/1999/xlink';
@@ -614,7 +615,7 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   const sc = svgEditor.svgCanvas;
   const pathEl = ensurePathElement(svgEditor, shapeEl);
   const { family, size, fill } = readTextStyle(svgEditor);
-  const content = opts.content || 'Lorem ipsum';
+  const content = opts.content != null ? String(opts.content) : 'Type';
   const align = opts.align || 'start';
   const reverse = !!opts.reverse;
 
@@ -729,6 +730,26 @@ function syncOptionsPanel(svgEditor) {
   if (reverseCheck) {
     reverseCheck.checked = /_rev$/.test(href);
   }
+
+  const textEl = tp.parentElement;
+  const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
+  const dyRaw = tp.getAttribute('dy') || textEl?.getAttribute('dy') || '0';
+  const dy = parseFloat(String(dyRaw)) || 0;
+  const alignPath = panel.querySelector('#top_align_path');
+  if (alignPath) {
+    const ratio = dy / fontSize;
+    let mode = 'baseline';
+    if (Math.abs(ratio + 0.8) < 0.15) mode = 'ascender';
+    else if (Math.abs(ratio + 0.35) < 0.15) mode = 'center';
+    else if (Math.abs(ratio - 0.25) < 0.15) mode = 'descender';
+    alignPath.value = mode;
+  }
+
+  const tracking = panel.querySelector('#top_tracking');
+  const trackingVal = panel.querySelector('#top_tracking_val');
+  const ls = parseFloat(textEl?.getAttribute('letter-spacing') || '0') || 0;
+  if (tracking) tracking.value = String(Math.round(ls));
+  if (trackingVal) trackingVal.textContent = String(Math.round(ls));
 }
 
 function wireOptionsPanel(svgEditor) {
@@ -740,6 +761,9 @@ function wireOptionsPanel(svgEditor) {
   const offsetVal = panel.querySelector('#top_offset_val');
   const alignSelect = panel.querySelector('#top_align');
   const reverseCheck = panel.querySelector('#top_reverse');
+  const alignPath = panel.querySelector('#top_align_path');
+  const tracking = panel.querySelector('#top_tracking');
+  const trackingVal = panel.querySelector('#top_tracking_val');
 
   offsetSlider?.addEventListener('input', (e) => {
     const tp = findTextPath(getSelected(svgEditor));
@@ -773,6 +797,41 @@ function wireOptionsPanel(svgEditor) {
       if (offsetSlider) offsetSlider.value = '0';
       if (offsetVal) offsetVal.textContent = '0%';
     }
+    svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
+  });
+
+  function applyAlignToPath(mode) {
+    const tp = findTextPath(getSelected(svgEditor));
+    if (!tp) return;
+    const textEl = tp.parentElement;
+    const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
+    const map = {
+      baseline: 0,
+      ascender: -0.8 * fontSize,
+      center: -0.35 * fontSize,
+      descender: 0.25 * fontSize,
+    };
+    const dy = map[mode] ?? 0;
+    tp.setAttribute('dy', String(dy));
+    textEl?.setAttribute('data-visteras-align-path', mode);
+    svgEditor.svgCanvas?.call?.('changed', [textEl]);
+  }
+
+  alignPath?.addEventListener('change', (e) => {
+    applyAlignToPath(e.target.value);
+  });
+
+  tracking?.addEventListener('input', (e) => {
+    const tp = findTextPath(getSelected(svgEditor));
+    if (!tp) return;
+    const textEl = tp.parentElement;
+    const v = e.target.value;
+    if (trackingVal) trackingVal.textContent = v;
+    textEl?.setAttribute('letter-spacing', v);
+  });
+  tracking?.addEventListener('change', () => {
+    const tp = findTextPath(getSelected(svgEditor));
+    if (!tp) return;
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
   });
 

@@ -163,7 +163,7 @@ export function mountSelectionTools(editor) {
   }, true);
   // One route for toolbar clicks and Illustrator tool keys. Capture prevents legacy
   // SVGEdit bindings (A=select all, D=duplicate, Ctrl-only Undo) from also firing.
-  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', h: 'ext-panning', '\\': 'tool_line' };
+  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', h: 'ext-panning', c: 'tool_scissors', '\\': 'tool_line' };
   document.addEventListener('keydown', e => {
     if (e.isComposing || window.__visterasIsTypingDirectly || e.composedPath().some(el => el?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.nodeName))) return;
     const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;
