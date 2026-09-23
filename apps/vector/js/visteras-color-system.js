@@ -210,17 +210,66 @@ function flattenPaintTargets(elements, { attr = null } = {}) {
   return out;
 }
 
+/**
+ * Apply fill/stroke/stroke-width/opacity to resolved targets.
+ *
+ * CRITICAL: Do NOT use svgCanvas.changeSelectedAttribute while mode is
+ * "pathedit". SVG-Edit always calls pathActions.moveNode(attr, value) first;
+ * Direct Selection keeps mode=pathedit but clears the native path object
+ * (K=null), so moveNode throws (K.selected_pts) and aborts paint — and any
+ * modal close() after setWorkingColor never runs. Stroke-width appeared to
+ * "work" in some flows via curProperties fallbacks; fill/stroke did not.
+ * Write attributes (and history) ourselves instead.
+ */
 function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
-  if (!sc || typeof sc.changeSelectedAttribute !== 'function') return false;
+  if (!sc) return false;
   const elems = flattenPaintTargets(resolvePaintTargets(sc), { attr });
   if (!elems.length) return false;
-  if (noUndo && typeof sc.changeSelectedAttributeNoUndo === 'function') {
-    sc.changeSelectedAttributeNoUndo(attr, value, elems);
-  } else {
-    sc.changeSelectedAttribute(attr, value, elems);
+
+  const next = (value == null || value === '') ? null : String(value);
+  const inPathEdit = sc.getCurrentMode?.() === 'pathedit' || !!sc.directSelection?.active;
+  const canUseStock = !inPathEdit
+    && typeof sc.changeSelectedAttribute === 'function'
+    && (noUndo ? typeof sc.changeSelectedAttributeNoUndo === 'function' : true);
+
+  if (canUseStock) {
+    if (noUndo) sc.changeSelectedAttributeNoUndo(attr, next, elems);
+    else {
+      sc.changeSelectedAttribute(attr, next, elems);
+      sc.call?.('changed', elems);
+    }
+    return true;
   }
-  sc.call?.('changed', elems);
-  return true;
+
+  // Direct DOM write for Direct Selection / pathedit.
+  const { ChangeElementCommand, BatchCommand } = sc.history || {};
+  const batch = (!noUndo && BatchCommand && ChangeElementCommand)
+    ? new BatchCommand(`Change ${attr}`)
+    : null;
+  const changed = [];
+
+  for (const el of elems) {
+    if (!el?.isConnected) continue;
+    const prev = el.getAttribute(attr);
+    const prevNorm = prev == null ? null : String(prev);
+    if (prevNorm === next) continue;
+    if (batch) batch.addSubCommand(new ChangeElementCommand(el, { [attr]: prev }));
+    if (next == null) el.removeAttribute(attr);
+    else el.setAttribute(attr, next);
+    changed.push(el);
+  }
+
+  if (batch && changed.length) {
+    try {
+      if (typeof batch.isEmpty === 'function') {
+        if (!batch.isEmpty()) sc.addCommandToHistory?.(batch);
+      } else {
+        sc.addCommandToHistory?.(batch);
+      }
+    } catch { /* ignore history failures */ }
+  }
+  if (changed.length) sc.call?.('changed', changed);
+  return changed.length > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -277,20 +326,30 @@ function createColorController(svgEditor) {
 
     setWorkingColor(hexOrNone, { apply = true, recordRecent = true, noUndo = false } = {}) {
       const sc = svgEditor.svgCanvas;
-      if (!hexOrNone || hexOrNone === 'none' || hexOrNone === 'transparent') {
-        state.workingNone = true;
-        if (apply && sc) {
-          state.suppressSync = true;
-          // Stock setColor updates cur style (+ Selection targets). Direct Selection
-          // clears SVG-Edit selection, so also paint DS targets explicitly — same
-          // pattern as live stroke width.
-          sc.setColor(state.activeTarget, 'none', noUndo);
-          applyPaintAttribute(sc, state.activeTarget, 'none', { noUndo });
-          if (!noUndo) svgEditor.bottomPanel?.updateColorpickers?.(true);
-          // Picker sync can clobber DS elems; re-assert paint without a second undo.
-          applyPaintAttribute(sc, state.activeTarget, 'none', { noUndo: true });
+      const paint = (val) => {
+        if (!sc) return;
+        state.suppressSync = true;
+        try {
+          // Update SVG-Edit "current style" only — avoid stock setColor's
+          // changeSelectedAttribute under pathedit (throws when path K is null).
+          if (typeof sc.setCurShape === 'function') sc.setCurShape(state.activeTarget, val);
+          if (typeof sc.setCurProperties === 'function') {
+            sc.setCurProperties(`${state.activeTarget}_paint`, { type: 'solidColor' });
+          }
+          if (sc.curProperties) sc.curProperties[state.activeTarget] = val;
+          if (sc.curShape) sc.curShape[state.activeTarget] = val;
+          // Paint Selection + Direct Selection targets via safe DOM write.
+          applyPaintAttribute(sc, state.activeTarget, val, { noUndo });
+          if (!noUndo) {
+            try { svgEditor.bottomPanel?.updateColorpickers?.(true); } catch { /* ignore */ }
+          }
+        } finally {
           state.suppressSync = false;
         }
+      };
+      if (!hexOrNone || hexOrNone === 'none' || hexOrNone === 'transparent') {
+        state.workingNone = true;
+        if (apply) paint('none');
         api.emit();
         window.__visterasUpdateSwatches?.();
         return;
@@ -299,14 +358,7 @@ function createColorController(svgEditor) {
       if (!hex) return;
       state.workingNone = false;
       state.workingHex = hex;
-      if (apply && sc) {
-        state.suppressSync = true;
-        sc.setColor(state.activeTarget, hex, noUndo);
-        applyPaintAttribute(sc, state.activeTarget, hex, { noUndo });
-        if (!noUndo) svgEditor.bottomPanel?.updateColorpickers?.(true);
-        applyPaintAttribute(sc, state.activeTarget, hex, { noUndo: true });
-        state.suppressSync = false;
-      }
+      if (apply) paint(hex);
       if (recordRecent && apply && !noUndo) api.pushRecent(hex);
       api.emit();
       window.__visterasUpdateSwatches?.();
@@ -1530,17 +1582,27 @@ function mountPickerModal(ctrl) {
   }
 
   function cancel() {
-    // Restore snapshot
-    ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
-    if (openSnapshot.none) ctrl.setWorkingColor('none', { recordRecent: false });
-    else ctrl.setWorkingColor(openSnapshot.hex, { recordRecent: false });
-    close();
+    try {
+      // Restore snapshot
+      ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
+      if (openSnapshot.none) ctrl.setWorkingColor('none', { recordRecent: false });
+      else ctrl.setWorkingColor(openSnapshot.hex, { recordRecent: false });
+    } catch (err) {
+      console.warn('[visteras-color-system] cancel restore failed', err);
+    } finally {
+      close();
+    }
   }
 
   function applyAndClose() {
-    if (draftNone) ctrl.setWorkingColor('none');
-    else ctrl.setWorkingColor(draftHex, { recordRecent: true });
-    close();
+    try {
+      if (draftNone) ctrl.setWorkingColor('none');
+      else ctrl.setWorkingColor(draftHex, { recordRecent: true });
+    } catch (err) {
+      console.warn('[visteras-color-system] apply failed', err);
+    } finally {
+      close();
+    }
   }
 
   modal.querySelector('#vcs_picker_none').addEventListener('click', () => {
@@ -1572,12 +1634,13 @@ function mountPickerModal(ctrl) {
     if (!modal.classList.contains('open')) return;
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopImmediatePropagation();
       cancel();
     } else if (e.key === 'Enter' && e.target?.id?.startsWith('vcs_picker_')) {
       e.preventDefault();
       applyAndClose();
     }
-  });
+  }, true); // capture so we win over Direct Selection's Escape handler
 
   window.__visterasOpenColorPicker = open;
   ctrl.subscribe(() => {

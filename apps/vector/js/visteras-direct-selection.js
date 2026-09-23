@@ -240,34 +240,80 @@ export function mountDirectSelection(editor) {
       : records.filter((r) => r.el?.isConnected).map((r) => r.el);
     let elems = paintLeaves(targets).filter((el) => !skipTags.includes(el.tagName));
     if (!elems.length) return false;
-    if (noUndo) sc.changeSelectedAttributeNoUndo(attr, value, elems);
-    else {
-      sc.changeSelectedAttribute(attr, value, elems);
-      sc.call('changed', elems);
+    // Never call changeSelectedAttribute here — under pathedit it invokes
+    // pathActions.moveNode and throws when native path K is null.
+    const next = value == null || value === '' ? null : String(value);
+    const { ChangeElementCommand, BatchCommand } = sc.history || {};
+    const batch = (!noUndo && BatchCommand && ChangeElementCommand)
+      ? new BatchCommand(`Change ${attr}`)
+      : null;
+    const changed = [];
+    for (const el of elems) {
+      if (!el?.isConnected) continue;
+      const prev = el.getAttribute(attr);
+      if ((prev == null ? null : String(prev)) === next) continue;
+      if (batch) batch.addSubCommand(new ChangeElementCommand(el, { [attr]: prev }));
+      if (next == null) el.removeAttribute(attr);
+      else el.setAttribute(attr, next);
+      changed.push(el);
     }
-    return true;
+    if (batch && changed.length) {
+      try { sc.addCommandToHistory?.(batch); } catch { /* ignore */ }
+    }
+    if (changed.length) sc.call('changed', changed);
+    return changed.length > 0;
   }
+  // Keep cur-style updates from stock APIs, but never let them run the broken
+  // pathedit changeSelectedAttribute path for empty SVG selection.
   const origSetColor = sc.setColor.bind(sc);
   sc.setColor = function (type, val, preventUndo) {
-    const result = origSetColor(type, val, preventUndo);
+    try {
+      // Prefer cur-style only when DS owns the selection (SVG selection empty).
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (typeof sc.setCurShape === 'function') sc.setCurShape(type, val);
+        if (typeof sc.setCurProperties === 'function') {
+          sc.setCurProperties(`${type}_paint`, { type: 'solidColor' });
+        }
+        if (sc.curProperties) sc.curProperties[type] = val;
+        if (sc.curShape) sc.curShape[type] = val;
+      } else {
+        origSetColor(type, val, preventUndo);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setColor cur-style failed', err);
+    }
     applyPaintWhileActive(type, val, {
       noUndo: !!preventUndo,
       skipTags: type === 'fill' ? ['polyline', 'line'] : [],
     });
-    return result;
   };
   const origSetStrokeWidth = sc.setStrokeWidth.bind(sc);
   sc.setStrokeWidth = function (val) {
-    const result = origSetStrokeWidth(val);
-    // Yy already no-ops on empty SVG selection; apply to DS targets.
+    try {
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (typeof sc.setCurProperties === 'function') sc.setCurProperties('stroke_width', val);
+        if (sc.curProperties) sc.curProperties.stroke_width = val;
+        if (sc.curShape) sc.curShape.stroke_width = val;
+      } else {
+        origSetStrokeWidth(val);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setStrokeWidth cur-style failed', err);
+    }
     applyPaintWhileActive('stroke-width', val, { noUndo: false });
-    return result;
   };
   const origSetPaintOpacity = sc.setPaintOpacity.bind(sc);
   sc.setPaintOpacity = function (type, val, preventUndo) {
-    const result = origSetPaintOpacity(type, val, preventUndo);
+    try {
+      if (active && !(sc.getSelectedElements?.() || []).filter(Boolean).length) {
+        if (sc.curShape) sc.curShape[`${type}_opacity`] = val;
+      } else {
+        origSetPaintOpacity(type, val, preventUndo);
+      }
+    } catch (err) {
+      console.warn('[direct-selection] setPaintOpacity cur-style failed', err);
+    }
     applyPaintWhileActive(`${type}-opacity`, val, { noUndo: !!preventUndo });
-    return result;
   };
 
   sc.directSelection = {
@@ -413,7 +459,10 @@ export function mountDirectSelection(editor) {
       schedule(); return;
     }
     if (!active) return;
-    if (key === 'escape') { stop(e); if (gesture) finish(true); else clearPoints(); schedule(); }
+    if (key === 'escape') {
+      if (document.getElementById('vcs_picker_modal')?.classList.contains('open')) return;
+      stop(e); if (gesture) finish(true); else clearPoints(); schedule();
+    }
     else if (!command && !e.altKey && ['backspace','delete'].includes(key)) { stop(e); removeSelected(); }
     else if (!command && !e.altKey && ['arrowleft','arrowright','arrowup','arrowdown'].includes(key)) {
       stop(e);
