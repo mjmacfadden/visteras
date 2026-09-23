@@ -6,6 +6,7 @@
  * ruler right-click unit menu (Studio parity), unit switching.
  *
  * In-memory documents only (v1). Does not import Studio modules.
+ * Leave/refresh uses Studio-style beforeunload when any tab is dirty.
  */
 
 import {
@@ -328,6 +329,36 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     doc.dirty = true;
     doc.isStartupDefault = false;
     renderTabs();
+  }
+
+  function hasAnyDirty() {
+    return state.documents.some((d) => d && d.dirty);
+  }
+
+  function clearActiveDirty() {
+    const doc = getActiveDoc();
+    if (!doc) return;
+    if (!doc.dirty) {
+      renderTabs();
+      return;
+    }
+    doc.dirty = false;
+    renderTabs();
+  }
+
+  /**
+   * Studio-parity leave/refresh warning.
+   * SVG-Edit's built-in beforeunload is often disabled by ext-storage
+   * (no_save_warning) when prefsAndContent is auto-persisted; Mike wants
+   * an explicit dirty-document warning instead of relying on that restore.
+   */
+  function bindLeaveWarning() {
+    window.addEventListener('beforeunload', (e) => {
+      if (!hasAnyDirty()) return undefined;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    });
   }
 
   // ----- tabs -----
@@ -863,7 +894,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
 
   // ----- events -----
   function bindCanvasDirty() {
-    ['changed', 'elementChanged', 'selectedChanged', 'pointsAdded', 'ext_added'].forEach((name) => {
+    // Do not bind selectedChanged — selection alone is not unsaved work (Studio parity).
+    ['changed', 'elementChanged', 'pointsAdded', 'ext_added'].forEach((name) => {
       try { sc.bind?.(name, () => markDirty()); } catch { /* ignore */ }
     });
     try {
@@ -1014,6 +1046,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     });
 
     bindCanvasDirty();
+    bindLeaveWarning();
     bindKeyboard();
     bindRulerContextMenu();
     bindMenuActions();
@@ -1038,6 +1071,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     isActiveUntouchedDefault,
     updateStatusBar,
     showRulerContextMenu,
+    markDirty,
+    clearActiveDirty,
+    hasAnyDirty,
   };
   window.__visterasDocumentShell = api;
   return api;

@@ -490,7 +490,19 @@
           const file = e.target.files[0];
           if (file) {
             const reader = new FileReader();
-            reader.onload = (re) => sc.setSvgString(re.target.result);
+            reader.onload = (re) => {
+              sc.setSvgString(re.target.result);
+              const base = (file.name || 'untitled.svg').replace(/\.svg$/i, '');
+              if (base) svgEditor.title = base;
+              // Opened file becomes the clean baseline (Studio parity).
+              setTimeout(() => {
+                const shell = window.__visterasDocumentShell;
+                const doc = shell?.getActiveDoc?.();
+                if (doc && base) doc.title = base;
+                shell?.clearActiveDirty?.();
+                shell?.updateStatusBar?.();
+              }, 80);
+            };
             reader.readAsText(file);
           }
         };
@@ -508,6 +520,9 @@
         a.href = URL.createObjectURL(blob);
         a.download = (svgEditor.title || 'untitled') + '.svg';
         a.click();
+        // Download started — clear dirty like Studio after save.
+        window.__visterasDocumentShell?.clearActiveDirty?.();
+        if (svgEditor) svgEditor.showSaveWarning = false;
       });
 
       document.getElementById('action_export_png')?.addEventListener('click', () => {
@@ -848,6 +863,14 @@
             e.preventDefault();
             e.stopPropagation();
             document.getElementById('tool_redo')?.click();
+            return;
+          }
+
+          // Command/Ctrl + S: Save SVG (clears dirty via action_save handler)
+          if (!e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('action_save')?.click();
             return;
           }
 
