@@ -264,6 +264,8 @@ export function mountScissorsTool(editor) {
     sc.clearSelection();
     sc.addToSelection(created, true);
     sc.call('changed', created);
+    // Keep cuttable anchors visible on the resulting piece(s).
+    ensureAnchorChrome(created);
     clearHover();
   }
 
@@ -297,11 +299,26 @@ export function mountScissorsTool(editor) {
     consumed = false;
   }, true);
 
+  /** Reuse Direct Selection node chrome so cuttable anchors stay visible. */
+  function ensureAnchorChrome(elements) {
+    const targets = (elements || []).filter((el) => el?.isConnected);
+    if (!targets.length || !sc.directSelection?.showAnchors) return;
+    sc.directSelection.showAnchors(targets, false);
+  }
+
   document.addEventListener('modeChange', () => {
     const btn = document.getElementById('tool_scissors');
     if (sc.getMode() === MODE) {
       btn?.setAttribute('pressed', 'true');
       editor.leftPanel?.updateLeftPanel?.('tool_scissors');
+      // Entering Scissors with a selection (or existing DS session): keep/show anchors.
+      if (sc.directSelection?.active) {
+        // Already DS-active (kept alive across setMode('scissors')) — refresh chrome.
+        sc.call?.('changed', sc.directSelection.getPaintTargets?.() || []);
+      } else {
+        const selected = (sc.getSelectedElements?.() || []).filter(Boolean);
+        ensureAnchorChrome(selected);
+      }
     } else {
       btn?.removeAttribute('pressed');
       clearHover();
