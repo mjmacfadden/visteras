@@ -1,37 +1,23 @@
 /**
  * Visteras Vector — Color System
  *
- * Shared fill/stroke targeting, Color|Swatches tabs (Studio parity), Appearance wells, and a usable
- * spectrum picker modal. Replaces jGraduate as the primary UX while leaving
- * SVG-Edit color pickers in the DOM for internal sync.
+ * Color + Swatches panels stacked above Properties (Studio parity layout),
+ * Appearance fill/stroke wells, and a usable spectrum picker modal.
+ * Swatch presets reuse Studio's SWATCH_CATEGORIES (copied to
+ * ./visteras-swatches-data.js). Replaces jGraduate as the primary UX while
+ * leaving SVG-Edit color pickers in the DOM for internal sync.
  *
- * APIs: svgCanvas.getColor / setColor / getPaintOpacity / setPaintOpacity
+ * APIs: svgCanvas.getColor / setColor / getPaintOpacity / setPaintOpacity /
+ *       setStrokeWidth / getStrokeWidth
  *       svgEditor.bottomPanel.updateColorpickers
  */
+
+import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
 const MAX_RECENT = 12;
 const ACCENT = '#fa7c1b';
-
-const STARTER_SWATCHES = [
-  { id: 's_black', name: 'Black', hex: '#000000' },
-  { id: 's_white', name: 'White', hex: '#ffffff' },
-  { id: 's_gray1', name: 'Gray 20%', hex: '#333333' },
-  { id: 's_gray2', name: 'Gray 40%', hex: '#666666' },
-  { id: 's_gray3', name: 'Gray 60%', hex: '#999999' },
-  { id: 's_gray4', name: 'Gray 80%', hex: '#cccccc' },
-  { id: 's_red', name: 'Red', hex: '#e74c3c' },
-  { id: 's_orange', name: 'Vector Orange', hex: '#fa7c1b' },
-  { id: 's_yellow', name: 'Yellow', hex: '#f1c40f' },
-  { id: 's_green', name: 'Green', hex: '#2ecc71' },
-  { id: 's_teal', name: 'Teal', hex: '#1abc9c' },
-  { id: 's_blue', name: 'Blue', hex: '#3498db' },
-  { id: 's_indigo', name: 'Indigo', hex: '#5b6ee1' },
-  { id: 's_purple', name: 'Purple', hex: '#9b59b6' },
-  { id: 's_pink', name: 'Pink', hex: '#e84393' },
-  { id: 's_brown', name: 'Brown', hex: '#8d6e63' },
-];
 
 // ---------------------------------------------------------------------------
 // Color math
@@ -298,6 +284,12 @@ function createColorController(svgEditor) {
       saveRecent(state.recent);
     },
 
+    clearRecent() {
+      state.recent = [];
+      saveRecent(state.recent);
+      api.emit();
+    },
+
     addUserSwatch(hex, name) {
       const n = normalizeHex(hex);
       if (!n || n === 'none') return null;
@@ -395,7 +387,7 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
   let h = 30;
   let s = 80;
   let l = 55;
-  let dragging = null;
+  let dragging = null; // 'sv' | 'hue' | null
 
   function drawHue() {
     const ctx = hueCanvas.getContext('2d');
@@ -410,16 +402,12 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
 
   function drawSV() {
     const ctx = svCanvas.getContext('2d');
-    // Base hue at full sat/light mid via HSL→ but classic SV: use HSL square approximation
-    // Horizontal: saturation 0→100 at L=50 against white/hue, then vertical black overlay.
     const hueRgb = hslToRgb(h, 100, 50);
-    // white → hue
     const gradX = ctx.createLinearGradient(0, 0, size, 0);
     gradX.addColorStop(0, '#ffffff');
     gradX.addColorStop(1, `rgb(${hueRgb.r},${hueRgb.g},${hueRgb.b})`);
     ctx.fillStyle = gradX;
     ctx.fillRect(0, 0, size, size);
-    // transparent → black
     const gradY = ctx.createLinearGradient(0, 0, 0, size);
     gradY.addColorStop(0, 'rgba(0,0,0,0)');
     gradY.addColorStop(1, 'rgba(0,0,0,1)');
@@ -427,9 +415,7 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
     ctx.fillRect(0, 0, size, size);
   }
 
-  // Convert HSV-like cursor (x=sat, y=value) to HSL for fields
   function svToHsl(sat, val) {
-    // sat,val in 0..100 (val = brightness)
     const sHsv = sat / 100;
     const v = val / 100;
     const lHsl = v * (1 - sHsv / 2);
@@ -449,10 +435,11 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
   }
 
   function updateCursors() {
+    // Percentages so cursors track the CSS-scaled canvases (not raw canvas px).
     const sv = hslToSv(h, s, l);
-    svCursor.style.left = `${(sv.s / 100) * size}px`;
-    svCursor.style.top = `${(1 - sv.v / 100) * size}px`;
-    hueCursor.style.left = `${(h / 360) * size}px`;
+    svCursor.style.left = `${sv.s}%`;
+    svCursor.style.top = `${100 - sv.v}%`;
+    hueCursor.style.left = `${(h / 360) * 100}%`;
   }
 
   function emit(commit) {
@@ -462,7 +449,9 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
     if (commit) onCommit?.({ hex, rgb, hsl: { h, s, l } });
   }
 
-  function setFromHex(hex) {
+  function setFromHex(hex, { force = false } = {}) {
+    // Never clobber in-progress drag (hex→HSL can lose hue on greys / round-trip).
+    if (dragging && !force) return;
     const rgb = hexToRgb(hex);
     if (!rgb) return;
     const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
@@ -472,9 +461,9 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
   }
 
   function pointerSV(clientX, clientY, commit) {
-    const rect = svCanvas.getBoundingClientRect();
-    const x = clamp((clientX - rect.left) / rect.width, 0, 1);
-    const y = clamp((clientY - rect.top) / rect.height, 0, 1);
+    const rect = svWrap.getBoundingClientRect();
+    const x = clamp((clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
+    const y = clamp((clientY - rect.top) / Math.max(rect.height, 1), 0, 1);
     const hsl = svToHsl(x * 100, (1 - y) * 100);
     s = hsl.s; l = hsl.l;
     updateCursors();
@@ -482,8 +471,8 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
   }
 
   function pointerHue(clientX, commit) {
-    const rect = hueCanvas.getBoundingClientRect();
-    const x = clamp((clientX - rect.left) / rect.width, 0, 1);
+    const rect = hueWrap.getBoundingClientRect();
+    const x = clamp((clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
     h = x * 360;
     drawSV();
     updateCursors();
@@ -492,33 +481,54 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
 
   function onPointerDown(e, kind) {
     e.preventDefault();
+    e.stopPropagation();
     dragging = kind;
     const pt = e.touches ? e.touches[0] : e;
     if (kind === 'sv') pointerSV(pt.clientX, pt.clientY, false);
     else pointerHue(pt.clientX, false);
+    try {
+      (kind === 'sv' ? svWrap : hueWrap).setPointerCapture?.(e.pointerId);
+    } catch { /* ignore */ }
   }
 
   function onPointerMove(e) {
     if (!dragging) return;
+    e.preventDefault();
     const pt = e.touches ? e.touches[0] : e;
     if (dragging === 'sv') pointerSV(pt.clientX, pt.clientY, false);
     else pointerHue(pt.clientX, false);
   }
 
-  function onPointerUp() {
+  function onPointerUp(e) {
     if (!dragging) return;
     dragging = null;
     emit(true);
+    try {
+      (e?.currentTarget)?.releasePointerCapture?.(e.pointerId);
+    } catch { /* ignore */ }
   }
 
-  svCanvas.addEventListener('mousedown', (e) => onPointerDown(e, 'sv'));
-  hueCanvas.addEventListener('mousedown', (e) => onPointerDown(e, 'hue'));
-  svCanvas.addEventListener('touchstart', (e) => onPointerDown(e, 'sv'), { passive: false });
-  hueCanvas.addEventListener('touchstart', (e) => onPointerDown(e, 'hue'), { passive: false });
-  window.addEventListener('mousemove', onPointerMove);
-  window.addEventListener('touchmove', onPointerMove, { passive: false });
-  window.addEventListener('mouseup', onPointerUp);
-  window.addEventListener('touchend', onPointerUp);
+  // Prefer Pointer Events (tracks across the wrap, not just the canvas bitmap).
+  const usePointer = typeof window.PointerEvent === 'function';
+  if (usePointer) {
+    svWrap.addEventListener('pointerdown', (e) => onPointerDown(e, 'sv'));
+    hueWrap.addEventListener('pointerdown', (e) => onPointerDown(e, 'hue'));
+    svWrap.addEventListener('pointermove', onPointerMove);
+    hueWrap.addEventListener('pointermove', onPointerMove);
+    svWrap.addEventListener('pointerup', onPointerUp);
+    hueWrap.addEventListener('pointerup', onPointerUp);
+    svWrap.addEventListener('pointercancel', onPointerUp);
+    hueWrap.addEventListener('pointercancel', onPointerUp);
+  } else {
+    svWrap.addEventListener('mousedown', (e) => onPointerDown(e, 'sv'));
+    hueWrap.addEventListener('mousedown', (e) => onPointerDown(e, 'hue'));
+    svWrap.addEventListener('touchstart', (e) => onPointerDown(e, 'sv'), { passive: false });
+    hueWrap.addEventListener('touchstart', (e) => onPointerDown(e, 'hue'), { passive: false });
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchend', onPointerUp);
+  }
 
   drawHue();
   drawSV();
@@ -528,11 +538,14 @@ function createSpectrumWidget({ size = 160, hueHeight = 14, onChange, onCommit }
     el: root,
     setFromHex,
     getHsl: () => ({ h, s, l }),
+    isDragging: () => !!dragging,
     destroy() {
-      window.removeEventListener('mousemove', onPointerMove);
-      window.removeEventListener('touchmove', onPointerMove);
-      window.removeEventListener('mouseup', onPointerUp);
-      window.removeEventListener('touchend', onPointerUp);
+      if (!usePointer) {
+        window.removeEventListener('mousemove', onPointerMove);
+        window.removeEventListener('touchmove', onPointerMove);
+        window.removeEventListener('mouseup', onPointerUp);
+        window.removeEventListener('touchend', onPointerUp);
+      }
     },
   };
 }
@@ -697,7 +710,7 @@ function mountToolbarColorSwatches(svgEditor, ctrl) {
 }
 
 // ---------------------------------------------------------------------------
-// Side panels: Color | Swatches tabs next to Properties (Studio parity)
+// Side panels: Color | Swatches stacked ABOVE Properties (Studio parity)
 // + Appearance fill/stroke wells in Properties
 // ---------------------------------------------------------------------------
 
@@ -718,105 +731,118 @@ function readCanvasPaint(svgEditor, which) {
 }
 
 function activateVcsTab(tab) {
-  const block = document.getElementById('vcs_colors_block') || document.getElementById('properties_panel');
+  const block = document.getElementById('vcs_colors_block');
   if (!block) return;
   const tabs = {
-    properties: document.getElementById('vcs_tab_btn_properties'),
     color: document.getElementById('vcs_tab_btn_color'),
     swatches: document.getElementById('vcs_tab_btn_swatches'),
   };
   const panes = {
-    properties: document.getElementById('properties_content'),
     color: document.getElementById('vcs_color_panel'),
     swatches: document.getElementById('vcs_swatches_panel'),
   };
-  if (!tabs.properties || !tabs.color || !tabs.swatches) return;
-  if (!panes.properties || !panes.color || !panes.swatches) return;
+  if (!tabs.color || !tabs.swatches || !panes.color || !panes.swatches) return;
 
-  const next = (tab === 'color' || tab === 'swatches') ? tab : 'properties';
-  for (const key of ['properties', 'color', 'swatches']) {
-    tabs[key].classList.toggle('active', key === next);
-    panes[key].classList.toggle('hidden', key !== next);
-    panes[key].classList.toggle('vcs-tab-pane-active', key === next);
+  const next = tab === 'swatches' ? 'swatches' : 'color';
+  for (const key of ['color', 'swatches']) {
+    const selected = key === next;
+    tabs[key].classList.toggle('active', selected);
+    tabs[key].setAttribute('aria-selected', selected ? 'true' : 'false');
+    tabs[key].tabIndex = selected ? 0 : -1;
+    panes[key].classList.toggle('hidden', !selected);
+    panes[key].classList.toggle('vcs-tab-pane-active', selected);
   }
-  // Ensure the shared block is expanded when switching tabs
   block.classList.remove('collapsed');
   try { localStorage.setItem(VCS_TAB_STORAGE, next); } catch { /* ignore */ }
 }
 
-function ensurePropertiesTabChrome() {
+/**
+ * Ensure Color|Swatches sit in their own sidebar block ABOVE Properties
+ * (not tabbed beside Properties). Restores a plain Properties header if an
+ * older tabbed-props chrome was previously injected.
+ */
+function ensureColorSwatchesBlock() {
   const propPanel = document.getElementById('properties_panel');
   if (!propPanel) return null;
-  if (propPanel.dataset.vcsTabs === '1') return propPanel;
 
-  const oldHeader = document.getElementById('properties_panel_header');
-  const propsContent = document.getElementById('properties_content');
-  if (!oldHeader || !propsContent) return null;
+  // Undo prior Properties|Color|Swatches tab chrome from earlier PR revisions.
+  if (propPanel.dataset.vcsTabs === '1') {
+    const propsContent = document.getElementById('properties_content');
+    const oldColor = document.getElementById('vcs_color_panel');
+    const oldSwatches = document.getElementById('vcs_swatches_panel');
+    oldColor?.remove();
+    oldSwatches?.remove();
+    propsContent?.classList.remove('panel_tab_pane', 'vcs-tab-pane', 'vcs-tab-pane-active', 'hidden');
+    propsContent?.removeAttribute('role');
+    const header = document.getElementById('properties_panel_header');
+    if (header) {
+      header.className = 'sidebar_block_header';
+      header.title = 'Toggle Properties Panel';
+      header.innerHTML = `
+        <span class="sidebar_block_title">Properties</span>
+        <span class="sidebar_block_arrow"></span>
+      `;
+    }
+    propPanel.classList.remove('vcs-block', 'vcs-tabbed-props');
+    delete propPanel.dataset.vcsTabs;
+    delete propPanel.dataset.vcsColorsBlock;
+  }
 
-  // Studio-like panel tab header: Properties | Color | Swatches
-  const header = document.createElement('div');
-  header.className = 'sidebar_block_header vcs-panel-tabs-header panel_tabs_header';
-  header.id = 'properties_panel_header';
-  header.title = 'Properties / Color / Swatches';
-  header.innerHTML = `
-    <span class="panel_tabs vcs-panel-tabs" role="tablist">
-      <button type="button" class="panel_tab_btn vcs-panel-tab-btn active" id="vcs_tab_btn_properties" role="tab" aria-selected="true">Properties</button>
-      <button type="button" class="panel_tab_btn vcs-panel-tab-btn" id="vcs_tab_btn_color" role="tab" aria-selected="false">Color</button>
-      <button type="button" class="panel_tab_btn vcs-panel-tab-btn" id="vcs_tab_btn_swatches" role="tab" aria-selected="false">Swatches</button>
-    </span>
-    <span class="sidebar_block_arrow" id="vcs_props_collapse_arrow" title="Collapse panel"></span>
+  let block = document.getElementById('vcs_colors_block');
+  if (block?.dataset.vcsReady === '1') return block;
+
+  if (!block) {
+    block = document.createElement('div');
+    block.id = 'vcs_colors_block';
+    block.className = 'sidebar_block vcs-block vcs-colors-block';
+    propPanel.parentNode?.insertBefore(block, propPanel);
+  }
+
+  block.innerHTML = `
+    <div class="sidebar_block_header vcs-panel-tabs-header panel_tabs_header" id="vcs_colors_block_header" title="Color / Swatches">
+      <span class="panel_tabs vcs-panel-tabs" role="tablist" aria-label="Color and Swatches">
+        <button type="button" class="panel_tab_btn vcs-panel-tab-btn active" id="vcs_tab_btn_color" role="tab" aria-selected="true" aria-controls="vcs_color_panel">Color</button>
+        <button type="button" class="panel_tab_btn vcs-panel-tab-btn" id="vcs_tab_btn_swatches" role="tab" aria-selected="false" aria-controls="vcs_swatches_panel">Swatches</button>
+      </span>
+      <span class="sidebar_block_arrow" id="vcs_colors_collapse_arrow" title="Collapse panel"></span>
+    </div>
+    <div id="vcs_color_panel" class="panel_tab_pane vcs-tab-pane vcs-block-content vcs-tab-pane-active" role="tabpanel" aria-labelledby="vcs_tab_btn_color"></div>
+    <div id="vcs_swatches_panel" class="panel_tab_pane vcs-tab-pane vcs-block-content hidden" role="tabpanel" aria-labelledby="vcs_tab_btn_swatches"></div>
   `;
-  oldHeader.replaceWith(header);
+  block.dataset.vcsReady = '1';
 
-  // Wrap properties content as a tab pane; add Color + Swatches panes as siblings
-  propsContent.classList.add('panel_tab_pane', 'vcs-tab-pane', 'vcs-tab-pane-active');
-  propsContent.setAttribute('role', 'tabpanel');
-
-  const colorPane = document.createElement('div');
-  colorPane.id = 'vcs_color_panel';
-  colorPane.className = 'panel_tab_pane vcs-tab-pane vcs-block-content hidden';
-  colorPane.setAttribute('role', 'tabpanel');
-
-  const swatchesPane = document.createElement('div');
-  swatchesPane.id = 'vcs_swatches_panel';
-  swatchesPane.className = 'panel_tab_pane vcs-tab-pane vcs-block-content hidden';
-  swatchesPane.setAttribute('role', 'tabpanel');
-
-  propsContent.after(colorPane, swatchesPane);
-
-  propPanel.classList.add('vcs-block', 'vcs-tabbed-props');
-  propPanel.dataset.vcsTabs = '1';
-  // Alias id used by older CSS expectations for the shared colors block
-  propPanel.dataset.vcsColorsBlock = '1';
-
-  // Tab clicks (stopPropagation so collapse handler doesn't fire)
-  propPanel.addEventListener('click', (e) => {
-    const btn = e.target?.closest?.('#vcs_tab_btn_properties, #vcs_tab_btn_color, #vcs_tab_btn_swatches');
-    if (!btn || !propPanel.contains(btn)) return;
+  block.addEventListener('click', (e) => {
+    const btn = e.target?.closest?.('#vcs_tab_btn_color, #vcs_tab_btn_swatches');
+    if (!btn || !block.contains(btn)) return;
     e.preventDefault();
     e.stopPropagation();
-    if (btn.id === 'vcs_tab_btn_color') activateVcsTab('color');
-    else if (btn.id === 'vcs_tab_btn_swatches') activateVcsTab('swatches');
-    else activateVcsTab('properties');
+    activateVcsTab(btn.id === 'vcs_tab_btn_swatches' ? 'swatches' : 'color');
   });
 
-  // Collapse only via the chevron (tabs stopPropagation above)
-  header.querySelector('#vcs_props_collapse_arrow')?.addEventListener('click', (e) => {
+  block.querySelector('#vcs_colors_collapse_arrow')?.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    propPanel.classList.toggle('collapsed');
+    block.classList.toggle('collapsed');
   });
 
-  let saved = 'properties';
-  try { saved = localStorage.getItem(VCS_TAB_STORAGE) || 'properties'; } catch { /* ignore */ }
+  let saved = 'color';
+  try { saved = localStorage.getItem(VCS_TAB_STORAGE) || 'color'; } catch { /* ignore */ }
+  if (saved === 'properties') saved = 'color';
   activateVcsTab(saved);
-  return propPanel;
+  return block;
 }
 
 function mountColorPanelContent(ctrl, svgEditor, content) {
   if (!content || content.dataset.vcsMounted === '1') return content;
   content.dataset.vcsMounted = '1';
   content.innerHTML = `
+    <div class="recent_colors_bar vcs-recent-colors-bar" id="vcs_recent_colors_bar">
+      <div class="recent_colors_header">
+        <span class="recent_colors_title">Recent Colors</span>
+        <button type="button" id="vcs_recent_clear_btn" class="recent_colors_clear_btn" title="Clear recent colors">Clear</button>
+      </div>
+      <div id="vcs_recent_colors_grid" class="recent_colors_grid"></div>
+    </div>
     <div class="vcs-target-row" role="group" aria-label="Paint target">
       <button type="button" class="vcs-target-btn" data-target="fill" id="vcs_target_fill">Fill</button>
       <button type="button" class="vcs-target-btn" data-target="stroke" id="vcs_target_stroke">Stroke</button>
@@ -824,8 +850,7 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
     <div class="vcs-spectrum-slot" id="vcs_color_spectrum_slot"></div>
     <div class="vcs-preview-row">
       <div class="vcs-preview" id="vcs_color_preview" title="Current color"></div>
-      <button type="button" class="vcs-btn-ghost" id="vcs_open_picker_btn" title="Open large color picker">⋯</button>
-      <button type="button" class="vcs-btn-ghost" id="vcs_none_btn" title="No color (/)">⌀</button>
+      <button type="button" class="vcs-btn-ghost vcs-none-swatch-btn" id="vcs_none_btn" title="No color (/)" aria-label="No color"></button>
     </div>
     <div class="vcs-fields">
       <label class="vcs-field"><span>Hex</span><input id="vcs_hex" type="text" spellcheck="false" maxlength="7" /></label>
@@ -875,7 +900,30 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
   const preview = content.querySelector('#vcs_color_preview');
   const fillBtn = content.querySelector('#vcs_target_fill');
   const strokeBtn = content.querySelector('#vcs_target_stroke');
+  const recentGrid = content.querySelector('#vcs_recent_colors_grid');
   const block = content;
+
+  function renderRecent(state) {
+    if (!recentGrid) return;
+    recentGrid.innerHTML = '';
+    const recent = state.recent || [];
+    if (!recent.length) {
+      recentGrid.innerHTML = '<span class="recent_colors_empty">No recent colors</span>';
+      return;
+    }
+    const active = state.workingNone ? null : state.workingHex?.toLowerCase();
+    for (const hex of recent) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'recent_color_chip';
+      chip.style.backgroundColor = hex;
+      chip.dataset.hex = hex;
+      chip.title = hex.toUpperCase();
+      if (active && hex.toLowerCase() === active) chip.classList.add('active');
+      chip.addEventListener('click', () => ctrl.setWorkingColor(hex));
+      recentGrid.appendChild(chip);
+    }
+  }
 
   function refreshFields(state) {
     applying = true;
@@ -907,19 +955,22 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
         hInput.value = Math.round(hsl.h);
         sInput.value = Math.round(hsl.s);
         lInput.value = Math.round(hsl.l);
-        spectrum.setFromHex(state.workingHex);
+        if (!spectrum.isDragging()) spectrum.setFromHex(state.workingHex);
       }
     }
     const pct = Math.round((state.opacity ?? 1) * 100);
     opInput.value = String(pct);
     opVal.textContent = `${pct}%`;
+    renderRecent(state);
     applying = false;
   }
 
   fillBtn.addEventListener('click', () => ctrl.setActiveTarget('fill'));
   strokeBtn.addEventListener('click', () => ctrl.setActiveTarget('stroke'));
-  content.querySelector('#vcs_open_picker_btn').addEventListener('click', () => ctrl.openPicker());
   content.querySelector('#vcs_none_btn').addEventListener('click', () => ctrl.setWorkingColor('none'));
+  content.querySelector('#vcs_recent_clear_btn')?.addEventListener('click', () => {
+    ctrl.clearRecent();
+  });
 
   hexInput.addEventListener('change', () => {
     if (applying) return;
@@ -971,21 +1022,53 @@ function mountSwatchesPanelContent(ctrl, content) {
   if (!content || content.dataset.vcsMounted === '1') return content;
   content.dataset.vcsMounted = '1';
   content.innerHTML = `
-    <div class="vcs-swatch-toolbar">
-      <button type="button" class="vcs-btn" id="vcs_add_swatch" title="Add current color to swatches">+</button>
-      <span class="vcs-swatch-hint">Click applies to active Fill/Stroke</span>
+    <div class="swatches_panel_content vcs-swatches-panel-content">
+      <div class="swatches_toolbar">
+        <div class="swatches_toolbar_row">
+          <div class="swatches_search_box">
+            <svg class="swatches_search_icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="vcs_swatches_search_input" class="swatches_search_input" placeholder="Search swatches..." />
+            <button type="button" id="vcs_swatches_search_clear" class="swatches_search_clear hidden" title="Clear search">&times;</button>
+          </div>
+          <button type="button" id="vcs_swatches_toggle_all_btn" class="swatches_icon_btn" title="Expand/Collapse All Categories">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="7 13 12 18 17 13"></polyline>
+              <polyline points="7 6 12 11 17 6"></polyline>
+            </svg>
+          </button>
+          <button type="button" class="vcs-btn" id="vcs_add_swatch" title="Add current color to user swatches">+</button>
+        </div>
+      </div>
+      <div class="vcs-section-label">User</div>
+      <div class="vcs-swatch-grid" id="vcs_user_grid"></div>
+      <div class="swatches_schemes_wrapper">
+        <div id="vcs_swatches_folders_container" class="swatches_folders_container"></div>
+      </div>
     </div>
-    <div class="vcs-section-label">Recent</div>
-    <div class="vcs-swatch-grid" id="vcs_recent_grid"></div>
-    <div class="vcs-section-label">Library</div>
-    <div class="vcs-swatch-grid" id="vcs_library_grid"></div>
-    <div class="vcs-section-label">User</div>
-    <div class="vcs-swatch-grid" id="vcs_user_grid"></div>
   `;
 
-  const recentGrid = content.querySelector('#vcs_recent_grid');
-  const libraryGrid = content.querySelector('#vcs_library_grid');
   const userGrid = content.querySelector('#vcs_user_grid');
+  const folders = content.querySelector('#vcs_swatches_folders_container');
+  const searchInput = content.querySelector('#vcs_swatches_search_input');
+  const searchClear = content.querySelector('#vcs_swatches_search_clear');
+  let searchQuery = '';
+  const collapsedKey = 'visteras-vector-swatch-collapsed';
+  let collapsed = {};
+  try {
+    collapsed = JSON.parse(localStorage.getItem(collapsedKey) || '{}') || {};
+  } catch { collapsed = {}; }
+  // Default: collapse all but first category
+  const catNames = Object.keys(SWATCH_CATEGORIES || {});
+  catNames.forEach((name, idx) => {
+    if (!(name in collapsed) && idx > 0) collapsed[name] = true;
+  });
+
+  function saveCollapsed() {
+    try { localStorage.setItem(collapsedKey, JSON.stringify(collapsed)); } catch { /* ignore */ }
+  }
 
   function swatchEl(hex, name, { userId = null } = {}) {
     const btn = document.createElement('button');
@@ -1015,18 +1098,7 @@ function mountSwatchesPanelContent(ctrl, content) {
     return btn;
   }
 
-  function render(state) {
-    recentGrid.innerHTML = '';
-    const recent = state.recent.length ? state.recent : STARTER_SWATCHES.slice(0, 8).map((s) => s.hex);
-    for (const hex of recent) {
-      recentGrid.appendChild(swatchEl(hex, hex.toUpperCase()));
-    }
-
-    libraryGrid.innerHTML = '';
-    for (const s of STARTER_SWATCHES) {
-      libraryGrid.appendChild(swatchEl(s.hex, s.name));
-    }
-
+  function renderUser(state) {
     userGrid.innerHTML = '';
     if (!state.userSwatches.length) {
       const empty = document.createElement('div');
@@ -1038,14 +1110,122 @@ function mountSwatchesPanelContent(ctrl, content) {
         userGrid.appendChild(swatchEl(s.hex, s.name, { userId: s.id }));
       }
     }
-
     const active = state.workingNone ? null : state.workingHex?.toLowerCase();
     content.querySelectorAll('.vcs-swatch').forEach((el) => {
       el.classList.toggle('active', active && el.dataset.hex?.toLowerCase() === active);
     });
   }
 
-  content.querySelector('#vcs_add_swatch').addEventListener('click', () => {
+  function renderFolders(state) {
+    folders.innerHTML = '';
+    const query = searchQuery;
+    let totalMatches = 0;
+    const active = state.workingNone ? null : state.workingHex?.toLowerCase();
+
+    catNames.forEach((catName) => {
+      let palettes = SWATCH_CATEGORIES[catName] || [];
+      if (query) {
+        palettes = palettes.filter((p) => {
+          if (p.name.toLowerCase().includes(query)) return true;
+          return p.colors.some((c) => c.hex.toLowerCase().includes(query)
+            || (c.name && c.name.toLowerCase().includes(query)));
+        });
+        if (!palettes.length) return;
+      }
+      totalMatches += palettes.length;
+      const isSearching = !!query;
+      const isCollapsed = isSearching ? false : !!collapsed[catName];
+
+      const folderEl = document.createElement('div');
+      folderEl.className = `swatches_folder ${isCollapsed ? 'collapsed' : 'expanded'}`;
+      folderEl.dataset.category = catName;
+
+      let previewColors = ['#e74c3c', '#f1c40f', '#2ecc71', '#3498db'];
+      if (palettes.length > 0 && palettes[0].colors?.length >= 4) {
+        previewColors = palettes[0].colors.slice(0, 4).map((c) => c.hex);
+      }
+      const previewHtml = previewColors.map((c) => `<span class="folder_preview_bar_segment" style="background:${c}"></span>`).join('');
+
+      const headerEl = document.createElement('div');
+      headerEl.className = 'swatches_folder_header';
+      headerEl.title = `Click to ${isCollapsed ? 'expand' : 'collapse'} ${catName}`;
+      headerEl.innerHTML = `
+        <div class="folder_header_left">
+          <svg class="folder_chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+          <span class="folder_title">${catName}</span>
+          <span class="folder_count">(${palettes.length})</span>
+        </div>
+        <div class="folder_preview_bar">${previewHtml}</div>
+      `;
+      headerEl.addEventListener('click', () => {
+        collapsed[catName] = !collapsed[catName];
+        saveCollapsed();
+        renderFolders(ctrl.getState());
+      });
+      folderEl.appendChild(headerEl);
+
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'swatches_folder_body';
+      palettes.forEach((palette) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'swatches_palette_row';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'swatches_palette_name';
+        nameEl.textContent = palette.name;
+        nameEl.title = palette.name;
+        const chipsEl = document.createElement('div');
+        chipsEl.className = 'swatches_palette_chips';
+        palette.colors.forEach((color) => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'swatch_chip scheme_chip';
+          chip.style.backgroundColor = color.hex;
+          chip.dataset.hex = color.hex;
+          chip.title = `${palette.name}\n${color.name ? `${color.name} ` : ''}${color.hex.toUpperCase()}`;
+          if (active && color.hex.toLowerCase() === active) chip.classList.add('active');
+          chip.addEventListener('click', () => ctrl.setWorkingColor(color.hex));
+          chipsEl.appendChild(chip);
+        });
+        rowEl.append(nameEl, chipsEl);
+        bodyEl.appendChild(rowEl);
+      });
+      folderEl.appendChild(bodyEl);
+      folders.appendChild(folderEl);
+    });
+
+    if (totalMatches === 0 && query) {
+      folders.innerHTML = `<div class="swatches_no_results"><span>No palettes match "${query}"</span></div>`;
+    }
+  }
+
+  function render(state) {
+    renderUser(state);
+    renderFolders(state);
+  }
+
+  searchInput?.addEventListener('input', (e) => {
+    searchQuery = e.target.value.trim().toLowerCase();
+    searchClear?.classList.toggle('hidden', !e.target.value.length);
+    renderFolders(ctrl.getState());
+  });
+  searchClear?.addEventListener('click', () => {
+    if (searchInput) {
+      searchInput.value = '';
+      searchInput.focus();
+    }
+    searchQuery = '';
+    searchClear.classList.add('hidden');
+    renderFolders(ctrl.getState());
+  });
+  content.querySelector('#vcs_swatches_toggle_all_btn')?.addEventListener('click', () => {
+    const someOpen = catNames.some((name) => !collapsed[name]);
+    catNames.forEach((name) => { collapsed[name] = someOpen; });
+    saveCollapsed();
+    renderFolders(ctrl.getState());
+  });
+  content.querySelector('#vcs_add_swatch')?.addEventListener('click', () => {
     const st = ctrl.getState();
     if (st.workingNone) return;
     const name = window.prompt('Swatch name', st.workingHex.toUpperCase());
@@ -1059,13 +1239,13 @@ function mountSwatchesPanelContent(ctrl, content) {
 }
 
 function mountColorSwatchesTabs(ctrl, svgEditor) {
-  const propPanel = ensurePropertiesTabChrome();
-  if (!propPanel) return null;
+  const block = ensureColorSwatchesBlock();
+  if (!block) return null;
   const colorPane = document.getElementById('vcs_color_panel');
   const swatchesPane = document.getElementById('vcs_swatches_panel');
   mountColorPanelContent(ctrl, svgEditor, colorPane);
   mountSwatchesPanelContent(ctrl, swatchesPane);
-  return propPanel;
+  return block;
 }
 
 function mountAppearanceColors(ctrl, svgEditor) {
@@ -1078,11 +1258,12 @@ function mountAppearanceColors(ctrl, svgEditor) {
   const fillTarget = document.getElementById('vcs_app_fill_target');
   const strokeTarget = document.getElementById('vcs_app_stroke_target');
   const fillNone = document.getElementById('vcs_app_fill_none');
-  const strokeNone = document.getElementById('vcs_app_stroke_none');
+  const weightInput = document.getElementById('vcs_app_stroke_weight');
   const rowFill = fillChip.closest('.vcs-appearance-row');
   const rowStroke = strokeChip.closest('.vcs-appearance-row');
+  const sc = svgEditor?.svgCanvas;
 
-  function paintChip(el, paint, isStroke) {
+  function paintChip(el, paint) {
     if (paint.none) {
       el.classList.add('is-none');
       el.style.backgroundColor = '';
@@ -1092,16 +1273,45 @@ function mountAppearanceColors(ctrl, svgEditor) {
     }
   }
 
+  function readStrokeWidth() {
+    if (typeof sc?.getStrokeWidth === 'function') {
+      const w = sc.getStrokeWidth();
+      if (w != null && w !== '') return Number(w);
+    }
+    const native = document.getElementById('stroke_width');
+    if (native?.value != null && native.value !== '') return Number(native.value);
+    return 1;
+  }
+
+  function writeStrokeWidth(value) {
+    const n = Math.max(0, Number(value));
+    if (Number.isNaN(n)) return;
+    const native = document.getElementById('stroke_width');
+    if (native) {
+      // Prefer SVG-Edit's changeStrokeWidth path (undo + UI sync).
+      native.value = String(n);
+      native.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (typeof sc?.setStrokeWidth === 'function') {
+      sc.setStrokeWidth(n);
+    }
+    if (weightInput && document.activeElement !== weightInput) {
+      weightInput.value = String(n);
+    }
+  }
+
   function refresh() {
     const fill = readCanvasPaint(svgEditor, 'fill');
     const stroke = readCanvasPaint(svgEditor, 'stroke');
-    paintChip(fillChip, fill, false);
-    paintChip(strokeChip, stroke, true);
+    paintChip(fillChip, fill);
+    paintChip(strokeChip, stroke);
     const active = ctrl.getActiveTarget();
     rowFill?.classList.toggle('active', active === 'fill');
     rowStroke?.classList.toggle('active', active === 'stroke');
     fillTarget?.classList.toggle('active', active === 'fill');
     strokeTarget?.classList.toggle('active', active === 'stroke');
+    if (weightInput && document.activeElement !== weightInput) {
+      weightInput.value = String(readStrokeWidth());
+    }
   }
 
   const openFor = (target) => {
@@ -1111,31 +1321,31 @@ function mountAppearanceColors(ctrl, svgEditor) {
 
   fillChip.addEventListener('click', (e) => { e.stopPropagation(); openFor('fill'); });
   strokeChip.addEventListener('click', (e) => { e.stopPropagation(); openFor('stroke'); });
-  fillTarget?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ctrl.setActiveTarget('fill');
-    activateVcsTab('color');
-  });
-  strokeTarget?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ctrl.setActiveTarget('stroke');
-    activateVcsTab('color');
-  });
+  // Words "Fill" / "Stroke" open the color picker modal (Illustrator-like).
+  fillTarget?.addEventListener('click', (e) => { e.stopPropagation(); openFor('fill'); });
+  strokeTarget?.addEventListener('click', (e) => { e.stopPropagation(); openFor('stroke'); });
   fillNone?.addEventListener('click', (e) => {
     e.stopPropagation();
     ctrl.setActiveTarget('fill', { syncColor: false });
     ctrl.setWorkingColor('none');
   });
-  strokeNone?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    ctrl.setActiveTarget('stroke', { syncColor: false });
-    ctrl.setWorkingColor('none');
-  });
+
+  if (weightInput) {
+    const applyWeight = () => writeStrokeWidth(weightInput.value);
+    weightInput.addEventListener('change', applyWeight);
+    weightInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyWeight();
+        weightInput.blur();
+      }
+    });
+  }
 
   ctrl.subscribe(refresh);
-  // Also refresh when SVG-Edit selection/color changes via native pickers
   document.getElementById('fill_color')?.addEventListener('change', refresh);
   document.getElementById('stroke_color')?.addEventListener('change', refresh);
+  document.getElementById('stroke_width')?.addEventListener('change', refresh);
   refresh();
 }
 
@@ -1170,7 +1380,8 @@ function mountPickerModal(ctrl) {
         </div>
         <div class="vcs-preview-row">
           <div class="vcs-preview vcs-preview-lg" id="vcs_picker_preview"></div>
-          <button type="button" class="vcs-btn-ghost" id="vcs_picker_none" title="No color">⌀ None</button>
+          <button type="button" class="vcs-btn-ghost vcs-none-swatch-btn" id="vcs_picker_none" title="No color" aria-label="No color"></button>
+          <span class="vcs-none-label">None</span>
         </div>
         <div class="vcs-fields">
           <label class="vcs-field"><span>Hex</span><input id="vcs_picker_hex" type="text" spellcheck="false" maxlength="7" /></label>
@@ -1254,7 +1465,7 @@ function mountPickerModal(ctrl) {
         hInput.value = Math.round(hsl.h);
         sInput.value = Math.round(hsl.s);
         lInput.value = Math.round(hsl.l);
-        spectrum.setFromHex(draftHex);
+        if (!spectrum.isDragging()) spectrum.setFromHex(draftHex);
       }
     }
     applying = false;

@@ -1,8 +1,9 @@
 /* ==========================================================================
-   Visteras Vector — Color System (Color panel, Swatches, Picker modal)
+   Visteras Vector — Color System (Color + Swatches above Properties)
    ========================================================================== */
 
-.vcs-block {
+.vcs-block,
+#vcs_colors_block {
   width: 100% !important;
   background-color: var(--studio-panel-bg, #3c3c3c) !important;
   border-bottom: 1px solid var(--studio-border-dark, #1a1a1a) !important;
@@ -10,9 +11,9 @@
   user-select: none !important;
 }
 
-/* Studio-parity panel tabs on Properties (Properties | Color | Swatches) */
-.vcs-tabbed-props .vcs-panel-tabs-header,
-#properties_panel.vcs-tabbed-props > .vcs-panel-tabs-header {
+/* Studio-parity Color | Swatches tab header (stacked block above Properties) */
+#vcs_colors_block .vcs-panel-tabs-header,
+#vcs_colors_block > .panel_tabs_header {
   font-size: 11px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
@@ -29,7 +30,8 @@
   box-sizing: border-box !important;
 }
 
-.vcs-panel-tabs {
+.vcs-panel-tabs,
+#vcs_colors_block .panel_tabs {
   display: flex !important;
   align-items: stretch !important;
   height: 100% !important;
@@ -37,8 +39,10 @@
   min-width: 0 !important;
 }
 
-.vcs-panel-tab-btn,
-#properties_panel .vcs-panel-tab-btn {
+/* Match Studio .panel_tab_btn / .panel_tab_btn.active (Vector accent orange) */
+#vcs_colors_block .panel_tab_btn,
+#vcs_colors_block .vcs-panel-tab-btn,
+.vcs-panel-tab-btn {
   background: transparent !important;
   border: none !important;
   border-right: 1px solid #1c1c1c !important;
@@ -48,27 +52,36 @@
   font-weight: 600 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
-  padding: 0 10px !important;
+  padding: 0 12px !important;
   cursor: pointer !important;
   height: 100% !important;
   display: flex !important;
   align-items: center !important;
   transition: background 0.15s, color 0.15s, border-color 0.15s !important;
   border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
+#vcs_colors_block .panel_tab_btn:hover,
+#vcs_colors_block .vcs-panel-tab-btn:hover,
 .vcs-panel-tab-btn:hover {
   color: #e0e0e0 !important;
   background-color: #2b2b2b !important;
 }
 
-.vcs-panel-tab-btn.active {
+#vcs_colors_block .panel_tab_btn.active,
+#vcs_colors_block .panel_tab_btn[aria-selected="true"],
+#vcs_colors_block .vcs-panel-tab-btn.active,
+#vcs_colors_block .vcs-panel-tab-btn[aria-selected="true"],
+.vcs-panel-tab-btn.active,
+.vcs-panel-tab-btn[aria-selected="true"] {
   color: #ffffff !important;
   background-color: #2d2d2d !important;
-  border-bottom-color: #fa7c1b !important; /* Vector orange (Studio uses blue) */
+  border-bottom-color: #fa7c1b !important; /* Vector orange (Studio uses #3b82f6) */
 }
 
-#properties_panel.vcs-tabbed-props .sidebar_block_arrow {
+#vcs_colors_block .sidebar_block_arrow {
   display: inline-block !important;
   width: 0 !important;
   height: 0 !important;
@@ -82,14 +95,13 @@
   flex-shrink: 0 !important;
 }
 
-#properties_panel.vcs-tabbed-props.collapsed .sidebar_block_arrow {
+#vcs_colors_block.collapsed .sidebar_block_arrow {
   border-width: 5px 4px 0 4px !important;
   border-color: #999999 transparent transparent transparent !important;
 }
 
-#properties_panel.vcs-tabbed-props.collapsed #properties_content,
-#properties_panel.vcs-tabbed-props.collapsed #vcs_color_panel,
-#properties_panel.vcs-tabbed-props.collapsed #vcs_swatches_panel {
+#vcs_colors_block.collapsed #vcs_color_panel,
+#vcs_colors_block.collapsed #vcs_swatches_panel {
   display: none !important;
 }
 
@@ -105,6 +117,91 @@
   font-size: 11px !important;
   color: var(--studio-text, #cccccc) !important;
   box-sizing: border-box !important;
+}
+
+#vcs_swatches_panel {
+  padding: 0 !important;
+  max-height: 420px;
+  overflow: auto;
+}
+
+/* ---------- Recent colors (Studio parity, top of Color panel) ---------- */
+.vcs-recent-colors-bar,
+#vcs_color_panel .recent_colors_bar {
+  padding: 4px 0 6px 0;
+  background-color: #262626;
+  border-bottom: 1px solid #1e1e1e;
+  margin: -8px -8px 8px -8px;
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-top: 4px;
+  padding-bottom: 6px;
+}
+
+.recent_colors_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.recent_colors_title {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #888888;
+}
+
+.recent_colors_clear_btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 9.5px;
+  color: #666666;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+.recent_colors_clear_btn:hover {
+  color: #ff6b6b;
+}
+
+.recent_colors_grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  min-height: 18px;
+}
+
+.recent_color_chip {
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid #181818;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s;
+}
+.recent_color_chip:hover {
+  transform: scale(1.22);
+  z-index: 10;
+  border-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.recent_color_chip.active {
+  box-shadow: 0 0 0 1.5px #fa7c1b, inset 0 0 0 1px #ffffff;
+  z-index: 5;
+}
+
+.recent_colors_empty {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+  padding: 2px 0;
 }
 
 /* Fill / Stroke target */
@@ -140,11 +237,6 @@
   box-shadow: inset 0 0 0 1px rgba(250, 124, 27, 0.35);
 }
 
-#vcs_color_panel[data-target="fill"] .vcs-target-btn[data-target="fill"],
-#vcs_color_panel[data-target="stroke"] .vcs-target-btn[data-target="stroke"] {
-  /* already handled by .active */
-}
-
 /* Spectrum */
 .vcs-spectrum {
   width: 100%;
@@ -162,6 +254,7 @@
   overflow: hidden;
   cursor: crosshair;
   background: #111;
+  touch-action: none;
 }
 
 .vcs-sv-canvas,
@@ -170,6 +263,7 @@
   width: 100%;
   height: auto;
   vertical-align: top;
+  pointer-events: none; /* events on wrap so drag tracks reliably */
 }
 
 .vcs-sv-canvas {
@@ -199,7 +293,7 @@
   height: 100%;
   border-radius: 2px;
   transform: translate(-50%, -50%);
-  background: transparent;
+  background: rgba(255,255,255,0.35);
 }
 
 /* Preview + actions */
@@ -225,12 +319,43 @@
   height: 40px;
 }
 
-.vcs-preview.is-none {
-  background: linear-gradient(to top right,
+/* White square + red slash (no-color) */
+.vcs-preview.is-none,
+.vcs-none-swatch-btn,
+.vcs-appearance-chip.is-none,
+.swatch-color-indicator.is-none {
+  background: #ffffff !important;
+  background-image: linear-gradient(
+    to top right,
     #ffffff calc(50% - 1.2px),
     #e62e2e calc(50% - 1.2px),
     #e62e2e calc(50% + 1.2px),
-    #ffffff calc(50% + 1.2px)) !important;
+    #ffffff calc(50% + 1.2px)
+  ) !important;
+  border: 1px solid #111 !important;
+  box-shadow: none !important;
+}
+
+.vcs-none-swatch-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vcs-none-swatch-btn:hover {
+  outline: 1px solid #fff;
+  outline-offset: 1px;
+}
+
+.vcs-none-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .vcs-btn-ghost {
@@ -331,23 +456,211 @@
   font-size: 10px;
 }
 
-/* Swatches */
-.vcs-swatch-toolbar {
+/* ---------- Swatches (Studio searchable presets) ---------- */
+.vcs-swatches-panel-content,
+.swatches_panel_content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.swatches_toolbar {
+  padding: 6px 8px;
+  border-bottom: 1px solid #1e1e1e;
+  background: #2a2a2a;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.swatches_toolbar_row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 6px;
 }
 
-.vcs-swatch-toolbar .vcs-btn {
-  padding: 2px 8px;
-  font-size: 14px;
-  line-height: 1.2;
+.swatches_search_box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  padding: 2px 6px;
+  min-width: 0;
 }
 
-.vcs-swatch-hint {
-  font-size: 10px;
+.swatches_search_icon {
+  color: #777;
+  flex-shrink: 0;
+}
+
+.swatches_search_input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: #ddd;
+  font-size: 11px;
+  padding: 3px 0;
+  outline: none;
+}
+
+.swatches_search_clear {
+  background: none;
+  border: none;
   color: #888;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.swatches_search_clear.hidden {
+  display: none;
+}
+
+.swatches_icon_btn {
+  background: #242424;
+  border: 1px solid #444;
+  color: #bbb;
+  border-radius: 3px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.swatches_icon_btn:hover {
+  border-color: #fa7c1b;
+  color: #fff;
+}
+
+.swatches_schemes_wrapper {
+  padding: 4px 0 8px;
+}
+
+.swatches_folders_container {
+  display: flex;
+  flex-direction: column;
+}
+
+.swatches_folder {
+  border-bottom: 1px solid #222;
+}
+
+.swatches_folder_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  background: #303030;
+}
+.swatches_folder_header:hover {
+  background: #363636;
+}
+
+.folder_header_left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.folder_chevron {
+  color: #999;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.swatches_folder.expanded .folder_chevron {
+  transform: rotate(90deg);
+}
+
+.folder_title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder_count {
+  font-size: 10px;
+  color: #777;
+}
+
+.folder_preview_bar {
+  display: flex;
+  height: 10px;
+  width: 48px;
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #111;
+}
+.folder_preview_bar_segment {
+  flex: 1;
+}
+
+.swatches_folder.collapsed .swatches_folder_body {
+  display: none;
+}
+
+.swatches_folder_body {
+  padding: 4px 8px 8px;
+  background: #2b2b2b;
+}
+
+.swatches_palette_row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+
+.swatches_palette_name {
+  font-size: 10px;
+  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swatches_palette_chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.swatch_chip.scheme_chip {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid #111;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+.swatch_chip.scheme_chip:hover {
+  outline: 1px solid #fff;
+  z-index: 1;
+}
+.swatch_chip.scheme_chip.active {
+  outline: 2px solid #fa7c1b;
+  z-index: 2;
+}
+
+.swatches_no_results {
+  padding: 16px 8px;
+  text-align: center;
+  color: #777;
+  font-size: 11px;
 }
 
 .vcs-section-label {
@@ -356,13 +669,14 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: #888;
-  margin: 8px 0 4px;
+  margin: 8px 8px 4px;
 }
 
 .vcs-swatch-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   gap: 3px;
+  padding: 0 8px 8px;
 }
 
 .vcs-swatch {
@@ -380,7 +694,7 @@
 }
 
 .vcs-swatch:hover {
-  outline: 1px solid #fa7c1b;
+  outline: 1px solid #ffffff;
   outline-offset: 0;
   z-index: 1;
 }
@@ -502,11 +816,10 @@
   flex: 1;
 }
 
-/* Stronger active ring on toolbar when color system owns targeting */
+/* Fill/stroke active ring: WHITE (not orange — clashes with selected color) */
 .tools-left-swatches .swatch-box.active {
-  box-shadow: 0 0 0 1.5px #fa7c1b, 0 0 0 2.5px rgba(250, 124, 27, 0.35), 0 2px 6px rgba(0, 0, 0, 0.8) !important;
+  box-shadow: 0 0 0 1.5px #ffffff, 0 2px 6px rgba(0, 0, 0, 0.8) !important;
 }
-
 
 /* ==========================================================================
    Appearance fill / stroke wells (Properties → Appearance)
@@ -531,8 +844,8 @@
 }
 
 .vcs-appearance-row.active {
-  border-color: rgba(250, 124, 27, 0.55) !important;
-  background: rgba(250, 124, 27, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 
 .vcs-appearance-chip {
@@ -565,14 +878,6 @@
   pointer-events: none !important;
 }
 
-.vcs-appearance-chip.is-none {
-  background: linear-gradient(to top right,
-    #ffffff calc(50% - 1.2px),
-    #e62e2e calc(50% - 1.2px),
-    #e62e2e calc(50% + 1.2px),
-    #ffffff calc(50% + 1.2px)) !important;
-}
-
 .vcs-appearance-chip-stroke.is-none .vcs-appearance-stroke-hole {
   display: none !important;
 }
@@ -593,30 +898,64 @@
 
 .vcs-appearance-target:hover,
 .vcs-appearance-target.active {
-  color: #fa7c1b !important;
+  color: #ffffff !important;
 }
 
 .vcs-appearance-none {
-  background: #242424 !important;
-  border: 1px solid #444 !important;
-  color: #aaa !important;
-  border-radius: 3px !important;
-  width: 24px !important;
+  width: 22px !important;
   height: 22px !important;
-  font-size: 12px !important;
-  line-height: 1 !important;
-  cursor: pointer !important;
+  min-width: 22px !important;
   padding: 0 !important;
+  border-radius: 3px !important;
+  border: 1px solid #111 !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  background-image: linear-gradient(
+    to top right,
+    #ffffff calc(50% - 1.2px),
+    #e62e2e calc(50% - 1.2px),
+    #e62e2e calc(50% + 1.2px),
+    #ffffff calc(50% + 1.2px)
+  ) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 
 .vcs-appearance-none:hover {
-  border-color: #fa7c1b !important;
-  color: #fff !important;
+  outline: 1px solid #fff;
+  outline-offset: 1px;
 }
 
-/* Toolbar fill/stroke swap: nudge higher + to the right (was cramped on stroke) */
-.tools-left-swatches .swatch-swap-btn,
-#swatch_swap_btn.swatch-swap-btn {
-  top: -6px !important;
-  right: -6px !important;
+.vcs-appearance-weight {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.vcs-appearance-weight-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: #888 !important;
+  text-transform: uppercase !important;
+}
+
+.vcs-appearance-weight input {
+  width: 52px !important;
+  background: #242424 !important;
+  border: 1px solid #444 !important;
+  color: #eee !important;
+  border-radius: 2px !important;
+  padding: 2px 4px !important;
+  font-size: 11px !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  box-sizing: border-box !important;
+}
+
+.vcs-appearance-weight input:focus {
+  outline: none !important;
+  border-color: #fa7c1b !important;
 }
