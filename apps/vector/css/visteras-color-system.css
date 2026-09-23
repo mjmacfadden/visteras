@@ -10,27 +10,65 @@
   user-select: none !important;
 }
 
-.vcs-block .vcs-block-header,
-.vcs-block .sidebar_block_header {
+/* Studio-parity panel tabs on Properties (Properties | Color | Swatches) */
+.vcs-tabbed-props .vcs-panel-tabs-header,
+#properties_panel.vcs-tabbed-props > .vcs-panel-tabs-header {
   font-size: 11px !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
   color: #cccccc !important;
-  background-color: #333333 !important;
-  padding: 5px 8px !important;
-  border-bottom: 1px solid #222222 !important;
+  background-color: #242424 !important;
+  padding: 0 8px 0 0 !important;
+  border-bottom: 1px solid #1a1a1a !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
+  cursor: default !important;
+  height: 26px !important;
+  box-sizing: border-box !important;
+}
+
+.vcs-panel-tabs {
+  display: flex !important;
+  align-items: stretch !important;
+  height: 100% !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.vcs-panel-tab-btn,
+#properties_panel .vcs-panel-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #1c1c1c !important;
+  border-bottom: 2px solid transparent !important;
+  color: #8c8c8c !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 0 10px !important;
   cursor: pointer !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: background 0.15s, color 0.15s, border-color 0.15s !important;
+  border-radius: 0 !important;
 }
 
-.vcs-block .vcs-block-header:hover {
-  background-color: #3a3a3a !important;
+.vcs-panel-tab-btn:hover {
+  color: #e0e0e0 !important;
+  background-color: #2b2b2b !important;
 }
 
-.vcs-block .sidebar_block_arrow {
+.vcs-panel-tab-btn.active {
+  color: #ffffff !important;
+  background-color: #2d2d2d !important;
+  border-bottom-color: #fa7c1b !important; /* Vector orange (Studio uses blue) */
+}
+
+#properties_panel.vcs-tabbed-props .sidebar_block_arrow {
   display: inline-block !important;
   width: 0 !important;
   height: 0 !important;
@@ -40,21 +78,33 @@
   font-size: 0 !important;
   line-height: 0 !important;
   margin-right: 2px !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
 }
 
-.vcs-block.collapsed .sidebar_block_arrow {
+#properties_panel.vcs-tabbed-props.collapsed .sidebar_block_arrow {
   border-width: 5px 4px 0 4px !important;
   border-color: #999999 transparent transparent transparent !important;
 }
 
-.vcs-block.collapsed .vcs-block-content {
+#properties_panel.vcs-tabbed-props.collapsed #properties_content,
+#properties_panel.vcs-tabbed-props.collapsed #vcs_color_panel,
+#properties_panel.vcs-tabbed-props.collapsed #vcs_swatches_panel {
   display: none !important;
 }
 
-.vcs-block-content {
+.panel_tab_pane.hidden,
+.vcs-tab-pane.hidden {
+  display: none !important;
+}
+
+.vcs-block-content,
+#vcs_color_panel,
+#vcs_swatches_panel {
   padding: 8px !important;
   font-size: 11px !important;
   color: var(--studio-text, #cccccc) !important;
+  box-sizing: border-box !important;
 }
 
 /* Fill / Stroke target */
@@ -455,4 +505,118 @@
 /* Stronger active ring on toolbar when color system owns targeting */
 .tools-left-swatches .swatch-box.active {
   box-shadow: 0 0 0 1.5px #fa7c1b, 0 0 0 2.5px rgba(250, 124, 27, 0.35), 0 2px 6px rgba(0, 0, 0, 0.8) !important;
+}
+
+
+/* ==========================================================================
+   Appearance fill / stroke wells (Properties → Appearance)
+   ========================================================================== */
+
+.vcs-appearance-colors {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 8px !important;
+  width: 100% !important;
+}
+
+.vcs-appearance-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+  background: #2a2a2a !important;
+}
+
+.vcs-appearance-row.active {
+  border-color: rgba(250, 124, 27, 0.55) !important;
+  background: rgba(250, 124, 27, 0.1) !important;
+}
+
+.vcs-appearance-chip {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 3px !important;
+  border: 1px solid #111 !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.4) !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  background: #ccc !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.vcs-appearance-chip-stroke {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #000 !important;
+}
+
+.vcs-appearance-stroke-hole {
+  width: 10px !important;
+  height: 10px !important;
+  border-radius: 1px !important;
+  background: #2a2a2a !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  pointer-events: none !important;
+}
+
+.vcs-appearance-chip.is-none {
+  background: linear-gradient(to top right,
+    #ffffff calc(50% - 1.2px),
+    #e62e2e calc(50% - 1.2px),
+    #e62e2e calc(50% + 1.2px),
+    #ffffff calc(50% + 1.2px)) !important;
+}
+
+.vcs-appearance-chip-stroke.is-none .vcs-appearance-stroke-hole {
+  display: none !important;
+}
+
+.vcs-appearance-target {
+  flex: 1 !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: none !important;
+  color: #ccc !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  cursor: pointer !important;
+  padding: 2px 0 !important;
+}
+
+.vcs-appearance-target:hover,
+.vcs-appearance-target.active {
+  color: #fa7c1b !important;
+}
+
+.vcs-appearance-none {
+  background: #242424 !important;
+  border: 1px solid #444 !important;
+  color: #aaa !important;
+  border-radius: 3px !important;
+  width: 24px !important;
+  height: 22px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+}
+
+.vcs-appearance-none:hover {
+  border-color: #fa7c1b !important;
+  color: #fff !important;
+}
+
+/* Toolbar fill/stroke swap: nudge higher + to the right (was cramped on stroke) */
+.tools-left-swatches .swatch-swap-btn,
+#swatch_swap_btn.swatch-swap-btn {
+  top: -6px !important;
+  right: -6px !important;
 }

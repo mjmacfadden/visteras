@@ -979,6 +979,20 @@
                 <span class="prop_section_title">Appearance</span>
               </div>
               <div class="prop_section_body" id="sec_appearance_body">
+                <div class="prop_row vcs-appearance-colors" id="prop_appearance_colors">
+                  <div class="vcs-appearance-row" data-target="fill">
+                    <button type="button" class="vcs-appearance-chip" id="vcs_app_fill_chip" title="Fill color (click to edit)" aria-label="Fill color"></button>
+                    <button type="button" class="vcs-appearance-target" id="vcs_app_fill_target" data-target="fill" title="Edit fill">Fill</button>
+                    <button type="button" class="vcs-appearance-none" id="vcs_app_fill_none" title="No fill (/)" aria-label="No fill">⌀</button>
+                  </div>
+                  <div class="vcs-appearance-row" data-target="stroke">
+                    <button type="button" class="vcs-appearance-chip vcs-appearance-chip-stroke" id="vcs_app_stroke_chip" title="Stroke color (click to edit)" aria-label="Stroke color">
+                      <span class="vcs-appearance-stroke-hole" id="vcs_app_stroke_hole"></span>
+                    </button>
+                    <button type="button" class="vcs-appearance-target" id="vcs_app_stroke_target" data-target="stroke" title="Edit stroke">Stroke</button>
+                    <button type="button" class="vcs-appearance-none" id="vcs_app_stroke_none" title="No stroke (/)" aria-label="No stroke">⌀</button>
+                  </div>
+                </div>
                 <div class="prop_row">
                   <div id="slot_opacity" style="flex:1;"></div>
                   <div id="slot_blur" style="flex:1;"></div>
@@ -1101,7 +1115,6 @@
                 <span class="prop_section_title">Path & Nodes</span>
               </div>
               <div class="prop_section_body" id="sec_path_node_body">
-                <div class="prop_field_pair" id="slot_node_xy"></div>
                 <div class="prop_row">
                   <div class="prop_label" style="min-width:70px;">Convert:</div>
                   <div class="prop_actions_flow" style="gap:4px;">
@@ -1361,8 +1374,13 @@
       moveEl('tool_word_spacing', 'slot_word_spacing');
 
       // Relocate Path controls
-      moveEl('path_node_x', 'slot_node_xy');
-      moveEl('path_node_y', 'slot_node_xy');
+      // path_node_x / path_node_y removed from Properties (Mike smoke): SVG-Edit
+      // attrChanger wiring exists but the relocated X/Y spins were not a compelling,
+      // reliable node-edit UX — hide legacy inputs; keep Convert + node actions.
+      for (const id of ['path_node_x', 'path_node_y']) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      }
       // The legacy curve/straight control is intentionally left in SVGEdit's
       // hidden path toolbar. Direct Selection uses the explicit Convert
       // corner/smooth controls above instead.
@@ -1739,7 +1757,7 @@
     // Document shell: tabs, New Document modal, fit artboard, status bar, rulers/units
     mountVisterasDocumentShell({ svgEditor });
 
-    // Color system: Color + Swatches panels, picker modal, toolbar fill/stroke
+    // Color system: Color|Swatches tabs, picker modal, toolbar + Appearance fill/stroke
     mountVisterasColorSystem({ svgEditor });
   </script>
 </body>
