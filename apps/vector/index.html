@@ -19,9 +19,10 @@
   <link href="./svgedit.css" rel="stylesheet" media="all">
 
   <!-- Visteras Studio Companion Theme -->
-  <link href="./css/visteras-theme.css?v=smoke-69-3" rel="stylesheet" media="all">
-  <link href="./css/visteras-document-shell.css" rel="stylesheet" media="all">
+  <link href="./css/visteras-theme.css?v=hygiene-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-document-shell.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-color-system.css?v=smoke-69-3" rel="stylesheet" media="all">
+  <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -68,7 +69,7 @@
             <div class="menu_dropdown_item" id="action_cut">Cut <span class="menu_dropdown_shortcut">⌘X</span></div>
             <div class="menu_dropdown_item" id="action_copy">Copy <span class="menu_dropdown_shortcut">⌘C</span></div>
             <div class="menu_dropdown_item" id="action_paste">Paste <span class="menu_dropdown_shortcut">⌘V</span></div>
-            <div class="menu_dropdown_item" id="action_paste_in_place">Paste in Place <span class="menu_dropdown_shortcut">⌘⇧V</span></div>
+            <div class="menu_dropdown_item" id="action_paste_in_place">Paste in Place <span class="menu_dropdown_shortcut">⌘F / ⌘⇧V</span></div>
             <div class="menu_dropdown_item" id="action_clone">Duplicate <span class="menu_dropdown_shortcut">⌘D</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_select_all">Select All <span class="menu_dropdown_shortcut">⌘A</span></div>
@@ -90,7 +91,7 @@
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
-            <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">⌘Y</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
             <div class="menu_dropdown_separator"></div>
@@ -140,7 +141,7 @@
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_prefs">Preferences...</div>
             <div class="menu_dropdown_separator"></div>
-            <a href="../" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Studio...</a>
+            <a href="../studio/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Studio...</a>
           </div>
         </div>
 
@@ -844,9 +845,12 @@
           }
 
           // Command/Ctrl + Shift + V or Command/Ctrl + F: Paste in Place
-          if ((e.shiftKey && (e.key === 'v' || e.key === 'V')) || (!e.shiftKey && (e.key === 'f' || e.key === 'F'))) {
+          // (⌘F must win over browser Find and must not toggle wireframe — bare F is Outline Mode.)
+          if ((e.shiftKey && (e.key === 'v' || e.key === 'V' || e.code === 'KeyV')) ||
+              (!e.shiftKey && (e.key === 'f' || e.key === 'F' || e.code === 'KeyF'))) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             sc.pasteElements?.('in_place');
             return;
           }
@@ -895,10 +899,11 @@
             return;
           }
 
-          // Command/Ctrl + Y: Toggle Wireframe / Outline Mode
-          if (!e.shiftKey && (e.key === 'y' || e.key === 'Y')) {
+          // Command/Ctrl + Y: Toggle Wireframe / Outline Mode (also bare F; see below)
+          if (!e.shiftKey && (e.key === 'y' || e.key === 'Y' || e.code === 'KeyY')) {
             e.preventDefault();
             e.stopPropagation();
+            e.stopImmediatePropagation();
             document.getElementById('tool_wireframe')?.click();
             return;
           }
@@ -910,6 +915,17 @@
             document.getElementById('view_grid')?.click();
             return;
           }
+        }
+
+        // Bare F (no modifiers): Outline / Wireframe Mode.
+        // SVG-Edit's tool_wireframe shortcut="F" is cleared on init so it cannot
+        // race ⌘/Ctrl+F paste-in-place (or browser Find).
+        if (!isCmdOrCtrl && !e.altKey && !e.shiftKey && (e.key === 'f' || e.key === 'F' || e.code === 'KeyF')) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          document.getElementById('tool_wireframe')?.click();
+          return;
         }
       }, { capture: true });
     }
@@ -1440,23 +1456,11 @@
       moveEl('tool_letter_spacing', 'slot_letter_spacing');
       moveEl('tool_word_spacing', 'slot_word_spacing');
 
-      // Relocate Path controls
-      // path_node_x / path_node_y removed from Properties (Mike smoke): SVG-Edit
-      // attrChanger wiring exists but the relocated X/Y spins were not a compelling,
-      // reliable node-edit UX — hide legacy inputs; keep Convert + node actions.
-      for (const id of ['path_node_x', 'path_node_y']) {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-      }
-      // The legacy curve/straight control is intentionally left in SVGEdit's
-      // hidden path toolbar. Direct Selection uses the explicit Convert
-      // corner/smooth controls above instead.
-      const legacySegmentType = document.getElementById('seg_type');
-      if (legacySegmentType) legacySegmentType.style.display = 'none';
-      const legacyNodeLink = document.getElementById('tool_node_link');
-      if (legacyNodeLink) legacyNodeLink.style.display = 'none';
-      moveEl('tool_node_clone', 'slot_node_btns');
-      moveEl('tool_node_delete', 'slot_node_btns');
+      // Relocate Path controls (hygiene): dead SVG-Edit node clone/delete/link/
+      // seg_type / path_node X/Y stay in #tools_top and are CSS-hidden in
+      // visteras-svgedit-hygiene.css — do not surface them in Properties.
+      // Direct Selection Convert buttons own corner/smooth. Keep open/close +
+      // add-subpath as the remaining useful path actions.
       moveEl('tool_openclose_path', 'slot_node_btns');
       moveEl('tool_add_subpath', 'slot_node_btns');
 
@@ -1668,12 +1672,19 @@
           elImgH.value = Math.round(valH * 10) / 10;
         }
 
-        // Transform Position & Dimension visibility: always visible for selected objects
+        // Transform Position: X/Y stay visible for any selection.
         const xyGroup = document.getElementById('prop_xy_group');
         if (xyGroup) xyGroup.style.display = 'block';
 
+        // Rect W/H: only when a rect is selected or a rect-family tool is active
+        // (was always-on leftover from SVG-Edit rect_panel relocation).
         const rectGroup = document.getElementById('prop_rect_group');
-        if (rectGroup) rectGroup.style.display = 'block';
+        if (rectGroup) {
+          const mode = sc.getMode?.() || '';
+          const rectToolActive = ['rect', 'square', 'fhrect'].includes(mode);
+          const showRectWH = tagName === 'rect' || (rectToolActive && (!tagName || tagName === 'rect'));
+          rectGroup.style.display = showRectWH ? 'block' : 'none';
+        }
 
         const circleXY = document.getElementById('prop_circle_xy_group');
         if (circleXY) circleXY.style.display = (tagName === 'circle') ? 'block' : 'none';
@@ -1800,8 +1811,15 @@
     setupPropertiesPanel();
     mountPenTools(svgEditor);
     mountScissorsTool(svgEditor);
-    document.getElementById('tool_node_clone')?.style.setProperty('display', 'none');
-    document.getElementById('tool_node_delete')?.style.setProperty('display', 'none');
+    // Disarm SVG-Edit wireframe shortcut="F" so ⌘/Ctrl+F is paste-in-place only.
+    // Bare F is handled in setupMenuBar's capture keydown (Outline Mode).
+    const wireBtn = document.getElementById('tool_wireframe');
+    if (wireBtn) {
+      wireBtn.removeAttribute('shortcut');
+      const title = wireBtn.getAttribute('title') || 'tools.wireframe_mode';
+      // Refresh tooltip without the [F] suffix from se-button's attribute hook.
+      wireBtn.setAttribute('title', title);
+    }
     // Use delegation because SVGEdit may rebuild contextual controls while
     // changing modes. The Convert buttons must remain connected to the
     // current direct-selection controller after those rebuilds.

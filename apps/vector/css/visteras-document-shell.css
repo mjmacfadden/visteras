@@ -168,9 +168,9 @@
   border-radius: 2px !important;
 }
 
-#tools_bottom > *:not(#vector_status_bar):not(#zoom) { opacity: 0.55; }
+/* Bottom leftover color chrome is fully hidden in visteras-svgedit-hygiene.css
+   (DOM kept for paint bridge). Zoom sizing stays here. */
 #tools_bottom #zoom { margin-left: 8px; flex-shrink: 0; }
-#tools_bottom #palette { display: none !important; }
 
 /* New Document modal */
 #vector_new_doc_overlay {
