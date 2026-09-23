@@ -2,7 +2,8 @@
  * Visteras Vector — document shell
  *
  * Multi-document tabs, New Document modal, fit-to-workspace default artboard
- * (~32px padding), status bar (zoom / size / units), rulers toggle, unit switching.
+ * (~32px padding), status bar (zoom / size / units), rulers toggle (⌘/Ctrl+R),
+ * ruler right-click unit menu (Studio parity), unit switching.
  *
  * In-memory documents only (v1). Does not import Studio modules.
  */
@@ -778,6 +779,88 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     createDocument({ title: name, width: widthPx, height: heightPx, unit });
   }
 
+
+  // ----- ruler right-click unit menu (Studio parity) -----
+  function dismissRulerContextMenu() {
+    document.getElementById('vector_ruler_context_menu')?.remove();
+  }
+
+  function showRulerContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dismissRulerContextMenu();
+
+    const current = getBaseUnit();
+    const menu = document.createElement('div');
+    menu.id = 'vector_ruler_context_menu';
+    menu.className = 'vector-ruler-context-menu';
+    menu.setAttribute('role', 'menu');
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+
+    for (const unit of UNITS) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'vector-ruler-context-item';
+      row.setAttribute('role', 'menuitemradio');
+      row.setAttribute('aria-checked', unit.id === current ? 'true' : 'false');
+      row.dataset.unit = unit.id;
+      const check = unit.id === current ? '✓' : '';
+      row.innerHTML = `<span class="vector-ruler-context-check">${check}</span><span>${escapeHtml(unit.label)}</span>`;
+      row.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setBaseUnit(unit.id);
+        const doc = getActiveDoc();
+        if (doc) doc.unit = unit.id;
+        updateStatusBar();
+        dismissRulerContextMenu();
+      });
+      menu.appendChild(row);
+    }
+
+    document.body.appendChild(menu);
+
+    // Keep on-screen
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) {
+      menu.style.left = `${Math.max(8, window.innerWidth - rect.width - 8)}px`;
+    }
+    if (rect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${Math.max(8, window.innerHeight - rect.height - 8)}px`;
+    }
+
+    const onClose = (ev) => {
+      if (ev.type === 'keydown' && ev.key !== 'Escape') return;
+      if (ev.type === 'mousedown' && menu.contains(ev.target)) return;
+      dismissRulerContextMenu();
+      window.removeEventListener('mousedown', onClose, true);
+      window.removeEventListener('keydown', onClose, true);
+      window.removeEventListener('blur', onClose);
+      window.removeEventListener('resize', onClose);
+    };
+    window.addEventListener('mousedown', onClose, true);
+    window.addEventListener('keydown', onClose, true);
+    window.addEventListener('blur', onClose);
+    window.addEventListener('resize', onClose);
+  }
+
+  function bindRulerContextMenu() {
+    const bind = (el) => {
+      if (!el || el.dataset.vcsRulerMenu === '1') return;
+      el.dataset.vcsRulerMenu = '1';
+      el.addEventListener('contextmenu', showRulerContextMenu);
+    };
+    const tryBind = () => {
+      bind(document.getElementById('ruler_x'));
+      bind(document.getElementById('ruler_y'));
+      bind(document.getElementById('ruler_corner'));
+    };
+    tryBind();
+    setTimeout(tryBind, 100);
+    setTimeout(tryBind, 500);
+  }
+
   // ----- events -----
   function bindCanvasDirty() {
     ['changed', 'elementChanged', 'selectedChanged', 'pointsAdded', 'ext_added'].forEach((name) => {
@@ -795,6 +878,26 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   function bindKeyboard() {
     window.addEventListener('keydown', (e) => {
       const target = e.target;
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      const isKeyR = !e.shiftKey && !e.altKey && isCmdOrCtrl
+        && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR');
+
+      // Always claim Cmd/Ctrl+R (mac meta + win/linux ctrl) so the browser
+      // does not reload — even when focus is on SELECT/buttons. Skip only
+      // while typing in a text field / contenteditable.
+      if (isKeyR) {
+        const typing = window.__visterasIsTypingDirectly
+          || target?.isContentEditable
+          || (target && ['INPUT', 'TEXTAREA'].includes(target.nodeName));
+        if (!typing) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          toggleRulers();
+          return;
+        }
+      }
+
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.nodeName)) {
         if (state.modal.open && e.key === 'Escape') {
           e.preventDefault();
@@ -811,7 +914,6 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         return;
       }
 
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       if (!isCmdOrCtrl || e.altKey) return;
 
       if (!e.shiftKey && (e.key === 'n' || e.key === 'N' || e.code === 'KeyN')) {
@@ -825,11 +927,6 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         e.stopPropagation();
         if (state.activeId) closeDocument(state.activeId);
         return;
-      }
-      if (!e.shiftKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
-        e.preventDefault();
-        e.stopPropagation();
-        toggleRulers();
       }
     }, true);
   }
@@ -918,6 +1015,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
 
     bindCanvasDirty();
     bindKeyboard();
+    bindRulerContextMenu();
     bindMenuActions();
     bindResize();
     bindZoomWatch();
@@ -939,6 +1037,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     getActiveDoc,
     isActiveUntouchedDefault,
     updateStatusBar,
+    showRulerContextMenu,
   };
   window.__visterasDocumentShell = api;
   return api;

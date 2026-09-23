@@ -88,7 +88,7 @@
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
             <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">⌘Y</span></div>
             <div class="menu_dropdown_separator"></div>
@@ -649,7 +649,10 @@
       });
 
       document.getElementById('action_toggle_rulers')?.addEventListener('click', () => {
-        document.getElementById('view_rulers')?.click();
+        // SVG-Edit has no #view_rulers control — document shell owns ruler toggle.
+        if (window.__visterasDocumentShell?.toggleRulers) {
+          window.__visterasDocumentShell.toggleRulers();
+        }
       });
 
       document.getElementById('action_source')?.addEventListener('click', () => {
@@ -856,11 +859,15 @@
             return;
           }
 
-          // Command/Ctrl + R: Toggle Rulers
-          if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+          // Command/Ctrl + R: Toggle Rulers (metaKey mac + ctrlKey win/linux).
+          // #view_rulers does not exist in this SVG-Edit build — route through shell.
+          if (!e.shiftKey && (e.key === 'r' || e.key === 'R' || e.code === 'KeyR')) {
             e.preventDefault();
             e.stopPropagation();
-            document.getElementById('view_rulers')?.click();
+            e.stopImmediatePropagation();
+            if (window.__visterasDocumentShell?.toggleRulers) {
+              window.__visterasDocumentShell.toggleRulers();
+            }
             return;
           }
 
