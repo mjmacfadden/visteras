@@ -499,10 +499,17 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .pen:after{ background-image: url('../images/icons/pen.svg'); }
 .sidebar_left .direct_select:after{ background-image: url('../images/icons/direct_select.svg'); }
 .sidebar_left .text:after{ background-image: url('../images/icons/text.svg'); background-size: 13px auto; }
-.sidebar_left .gradient:after{ background-image: url('../images/icons/gradient.png'); background-size: 14px 9px; filter: none; }
-/* Keep multicolor gradient ramp readable when selected (skip blue SVG tint wash) */
-.sidebar_left .item.active.gradient:after,
+.sidebar_left .gradient:after{
+	/* PS-like bordered spectrum ramp; idle is non-blue (no always-on #2f6fae) */
+	background-image: url('../images/icons/gradient.svg');
+	background-size: 14px 9px;
+	filter: none;
+}
+/* Selected: blue border chrome via active asset; keep filter:none so ramp stays readable */
+.sidebar_left .item.active.gradient:not(.marquee_fill):after,
 .sidebar_left .item.active.gradient.marquee_gradient:after{
+	background-image: url('../images/icons/gradient-active.svg');
+	background-size: 14px 9px;
 	filter: none;
 }
 .sidebar_left .clone:after{ background-image: url('../images/icons/clone.svg'); }
@@ -542,7 +549,7 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 	filter: brightness(0) saturate(100%) invert(39%) sepia(47%) saturate(1012%) hue-rotate(174deg) brightness(92%) contrast(88%);
 }
 .sidebar_left .item.gradient.marquee_gradient:after{
-	background-image: url('../images/icons/gradient.png');
+	background-image: url('../images/icons/gradient.svg');
 	background-size: 14px 9px;
 }
 .sidebar_left .item.rectangle.marquee_rectangle:after{ background-image: url('../images/icons/rectangle.svg'); }
@@ -609,9 +616,12 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.custom_shape{ background-image: url('../images/icons/custom_shape.svg'); }
 .tg_icon.fill{ background-image: url('../images/icons/fill.svg'); }
 .tg_icon.gradient{
-	background-image: url('../images/icons/gradient.png');
+	background-image: url('../images/icons/gradient.svg');
 	background-size: 14px 9px;
 	filter: none;
+}
+.tool_group_item.active .tg_icon.gradient{
+	background-image: url('../images/icons/gradient-active.svg');
 }
 
 @media screen and (max-width:550px){
