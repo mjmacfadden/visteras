@@ -64,7 +64,10 @@
 		animation-duration: 1ms !important;
 	}
 }
-#popups .popup.wide{
+/* Specificity must match/beat the default popup rule which uses two :not()
+   selectors (#popups .popup:not(...):not(...) → 1,3,0). Without :not() here,
+   .wide / .layer_style_dialog lose and max-width stays 500px. */
+#popups .popup.wide:not(.new_doc_popup):not(.raw_develop_popup) {
 	max-width: 840px;
 }
 #popups .popup a{
@@ -316,7 +319,7 @@
    Layer Style Dialog
    ========================================================================== */
 
-#popups .popup.layer_style_dialog {
+#popups .popup.layer_style_dialog:not(.new_doc_popup):not(.raw_develop_popup) {
 	max-width: 860px;
 }
 .layer_style_container {
