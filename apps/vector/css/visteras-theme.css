@@ -298,8 +298,10 @@ html, body {
   display: none !important;
 }
 
+/* #title_panel is hidden by visteras-svgedit-hygiene.css (document tabs own titles).
+   Styles kept for any temporary pre-hygiene flash / updateTitle DOM writes. */
 #title_panel {
-  display: flex !important;
+  display: flex;
   align-items: center !important;
   height: 24px !important;
   padding: 0 10px !important;

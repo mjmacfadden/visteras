@@ -1,0 +1,82 @@
+/**
+ * SVG-Edit leftover hygiene (Sep 2026 leftover audit).
+ * Surgical hide/cull only — keep paint/fill-stroke bridge DOM intact.
+ */
+
+/* --------------------------------------------------------------------------
+ * 1. Bottom bar: hide legacy fill/stroke chrome. Keep #tools_bottom, #zoom,
+ *    and #vector_status_bar. #fill_color / #stroke_color / #stroke_width stay
+ *    in the DOM for the Studio↔Vector paint bridge + color-system listeners.
+ * -------------------------------------------------------------------------- */
+#tools_bottom #fill_color,
+#tools_bottom #stroke_color,
+#tools_bottom #stroke_width,
+#tools_bottom #stroke_style,
+#tools_bottom #stroke_linejoin,
+#tools_bottom #stroke_linecap,
+#tools_bottom #opacity,
+#tools_bottom #palette {
+  display: none !important;
+}
+
+/* Status + zoom are the only intentional bottom chrome now. */
+#tools_bottom > *:not(#vector_status_bar):not(#zoom) {
+  /* Replaces the old 0.55 dimming of leftover color widgets. */
+  pointer-events: none;
+}
+
+#tools_bottom #zoom {
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * 2. Document tabs (#67) own the doc title — hide SVG-Edit #title_panel.
+ *    Do not remove from DOM (TopPanel.updateTitle still writes it).
+ * -------------------------------------------------------------------------- */
+#title_panel {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * 3. Marker / star / polygon context leftovers in the options bar.
+ *    Left-toolbar star/polygon tools remain; Properties integration deferred.
+ *    Unsafe to delete extension DOM (ext-markers / ext-polystar still wire it).
+ * -------------------------------------------------------------------------- */
+#tools_top #star_panel,
+#tools_top #polygon_panel,
+#tools_top #marker_panel {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * 4. Dead Path & Nodes controls (replaced by Direct Selection Convert + menu).
+ *    Keep elements for SVG-Edit click wiring; never surface in Properties.
+ * -------------------------------------------------------------------------- */
+#tool_node_clone,
+#tool_node_delete,
+#tool_node_link,
+#seg_type,
+#path_node_x,
+#path_node_y {
+  display: none !important;
+}
+
+/* --------------------------------------------------------------------------
+ * 5. Orphan options-bar tools that stay permanently unused under the Visteras
+ *    shell (menus / Properties own these flows). Leave in DOM — Editor.js
+ *    still binds handlers by id.
+ * -------------------------------------------------------------------------- */
+#tools_top #tool_make_link,
+#tools_top #tool_make_link_multi,
+#tools_top #tool_clone_multi,
+#tools_top #tool_delete_multi,
+#tools_top #tool_unlink_use,
+#tools_top #tool_position,
+#tools_top #g_title,
+#tools_top #link_url,
+#tools_top #linkLabel,
+#tools_top #image_url,
+#tools_top #text {
+  display: none !important;
+}
