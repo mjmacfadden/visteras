@@ -218,8 +218,8 @@ class Layer_styles_class {
 			fields = `
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
-					<input type="range" class="ls_range" id="ls_stroke_size" min="1" max="100" value="${size}" data-default="3" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_stroke_size" min="1" max="100" value="${size}" data-default="3" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_stroke_size" min="1" max="100" value="${size}" step="1" data-default="3" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_stroke_size" min="1" max="100" value="${size}" step="any" data-default="3" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
@@ -232,8 +232,8 @@ class Layer_styles_class {
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_stroke_opacity" min="0" max="100" value="${opacity}" data-default="100" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_stroke_opacity" min="0" max="100" value="${opacity}" data-default="100" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_stroke_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_stroke_opacity" min="0" max="100" value="${opacity}" step="any" data-default="100" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -275,8 +275,8 @@ class Layer_styles_class {
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_color_overlay_opacity" min="0" max="100" value="${opacity}" data-default="100" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_color_overlay_opacity" min="0" max="100" value="${opacity}" data-default="100" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_color_overlay_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_color_overlay_opacity" min="0" max="100" value="${opacity}" step="any" data-default="100" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -290,14 +290,14 @@ class Layer_styles_class {
 			fields = `
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
-					<input type="range" class="ls_range" id="ls_inner_glow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_inner_glow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_inner_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_inner_glow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_inner_glow_opacity" min="0" max="100" value="${opacity}" data-default="75" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_inner_glow_opacity" min="0" max="100" value="${opacity}" data-default="75" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_inner_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_inner_glow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="75" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -311,14 +311,14 @@ class Layer_styles_class {
 			fields = `
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
-					<input type="range" class="ls_range" id="ls_outer_glow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_outer_glow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_outer_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_outer_glow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_outer_glow_opacity" min="0" max="100" value="${opacity}" data-default="75" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_outer_glow_opacity" min="0" max="100" value="${opacity}" data-default="75" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_outer_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_outer_glow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="75" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -337,26 +337,26 @@ class Layer_styles_class {
 			fields = `
 				<div class="ls_row">
 					<span class="ls_label">Angle:</span>
-					<input type="range" class="ls_range" id="ls_shadow_angle" min="0" max="360" value="${angle}" data-default="135" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_angle" min="0" max="360" value="${angle}" data-default="135" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_angle" min="0" max="360" value="${angle}" step="1" data-default="135" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_angle" min="0" max="360" value="${angle}" step="any" data-default="135" title="Double-click to reset" />
 					<span class="ls_unit">°</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Distance:</span>
-					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" data-default="7" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" data-default="7" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="7" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" step="any" data-default="7" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Radius:</span>
-					<input type="range" class="ls_range" id="ls_shadow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" data-default="10" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_shadow_opacity" min="0" max="100" value="${opacity}" data-default="25" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" data-default="25" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="25" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="25" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -430,10 +430,67 @@ class Layer_styles_class {
 			this.apply_live_canvas();
 		};
 
+		// Drag sensitivity: native <input type="range"> maps pointer X across the
+		// track width (often jumpy on short tracks). Relative drag with scale > 1
+		// means more pixels of movement per unit — finer control. Number fields
+		// stay free (step="any"); they are not snapped to the range step.
+		const LS_RANGE_DRAG_SCALE = 2.75;
+		const applyRangeValue = (range, numInput, raw) => {
+			const min = parseFloat(range.min ?? 0);
+			const max = parseFloat(range.max ?? 100);
+			const stepAttr = range.step;
+			const step = (stepAttr && stepAttr !== 'any') ? parseFloat(stepAttr) : 1;
+			let val = Math.max(min, Math.min(max, raw));
+			if (step > 0 && !isNaN(step)) {
+				val = Math.round(val / step) * step;
+				// Avoid float noise (e.g. 10.0000002)
+				const decimals = (String(step).split('.')[1] || '').length;
+				val = parseFloat(val.toFixed(Math.max(decimals, 0)));
+			}
+			if (String(range.value) === String(val)) return;
+			range.value = val;
+			if (numInput) numInput.value = val;
+			this.read_current_controls();
+			this.apply_live_canvas();
+		};
+
 		ranges.forEach(range => {
 			const key = range.id.replace('ls_', '');
 			const numInput = controls.querySelector('#ls_num_' + key);
+			let dragging = false;
+			let startX = 0;
+			let startVal = 0;
+
+			range.addEventListener('pointerdown', (e) => {
+				if (e.button != null && e.button !== 0) return;
+				dragging = true;
+				startX = e.clientX;
+				startVal = parseFloat(range.value) || 0;
+				try { range.setPointerCapture(e.pointerId); } catch (_) {}
+				// Prevent native absolute scrub (too sensitive on short tracks).
+				e.preventDefault();
+			});
+			range.addEventListener('pointermove', (e) => {
+				if (!dragging) return;
+				const min = parseFloat(range.min ?? 0);
+				const max = parseFloat(range.max ?? 100);
+				const span = Math.max(max - min, 1);
+				const trackW = Math.max(range.getBoundingClientRect().width || 160, 1);
+				const pxPerUnit = (trackW * LS_RANGE_DRAG_SCALE) / span;
+				const raw = startVal + (e.clientX - startX) / pxPerUnit;
+				applyRangeValue(range, numInput, raw);
+			});
+			const endDrag = (e) => {
+				if (!dragging) return;
+				dragging = false;
+				try { range.releasePointerCapture(e.pointerId); } catch (_) {}
+			};
+			range.addEventListener('pointerup', endDrag);
+			range.addEventListener('pointercancel', endDrag);
+
+			// Keyboard / a11y still fire input/change on the range.
 			range.addEventListener('input', () => {
+				if (dragging) return; // pointer path already applied
 				if (numInput) numInput.value = range.value;
 				this.read_current_controls();
 				this.apply_live_canvas();
@@ -456,11 +513,13 @@ class Layer_styles_class {
 			const syncFromNumber = () => {
 				let val = parseFloat(num.value);
 				if (isNaN(val)) return;
+				// Typed values are free (step="any") — do not snap to the range step.
+				// Only clamp the paired range thumb so it stays within its track.
 				if (rangeInput) {
 					const min = parseFloat(rangeInput.min ?? 0);
 					const max = parseFloat(rangeInput.max ?? 100);
-					val = Math.max(min, Math.min(max, val));
-					rangeInput.value = val;
+					const clamped = Math.max(min, Math.min(max, val));
+					rangeInput.value = clamped;
 				}
 				this.read_current_controls();
 				this.apply_live_canvas();

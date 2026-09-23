@@ -6205,7 +6205,7 @@ body.canvas-only-mode .canvas_wrapper canvas {
    ========================================================================== */
 
 #popups .popup.layer_style_dialog {
-	max-width: 720px;
+	max-width: 860px;
 }
 .layer_style_container {
 	display: flex;
@@ -6284,14 +6284,17 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	gap: 10px;
 }
 .ls_label {
-	width: 75px;
+	width: 70px;
 	flex-shrink: 0;
 	font-size: 12px;
 	color: #bbbbbb;
 }
 .ls_row input[type="range"] {
-	flex-grow: 1;
+	flex: 1 1 280px;
 	margin: 0;
+	min-width: 280px;
+	/* Longer track = fewer units per pixel. Sensitivity is further
+	   reduced in styles.js via relative drag (see LS_RANGE_DRAG_SCALE). */
 }
 .ls_row input[type="number"].ls_num {
 	width: 52px !important;
@@ -6362,6 +6365,14 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	to { transform: rotate(360deg); }
 }
 
+
+/* Layer Style: canvas IS the preview — do not dim/grey the document behind the dialog */
+#popups:has(.layer_style_dialog) {
+	background: transparent;
+	/* Keep overlay for hit-testing so clicks outside the dialog don't fall through,
+	   but never darken the live canvas. */
+	animation: none;
+}
 
 /* Layer Style: no mini preview pane — draft lives on the main canvas */
 #popups .popup.layer_style_dialog [data-id="preview_content"]:empty,
