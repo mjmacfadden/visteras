@@ -5984,6 +5984,87 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
 }
 
+/* Match Adjustment Properties cool gradient language + PS-like luminance cues */
+.raw-develop__control input[type="range"][name="saturation"]::-webkit-slider-runnable-track,
+.raw-develop__control input[type="range"][name="vibrance"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #808080, #e11d48);
+}
+
+.raw-develop__control input[type="range"][name="saturation"]::-moz-range-track,
+.raw-develop__control input[type="range"][name="vibrance"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #808080, #e11d48);
+}
+
+.raw-develop__control input[type="range"][name="exposure"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #000000, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="exposure"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #000000, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="highlights"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #666666, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="highlights"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #666666, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="shadows"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #000000, #888888);
+}
+
+.raw-develop__control input[type="range"][name="shadows"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #000000, #888888);
+}
+
+.raw-develop__control input[type="range"][name="whites"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #888888, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="whites"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #888888, #ffffff);
+}
+
+.raw-develop__control input[type="range"][name="blacks"]::-webkit-slider-runnable-track {
+	height: 2px;
+	border-radius: 1px;
+	background: linear-gradient(to right, #000000, #666666);
+}
+
+.raw-develop__control input[type="range"][name="blacks"]::-moz-range-track {
+	height: 2px;
+	border-radius: 1px;
+	border: 0;
+	background: linear-gradient(to right, #000000, #666666);
+}
+
 
 .raw-develop__control output {
 	font-variant-numeric: tabular-nums;
