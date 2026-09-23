@@ -4,11 +4,13 @@ import Base_tools_class from './../core/base-tools.js';
 import Base_layers_class from './../core/base-layers.js';
 import Helper_class from './../libs/helpers.js';
 import Mask_class from './../modules/mask/mask.js';
+import { ensure_paint_layer } from './../libs/paint-target.js';
 
 /**
- * Gradient tool — editable gradient layers (Linear / Radial).
- * Click-drag sets angle + scale with live preview. Selection clips via mask.
- * Mask mode paints B/W or FG→transparent with live preview (no white wipe).
+ * Gradient tool — paints Linear / Radial onto the active raster layer
+ * (Photoshop Gradient-tool model), not a new containing rect layer.
+ * Click-drag sets the vector with live layer preview + on-canvas stop markers.
+ * Selection clips via constrain_edit_to_selection; mask mode uses Mask.gradient_*.
  */
 class Gradient_class extends Base_tools_class {
 
@@ -19,9 +21,13 @@ class Gradient_class extends Base_tools_class {
 		this.Mask = new Mask_class();
 		this.ctx = ctx;
 		this.name = 'gradient';
-		this.layer = {};
 		this.mouse_click = { x: null, y: null };
-		this._editing_layer_id = null;
+		this.started = false;
+		this.tmpCanvas = null;
+		this.tmpCanvasCtx = null;
+		this.baseCanvas = null;
+		this.selection_snapshot = null;
+		this._preview_line = null;
 	}
 
 	load() {
@@ -33,8 +39,13 @@ class Gradient_class extends Base_tools_class {
 		this.sync_options_from_layer(config.layer, { rebuild: true });
 	}
 
+	ensure_raster_layer() {
+		return ensure_paint_layer({ verb: 'paint', toolName: 'Gradient' });
+	}
+
 	/**
-	 * Options bar → layer params (undoable) when a gradient layer is selected.
+	 * Options bar drives the next paint (and FG/BG sync). No longer updates a
+	 * dedicated gradient vector layer — paint-on-layer model.
 	 */
 	on_params_update(data = {}) {
 		if (data && (data.key === 'color_1' || data.key === 'color_2')) {
@@ -43,25 +54,6 @@ class Gradient_class extends Base_tools_class {
 		if (data && data.key === 'style' && app.GUI && app.GUI.GUI_tools) {
 			app.GUI.GUI_tools.show_action_attributes();
 		}
-
-		const layer = this._target_gradient_layer();
-		if (!layer) {
-			return;
-		}
-
-		const next_params = this._params_snapshot_for_layer();
-		if (this._params_equal(layer.params, next_params)) {
-			return;
-		}
-
-		app.State.do_action(
-			new app.Actions.Update_layer_action(layer.id, {
-				params: next_params,
-				name: this._layer_name_for_params(next_params, layer),
-				is_vector: true,
-			})
-		);
-		this.Base_layers.render();
 	}
 
 	/**
@@ -80,17 +72,6 @@ class Gradient_class extends Base_tools_class {
 			&& config.TOOL && config.TOOL.name === this.name) {
 			app.GUI.GUI_tools.show_action_attributes();
 		}
-
-		const layer = this._target_gradient_layer();
-		if (options.apply_to_layer && layer) {
-			const next_params = this._params_snapshot_for_layer();
-			if (!this._params_equal(layer.params, next_params)) {
-				app.State.do_action(
-					new app.Actions.Update_layer_action(layer.id, { params: next_params })
-				);
-				this.Base_layers.render();
-			}
-		}
 	}
 
 	sync_fg_bg_from_colors() {
@@ -108,11 +89,11 @@ class Gradient_class extends Base_tools_class {
 	}
 
 	/**
-	 * Selecting a gradient layer rebinds the options bar to its params.
+	 * Legacy: selecting an old type:'gradient' layer still rebinds the options bar.
+	 * New paints do not create gradient layers, so this is usually a no-op.
 	 */
 	sync_options_from_layer(layer, options = {}) {
 		if (!layer || layer.type !== 'gradient') {
-			this._editing_layer_id = null;
 			return false;
 		}
 
@@ -141,13 +122,39 @@ class Gradient_class extends Base_tools_class {
 			tool.attributes.radial_power.value = this._number_value(p.radial_power, 50);
 		}
 
-		this._editing_layer_id = layer.id;
-
 		if (options.rebuild !== false && app.GUI && app.GUI.GUI_tools
 			&& config.TOOL && config.TOOL.name === this.name) {
 			app.GUI.GUI_tools.show_action_attributes();
 		}
 		return true;
+	}
+
+	get_layer_local_coords(world_x, world_y, layer) {
+		var lx = (layer.x != null) ? layer.x : 0;
+		var ly = (layer.y != null) ? layer.y : 0;
+		var lw = (layer.width != null && layer.width > 0) ? layer.width : (config.WIDTH || 1);
+		var lh = (layer.height != null && layer.height > 0) ? layer.height : (config.HEIGHT || 1);
+		var lwo = layer.width_original || lw;
+		var lho = layer.height_original || lh;
+		var rot = layer.rotate || 0;
+
+		var px = world_x;
+		var py = world_y;
+
+		if (rot !== 0) {
+			var rad = -rot * Math.PI / 180;
+			var cx = lx + lw / 2;
+			var cy = ly + lh / 2;
+			var cos = Math.cos(rad);
+			var sin = Math.sin(rad);
+			px = cx + (world_x - cx) * cos - (world_y - cy) * sin;
+			py = cy + (world_x - cx) * sin + (world_y - cy) * cos;
+		}
+
+		return {
+			x: ((px - lx) / lw) * lwo,
+			y: ((py - ly) / lh) * lho,
+		};
 	}
 
 	mousedown(e) {
@@ -157,45 +164,60 @@ class Gradient_class extends Base_tools_class {
 
 		if (config.mask_active === true && config.layer && config.layer.mask != null) {
 			this.Mask.gradient_start(this, e);
+			const click = this._constrain_point(e, mouse.x, mouse.y, mouse.x, mouse.y);
+			this.mouse_click = { x: click.x, y: click.y };
+			this.started = true;
+			this._update_preview_line(e, mouse);
+			return;
+		}
+
+		const layer = this.ensure_raster_layer();
+		if (!layer || layer.type !== 'image') {
 			return;
 		}
 
 		const click = this._constrain_point(e, mouse.x, mouse.y, mouse.x, mouse.y);
 		this.mouse_click = { x: click.x, y: click.y };
+		this.started = true;
 
-		const params = this._normalized_params();
-		const name = params.radial ? 'Radial gradient' : 'gradient';
+		var lw = layer.width_original || layer.width || config.WIDTH;
+		var lh = layer.height_original || layer.height || config.HEIGHT;
 
-		// New editable gradient layer (draft) — live preview while dragging
-		this.layer = {
-			type: this.name,
-			name: this.Helper.ucfirst(name) + ' #' + this.Base_layers.auto_increment,
-			params: this.clone(params),
-			status: 'draft',
-			render_function: [this.name, 'render'],
-			x: click.x,
-			y: click.y,
-			width: 0,
-			height: 0,
-			rotate: null,
-			is_vector: true,
-			color: null,
-			mask: this.selection_clip_mask(),
-			data: {
-				x1: click.x,
-				y1: click.y,
-				x2: click.x,
-				y2: click.y,
-				center_x: click.x,
-				center_y: click.y,
-			},
-		};
-		app.State.do_action(
-			new app.Actions.Bundle_action('new_gradient_layer', 'New Gradient Layer', [
-				new app.Actions.Insert_layer_action(this.layer)
-			])
-		);
-		this._editing_layer_id = config.layer ? config.layer.id : null;
+		this.baseCanvas = document.createElement('canvas');
+		this.baseCanvas.width = lw;
+		this.baseCanvas.height = lh;
+		var baseCtx = this.baseCanvas.getContext('2d');
+
+		var src = layer.link_canvas || layer.link;
+		if (src) {
+			if (typeof src.complete === 'boolean') {
+				if (src.complete && src.naturalWidth > 0) {
+					baseCtx.drawImage(src, 0, 0, lw, lh);
+				}
+			} else if (src.width > 0 && src.height > 0) {
+				baseCtx.drawImage(src, 0, 0, lw, lh);
+			}
+		}
+
+		this.tmpCanvas = document.createElement('canvas');
+		this.tmpCanvas.width = lw;
+		this.tmpCanvas.height = lh;
+		this.tmpCanvasCtx = this.tmpCanvas.getContext('2d');
+		this.tmpCanvasCtx.drawImage(this.baseCanvas, 0, 0);
+
+		this.selection_snapshot = this.copy_layer_snapshot();
+		if (this.selection_snapshot == null) {
+			this.selection_snapshot = document.createElement('canvas');
+			this.selection_snapshot.width = lw;
+			this.selection_snapshot.height = lh;
+			this.selection_snapshot.getContext('2d').drawImage(this.baseCanvas, 0, 0);
+		}
+
+		config.layer._link_apply_gen = (config.layer._link_apply_gen || 0) + 1;
+		config.layer.link_canvas = this.tmpCanvas;
+
+		this._update_preview_line(e, mouse);
+		this.Base_layers.render();
 	}
 
 	mousemove(e) {
@@ -204,67 +226,128 @@ class Gradient_class extends Base_tools_class {
 			return;
 		if (mouse.click_valid == false)
 			return;
+		if (!this.started)
+			return;
 
 		if (config.mask_active === true && config.layer && config.layer.mask != null) {
 			this.Mask.gradient_move(this, e);
+			this._update_preview_line(e, mouse);
+			this.Base_layers.render();
 			return;
 		}
 
-		if (!config.layer || config.layer.type !== 'gradient')
+		if (!this.tmpCanvas || !this.baseCanvas || !config.layer || config.layer.type !== 'image')
 			return;
 
-		const geom = this._geometry_from_drag(e, mouse);
-		config.layer.x = geom.x;
-		config.layer.y = geom.y;
-		config.layer.width = geom.width;
-		config.layer.height = geom.height;
-		config.layer.data = geom.data;
-		config.layer.params = this.clone(this._normalized_params());
-
+		this._paint_gradient_preview(e, mouse);
+		this._update_preview_line(e, mouse);
+		config.layer.link_canvas = this.tmpCanvas;
+		if (typeof this.Base_layers.render_interactive_layer === 'function') {
+			this.Base_layers.render_interactive_layer(config.layer.id);
+		}
 		this.Base_layers.render();
 	}
 
 	mouseup(e) {
 		var mouse = this.get_mouse_info(e);
-		if (mouse.click_valid == false) {
-			if (config.layer) config.layer.status = null;
+		if (!this.started) {
 			return;
 		}
 
 		if (config.mask_active === true && config.layer && config.layer.mask != null) {
 			this.Mask.gradient_end(this, e);
+			this._clear_session({ keep_link: false });
 			return;
 		}
 
-		if (!config.layer || config.layer.type !== 'gradient')
+		if (mouse.click_valid == false) {
+			this._abort_paint();
 			return;
+		}
 
 		const geom = this._geometry_from_drag(e, mouse);
-		if (geom.empty || (geom.width == 0 && geom.height == 0)) {
-			app.State.scrap_last_action();
+		if (geom.empty) {
+			this._abort_paint();
 			return;
 		}
 
-		const params = this.clone(this._normalized_params());
-		app.State.do_action(
-			new app.Actions.Update_layer_action(config.layer.id, {
-				x: geom.x,
-				y: geom.y,
-				width: geom.width,
-				height: geom.height,
-				data: geom.data,
-				params: params,
-				status: null,
-				is_vector: true,
-				name: this._layer_name_for_params(params, config.layer),
-			}),
-			{ merge_with_history: 'new_gradient_layer' }
-		);
+		if (this.tmpCanvas && config.layer && config.layer.type === 'image') {
+			this._paint_gradient_preview(e, mouse);
+			const canvas = this.tmpCanvas;
+			const layer_id = config.layer.id;
+			// Hand canvas to history; Update_layer_image_action clears link_canvas on decode.
+			app.State.do_action(
+				new app.Actions.Bundle_action('gradient_tool', 'Gradient Tool', [
+					new app.Actions.Update_layer_image_action(canvas, layer_id)
+				])
+			);
+			this.tmpCanvas = null;
+			this.tmpCanvasCtx = null;
+		}
 
-		this._editing_layer_id = config.layer.id;
+		this._clear_session({ keep_link: true });
 		this.Base_layers.render();
 	}
 
+	/**
+	 * On-canvas drag annotator: guide line + colored stop markers.
+	 */
+	render_overlay(ctx) {
+		const line = this._preview_line;
+		if (!line || !this.started)
+			return;
+
+		const x1 = line.x1;
+		const y1 = line.y1;
+		const x2 = line.x2;
+		const y2 = line.y2;
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		const len = Math.sqrt(dx * dx + dy * dy);
+		if (len < 0.5)
+			return;
+
+		ctx.save();
+		ctx.lineWidth = 1;
+		ctx.setLineDash([]);
+
+		ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+		ctx.beginPath();
+		ctx.moveTo(x1, y1);
+		ctx.lineTo(x2, y2);
+		ctx.stroke();
+		ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+		ctx.beginPath();
+		ctx.moveTo(x1 + 0.5, y1 + 0.5);
+		ctx.lineTo(x2 + 0.5, y2 + 0.5);
+		ctx.stroke();
+
+		const stops = line.stops || [];
+		const r = 6;
+		for (let i = 0; i < stops.length; i++) {
+			const s = stops[i];
+			const t = Math.max(0, Math.min(1, s.offset));
+			const sx = x1 + dx * t;
+			const sy = y1 + dy * t;
+
+			ctx.beginPath();
+			ctx.arc(sx, sy, r, 0, Math.PI * 2);
+			ctx.fillStyle = this._rgba_string(s.color, s.alpha != null ? s.alpha : 1);
+			ctx.fill();
+			ctx.lineWidth = 2;
+			ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+			ctx.stroke();
+			ctx.lineWidth = 1;
+			ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+			ctx.stroke();
+		}
+
+		ctx.restore();
+	}
+
+	/**
+	 * Legacy render for type:'gradient' layers still present in older documents.
+	 */
 	render(ctx, layer) {
 		if (layer.width == 0 && layer.height == 0)
 			return;
@@ -313,21 +396,111 @@ class Gradient_class extends Base_tools_class {
 	}
 
 	// -------------------------------------------------------------------------
-	// helpers
+	// paint / preview helpers
+	// -------------------------------------------------------------------------
+
+	_paint_gradient_preview(e, mouse) {
+		const layer = config.layer;
+		if (!layer || !this.tmpCanvasCtx || !this.baseCanvas)
+			return;
+
+		const geom = this._geometry_from_drag(e, mouse);
+		const params = this._normalized_params();
+		const stops = this._color_stops(params);
+
+		const p1 = this.get_layer_local_coords(geom.data.x1, geom.data.y1, layer);
+		const p2 = this.get_layer_local_coords(geom.data.x2, geom.data.y2, layer);
+		const center = this.get_layer_local_coords(geom.data.center_x, geom.data.center_y, layer);
+
+		const ctx = this.tmpCanvasCtx;
+		ctx.clearRect(0, 0, this.tmpCanvas.width, this.tmpCanvas.height);
+		ctx.drawImage(this.baseCanvas, 0, 0);
+
+		let gradient;
+		if (params.radial) {
+			const dist_x = p2.x - center.x;
+			const dist_y = p2.y - center.y;
+			const distance = Math.max(1, Math.sqrt(dist_x * dist_x + dist_y * dist_y));
+			let power = this._number_value(params.radial_power, 50);
+			if (power > 99) power = 99;
+			if (power < 0) power = 0;
+			gradient = ctx.createRadialGradient(
+				center.x, center.y, distance * power / 100,
+				center.x, center.y, distance
+			);
+		}
+		else {
+			gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+		}
+
+		gradient.addColorStop(0, stops.start);
+		gradient.addColorStop(1, stops.end);
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, this.tmpCanvas.width, this.tmpCanvas.height);
+
+		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
+	}
+
+	_update_preview_line(e, mouse) {
+		const geom = this._geometry_from_drag(e, mouse);
+		const params = this._normalized_params();
+		this._preview_line = {
+			x1: geom.data.x1,
+			y1: geom.data.y1,
+			x2: geom.data.x2,
+			y2: geom.data.y2,
+			radial: !!params.radial,
+			stops: this._stop_markers(params),
+		};
+	}
+
+	_stop_markers(params) {
+		let c1 = params.color_1;
+		let c2 = params.color_2;
+		let a1 = Math.max(0, Math.min(100, this._number_value(params.alpha_1, 100))) / 100;
+		let a2 = Math.max(0, Math.min(100, this._number_value(params.alpha_2, 100))) / 100;
+		if (params.reverse) {
+			const tc = c1; c1 = c2; c2 = tc;
+			const ta = a1; a1 = a2; a2 = ta;
+		}
+		return [
+			{ offset: 0, color: c1, alpha: a1 },
+			{ offset: 1, color: c2, alpha: a2 },
+		];
+	}
+
+	_abort_paint() {
+		if (config.layer && this.tmpCanvas && config.layer.link_canvas === this.tmpCanvas) {
+			delete config.layer.link_canvas;
+		}
+		this._clear_session({ keep_link: false });
+		this.Base_layers.render();
+	}
+
+	_clear_session(options = {}) {
+		this.started = false;
+		this._preview_line = null;
+		this.selection_snapshot = null;
+		if (!options.keep_link && config.layer && this.tmpCanvas
+			&& config.layer.link_canvas === this.tmpCanvas) {
+			delete config.layer.link_canvas;
+		}
+		this.tmpCanvas = null;
+		this.tmpCanvasCtx = null;
+		if (this.baseCanvas) {
+			this.baseCanvas.width = 1;
+			this.baseCanvas.height = 1;
+			this.baseCanvas = null;
+		}
+		this.mouse_click = { x: null, y: null };
+	}
+
+	// -------------------------------------------------------------------------
+	// shared param / geometry helpers (Mask.gradient_* depends on these names)
 	// -------------------------------------------------------------------------
 
 	_tool_config() {
 		return (config.TOOLS || []).find(t => t.name === this.name) || config.TOOL;
-	}
-
-	_target_gradient_layer() {
-		if (config.layer && config.layer.type === 'gradient') {
-			return config.layer;
-		}
-		if (this._editing_layer_id != null) {
-			return this.Base_layers.get_layer(this._editing_layer_id);
-		}
-		return null;
 	}
 
 	_attr_value(attr, fallback) {
@@ -400,29 +573,6 @@ class Gradient_class extends Base_tools_class {
 		};
 	}
 
-	_params_snapshot_for_layer() {
-		return this.clone(this._normalized_params());
-	}
-
-	_params_equal(a, b) {
-		try {
-			return JSON.stringify(this._normalize_stored_params(a || {}))
-				=== JSON.stringify(this._normalize_stored_params(b || {}));
-		} catch (e) {
-			return false;
-		}
-	}
-
-	_layer_name_for_params(params, layer) {
-		const radial = this._is_radial(params);
-		const base = radial ? 'Radial gradient' : 'Gradient';
-		if (layer && typeof layer.name === 'string') {
-			const m = layer.name.match(/#\d+\s*$/);
-			if (m) return this.Helper.ucfirst(base) + ' ' + m[0].trim();
-		}
-		return this.Helper.ucfirst(base);
-	}
-
 	_color_stops(params) {
 		let c1 = params.color_1;
 		let c2 = params.color_2;
@@ -445,6 +595,7 @@ class Gradient_class extends Base_tools_class {
 
 	/**
 	 * Shift → snap angle to 45°. Alt → expand from center (linear).
+	 * Kept name `_constrain_point` for Mask.gradient_* compatibility.
 	 */
 	_constrain_point(e, x, y, origin_x, origin_y) {
 		let mx = x;
@@ -476,14 +627,12 @@ class Gradient_class extends Base_tools_class {
 		let center_y = click_y;
 
 		if (params.radial) {
-			// Start = center; drag = radius endpoint.
 			center_x = click_x;
 			center_y = click_y;
 			x1 = click_x;
 			y1 = click_y;
 		}
 		else if (isAlt) {
-			// From-center: click is midpoint of the gradient vector
 			const dx = x2 - click_x;
 			const dy = y2 - click_y;
 			x1 = click_x - dx;
