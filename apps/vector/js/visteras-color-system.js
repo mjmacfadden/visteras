@@ -16,7 +16,11 @@ import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
-const MAX_RECENT = 12;
+const MAX_RECENT = 10; // Studio parity
+const DEFAULT_RECENT = [
+  '#000000', '#ffffff', '#e74c3c', '#e67e22', '#f1c40f',
+  '#2ecc71', '#1abc9c', '#3498db', '#9b59b6', '#34495e',
+];
 const ACCENT = '#fa7c1b';
 
 // ---------------------------------------------------------------------------
@@ -143,13 +147,16 @@ function saveUserSwatches(list) {
 function loadRecent() {
   try {
     const raw = localStorage.getItem(STORAGE_RECENT);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeHex).filter((h) => h && h !== 'none').slice(0, MAX_RECENT);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map(normalizeHex).filter((h) => h && h !== 'none').slice(0, MAX_RECENT);
+      }
+    }
   } catch {
-    return [];
+    /* fall through to Studio defaults */
   }
+  return [...DEFAULT_RECENT];
 }
 
 function saveRecent(list) {
@@ -843,10 +850,6 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
       </div>
       <div id="vcs_recent_colors_grid" class="recent_colors_grid"></div>
     </div>
-    <div class="vcs-target-row" role="group" aria-label="Paint target">
-      <button type="button" class="vcs-target-btn" data-target="fill" id="vcs_target_fill">Fill</button>
-      <button type="button" class="vcs-target-btn" data-target="stroke" id="vcs_target_stroke">Stroke</button>
-    </div>
     <div class="vcs-spectrum-slot" id="vcs_color_spectrum_slot"></div>
     <div class="vcs-preview-row">
       <div class="vcs-preview" id="vcs_color_preview" title="Current color"></div>
@@ -854,21 +857,6 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
     </div>
     <div class="vcs-fields">
       <label class="vcs-field"><span>Hex</span><input id="vcs_hex" type="text" spellcheck="false" maxlength="7" /></label>
-      <div class="vcs-field-row">
-        <label class="vcs-field"><span>R</span><input id="vcs_r" type="number" min="0" max="255" /></label>
-        <label class="vcs-field"><span>G</span><input id="vcs_g" type="number" min="0" max="255" /></label>
-        <label class="vcs-field"><span>B</span><input id="vcs_b" type="number" min="0" max="255" /></label>
-      </div>
-      <div class="vcs-field-row">
-        <label class="vcs-field"><span>H</span><input id="vcs_h" type="number" min="0" max="360" /></label>
-        <label class="vcs-field"><span>S</span><input id="vcs_s" type="number" min="0" max="100" /></label>
-        <label class="vcs-field"><span>L</span><input id="vcs_l" type="number" min="0" max="100" /></label>
-      </div>
-      <label class="vcs-field vcs-opacity-field">
-        <span>Opacity</span>
-        <input id="vcs_opacity" type="range" min="0" max="100" value="100" />
-        <span class="vcs-opacity-val" id="vcs_opacity_val">100%</span>
-      </label>
     </div>
   `;
 
@@ -889,17 +877,7 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
   content.querySelector('#vcs_color_spectrum_slot').appendChild(spectrum.el);
 
   const hexInput = content.querySelector('#vcs_hex');
-  const rInput = content.querySelector('#vcs_r');
-  const gInput = content.querySelector('#vcs_g');
-  const bInput = content.querySelector('#vcs_b');
-  const hInput = content.querySelector('#vcs_h');
-  const sInput = content.querySelector('#vcs_s');
-  const lInput = content.querySelector('#vcs_l');
-  const opInput = content.querySelector('#vcs_opacity');
-  const opVal = content.querySelector('#vcs_opacity_val');
   const preview = content.querySelector('#vcs_color_preview');
-  const fillBtn = content.querySelector('#vcs_target_fill');
-  const strokeBtn = content.querySelector('#vcs_target_stroke');
   const recentGrid = content.querySelector('#vcs_recent_colors_grid');
   const block = content;
 
@@ -927,46 +905,22 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
 
   function refreshFields(state) {
     applying = true;
-    const active = state.activeTarget;
-    fillBtn.classList.toggle('active', active === 'fill');
-    strokeBtn.classList.toggle('active', active === 'stroke');
-    block.dataset.target = active;
+    block.dataset.target = state.activeTarget;
 
     if (state.workingNone) {
       preview.classList.add('is-none');
       preview.style.backgroundColor = '';
       hexInput.value = 'none';
-      rInput.value = '';
-      gInput.value = '';
-      bInput.value = '';
-      hInput.value = '';
-      sInput.value = '';
-      lInput.value = '';
     } else {
       preview.classList.remove('is-none');
       preview.style.backgroundColor = state.workingHex;
       hexInput.value = state.workingHex.toUpperCase();
-      const rgb = hexToRgb(state.workingHex);
-      if (rgb) {
-        rInput.value = rgb.r;
-        gInput.value = rgb.g;
-        bInput.value = rgb.b;
-        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-        hInput.value = Math.round(hsl.h);
-        sInput.value = Math.round(hsl.s);
-        lInput.value = Math.round(hsl.l);
-        if (!spectrum.isDragging()) spectrum.setFromHex(state.workingHex);
-      }
+      if (!spectrum.isDragging()) spectrum.setFromHex(state.workingHex);
     }
-    const pct = Math.round((state.opacity ?? 1) * 100);
-    opInput.value = String(pct);
-    opVal.textContent = `${pct}%`;
     renderRecent(state);
     applying = false;
   }
 
-  fillBtn.addEventListener('click', () => ctrl.setActiveTarget('fill'));
-  strokeBtn.addEventListener('click', () => ctrl.setActiveTarget('stroke'));
   content.querySelector('#vcs_none_btn').addEventListener('click', () => ctrl.setWorkingColor('none'));
   content.querySelector('#vcs_recent_clear_btn')?.addEventListener('click', () => {
     ctrl.clearRecent();
@@ -984,33 +938,6 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
   });
   hexInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') hexInput.dispatchEvent(new Event('change'));
-  });
-
-  const applyRgb = (noUndo) => {
-    if (applying) return;
-    const hex = rgbToHex(+rInput.value || 0, +gInput.value || 0, +bInput.value || 0);
-    ctrl.setWorkingColor(hex, { noUndo: !!noUndo, recordRecent: !noUndo });
-  };
-  const applyHsl = (noUndo) => {
-    if (applying) return;
-    const rgb = hslToRgb(+hInput.value || 0, +sInput.value || 0, +lInput.value || 0);
-    ctrl.setWorkingColor(rgbToHex(rgb.r, rgb.g, rgb.b), { noUndo: !!noUndo, recordRecent: !noUndo });
-  };
-  for (const el of [rInput, gInput, bInput]) {
-    el.addEventListener('input', () => applyRgb(true));
-    el.addEventListener('change', () => applyRgb(false));
-  }
-  for (const el of [hInput, sInput, lInput]) {
-    el.addEventListener('input', () => applyHsl(true));
-    el.addEventListener('change', () => applyHsl(false));
-  }
-  opInput.addEventListener('input', () => {
-    if (applying) return;
-    ctrl.setOpacity((+opInput.value || 0) / 100, { apply: true, noUndo: true });
-  });
-  opInput.addEventListener('change', () => {
-    if (applying) return;
-    ctrl.setOpacity((+opInput.value || 0) / 100, { apply: true, noUndo: false });
   });
 
   ctrl.subscribe(refreshFields);
@@ -1039,7 +966,6 @@ function mountSwatchesPanelContent(ctrl, content) {
               <polyline points="7 6 12 11 17 6"></polyline>
             </svg>
           </button>
-          <button type="button" class="vcs-btn" id="vcs_add_swatch" title="Add current color to user swatches">+</button>
         </div>
       </div>
       <div class="vcs-section-label">User</div>
@@ -1100,15 +1026,8 @@ function mountSwatchesPanelContent(ctrl, content) {
 
   function renderUser(state) {
     userGrid.innerHTML = '';
-    if (!state.userSwatches.length) {
-      const empty = document.createElement('div');
-      empty.className = 'vcs-empty';
-      empty.textContent = 'No saved swatches yet';
-      userGrid.appendChild(empty);
-    } else {
-      for (const s of state.userSwatches) {
-        userGrid.appendChild(swatchEl(s.hex, s.name, { userId: s.id }));
-      }
+    for (const s of state.userSwatches) {
+      userGrid.appendChild(swatchEl(s.hex, s.name, { userId: s.id }));
     }
     const active = state.workingNone ? null : state.workingHex?.toLowerCase();
     content.querySelectorAll('.vcs-swatch').forEach((el) => {
@@ -1225,14 +1144,6 @@ function mountSwatchesPanelContent(ctrl, content) {
     saveCollapsed();
     renderFolders(ctrl.getState());
   });
-  content.querySelector('#vcs_add_swatch')?.addEventListener('click', () => {
-    const st = ctrl.getState();
-    if (st.workingNone) return;
-    const name = window.prompt('Swatch name', st.workingHex.toUpperCase());
-    if (name == null) return;
-    ctrl.addUserSwatch(st.workingHex, name.trim() || st.workingHex.toUpperCase());
-  });
-
   ctrl.subscribe(render);
   render(ctrl.getState());
   return content;
@@ -1374,10 +1285,6 @@ function mountPickerModal(ctrl) {
     <div class="vcs-picker-body">
       <div class="vcs-picker-spectrum" id="vcs_picker_spectrum_slot"></div>
       <div class="vcs-picker-side">
-        <div class="vcs-target-row">
-          <button type="button" class="vcs-target-btn" data-target="fill" id="vcs_picker_fill">Fill</button>
-          <button type="button" class="vcs-target-btn" data-target="stroke" id="vcs_picker_stroke">Stroke</button>
-        </div>
         <div class="vcs-preview-row">
           <div class="vcs-preview vcs-preview-lg" id="vcs_picker_preview"></div>
           <button type="button" class="vcs-btn-ghost vcs-none-swatch-btn" id="vcs_picker_none" title="No color" aria-label="No color"></button>
@@ -1385,16 +1292,6 @@ function mountPickerModal(ctrl) {
         </div>
         <div class="vcs-fields">
           <label class="vcs-field"><span>Hex</span><input id="vcs_picker_hex" type="text" spellcheck="false" maxlength="7" /></label>
-          <div class="vcs-field-row">
-            <label class="vcs-field"><span>R</span><input id="vcs_picker_r" type="number" min="0" max="255" /></label>
-            <label class="vcs-field"><span>G</span><input id="vcs_picker_g" type="number" min="0" max="255" /></label>
-            <label class="vcs-field"><span>B</span><input id="vcs_picker_b" type="number" min="0" max="255" /></label>
-          </div>
-          <div class="vcs-field-row">
-            <label class="vcs-field"><span>H</span><input id="vcs_picker_h" type="number" min="0" max="360" /></label>
-            <label class="vcs-field"><span>S</span><input id="vcs_picker_s" type="number" min="0" max="100" /></label>
-            <label class="vcs-field"><span>L</span><input id="vcs_picker_l" type="number" min="0" max="100" /></label>
-          </div>
         </div>
         <div class="vcs-picker-actions">
           <button type="button" class="vcs-btn" id="vcs_picker_apply">OK</button>
@@ -1431,42 +1328,22 @@ function mountPickerModal(ctrl) {
   modal.querySelector('#vcs_picker_spectrum_slot').appendChild(spectrum.el);
 
   const hexInput = modal.querySelector('#vcs_picker_hex');
-  const rInput = modal.querySelector('#vcs_picker_r');
-  const gInput = modal.querySelector('#vcs_picker_g');
-  const bInput = modal.querySelector('#vcs_picker_b');
-  const hInput = modal.querySelector('#vcs_picker_h');
-  const sInput = modal.querySelector('#vcs_picker_s');
-  const lInput = modal.querySelector('#vcs_picker_l');
   const preview = modal.querySelector('#vcs_picker_preview');
   const targetLabel = modal.querySelector('#vcs_picker_target_label');
-  const fillBtn = modal.querySelector('#vcs_picker_fill');
-  const strokeBtn = modal.querySelector('#vcs_picker_stroke');
 
   function refreshDraft() {
     applying = true;
     const target = ctrl.getActiveTarget();
-    fillBtn.classList.toggle('active', target === 'fill');
-    strokeBtn.classList.toggle('active', target === 'stroke');
     targetLabel.textContent = target === 'fill' ? 'Fill' : 'Stroke';
     if (draftNone) {
       preview.classList.add('is-none');
       preview.style.backgroundColor = '';
       hexInput.value = 'none';
-      rInput.value = gInput.value = bInput.value = '';
-      hInput.value = sInput.value = lInput.value = '';
     } else {
       preview.classList.remove('is-none');
       preview.style.backgroundColor = draftHex;
       hexInput.value = draftHex.toUpperCase();
-      const rgb = hexToRgb(draftHex);
-      if (rgb) {
-        rInput.value = rgb.r; gInput.value = rgb.g; bInput.value = rgb.b;
-        const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-        hInput.value = Math.round(hsl.h);
-        sInput.value = Math.round(hsl.s);
-        lInput.value = Math.round(hsl.l);
-        if (!spectrum.isDragging()) spectrum.setFromHex(draftHex);
-      }
+      if (!spectrum.isDragging()) spectrum.setFromHex(draftHex);
     }
     applying = false;
   }
@@ -1507,21 +1384,6 @@ function mountPickerModal(ctrl) {
     close();
   }
 
-  fillBtn.addEventListener('click', () => {
-    ctrl.setActiveTarget('fill');
-    const st = ctrl.getState();
-    draftHex = st.workingHex;
-    draftNone = st.workingNone;
-    refreshDraft();
-  });
-  strokeBtn.addEventListener('click', () => {
-    ctrl.setActiveTarget('stroke');
-    const st = ctrl.getState();
-    draftHex = st.workingHex;
-    draftNone = st.workingNone;
-    refreshDraft();
-  });
-
   modal.querySelector('#vcs_picker_none').addEventListener('click', () => {
     draftNone = true;
     refreshDraft();
@@ -1547,24 +1409,6 @@ function mountPickerModal(ctrl) {
     if (liveApply) ctrl.setWorkingColor(draftNone ? 'none' : draftHex, { recordRecent: false });
   });
 
-  const applyRgb = () => {
-    if (applying) return;
-    draftNone = false;
-    draftHex = rgbToHex(+rInput.value || 0, +gInput.value || 0, +bInput.value || 0);
-    refreshDraft();
-    if (liveApply) ctrl.setWorkingColor(draftHex, { recordRecent: false });
-  };
-  const applyHsl = () => {
-    if (applying) return;
-    const rgb = hslToRgb(+hInput.value || 0, +sInput.value || 0, +lInput.value || 0);
-    draftNone = false;
-    draftHex = rgbToHex(rgb.r, rgb.g, rgb.b);
-    refreshDraft();
-    if (liveApply) ctrl.setWorkingColor(draftHex, { recordRecent: false });
-  };
-  for (const el of [rInput, gInput, bInput]) el.addEventListener('input', applyRgb);
-  for (const el of [hInput, sInput, lInput]) el.addEventListener('input', applyHsl);
-
   document.addEventListener('keydown', (e) => {
     if (!modal.classList.contains('open')) return;
     if (e.key === 'Escape') {
@@ -1581,8 +1425,6 @@ function mountPickerModal(ctrl) {
     if (!modal.classList.contains('open')) return;
     // Keep target chrome in sync if changed externally
     targetLabel.textContent = ctrl.getActiveTarget() === 'fill' ? 'Fill' : 'Stroke';
-    fillBtn.classList.toggle('active', ctrl.getActiveTarget() === 'fill');
-    strokeBtn.classList.toggle('active', ctrl.getActiveTarget() === 'stroke');
   });
 }
 
