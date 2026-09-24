@@ -289,9 +289,15 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
 // Stroke alignment (Center / Inside / Outside)
 // SVG has no native Illustrator-style stroke alignment. We approximate:
 //   center  — default SVG stroke (centered on path)
-//   inside  — 2× stroke-width + clipPath to the path geometry (closed shapes)
+//   inside  — 2× stroke-width + clipPath to the path LOCAL geometry (closed shapes).
+//             Clip clones must NOT copy `transform` — clipPath is applied in the
+//             referencing element's local space, so the element's own transform
+//             moves fill+stroke+clip together. Copying transform double-applies
+//             and leaves a stale clip when the shape is dragged (Mike smoke).
 //   outside — 2× stroke on a non-selectable helper path + mask punching the
-//             interior so the main element keeps its fill
+//             interior so the main element keeps its fill. Helper lives in a
+//             wrapper <g> with the body and mirrors body geometry (incl.
+//             transform) so drag/transform keeps fill+stroke coincident.
 // Open paths, lines, polylines, text, images: fall back to center rendering
 // (attribute is still stored; UI may show the choice).
 // ---------------------------------------------------------------------------
@@ -304,7 +310,20 @@ const STROKE_MASK_ATTR = 'data-visteras-sa-mask';
 const STROKE_HELPER_ATTR = 'data-visteras-stroke-align-helper';
 const STROKE_HELPER_FOR_ATTR = 'data-visteras-helper-for';
 const STROKE_PAINT_ATTR = 'data-visteras-stroke-paint';
+const STROKE_WRAP_ATTR = 'data-visteras-sa-wrap';
+const STROKE_BODY_ATTR = 'data-visteras-sa-body';
 
+/** Local geometry attrs — NEVER include transform (clip/mask stay local). */
+const STROKE_ALIGN_LOCAL_GEOM_ATTRS = {
+  path: ['d'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry'],
+  circle: ['cx', 'cy', 'r'],
+  ellipse: ['cx', 'cy', 'rx', 'ry'],
+  polygon: ['points'],
+  polyline: ['points'],
+};
+
+/** Full geom incl. transform — used to mirror body → outside helper. */
 const STROKE_ALIGN_GEOM_ATTRS = {
   path: ['d', 'transform'],
   rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'transform'],
@@ -355,8 +374,12 @@ function isStrokeAlignHelper(el) {
   return !!el?.getAttribute?.(STROKE_HELPER_ATTR);
 }
 
+function isStrokeAlignWrap(el) {
+  return !!el?.getAttribute?.(STROKE_WRAP_ATTR);
+}
+
 function isClosedStrokeTarget(el) {
-  if (!el || isStrokeAlignHelper(el)) return false;
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return false;
   const tag = el.tagName?.toLowerCase?.() || '';
   if (tag === 'rect' || tag === 'circle' || tag === 'ellipse' || tag === 'polygon') return true;
   if (tag === 'path') {
@@ -367,10 +390,11 @@ function isClosedStrokeTarget(el) {
   return false;
 }
 
-function cloneStrokeGeometry(el) {
+/** Clone LOCAL geometry only (no transform) for clipPath / mask holes. */
+function cloneStrokeLocalGeometry(el) {
   const tag = el.tagName.toLowerCase();
   const clone = document.createElementNS(el.namespaceURI || SVG_NS, tag);
-  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+  for (const a of (STROKE_ALIGN_LOCAL_GEOM_ATTRS[tag] || [])) {
     const v = el.getAttribute(a);
     if (v != null) clone.setAttribute(a, v);
   }
@@ -379,12 +403,19 @@ function cloneStrokeGeometry(el) {
 
 function findStrokeAlignHelper(el) {
   if (!el?.id) return null;
+  // Prefer sibling inside wrap, then parent children, then document query.
   const parent = el.parentNode;
-  if (!parent) return null;
-  for (const child of parent.children) {
-    if (child.getAttribute?.(STROKE_HELPER_FOR_ATTR) === el.id) return child;
+  if (parent) {
+    for (const child of parent.children) {
+      if (child.getAttribute?.(STROKE_HELPER_FOR_ATTR) === el.id) return child;
+    }
   }
-  return null;
+  try {
+    const root = el.ownerSVGElement || document;
+    return root.querySelector?.(`[${STROKE_HELPER_FOR_ATTR}="${CSS.escape(el.id)}"]`) || null;
+  } catch {
+    return null;
+  }
 }
 
 function removeStrokeAlignHelper(el) {
@@ -399,6 +430,40 @@ function removeDefsResource(sc, attrName, el) {
   const node = defs?.getElementById?.(id) || document.getElementById(id);
   if (node?.parentNode) node.parentNode.removeChild(node);
   el.removeAttribute(attrName);
+}
+
+/**
+ * Ensure body lives in a stroke-align wrapper <g> so outside helper is not an
+ * orphan layer sibling. Transform stays on the body (and is mirrored to the
+ * helper); the wrap is structural so both share a parent.
+ */
+function ensureStrokeAlignWrap(el) {
+  if (!el?.parentNode) return null;
+  if (isStrokeAlignWrap(el.parentNode)) {
+    el.setAttribute(STROKE_BODY_ATTR, '1');
+    return el.parentNode;
+  }
+  const wrap = document.createElementNS(el.namespaceURI || SVG_NS, 'g');
+  wrap.setAttribute(STROKE_WRAP_ATTR, '1');
+  el.parentNode.insertBefore(wrap, el);
+  wrap.appendChild(el);
+  el.setAttribute(STROKE_BODY_ATTR, '1');
+  return wrap;
+}
+
+function unwrapStrokeAlignIfEmpty(el) {
+  const wrap = el?.parentNode;
+  if (!wrap || !isStrokeAlignWrap(wrap)) return;
+  // Only unwrap when the wrap no longer has a helper (center mode).
+  const hasHelper = [...wrap.children].some((c) => isStrokeAlignHelper(c));
+  if (hasHelper) return;
+  const parent = wrap.parentNode;
+  if (!parent) return;
+  el.removeAttribute(STROKE_BODY_ATTR);
+  parent.insertBefore(el, wrap);
+  // Move any leftover non-helper children out just in case.
+  while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+  parent.removeChild(wrap);
 }
 
 function clearStrokeAlignRendering(el, sc) {
@@ -429,6 +494,7 @@ function clearStrokeAlignRendering(el, sc) {
     else el.setAttribute('stroke', paint);
     el.removeAttribute(STROKE_PAINT_ATTR);
   }
+  unwrapStrokeAlignIfEmpty(el);
 }
 
 function ensureClipForInside(el, sc) {
@@ -445,7 +511,8 @@ function ensureClipForInside(el, sc) {
     el.setAttribute(STROKE_CLIP_ATTR, clipId);
   }
   while (clip.firstChild) clip.removeChild(clip.firstChild);
-  clip.appendChild(cloneStrokeGeometry(el));
+  // LOCAL geom only — element's own transform moves clip with fill/stroke.
+  clip.appendChild(cloneStrokeLocalGeometry(el));
   el.setAttribute('clip-path', `url(#${clipId})`);
   return clipId;
 }
@@ -465,6 +532,8 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
   }
   while (mask.firstChild) mask.removeChild(mask.firstChild);
 
+  // BBox is local (pre-transform) — correct because mask content is local and
+  // the helper's own transform moves the masked stroke with the body.
   let bbox = null;
   try { bbox = shapeEl.getBBox(); } catch { bbox = null; }
   const p = Math.max(2, Number(pad) || 2);
@@ -485,7 +554,7 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
     bg.setAttribute('fill', '#ffffff');
     mask.appendChild(bg);
   }
-  const hole = cloneStrokeGeometry(shapeEl);
+  const hole = cloneStrokeLocalGeometry(shapeEl);
   hole.setAttribute('fill', '#000000');
   hole.setAttribute('stroke', 'none');
   mask.appendChild(hole);
@@ -493,8 +562,19 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
   return maskId;
 }
 
+/** Mirror body local+transform geom onto the outside helper. */
+function mirrorGeomToHelper(el, helper) {
+  const tag = el.tagName.toLowerCase();
+  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+    const v = el.getAttribute(a);
+    if (v == null) helper.removeAttribute(a);
+    else helper.setAttribute(a, v);
+  }
+}
+
 function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
   const id = ensureElementId(el, sc);
+  const wrap = ensureStrokeAlignWrap(el);
   let helper = findStrokeAlignHelper(el);
   const tag = el.tagName.toLowerCase();
   if (!helper) {
@@ -503,14 +583,13 @@ function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
     helper.setAttribute(STROKE_HELPER_FOR_ATTR, id);
     helper.setAttribute('pointer-events', 'none');
     helper.classList.add('visteras-stroke-align-helper');
-    el.parentNode?.insertBefore(helper, el);
+    // Insert as sibling of body inside wrap (before body so stroke paints under fill).
+    (wrap || el.parentNode)?.insertBefore(helper, el);
+  } else if (wrap && helper.parentNode !== wrap) {
+    wrap.insertBefore(helper, el);
   }
-  // Refresh geometry
-  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
-    const v = el.getAttribute(a);
-    if (v == null) helper.removeAttribute(a);
-    else helper.setAttribute(a, v);
-  }
+  // Refresh geometry — MUST include transform so helper tracks body on drag.
+  mirrorGeomToHelper(el, helper);
   helper.setAttribute('fill', 'none');
   helper.setAttribute('stroke', strokePaint && strokePaint !== 'none' ? strokePaint : '#000000');
   helper.setAttribute('stroke-width', String(Math.max(0, userWidth) * 2));
@@ -531,7 +610,9 @@ function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
  * @param {{ align?: string, userWidth?: number }} [opts]
  */
 function applyStrokeAlignToElement(el, sc, opts = {}) {
-  if (!el || isStrokeAlignHelper(el)) return { applied: 'center', closed: false };
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+    return { applied: 'center', closed: false };
+  }
 
   const alignRaw = (opts.align ?? el.getAttribute(STROKE_ALIGN_ATTR) ?? 'center').toLowerCase();
   const align = (alignRaw === 'inside' || alignRaw === 'outside') ? alignRaw : 'center';
@@ -564,6 +645,7 @@ function applyStrokeAlignToElement(el, sc, opts = {}) {
 
   if (align === 'inside') {
     removeStrokeAlignHelper(el);
+    unwrapStrokeAlignIfEmpty(el);
     // Restore any paint hidden by a prior outside mode
     const paint = el.getAttribute(STROKE_PAINT_ATTR);
     if (paint != null) {
@@ -604,7 +686,7 @@ function applyStrokeAlignToElement(el, sc, opts = {}) {
 }
 
 function syncStrokeAlignRendering(el, sc) {
-  if (!el || isStrokeAlignHelper(el)) return;
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
   const align = (el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
   if (align === 'center' || !el.hasAttribute(STROKE_ALIGN_ATTR)) {
     // Still refresh helper cleanup if a stale helper exists
@@ -612,6 +694,64 @@ function syncStrokeAlignRendering(el, sc) {
     return;
   }
   applyStrokeAlignToElement(el, sc, { align });
+}
+
+/**
+ * Lightweight live sync during drag/transform: mirror body geom → helper and
+ * refresh local clip/mask without rewriting stroke paint. Called from
+ * `transition` + selection grip drag so fill+stroke stay coincident.
+ */
+function liveSyncStrokeAlignGeometry(el, sc) {
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
+  const align = (el.getAttribute(STROKE_ALIGN_ATTR) || '').toLowerCase();
+  if (align !== 'inside' && align !== 'outside') return;
+  if (!isClosedStrokeTarget(el)) return;
+
+  if (align === 'inside') {
+    if (el.getAttribute(STROKE_CLIP_ATTR) || el.getAttribute('clip-path')) {
+      ensureClipForInside(el, sc);
+    }
+    return;
+  }
+
+  // outside — mirror geom (incl. transform) onto helper + refresh local mask
+  const helper = findStrokeAlignHelper(el);
+  if (!helper) {
+    syncStrokeAlignRendering(el, sc);
+    return;
+  }
+  mirrorGeomToHelper(el, helper);
+  const userWidth = readElementStrokeWeight(el) ?? 1;
+  ensureMaskForOutsideHelper(helper, el, sc, userWidth * 2 + 4);
+}
+
+/** Sync every stroke-aligned descendant under svgcontent (or given roots). */
+function syncAllStrokeAlignGeometry(sc, roots) {
+  const list = [];
+  const addFrom = (root) => {
+    if (!root?.querySelectorAll) return;
+    for (const el of root.querySelectorAll(`[${STROKE_ALIGN_ATTR}]`)) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
+      list.push(el);
+    }
+  };
+  if (roots?.length) {
+    for (const r of roots) {
+      if (!r) continue;
+      if (r.getAttribute?.(STROKE_ALIGN_ATTR) && !isStrokeAlignHelper(r) && !isStrokeAlignWrap(r)) {
+        list.push(r);
+      }
+      addFrom(r);
+    }
+  } else {
+    addFrom(getSvgContent(sc));
+  }
+  const seen = new Set();
+  for (const el of list) {
+    if (seen.has(el)) continue;
+    seen.add(el);
+    try { liveSyncStrokeAlignGeometry(el, sc); } catch { /* ignore */ }
+  }
 }
 
 function readElementStrokeAlign(el) {
@@ -644,7 +784,7 @@ function readElementStrokeWeight(el) {
 function applyStrokeAlignToTargets(sc, align, { noUndo = false, userWidth = null } = {}) {
   if (!sc) return false;
   const elems = flattenPaintTargets(resolvePaintTargets(sc))
-    .filter((el) => el && !isStrokeAlignHelper(el));
+    .filter((el) => el && !isStrokeAlignHelper(el) && !isStrokeAlignWrap(el));
   if (!elems.length) {
     // Still store as current preference on canvas if possible
     try { sc.curShape && (sc.curShape._visterasStrokeAlign = align); } catch { /* ignore */ }
@@ -685,8 +825,16 @@ function applyStrokeAlignToTargets(sc, align, { noUndo = false, userWidth = null
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Shared color controller
+// Live geometry hook for selection grip drag (visteras-selection.js).
+window.__visterasLiveSyncStrokeAlign = (els, sc) => {
+  try {
+    const canvas = sc || window.svgEditor?.svgCanvas || window.svgCanvas;
+    if (!canvas) return;
+    if (els?.length) syncAllStrokeAlignGeometry(canvas, els);
+    else syncAllStrokeAlignGeometry(canvas);
+  } catch { /* ignore */ }
+};
+
 // ---------------------------------------------------------------------------
 
 function createColorController(svgEditor) {
@@ -2042,6 +2190,14 @@ function mountAppearanceColors(ctrl, svgEditor) {
       alignSyncing = false;
     }
   };
+  const onTransition = () => {
+    if (alignSyncing) return;
+    try {
+      // SVG-Edit fires transition during live drag — keep helper/clip coincident.
+      const targets = flattenPaintTargets(resolvePaintTargets(sc));
+      syncAllStrokeAlignGeometry(sc, targets);
+    } catch { /* ignore */ }
+  };
   try {
     chainCanvasEvent(sc, 'selected', syncSelectionUi);
     // selectedChanged is used by some Visteras callers / extensions; canvas itself
@@ -2049,240 +2205,5 @@ function mountAppearanceColors(ctrl, svgEditor) {
     chainCanvasEvent(sc, 'selectedChanged', syncSelectionUi);
     chainCanvasEvent(sc, 'elementChanged', syncSelectionUi);
     chainCanvasEvent(sc, 'changed', onChanged);
+    chainCanvasEvent(sc, 'transition', onTransition);
   } catch { /* ignore */ }
-
-  // When SVG-Edit refreshes the context panel (select / create), keep Appearance
-  // chips in lockstep — covers paths that update topPanel without re-firing bind.
-  try {
-    const top = svgEditor?.topPanel;
-    if (top && typeof top.updateContextPanel === 'function' && !top.__vcsAppearanceHooked) {
-      const prevUpdate = top.updateContextPanel.bind(top);
-      top.updateContextPanel = function vcsAppearanceUpdateContextPanel(...args) {
-        const ret = prevUpdate(...args);
-        try { syncSelectionUi(); } catch { /* ignore */ }
-        return ret;
-      };
-      top.__vcsAppearanceHooked = true;
-    }
-  } catch { /* ignore */ }
-
-  refresh();
-}
-
-// ---------------------------------------------------------------------------
-// Picker modal
-// ---------------------------------------------------------------------------
-
-function mountPickerModal(ctrl) {
-  if (document.getElementById('vcs_picker_modal')) return;
-
-  const overlay = document.createElement('div');
-  overlay.id = 'vcs_picker_overlay';
-  overlay.className = 'vcs-picker-overlay';
-
-  const modal = document.createElement('div');
-  modal.id = 'vcs_picker_modal';
-  modal.className = 'vcs-picker-modal';
-  modal.setAttribute('role', 'dialog');
-  modal.setAttribute('aria-modal', 'true');
-  modal.innerHTML = `
-    <div class="vcs-picker-header">
-      <span class="vcs-picker-title">Color Picker</span>
-      <span class="vcs-picker-target-label" id="vcs_picker_target_label">Fill</span>
-      <button type="button" class="vcs-picker-close" id="vcs_picker_close" title="Close">×</button>
-    </div>
-    <div class="vcs-picker-body">
-      <div class="vcs-picker-spectrum" id="vcs_picker_spectrum_slot"></div>
-      <div class="vcs-picker-side">
-        <div class="vcs-preview-row">
-          <div class="vcs-preview vcs-preview-lg" id="vcs_picker_preview"></div>
-          <button type="button" class="vcs-btn-ghost vcs-none-swatch-btn" id="vcs_picker_none" title="No color" aria-label="No color"></button>
-          <span class="vcs-none-label">None</span>
-        </div>
-        <div class="vcs-fields">
-          <label class="vcs-field"><span>Hex</span><input id="vcs_picker_hex" type="text" spellcheck="false" maxlength="7" /></label>
-        </div>
-        <div class="vcs-picker-actions">
-          <button type="button" class="vcs-btn" id="vcs_picker_apply">OK</button>
-          <button type="button" class="vcs-btn vcs-btn-secondary" id="vcs_picker_cancel">Cancel</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.append(overlay, modal);
-
-  let draftHex = '#cccccc';
-  let draftNone = false;
-  let openSnapshot = { hex: '#cccccc', none: false, target: 'fill' };
-  let applying = false;
-  let liveApply = true; // live apply while dragging; Cancel restores snapshot
-
-  const spectrum = createSpectrumWidget({
-    size: 260,
-    hueHeight: 16,
-    onChange: ({ hex }) => {
-      draftNone = false;
-      draftHex = hex;
-      refreshDraft();
-      if (liveApply) ctrl.setWorkingColor(hex, { apply: true, recordRecent: false, noUndo: true });
-    },
-    onCommit: ({ hex }) => {
-      draftHex = hex;
-      if (liveApply) {
-        ctrl.setWorkingColor(hex, { apply: true, recordRecent: true, noUndo: false });
-      }
-    },
-  });
-  modal.querySelector('#vcs_picker_spectrum_slot').appendChild(spectrum.el);
-
-  const hexInput = modal.querySelector('#vcs_picker_hex');
-  const preview = modal.querySelector('#vcs_picker_preview');
-  const targetLabel = modal.querySelector('#vcs_picker_target_label');
-
-  function refreshDraft() {
-    applying = true;
-    const target = ctrl.getActiveTarget();
-    targetLabel.textContent = target === 'fill' ? 'Fill' : 'Stroke';
-    if (draftNone) {
-      preview.classList.add('is-none');
-      preview.style.backgroundColor = '';
-      hexInput.value = 'none';
-    } else {
-      preview.classList.remove('is-none');
-      preview.style.backgroundColor = draftHex;
-      hexInput.value = draftHex.toUpperCase();
-      if (!spectrum.isDragging()) spectrum.setFromHex(draftHex);
-    }
-    applying = false;
-  }
-
-  function close() {
-    overlay.classList.remove('open');
-    modal.classList.remove('open');
-  }
-
-  function open(target) {
-    if (target) ctrl.setActiveTarget(target, { syncColor: true });
-    const st = ctrl.getState();
-    openSnapshot = {
-      hex: st.workingHex,
-      none: st.workingNone,
-      target: st.activeTarget,
-    };
-    draftHex = st.workingHex;
-    draftNone = st.workingNone;
-    refreshDraft();
-    overlay.classList.add('open');
-    modal.classList.add('open');
-    hexInput.focus();
-    hexInput.select();
-  }
-
-  function cancel() {
-    try {
-      // Restore snapshot
-      ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
-      if (openSnapshot.none) ctrl.setWorkingColor('none', { recordRecent: false });
-      else ctrl.setWorkingColor(openSnapshot.hex, { recordRecent: false });
-    } catch (err) {
-      console.warn('[visteras-color-system] cancel restore failed', err);
-    } finally {
-      close();
-    }
-  }
-
-  function applyAndClose() {
-    try {
-      if (draftNone) ctrl.setWorkingColor('none');
-      else ctrl.setWorkingColor(draftHex, { recordRecent: true });
-    } catch (err) {
-      console.warn('[visteras-color-system] apply failed', err);
-    } finally {
-      close();
-    }
-  }
-
-  modal.querySelector('#vcs_picker_none').addEventListener('click', () => {
-    draftNone = true;
-    refreshDraft();
-    if (liveApply) ctrl.setWorkingColor('none');
-  });
-  modal.querySelector('#vcs_picker_close').addEventListener('click', applyAndClose);
-  modal.querySelector('#vcs_picker_apply').addEventListener('click', applyAndClose);
-  modal.querySelector('#vcs_picker_cancel').addEventListener('click', cancel);
-  overlay.addEventListener('click', cancel);
-
-  hexInput.addEventListener('change', () => {
-    if (applying) return;
-    const v = hexInput.value.trim();
-    if (v.toLowerCase() === 'none') {
-      draftNone = true;
-    } else {
-      const hex = normalizeHex(v);
-      if (!hex) { refreshDraft(); return; }
-      draftNone = false;
-      draftHex = hex;
-    }
-    refreshDraft();
-    if (liveApply) ctrl.setWorkingColor(draftNone ? 'none' : draftHex, { recordRecent: false });
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (!modal.classList.contains('open')) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      cancel();
-    } else if (e.key === 'Enter' && e.target?.id?.startsWith('vcs_picker_')) {
-      e.preventDefault();
-      applyAndClose();
-    }
-  }, true); // capture so we win over Direct Selection's Escape handler
-
-  window.__visterasOpenColorPicker = open;
-  ctrl.subscribe(() => {
-    if (!modal.classList.contains('open')) return;
-    // Keep target chrome in sync if changed externally
-    targetLabel.textContent = ctrl.getActiveTarget() === 'fill' ? 'Fill' : 'Stroke';
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Public mount
-// ---------------------------------------------------------------------------
-
-/**
- * @param {{ svgEditor: any }} opts
- */
-export function mountVisterasColorSystem({ svgEditor } = {}) {
-  if (!svgEditor?.svgCanvas) {
-    console.warn('[visteras-color-system] svgEditor not ready');
-    return null;
-  }
-  if (window.__visterasColorSystemMounted) {
-    return window.__visterasColorSystem;
-  }
-
-  const ctrl = createColorController(svgEditor);
-
-  const tryMount = () => {
-    mountToolbarColorSwatches(svgEditor, ctrl);
-    mountColorSwatchesTabs(ctrl, svgEditor);
-    mountAppearanceColors(ctrl, svgEditor);
-    mountPickerModal(ctrl);
-  };
-
-  tryMount();
-  setTimeout(tryMount, 100);
-  setTimeout(tryMount, 500);
-  setTimeout(() => {
-    ctrl.syncFromCanvas();
-  }, 600);
-
-  window.__visterasColorSystemMounted = true;
-  console.info('[visteras-color-system] mounted');
-  return ctrl;
-}
-
-export default mountVisterasColorSystem;

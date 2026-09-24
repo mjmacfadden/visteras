@@ -134,6 +134,10 @@ export function mountSelectionTools(editor) {
       const m = item.parent.inverse().multiply(transform).multiply(item.parent).multiply(item.local);
       item.el.setAttribute('transform', `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`);
     }
+    // Keep outside helper / inside clip coincident with body during live grip drag.
+    try {
+      window.__visterasLiveSyncStrokeAlign?.(drag.items.map((i) => i.el), sc);
+    } catch { /* ignore */ }
     drag.moved = true;
     drag.visualFrame = {b,m:transform.multiply(basis)};
     schedule();
@@ -144,12 +148,14 @@ export function mountSelectionTools(editor) {
     drag = null;
     if (cancel || !moved) {
       for (const { el, original } of items) original === null ? el.removeAttribute('transform') : el.setAttribute('transform', original);
+      try { window.__visterasLiveSyncStrokeAlign?.(items.map((i) => i.el), sc); } catch { /* ignore */ }
     } else {
       if (items.length > 1) compoundFrame = { ...visualFrame, elements:items.map(i=>i.el), signature:items.map(i=>i.el.getAttribute('transform')) };
       const { BatchCommand, ChangeElementCommand } = sc.history;
       const command = new BatchCommand('Transform selection');
       for (const { el, original } of items) command.addSubCommand(new ChangeElementCommand(el, { transform: original }));
       sc.addCommandToHistory(command);
+      try { window.__visterasLiveSyncStrokeAlign?.(items.map((i) => i.el), sc); } catch { /* ignore */ }
       sc.call('changed', items.map(item => item.el));
     }
     schedule();
