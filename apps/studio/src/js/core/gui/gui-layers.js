@@ -144,7 +144,7 @@ class GUI_layers_class {
 			else if (target.id == 'filter_visibility') {
 				var layer_id = parseInt(target.dataset.pid);
 				var filter_id = target.dataset.id;
-				var layer = app.Layers.get_layer(layer_id);
+				var layer = app.Layers.get_layer(layer_id, true);
 				if (layer && layer.filters) {
 					var newFilters = layer.filters.map(f => {
 						if (f.id == filter_id) {
@@ -179,7 +179,7 @@ class GUI_layers_class {
 			}
 			else if (target.closest('.mask_thumb') != null) {
 				var layer_id = parseInt(target.closest('.mask_thumb').dataset.id);
-				var mask_layer = app.Layers.get_layer(layer_id);
+				var mask_layer = app.Layers.get_layer(layer_id, true);
 				if (mask_layer != null && mask_layer.mask == null) {
 					//Reveal the selection when present, otherwise reveal the whole layer.
 					app.State.do_action(
@@ -215,7 +215,7 @@ class GUI_layers_class {
 			else if (target.closest('.lock_icon') != null) {
 				var lockEl = target.closest('.lock_icon');
 				var layer_id = parseInt(lockEl.dataset.id);
-				var layer = app.Layers.get_layer(layer_id);
+				var layer = app.Layers.get_layer(layer_id, true);
 				if (layer) {
 					var new_locked = !layer.locked;
 					var new_name = layer.name;
@@ -233,7 +233,7 @@ class GUI_layers_class {
 			else if (target.closest('.clipping_arrow_btn') != null || target.closest('.arrow_down') != null) {
 				var arrowBtn = target.closest('.clipping_arrow_btn') || target.closest('.arrow_down');
 				var layer_id = parseInt(arrowBtn.dataset.id);
-				var arrow_layer = app.Layers.get_layer(layer_id);
+				var arrow_layer = app.Layers.get_layer(layer_id, true);
 				if (arrow_layer) {
 					return app.State.do_action(
 						new app.Actions.Update_layer_action(layer_id, clipping_toggle_updates(arrow_layer))
@@ -242,7 +242,7 @@ class GUI_layers_class {
 			}
 			else if (target.closest('.layer_thumb') != null) {
 				var layer_id = parseInt(target.closest('.layer_thumb').dataset.id);
-				var thumb_layer = app.Layers.get_layer(layer_id);
+				var thumb_layer = app.Layers.get_layer(layer_id, true);
 				var multi = event.shiftKey || event.ctrlKey || event.metaKey;
 				if (!multi && thumb_layer && thumb_layer.type === 'adjustment') {
 					if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
@@ -478,7 +478,7 @@ class GUI_layers_class {
 			var target = event.target;
 			var item = target.closest('.item');
 			var layer_id = (target.dataset && target.dataset.id) ? parseInt(target.dataset.id) : (item && item.dataset && item.dataset.id ? parseInt(item.dataset.id) : null);
-			var dbl_layer = layer_id != null ? app.Layers.get_layer(layer_id) : null;
+			var dbl_layer = layer_id != null ? app.Layers.get_layer(layer_id, true) : null;
 
 			// If double-clicking a text layer thumbnail or row (not the rename label)
 			if (dbl_layer && dbl_layer.type === 'text' && target.id !== 'layer_name') {
@@ -517,7 +517,7 @@ class GUI_layers_class {
 
 			if (target.id == 'layer_name') {
 				var target_layer_id = parseInt(target.dataset.id);
-				var target_dbl_layer = app.Layers.get_layer(target_layer_id);
+				var target_dbl_layer = app.Layers.get_layer(target_layer_id, true);
 				if (target_dbl_layer && target_dbl_layer.type === 'adjustment') {
 					if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
 						app.GUI.modules['layer/adjustment'].edit(target_layer_id);
@@ -588,7 +588,7 @@ class GUI_layers_class {
 		document.getElementById('layers_base').addEventListener('dragstart', function (event) {
 			var item = event.target.closest('.item');
 			if (!item) return;
-			var layer = app.Layers.get_layer(parseInt(item.dataset.id));
+			var layer = app.Layers.get_layer(parseInt(item.dataset.id), true);
 			if (layer && layer.locked) {
 				event.preventDefault();
 				return;
@@ -621,7 +621,7 @@ class GUI_layers_class {
 			if (!item) return;
 			var rect = item.getBoundingClientRect();
 			var y = event.clientY - rect.top;
-			var target_layer = app.Layers.get_layer(parseInt(item.dataset.id));
+			var target_layer = app.Layers.get_layer(parseInt(item.dataset.id), true);
 			var into = false;
 			if (target_layer && is_group(target_layer)) {
 				// Middle band or Ctrl/Cmd = drop into group
@@ -656,8 +656,8 @@ class GUI_layers_class {
 			var target_id = parseInt(item.dataset.id);
 			if (drag_layer_id === target_id) return;
 
-			var drag_layer = app.Layers.get_layer(drag_layer_id);
-			var target_layer = app.Layers.get_layer(target_id);
+			var drag_layer = app.Layers.get_layer(drag_layer_id, true);
+			var target_layer = app.Layers.get_layer(target_id, true);
 			if (!drag_layer || !target_layer) return;
 			if (drag_layer.locked) return;
 
@@ -710,7 +710,7 @@ class GUI_layers_class {
 		if (this.mask_context_menu) {
 			this.mask_context_menu.remove();
 		}
-		var layer = app.Layers.get_layer(layer_id);
+		var layer = app.Layers.get_layer(layer_id, true);
 		if (!layer)
 			return;
 
