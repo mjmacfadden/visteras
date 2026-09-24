@@ -265,6 +265,39 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Ctrl/Cmd + Shift + I = Select Inverse
+			if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey
+				&& (event.code === 'KeyI' || event.key === 'I' || event.key === 'i' || event.keyCode === 73)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection']) {
+					app.GUI.modules['edit/selection'].invert_selection();
+				}
+				return;
+			}
+
+			// Ctrl/Cmd + D = Deselect
+			if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey
+				&& (event.code === 'KeyD' || event.key === 'D' || event.key === 'd' || event.keyCode === 68)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection']) {
+					app.GUI.modules['edit/selection'].deselect();
+				}
+				return;
+			}
+
+			// Ctrl/Cmd + A = Select All (when not in text input or text editing)
+			if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey
+				&& (event.code === 'KeyA' || event.key === 'A' || event.key === 'a' || event.keyCode === 65)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection']) {
+					app.GUI.modules['edit/selection'].select_all();
+				}
+				return;
+			}
+
 			// Ctrl/Cmd + Shift + N = New Layer
 			if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey
 				&& (event.code === 'KeyN' || event.key === 'N' || event.key === 'n' || event.keyCode === 78)) {

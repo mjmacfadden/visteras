@@ -175,33 +175,11 @@ const menuDefinition = [
 			name: 'Paste as New',
 			shortcut: 'Ctrl + Alt + V',
 			target: 'file/new.paste_as_new'
-		},
-		{
-			divider: true
-		},
-			{
-				name: 'Select All',
-				shortcut: 'Ctrl + A',
-				target: 'edit/selection.select_all'
-			},
-			{
-				name: 'Deselect',
-				shortcut: 'Ctrl + D',
-				target: 'edit/selection.deselect'
-			}
-		]
-	},
-	{
-		name: 'Select',
-		children: [
-			{
-				name: 'Subject',
-				target: 'tools/bg_auto.select_subject'
-			}
-		]
-	},
-	{
-		name: 'View',
+		}
+	]
+},
+{
+	name: 'View',
 		children: [
 			{
 				name: 'Zoom',
@@ -522,6 +500,33 @@ const menuDefinition = [
 			{
 				name: 'Flatten Image',
 				target: 'layer/flatten.flatten'
+			}
+		]
+	},
+	{
+		name: 'Select',
+		children: [
+			{
+				name: 'Select All',
+				shortcut: 'Ctrl + A',
+				target: 'edit/selection.select_all'
+			},
+			{
+				name: 'Deselect',
+				shortcut: 'Ctrl + D',
+				target: 'edit/selection.deselect'
+			},
+			{
+				name: 'Select Inverse',
+				shortcut: 'Ctrl + Shift + I',
+				target: 'edit/selection.invert_selection'
+			},
+			{
+				divider: true
+			},
+			{
+				name: 'Subject',
+				target: 'tools/bg_auto.select_subject'
 			}
 		]
 	},

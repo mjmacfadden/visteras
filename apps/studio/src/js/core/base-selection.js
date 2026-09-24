@@ -831,6 +831,31 @@ class Base_selection_class {
 		this.update_mask_state();
 	}
 
+	invert_selection() {
+		var W = Math.max(1, config.WIDTH || (this.mask_canvas ? this.mask_canvas.width : 800));
+		var H = Math.max(1, config.HEIGHT || (this.mask_canvas ? this.mask_canvas.height : 600));
+		if (this.mask_canvas.width !== W || this.mask_canvas.height !== H) {
+			this.mask_canvas.width = W;
+			this.mask_canvas.height = H;
+		}
+		if (!this.has_selection) {
+			this.select_all();
+			return;
+		}
+		var img = this.mask_ctx.getImageData(0, 0, W, H);
+		var d = img.data;
+		for (var i = 0; i < d.length; i += 4) {
+			var currentStrength = Math.round(d[i] * (d[i + 3] / 255));
+			var inv = 255 - currentStrength;
+			d[i] = inv;
+			d[i + 1] = inv;
+			d[i + 2] = inv;
+			d[i + 3] = inv;
+		}
+		this.mask_ctx.putImageData(img, 0, 0);
+		this.update_mask_state();
+	}
+
 	draw_marching_ants(target_ctx = null) {
 		var ctx = target_ctx || this.ctx;
 		var Z = config.ZOOM || 1;

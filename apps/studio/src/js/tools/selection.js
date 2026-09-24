@@ -127,6 +127,11 @@ class Selection_class extends Base_tools_class {
 				e.preventDefault();
 				this.clear_selection();
 			}
+			if ((code == 73 || key === 'i' || key === 'I') && (e.ctrlKey == true || e.metaKey) && e.shiftKey) {
+				//Ctrl+Shift+I / Cmd+Shift+I - invert selection
+				e.preventDefault();
+				this.invert_selection();
+			}
 			if (code >= 37 && code <= 40 && config.TOOL.name == this.name
 				&& this.Base_selection.has_selection) {
 				//arrow keys - nudge selection
@@ -402,6 +407,17 @@ class Selection_class extends Base_tools_class {
 	select_all() {
 		var old_mask = this.Base_selection.clone_mask_canvas();
 		this.Base_selection.select_all();
+		app.State.do_action(
+			new app.Actions.Set_selection_action(
+				this.Base_selection.clone_mask_canvas(),
+				old_mask
+			)
+		);
+	}
+
+	invert_selection() {
+		var old_mask = this.Base_selection.clone_mask_canvas();
+		this.Base_selection.invert_selection();
 		app.State.do_action(
 			new app.Actions.Set_selection_action(
 				this.Base_selection.clone_mask_canvas(),

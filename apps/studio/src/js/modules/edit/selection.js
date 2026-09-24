@@ -26,6 +26,14 @@ class Edit_selection_class {
 		this.Selection.clear_selection();
 	}
 
+	invert_selection() {
+		this.Selection.invert_selection();
+	}
+
+	invert() {
+		this.invert_selection();
+	}
+
 	delete() {
 		this.Selection.delete_selection();
 	}
