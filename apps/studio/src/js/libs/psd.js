@@ -41,24 +41,24 @@ const PSD_TO_COMPOSITION = {
 	'darken': 'darken',
 	'multiply': 'multiply',
 	'color burn': 'color-burn',
-	'linear burn': 'multiply',
-	'darker color': 'darken',
+	'linear burn': 'linear-burn',
+	'darker color': 'darker-color',
 	'lighten': 'lighten',
 	'screen': 'screen',
 	'color dodge': 'color-dodge',
 	'linear dodge': 'lighter',
-	'lighter color': 'lighten',
+	'lighter color': 'lighter-color',
 	'overlay': 'overlay',
 	'soft light': 'soft-light',
 	'hard light': 'hard-light',
-	'vivid light': 'hard-light',
-	'linear light': 'hard-light',
-	'pin light': 'overlay',
-	'hard mix': 'hard-light',
+	'vivid light': 'vivid-light',
+	'linear light': 'linear-light',
+	'pin light': 'pin-light',
+	'hard mix': 'hard-mix',
 	'difference': 'difference',
 	'exclusion': 'exclusion',
-	'subtract': 'difference',
-	'divide': 'difference',
+	'subtract': 'subtract',
+	'divide': 'divide',
 	'hue': 'hue',
 	'saturation': 'saturation',
 	'color': 'color',
@@ -71,15 +71,24 @@ const COMPOSITION_TO_PSD = {
 	'darken': 'darken',
 	'multiply': 'multiply',
 	'color-burn': 'color burn',
+	'linear-burn': 'linear burn',
+	'darker-color': 'darker color',
 	'lighten': 'lighten',
 	'screen': 'screen',
 	'color-dodge': 'color dodge',
 	'lighter': 'linear dodge',
+	'lighter-color': 'lighter color',
 	'overlay': 'overlay',
 	'soft-light': 'soft light',
 	'hard-light': 'hard light',
+	'vivid-light': 'vivid light',
+	'linear-light': 'linear light',
+	'pin-light': 'pin light',
+	'hard-mix': 'hard mix',
 	'difference': 'difference',
 	'exclusion': 'exclusion',
+	'subtract': 'subtract',
+	'divide': 'divide',
 	'hue': 'hue',
 	'saturation': 'saturation',
 	'color': 'color',
@@ -336,14 +345,24 @@ function convert_psd_layer(psdLayer, id, docWidth, docHeight) {
 
 	// 4. Raster/Image Layer
 	let canvas = psdLayer.canvas;
+	const boundW = (psdLayer.right != null && psdLayer.left != null && psdLayer.right > psdLayer.left) ? Math.max(1, Math.round(psdLayer.right - psdLayer.left)) : null;
+	const boundH = (psdLayer.bottom != null && psdLayer.top != null && psdLayer.bottom > psdLayer.top) ? Math.max(1, Math.round(psdLayer.bottom - psdLayer.top)) : null;
+
 	if (!canvas) {
-		if (psdLayer.right != null && psdLayer.bottom != null && psdLayer.right > psdLayer.left && psdLayer.bottom > psdLayer.top) {
+		if (boundW && boundH) {
 			canvas = document.createElement('canvas');
-			canvas.width = Math.max(1, psdLayer.right - psdLayer.left);
-			canvas.height = Math.max(1, psdLayer.bottom - psdLayer.top);
+			canvas.width = boundW;
+			canvas.height = boundH;
 		} else {
 			return null;
 		}
+	} else if (boundW && boundH && (canvas.width !== boundW || canvas.height !== boundH)) {
+		const scaledCanvas = document.createElement('canvas');
+		scaledCanvas.width = boundW;
+		scaledCanvas.height = boundH;
+		const ctx = scaledCanvas.getContext('2d');
+		ctx.drawImage(canvas, 0, 0, boundW, boundH);
+		canvas = scaledCanvas;
 	}
 
 	const width = canvas.width;

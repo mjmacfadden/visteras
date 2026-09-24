@@ -30,10 +30,10 @@ class Effects_color_overlay_class extends Effects_common_class {
 		var filter = this.Base_layers.find_filter_by_id(filter_id, 'color_overlay');
 
 		var blend_modes = [
-			"source-over", "darken", "multiply", "color-burn",
-			"lighten", "screen", "color-dodge", "lighter",
-			"overlay", "soft-light", "hard-light",
-			"difference", "exclusion",
+			"source-over", "darken", "multiply", "color-burn", "linear-burn", "darker-color",
+			"lighten", "screen", "color-dodge", "lighter", "lighter-color",
+			"overlay", "soft-light", "hard-light", "vivid-light", "linear-light", "pin-light", "hard-mix",
+			"difference", "exclusion", "subtract", "divide",
 			"hue", "saturation", "color", "luminosity",
 		];
 		var params = [

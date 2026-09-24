@@ -205,17 +205,52 @@ export function get_layer_content_bounds(layer) {
 	const scaleX = (layer.width || baseW) / baseW;
 	const scaleY = (layer.height || baseH) / baseH;
 
-	const contentX = (layer.x || 0) + minX * scaleX;
-	const contentY = (layer.y || 0) + minY * scaleY;
 	const contentW = (maxX - minX + 1) * scaleX;
 	const contentH = (maxY - minY + 1) * scaleY;
+	const rot = layer.rotate || 0;
+
+	if (rot === 0) {
+		const contentX = (layer.x || 0) + minX * scaleX;
+		const contentY = (layer.y || 0) + minY * scaleY;
+		return {
+			x: contentX,
+			y: contentY,
+			width: contentW,
+			height: contentH,
+			rotate: 0,
+			local_min_x: minX,
+			local_min_y: minY,
+			local_width: maxX - minX + 1,
+			local_height: maxY - minY + 1,
+		};
+	}
+
+	const local_cx = (minX + maxX + 1) / 2;
+	const local_cy = (minY + maxY + 1) / 2;
+	const layer_cx = baseW / 2;
+	const layer_cy = baseH / 2;
+	const dcx = (local_cx - layer_cx) * scaleX;
+	const dcy = (local_cy - layer_cy) * scaleY;
+
+	const rad = rot * Math.PI / 180;
+	const cosA = Math.cos(rad);
+	const sinA = Math.sin(rad);
+
+	const layer_world_cx = (layer.x || 0) + (layer.width || baseW) / 2;
+	const layer_world_cy = (layer.y || 0) + (layer.height || baseH) / 2;
+
+	const content_world_cx = layer_world_cx + (dcx * cosA - dcy * sinA);
+	const content_world_cy = layer_world_cy + (dcx * sinA + dcy * cosA);
+
+	const contentX = content_world_cx - contentW / 2;
+	const contentY = content_world_cy - contentH / 2;
 
 	return {
 		x: contentX,
 		y: contentY,
 		width: contentW,
 		height: contentH,
-		rotate: layer.rotate || 0,
+		rotate: rot,
 		local_min_x: minX,
 		local_min_y: minY,
 		local_width: maxX - minX + 1,

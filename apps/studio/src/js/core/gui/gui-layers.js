@@ -29,32 +29,36 @@ var template = `
 					<option value="darken">Darken</option>
 					<option value="multiply">Multiply</option>
 					<option value="color-burn">Color Burn</option>
+					<option value="linear-burn">Linear Burn</option>
+					<option value="darker-color">Darker Color</option>
 				</optgroup>
 				<optgroup label="Lighten">
 					<option value="lighten">Lighten</option>
 					<option value="screen">Screen</option>
 					<option value="color-dodge">Color Dodge</option>
-					<option value="lighter">Lighter</option>
+					<option value="lighter">Linear Dodge (Add)</option>
+					<option value="lighter-color">Lighter Color</option>
 				</optgroup>
 				<optgroup label="Contrast">
 					<option value="overlay">Overlay</option>
 					<option value="soft-light">Soft Light</option>
 					<option value="hard-light">Hard Light</option>
+					<option value="vivid-light">Vivid Light</option>
+					<option value="linear-light">Linear Light</option>
+					<option value="pin-light">Pin Light</option>
+					<option value="hard-mix">Hard Mix</option>
 				</optgroup>
 				<optgroup label="Inversion">
 					<option value="difference">Difference</option>
 					<option value="exclusion">Exclusion</option>
+					<option value="subtract">Subtract</option>
+					<option value="divide">Divide</option>
 				</optgroup>
 				<optgroup label="Component">
 					<option value="hue">Hue</option>
 					<option value="saturation">Saturation</option>
 					<option value="color">Color</option>
 					<option value="luminosity">Luminosity</option>
-				</optgroup>
-				<optgroup label="Other">
-					<option value="destination-over">Destination Over</option>
-					<option value="destination-out">Destination Out</option>
-					<option value="xor">XOR</option>
 				</optgroup>
 			</select>
 			<div class="layer_opacity_group" title="Layer Opacity — fades layer and effects">
