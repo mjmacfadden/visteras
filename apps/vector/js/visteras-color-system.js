@@ -330,6 +330,11 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
 //   Helper mirrors body geom (incl. transform) on transition + pointerup sync,
 //   so after bake we rewrite helper x/y + rebuild clip/mask from current geom.
 //
+// Wrap / unwrap position invariant:
+//   SVG-Edit often selects the wrap <g> (not the body), so drag transform can
+//   land on the wrap. Switching to Center must bake wrap×body onto the body
+//   before removing the wrap, or the shape nudges on the artboard.
+//
 // Clip/mask clones use LOCAL geometry only (no transform). During drag the
 // helper carries the same transform as the body; after bake both share x/y.
 // Open paths, lines, polylines, text, images: fall back to center rendering
@@ -518,8 +523,10 @@ function removeDefsResource(sc, attrName, el) {
 
 /**
  * Ensure body lives in a stroke-align wrapper <g> so the helper is not an
- * orphan layer sibling. Transform stays on the body (and is mirrored to the
- * helper); the wrap is structural so both share a parent.
+ * orphan layer sibling. Wrap is identity (no transform) so wrapping never
+ * introduces an artboard delta; body keeps its own transform (mirrored to the
+ * helper). If a prior wrap already holds a transform (SVG-Edit selected the
+ * <g>), leave it — unwrap will bake it back onto the body.
  */
 function ensureStrokeAlignWrap(el) {
   if (!el?.parentNode) return null;
@@ -529,10 +536,68 @@ function ensureStrokeAlignWrap(el) {
   }
   const wrap = document.createElementNS(el.namespaceURI || SVG_NS, 'g');
   wrap.setAttribute(STROKE_WRAP_ATTR, '1');
+  // Identity wrap only — do not move body transform onto the wrap here.
   el.parentNode.insertBefore(wrap, el);
   wrap.appendChild(el);
   el.setAttribute(STROKE_BODY_ATTR, '1');
   return wrap;
+}
+
+/** Read an element's SVG transform list as a DOMMatrix (identity if none). */
+function elementTransformMatrix(el) {
+  let m = new DOMMatrix();
+  if (!el) return m;
+  try {
+    const list = el.transform?.baseVal;
+    if (list && list.numberOfItems > 0) {
+      for (let i = 0; i < list.numberOfItems; i++) {
+        const tm = list.getItem(i).matrix;
+        m = m.multiply(new DOMMatrix([tm.a, tm.b, tm.c, tm.d, tm.e, tm.f]));
+      }
+      return m;
+    }
+  } catch { /* fall through to attribute parse */ }
+  const attr = el.getAttribute?.('transform');
+  if (!attr) return m;
+  try {
+    return new DOMMatrix(attr);
+  } catch {
+    return new DOMMatrix();
+  }
+}
+
+function isIdentityMatrix(m, eps = 1e-9) {
+  if (!m) return true;
+  return Math.abs(m.a - 1) < eps && Math.abs(m.b) < eps && Math.abs(m.c) < eps
+    && Math.abs(m.d - 1) < eps && Math.abs(m.e) < eps && Math.abs(m.f) < eps;
+}
+
+function matrixToTransformAttr(m) {
+  if (isIdentityMatrix(m)) return null;
+  // Use matrix() so compose/bake round-trips cleanly.
+  const n = (v) => {
+    const r = Math.round(v * 1e6) / 1e6;
+    return Object.is(r, -0) ? 0 : r;
+  };
+  return `matrix(${n(m.a)} ${n(m.b)} ${n(m.c)} ${n(m.d)} ${n(m.e)} ${n(m.f)})`;
+}
+
+/**
+ * Bake wrap's transform onto one child so artboard position is preserved when
+ * the wrap is removed. SVG-Edit often selects the wrap <g> (not the body) on
+ * click-drag, so the live/baked translate lands on the wrap; dropping the wrap
+ * without this compose would nudge the shape back.
+ * Combined CTM: wrapMatrix × childMatrix (parent then child).
+ * Caller snapshots wrapM once and clears the wrap transform after all children.
+ */
+function bakeMatrixOntoElement(wrapM, el) {
+  if (!el || el.nodeType !== 1) return;
+  if (isIdentityMatrix(wrapM)) return;
+  const childM = elementTransformMatrix(el);
+  const combined = wrapM.multiply(childM);
+  const attr = matrixToTransformAttr(combined);
+  if (attr) el.setAttribute('transform', attr);
+  else el.removeAttribute('transform');
 }
 
 function unwrapStrokeAlignIfEmpty(el) {
@@ -543,6 +608,11 @@ function unwrapStrokeAlignIfEmpty(el) {
   if (hasHelper) return;
   const parent = wrap.parentNode;
   if (!parent) return;
+  // Keep artboard position: wrap may hold the select-drag transform.
+  // Snapshot once so every child gets the same bake before reparent.
+  const wrapM = elementTransformMatrix(wrap);
+  for (const child of [...wrap.children]) bakeMatrixOntoElement(wrapM, child);
+  if (wrap.hasAttribute?.('transform')) wrap.removeAttribute('transform');
   el.removeAttribute(STROKE_BODY_ATTR);
   parent.insertBefore(el, wrap);
   // Move any leftover non-helper children out just in case.
