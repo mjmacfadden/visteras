@@ -176,37 +176,63 @@ function resolvePaintTargets(sc) {
   const selected = (typeof sc.getSelectedElements === 'function'
     ? sc.getSelectedElements()
     : [])?.filter(Boolean) || [];
-  if (selected.length) return selected;
-  const ds = sc.directSelection;
-  if (ds?.active) {
-    const els = (typeof ds.getPaintTargets === 'function'
-      ? ds.getPaintTargets()
-      : typeof ds.getSelectedElements === 'function'
-        ? ds.getSelectedElements()
-        : []) || [];
-    if (els.length) return els;
+  let raw = selected;
+  if (!raw.length) {
+    const ds = sc.directSelection;
+    if (ds?.active) {
+      const els = (typeof ds.getPaintTargets === 'function'
+        ? ds.getPaintTargets()
+        : typeof ds.getSelectedElements === 'function'
+          ? ds.getSelectedElements()
+          : []) || [];
+      if (els.length) raw = els;
+    }
   }
-  const path = sc.getPathObj?.();
-  if (path?.elem?.isConnected) return [path.elem];
-  return [];
+  if (!raw.length) {
+    const path = sc.getPathObj?.();
+    if (path?.elem?.isConnected) raw = [path.elem];
+  }
+  // Remap stroke-align wrap/helper → body so selection never paints/reads the 2× helper.
+  return raw.map((el) => resolveStrokeAlignBody(el) || el).filter(Boolean);
 }
 
 function flattenPaintTargets(elements, { attr = null } = {}) {
   const out = [];
+  const seen = new Set();
   const skipFill = attr === 'fill';
+  const push = (el) => {
+    if (!el || seen.has(el)) return;
+    if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
+    seen.add(el);
+    out.push(el);
+  };
   for (const el of elements) {
     if (!el) continue;
+    // Helper / wrap → body (user stroke-width lives on the body only).
+    if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+      const body = resolveStrokeAlignBody(el);
+      if (body) push(body);
+      continue;
+    }
     if (el.getAttribute?.('data-visteras-stroke-align-helper')) continue;
     if (el.tagName === 'g') {
+      // Stroke-align wrap: only the body child (never the 2× helper).
+      if (el.getAttribute?.('data-visteras-sa-wrap')) {
+        const body = resolveStrokeAlignBody(el);
+        if (body) push(body);
+        continue;
+      }
       for (const child of el.querySelectorAll('*')) {
         if (child.nodeName === 'g') continue;
+        if (isStrokeAlignHelper(child)) continue;
+        if (child.getAttribute?.('data-visteras-stroke-align-helper')) continue;
         if (skipFill && (child.tagName === 'polyline' || child.tagName === 'line')) continue;
-        out.push(child);
+        push(child);
       }
     } else if (skipFill && (el.tagName === 'polyline' || el.tagName === 'line')) {
       continue;
     } else {
-      out.push(el);
+      push(el);
     }
   }
   return out;
@@ -384,6 +410,44 @@ function isStrokeAlignHelper(el) {
 
 function isStrokeAlignWrap(el) {
   return !!el?.getAttribute?.(STROKE_WRAP_ATTR);
+}
+
+/**
+ * Map a stroke-align wrap or helper back to the USER body element.
+ * Helper keeps 2× stroke-width for visual Inside/Outside compensation; that
+ * value must never leak into Appearance UI, curProperties, or align writes.
+ */
+function resolveStrokeAlignBody(el) {
+  if (!el) return null;
+  if (isStrokeAlignHelper(el)) {
+    const forId = el.getAttribute(STROKE_HELPER_FOR_ATTR);
+    if (forId) {
+      try {
+        const root = el.ownerSVGElement || document;
+        const body = root.getElementById?.(forId) || document.getElementById(forId);
+        if (body) return body;
+      } catch { /* fall through */ }
+    }
+    // Sibling body inside the same wrap (helper-for missing / stale).
+    const parent = el.parentNode;
+    if (parent && isStrokeAlignWrap(parent)) {
+      for (const child of parent.children) {
+        if (child.getAttribute?.(STROKE_BODY_ATTR)) return child;
+      }
+    }
+    return null;
+  }
+  if (isStrokeAlignWrap(el)) {
+    for (const child of el.children || []) {
+      if (child.getAttribute?.(STROKE_BODY_ATTR)) return child;
+    }
+    // Fallback: first non-helper shape child
+    for (const child of el.children || []) {
+      if (!isStrokeAlignHelper(child) && child.nodeName !== 'g') return child;
+    }
+    return null;
+  }
+  return el;
 }
 
 function isClosedStrokeTarget(el) {
@@ -833,6 +897,12 @@ function readElementStrokeAlign(el) {
 
 function readElementStrokeWeight(el) {
   if (!el) return null;
+  // Never read stroke-width from the helper (2×) or the structural wrap.
+  if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+    const body = resolveStrokeAlignBody(el);
+    if (body && body !== el) return readElementStrokeWeight(body);
+    return null;
+  }
   const stored = el.getAttribute(STROKE_WEIGHT_ATTR);
   if (stored != null && stored !== '') {
     const n = Number(stored);
@@ -1995,10 +2065,13 @@ function mountAppearanceColors(ctrl, svgEditor) {
   }
 
   function readStrokeWidth() {
+    // Prefer body-stored user weight. flattenPaintTargets already drops helpers,
+    // but defense-in-depth: never accept a helper/wrap read.
     const targets = flattenPaintTargets(resolvePaintTargets(sc));
     for (const el of targets) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
       const w = readElementStrokeWeight(el);
-      if (w != null) return w;
+      if (w != null && !Number.isNaN(Number(w))) return Number(w);
     }
     if (typeof sc?.getStrokeWidth === 'function') {
       const w = sc.getStrokeWidth();
@@ -2096,8 +2169,18 @@ function mountAppearanceColors(ctrl, svgEditor) {
 
   function writeStrokeAlign(align) {
     const a = (align === 'inside' || align === 'outside') ? align : 'center';
-    // Prefer stored user weight; never trust a legacy doubled stroke-width attr.
-    const w = readStrokeWidth();
+    // Always take user width from the BODY (data-visteras-stroke-weight / body
+    // stroke-width). Never from the helper's 2×, Appearance input, or a stale
+    // curProperties value left over from SVG-Edit's group stroke-width scan.
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    let w = null;
+    for (const el of targets) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
+      w = readElementStrokeWeight(el);
+      if (w != null) break;
+    }
+    if (w == null || Number.isNaN(Number(w))) w = readStrokeWidth();
+    w = Math.max(0, Number(w) || 0);
     applyStrokeAlignToTargets(sc, a, { userWidth: w, noUndo: false });
     setAlignButtons(a);
     // Keep SVG-Edit current style + Appearance input as the USER weight (idempotent).
@@ -2121,8 +2204,19 @@ function mountAppearanceColors(ctrl, svgEditor) {
     rowStroke?.classList.toggle('active', active === 'stroke');
     fillTarget?.classList.toggle('active', active === 'fill');
     strokeTarget?.classList.toggle('active', active === 'stroke');
+    const userW = readStrokeWidth();
     if (weightInput && document.activeElement !== weightInput) {
-      weightInput.value = formatStrokeWeight(readStrokeWidth());
+      weightInput.value = formatStrokeWeight(userW);
+    }
+    // SVG-Edit's group updateContextPanel may scan wrap children and briefly
+    // surface the helper's 2× into #stroke_width / curProperties. Re-assert the
+    // USER body weight on every selection refresh so align switches stay idempotent.
+    if (typeof sc?.setCurProperties === 'function') sc.setCurProperties('stroke_width', userW);
+    else if (sc?.curProperties) sc.curProperties.stroke_width = userW;
+    if (sc?.curShape) sc.curShape.stroke_width = userW;
+    const native = document.getElementById('stroke_width');
+    if (native && document.activeElement !== native) {
+      native.value = formatStrokeWeight(userW);
     }
     setAlignButtons(readStrokeAlign());
   }
