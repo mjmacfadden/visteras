@@ -20,6 +20,7 @@ import ComicStrip from '../components/ComicStrip.astro';
 import TodayInHistory from '../components/TodayInHistory.astro';
 import Birthdays from '../components/Birthdays.astro';
 import AnswersQr from '../components/AnswersQr.astro';
+import JokeOfTheDay from '../components/JokeOfTheDay.astro';
 import RightSidebarPanels from '../components/RightSidebarPanels.astro';
 import '../styles/visteras-publish-theme.css';
 
@@ -72,6 +73,8 @@ const hasWireStories =
             <div class="menu_entry_title">File</div>
             <div class="menu_dropdown_list">
               <div class="menu_dropdown_item" id="action_new_edition">New Edition <span class="menu_dropdown_shortcut">⌘N</span></div>
+              <div class="menu_dropdown_item" id="action_open_edition">Open Edition... <span class="menu_dropdown_shortcut">⌘O</span></div>
+              <div class="menu_dropdown_item" id="action_save_edition">Save Edition As... <span class="menu_dropdown_shortcut">⌘S</span></div>
               <div class="menu_dropdown_item" id="action_load_sample">Load Sample Edition</div>
               <div class="menu_dropdown_separator"></div>
               <div class="menu_dropdown_item" id="action_print">Print Edition... <span class="menu_dropdown_shortcut">⌘P</span></div>
@@ -81,6 +84,7 @@ const hasWireStories =
               <a href="../collage/" class="menu_dropdown_item">Open Visteras Collage...</a>
             </div>
           </div>
+          <input type="file" id="action_file_open_input" accept=".json,application/json" style="display: none;" />
 
           <!-- Edit Menu -->
           <div class="menu_entry" id="menu_edit">
@@ -209,7 +213,10 @@ const hasWireStories =
         </button>
       </aside>
 
-      <!-- 4. Middle Workspace -->
+      <!-- 4. Document Tabs Bar (Studio & Vector Parity) -->
+      <div id="publish_document_tabs" class="document_tabs screen-only" aria-label="Edition Tabs"></div>
+
+      <!-- 5. Middle Workspace -->
       <div id="workarea">
 <main class="newspaper-shell" id="newspaper">
       <!-- One continuous edition document — screen mirrors print packing -->
@@ -304,14 +311,14 @@ const hasWireStories =
           </header>
           {/* Fixed last-page block — out of the 3-column news flow */}
           <div class="page3-features" data-features-block>
-            <div class="comics-band" aria-label="Comics" data-live-comics>
+            <div class="comics-band" aria-label="Comics" data-live-comics data-feature="comics">
               {(comicsPool.length ? comicsPool : edition.comics).slice(0, 2).map((c, i) => <ComicStrip comic={c} slotIndex={i} />)}
             </div>
             <div class="games-band" aria-label="Games">
-              <div class="game-cell game-crossword">
+              <div class="game-cell game-crossword" data-feature="crossword">
                 <CrosswordPuzzle puzzle={puzzles.crossword} />
               </div>
-              <div class="game-cell game-jumble">
+              <div class="game-cell game-jumble" data-feature="jumble">
                 <div class="jumble-stack">
                   {puzzles.jumbles.map((j, i) => (
                     <JumblePuzzle
@@ -321,18 +328,21 @@ const hasWireStories =
                   ))}
                 </div>
               </div>
-              <div class="game-cell game-trivia">
+              <div class="game-cell game-trivia" data-feature="trivia">
                 <SportsTrivia trivia={puzzles.trivia} />
               </div>
             </div>
-            <div class="features-meta-band" aria-label="History and answers">
-              <div class="feature-cell feature-history">
+            <div class="features-meta-band" aria-label="History, joke and answers">
+              <div class="feature-cell feature-joke" data-feature="joke">
+                <JokeOfTheDay joke={puzzles.joke} />
+              </div>
+              <div class="feature-cell feature-history" data-feature="history">
                 <TodayInHistory history={edition.todayInHistory} />
               </div>
-              <div class="feature-cell feature-birthdays">
+              <div class="feature-cell feature-birthdays" data-feature="birthdays">
                 <Birthdays birthdays={edition.birthdays} />
               </div>
-              <div class="feature-cell feature-qr">
+              <div class="feature-cell feature-qr" data-feature="answers">
                 <AnswersQr date={edition.date} />
               </div>
             </div>
@@ -418,6 +428,10 @@ const hasWireStories =
         type PaperSettings,
         type CustomFeed,
       } from '../lib/settings';
+      import {
+        PublishDocumentManager,
+        type PublishDocument,
+      } from '../lib/publishDocumentManager';
       import {
         normalizeCalendarUrl,
         fetchMergedAgenda,
@@ -577,6 +591,7 @@ const hasWireStories =
       let calendars: CalendarSource[] = [...settings.calendars];
       let lastRss: any = null;
       let lastGrok: ParsedGrokBrief | null = null;
+      let docManager: PublishDocumentManager;
 
       const bootstrapEl = document.getElementById('edition-bootstrap');
       const bootstrap = bootstrapEl ? JSON.parse(bootstrapEl.textContent || '{}') : {};
@@ -644,7 +659,17 @@ const hasWireStories =
 
       function storyImageHtml(imageUrl?: string) {
         if (!imageUrl) return '';
-        return `<img class="story-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" decoding="async" />`;
+        return `<div class="column-image-wrap" data-column-image-wrap data-zoom-step="0">
+          <img class="story-image" src="${escapeHtml(imageUrl)}" alt="" loading="lazy" decoding="async" />
+          <button type="button" class="column-image-zoom-btn" data-column-image-zoom title="Magnify image (+10%)" aria-label="Magnify image">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.5" y2="16.5"></line>
+              <line x1="11" y1="8" x2="11" y2="14"></line>
+              <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+          </button>
+        </div>`;
       }
 
       const LEAD_POS_Y_KEY = 'daily-mike-lead-image-pos-y';
@@ -731,6 +756,7 @@ const hasWireStories =
         source: string;
         brief?: boolean;
         imageUrl?: string;
+        image?: string | null;
       }) {
         const title = s.url
           ? `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a>`
@@ -750,6 +776,9 @@ const hasWireStories =
               return '';
             })
             .join('');
+          if (!s.blocks.some((b) => b.type === 'image') && (s.imageUrl || s.image)) {
+            bodyHtml = `${storyImageHtml(s.imageUrl || s.image || undefined)}${bodyHtml}`;
+          }
         } else {
           const paragraphs: string[] = Array.isArray(s.paragraphs) && s.paragraphs.length
             ? s.paragraphs
@@ -757,7 +786,7 @@ const hasWireStories =
           const parasHtml = paragraphs.length
             ? paragraphs.map((p) => `<p class="deck">${escapeHtml(p)}</p>`).join('')
             : `<p class="deck">${escapeHtml(s.description)}</p>`;
-          bodyHtml = `${storyImageHtml(s.imageUrl)}${parasHtml}`;
+          bodyHtml = `${storyImageHtml(s.imageUrl || s.image || undefined)}${parasHtml}`;
         }
 
         return `<article class="${cls}">
@@ -803,6 +832,7 @@ const hasWireStories =
             .map(
               (s) => `<article class="brief ${s.brief ? 'brief-item' : ''}">
               <h3>${s.url ? `<a href="${s.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a>` : escapeHtml(s.title)}</h3>
+              ${storyImageHtml(s.imageUrl || s.image || undefined)}
               <p>${escapeHtml(s.description || '')}</p>
               <div class="source">${escapeHtml(s.source || '')}</div>
             </article>`,
@@ -869,8 +899,8 @@ const hasWireStories =
       ];
 
       function renderAgenda(items: { time: string; title: string; note?: string }[]) {
-        const root = document.querySelector('[data-live-agenda]');
-        if (!root) return;
+        const roots = document.querySelectorAll<HTMLElement>('[data-live-agenda]');
+        if (!roots.length) return;
         const list = Array.isArray(items) ? items : NO_VALID_CALENDAR;
         const body = list.length
           ? list
@@ -880,10 +910,14 @@ const hasWireStories =
               )
               .join('')
           : '<li class="agenda-empty">Quiet day</li>';
-        root.innerHTML = `<aside class="schedule-box" aria-label="Daily schedule">
+        const html = `<aside class="schedule-box" aria-label="Daily schedule">
           <h2 class="section-label">Today's Agenda</h2>
           <ul class="agenda-list">${body}</ul>
         </aside>`;
+        roots.forEach((r) => {
+          r.innerHTML = html;
+        });
+        schedulePaginate();
       }
 
       function renderGrokWeather(grok: ParsedGrokBrief | null) {
@@ -967,6 +1001,9 @@ const hasWireStories =
               return '';
             })
             .join('');
+          if (!story.blocks.some((b: any) => b.type === 'image') && (story.imageUrl || story.image)) {
+            bodyHtml = `${storyImageHtml(story.imageUrl || story.image)}${bodyHtml}`;
+          }
         } else {
           const paragraphs: string[] = Array.isArray(story.paragraphs) && story.paragraphs.length
             ? story.paragraphs
@@ -1240,12 +1277,21 @@ const hasWireStories =
           lastGrok = null;
           composeEdition(lastRss, null);
           setGrokStatus('Brief cleared');
+          docManager?.updateActiveDocument({
+            grokBrief: null,
+            isDirty: true,
+          });
           showPage(1);
           return;
         }
 
         saveGrokBrief(trimmed, editionDate);
         const parsed = parseGrokBrief(trimmed);
+
+        docManager?.updateActiveDocument({
+          grokBrief: { text: trimmed, date: editionDate },
+          isDirty: true,
+        });
 
         if (!parsed.structured) {
           lastGrok = null;
@@ -1373,17 +1419,29 @@ const hasWireStories =
         if (!list) return;
         list.innerHTML = calendars
           .map(
-            (c, i) => `<div class="custom-feed-row">
-              <span><strong>${escapeHtml(c.label)}</strong><br/>${escapeHtml(c.url)}</span>
-              <button type="button" data-remove-cal="${i}">Remove</button>
+            (c, i) => `<div class="custom-feed-row rss-source-row" data-cal-idx="${i}">
+              <span class="custom-feed-row-text" style="flex:1 1 auto; min-width:0;" title="${escapeAttr(c.url)}">
+                <span class="custom-feed-row-label">${escapeHtml(c.label)}</span>
+                <span class="custom-feed-row-url">${escapeHtml(c.url)}</span>
+              </span>
+              <button type="button" class="custom-feed-remove" data-remove-cal="${i}" title="Delete calendar" aria-label="Delete calendar">${CUSTOM_FEED_TRASH_ICON}</button>
             </div>`,
           )
           .join('');
         list.querySelectorAll('[data-remove-cal]').forEach((btn) => {
           btn.addEventListener('click', () => {
             const idx = Number((btn as HTMLElement).getAttribute('data-remove-cal'));
-            calendars.splice(idx, 1);
-            renderCalendarsList();
+            if (!isNaN(idx) && idx >= 0 && idx < calendars.length) {
+              calendars.splice(idx, 1);
+              renderCalendarsList();
+              settings = readSettingsFromForm();
+              saveSettings(settings);
+              docManager?.updateActiveDocument({
+                settings,
+                isDirty: true,
+              });
+              void refreshAgenda(settings);
+            }
           });
         });
       }
@@ -1401,6 +1459,22 @@ const hasWireStories =
         });
         document.querySelectorAll<HTMLInputElement>('input[name="comic"]').forEach((cb) => {
           cb.checked = s.enabledComicIds.includes(cb.value);
+        });
+        const features = s.features || {
+          comics: true,
+          crossword: true,
+          jumble: true,
+          trivia: true,
+          history: true,
+          birthdays: true,
+          answers: true,
+          joke: true,
+        };
+        document.querySelectorAll<HTMLInputElement>('input[name="feature"]').forEach((cb) => {
+          const key = cb.getAttribute('data-feature-id') as keyof typeof features;
+          if (key && key in features) {
+            cb.checked = features[key] !== false;
+          }
         });
         customFeeds = [...s.customFeeds];
         calendars = [...s.calendars];
@@ -1425,6 +1499,16 @@ const hasWireStories =
         const enabledComicIds = Array.from(
           document.querySelectorAll<HTMLInputElement>('input[name="comic"]:checked'),
         ).map((cb) => cb.value);
+        const features = {
+          comics: (document.querySelector('input[data-feature-id="comics"]') as HTMLInputElement)?.checked ?? true,
+          crossword: (document.querySelector('input[data-feature-id="crossword"]') as HTMLInputElement)?.checked ?? true,
+          jumble: (document.querySelector('input[data-feature-id="jumble"]') as HTMLInputElement)?.checked ?? true,
+          joke: (document.querySelector('input[data-feature-id="joke"]') as HTMLInputElement)?.checked ?? true,
+          trivia: (document.querySelector('input[data-feature-id="trivia"]') as HTMLInputElement)?.checked ?? true,
+          history: (document.querySelector('input[data-feature-id="history"]') as HTMLInputElement)?.checked ?? true,
+          birthdays: (document.querySelector('input[data-feature-id="birthdays"]') as HTMLInputElement)?.checked ?? true,
+          answers: (document.querySelector('input[data-feature-id="answers"]') as HTMLInputElement)?.checked ?? true,
+        };
         return {
           paperName,
           paperTagline,
@@ -1437,6 +1521,7 @@ const hasWireStories =
             ...c,
             url: normalizeCalendarUrl(c.url).url,
           })),
+          features,
         };
       }
 
@@ -1456,6 +1541,15 @@ const hasWireStories =
         (document.getElementById('custom-feed-name') as HTMLInputElement).value = '';
         (document.getElementById('custom-feed-url') as HTMLInputElement).value = '';
         renderCustomList();
+        settings = readSettingsFromForm();
+        saveSettings(settings);
+        docManager?.updateActiveDocument({
+          settings,
+          isDirty: true,
+        });
+        if (settings.rssEnabled) {
+          void refreshStories(settings);
+        }
       });
 
       document.getElementById('calendar-add-btn')?.addEventListener('click', () => {
@@ -1466,16 +1560,32 @@ const hasWireStories =
         calendars.push({ id: `cal-${Date.now()}`, label, url: norm.url });
         (document.getElementById('calendar-label') as HTMLInputElement).value = '';
         (document.getElementById('calendar-url') as HTMLInputElement).value = '';
-        const status = document.getElementById('settings-status');
-        if (status && norm.convertedFromEmbed) {
-          status.textContent = 'Converted Google embed URL → public ICS. Calendar must be public.';
-        }
         renderCalendarsList();
+        settings = readSettingsFromForm();
+        saveSettings(settings);
+        docManager?.updateActiveDocument({
+          settings,
+          isDirty: true,
+        });
+        void refreshAgenda(settings);
+      });
+
+      document.querySelectorAll<HTMLInputElement>('input[name="feature"]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          settings = readSettingsFromForm();
+          saveSettings(settings);
+          docManager?.updateActiveDocument({
+            settings,
+            isDirty: true,
+          });
+          applyFeaturesVisibility(settings);
+        });
       });
 
       document.getElementById('settings-reset')?.addEventListener('click', () => {
         settings = defaultSettings();
         populateSettingsForm(settings);
+        applyFeaturesVisibility(settings);
       });
 
       document.getElementById('settings-export')?.addEventListener('click', () => {
@@ -1515,6 +1625,7 @@ const hasWireStories =
           populateSettingsForm(settings);
           applyPaperIdentity(settings.paperName, settings.paperTagline);
           applyComicVisibility(settings);
+          applyFeaturesVisibility(settings);
           await Promise.all([
             applyWeather(settings.zip),
             refreshStories(settings),
@@ -1536,8 +1647,14 @@ const hasWireStories =
       async function saveAndRefreshAll(statusElementId?: string) {
         settings = readSettingsFromForm();
         saveSettings(settings);
+        docManager?.updateActiveDocument({
+          settings,
+          title: settings.paperName || 'The Daily Mike',
+          isDirty: true,
+        });
         applyPaperIdentity(settings.paperName, settings.paperTagline);
         applyComicVisibility(settings);
+        applyFeaturesVisibility(settings);
         const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
         if (ta) applyGrokText(ta.value);
         await Promise.all([
@@ -1906,6 +2023,30 @@ const hasWireStories =
         schedulePaginate();
       }
 
+      function applyFeaturesVisibility(s: PaperSettings) {
+        const f = s.features || {
+          comics: true,
+          crossword: true,
+          jumble: true,
+          trivia: true,
+          history: true,
+          birthdays: true,
+          answers: true,
+          joke: true,
+        };
+
+        const featureKeys = ['comics', 'crossword', 'jumble', 'trivia', 'history', 'birthdays', 'answers', 'joke'] as const;
+        featureKeys.forEach((key) => {
+          const visible = f[key] !== false;
+          const elements = document.querySelectorAll<HTMLElement>(`[data-feature="${key}"]`);
+          elements.forEach((el) => {
+            el.style.display = visible ? '' : 'none';
+          });
+        });
+
+        schedulePaginate();
+      }
+
       document.addEventListener(
         'error',
         (e) => {
@@ -1956,6 +2097,56 @@ const hasWireStories =
           const box = cycleBtn.closest('.comic-box') as HTMLElement | null;
           const dir = cycleBtn.getAttribute('data-comic-cycle') === 'prev' ? 'prev' : 'next';
           if (box) cycleComicSlot(box, dir);
+          return;
+        }
+
+        // Column image zoom button (magnifying glass)
+        const zoomBtn = t?.closest?.('[data-column-image-zoom]') as HTMLElement | null;
+        if (zoomBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          const wrap = zoomBtn.closest<HTMLElement>('[data-column-image-wrap]');
+          if (!wrap) return;
+          const img = wrap.querySelector<HTMLImageElement>('.story-image');
+          if (!img) return;
+
+          let step = Number(wrap.getAttribute('data-zoom-step') || 0);
+          step = (step + 1) % 4; // 0 (100%) -> 1 (110%) -> 2 (120%) -> 3 (130%) -> 0 (100%)
+
+          const targetSrc = (img.getAttribute('src') || img.src || '').trim();
+          const heights = [160, 176, 192, 208]; // +0%, +10%, +20%, +30%
+
+          // Update this specific image across DOM instances (#edition-document and #paged-edition)
+          document.querySelectorAll<HTMLElement>('[data-column-image-wrap]').forEach((w) => {
+            const i = w.querySelector<HTMLImageElement>('.story-image');
+            if (i) {
+              const srcAttr = (i.getAttribute('src') || '').trim();
+              const fullSrc = (i.src || '').trim();
+              const isMatch =
+                srcAttr === targetSrc ||
+                fullSrc === targetSrc ||
+                (targetSrc && (fullSrc.endsWith(targetSrc) || srcAttr.endsWith(targetSrc))) ||
+                (srcAttr && (targetSrc.endsWith(srcAttr) || fullSrc.endsWith(srcAttr)));
+              if (isMatch) {
+                w.setAttribute('data-zoom-step', String(step));
+                if (step === 0) {
+                  i.style.maxHeight = '160px';
+                  i.style.width = 'auto';
+                } else {
+                  i.style.maxHeight = `${heights[step]}px`;
+                  i.style.width = `min(100%, ${100 + step * 10}%)`;
+                }
+                const btn = w.querySelector<HTMLElement>('[data-column-image-zoom]');
+                if (btn) {
+                  btn.title = step === 3
+                    ? 'Reset image size (click to revert)'
+                    : `Magnify image (+${(step + 1) * 10}%)`;
+                }
+              }
+            }
+          });
+
+          schedulePaginate();
           return;
         }
 
@@ -2254,6 +2445,7 @@ const hasWireStories =
       void applyWeather(settings.zip);
       applyPaperIdentity(settings.paperName, settings.paperTagline);
       applyComicVisibility(settings);
+      applyFeaturesVisibility(settings);
       lastRss = {
         news: bootstrap.news || [],
         businessTech: bootstrap.businessTech || [],
@@ -2289,7 +2481,57 @@ const hasWireStories =
       }
       if (settings.calendars.length) refreshAgenda(settings);
 
-      // --- Visteras UX & Tool Controller ---
+      // --- Visteras UX & Document Controller ---
+      function loadDocumentIntoView(doc: PublishDocument) {
+        settings = { ...doc.settings };
+        customFeeds = [...settings.customFeeds];
+        calendars = [...settings.calendars];
+
+        populateSettingsForm(settings);
+        applyPaperIdentity(settings.paperName, settings.paperTagline);
+        applyComicVisibility(settings);
+        applyFeaturesVisibility(settings);
+        void applyWeather(settings.zip);
+        refreshAgenda(settings);
+
+        const text = doc.grokBrief?.text || '';
+        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
+        if (ta) ta.value = text;
+        const q = document.getElementById('grok-paste-quick') as HTMLTextAreaElement | null;
+        if (q) q.value = text;
+
+        ensureRssBootstrap();
+
+        if (text) {
+          const parsed = parseGrokBrief(text);
+          if (parsed.structured) {
+            lastGrok = parsed;
+            composeEdition(lastRss, lastGrok);
+            setGrokStatus(`Brief composed · ${parsed.sections.length} sections`);
+          } else {
+            lastGrok = null;
+            composeEdition(lastRss, null);
+            setGrokStatus(parsed.warning || 'Brief format warning', true);
+          }
+        } else {
+          lastGrok = null;
+          composeEdition(lastRss, null);
+          setGrokStatus('');
+        }
+
+        if (settings.rssEnabled || (Array.isArray(settings.customFeeds) && settings.customFeeds.some((f) => f.enabled !== false))) {
+          void refreshStories(settings);
+        }
+      }
+
+      docManager = new PublishDocumentManager();
+      const tabContainer = document.getElementById('publish_document_tabs');
+      if (tabContainer) {
+        docManager.setTabContainer(tabContainer, (doc) => {
+          loadDocumentIntoView(doc);
+        });
+      }
+
       populateSettingsForm(settings);
 
       function selectTool(toolName: string) {
@@ -2344,23 +2586,59 @@ const hasWireStories =
         const title = entry.querySelector<HTMLElement>('.menu_entry_title');
         title?.addEventListener('click', (e) => {
           e.stopPropagation();
-          const isActive = entry.classList.contains('active');
-          menuEntries.forEach((e2) => e2.classList.remove('active'));
-          if (!isActive) entry.classList.add('active');
+          const wasOpen = entry.classList.contains('open');
+          menuEntries.forEach((e2) => e2.classList.remove('open'));
+          if (!wasOpen) entry.classList.add('open');
+        });
+
+        entry.addEventListener('mouseenter', () => {
+          const anyOpen = Array.from(menuEntries).some((e2) => e2.classList.contains('open'));
+          if (anyOpen) {
+            menuEntries.forEach((e2) => e2.classList.remove('open'));
+            entry.classList.add('open');
+          }
         });
       });
+
       document.addEventListener('click', () => {
-        menuEntries.forEach((e) => e.classList.remove('active'));
+        menuEntries.forEach((e) => e.classList.remove('open'));
+      });
+
+      document.querySelectorAll<HTMLElement>('#visteras_menu_bar .menu_dropdown_item').forEach((item) => {
+        item.addEventListener('click', () => {
+          menuEntries.forEach((e) => e.classList.remove('open'));
+        });
       });
 
       // Menu Dropdown Actions
+      const openFileInput = document.getElementById('action_file_open_input') as HTMLInputElement | null;
+
       document.getElementById('action_new_edition')?.addEventListener('click', () => {
-        const ta = document.getElementById('grok-brief-input') as HTMLTextAreaElement | null;
-        if (ta) ta.value = '';
-        clearGrokBrief();
-        lastGrok = null;
-        composeEdition(lastRss, null);
+        const newDoc = docManager.createDocument();
+        loadDocumentIntoView(newDoc);
         selectTool('paste');
+      });
+
+      document.getElementById('action_open_edition')?.addEventListener('click', () => {
+        openFileInput?.click();
+      });
+
+      openFileInput?.addEventListener('change', async (ev) => {
+        const file = (ev.target as HTMLInputElement)?.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          const doc = docManager.importEditionFromText(text);
+          loadDocumentIntoView(doc);
+        } catch (err) {
+          alert('Failed to open edition JSON: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+          if (openFileInput) openFileInput.value = '';
+        }
+      });
+
+      document.getElementById('action_save_edition')?.addEventListener('click', () => {
+        docManager.exportEdition();
       });
 
       document.getElementById('action_load_sample')?.addEventListener('click', () => {
@@ -2375,6 +2653,7 @@ const hasWireStories =
       document.getElementById('action_page_1')?.addEventListener('click', () => showPage(1));
       document.getElementById('action_page_2')?.addEventListener('click', () => showPage(2));
       document.getElementById('action_page_3')?.addEventListener('click', () => showPage(3));
+      document.getElementById('action_zoom_fit')?.addEventListener('click', () => showPage(1));
 
       document.getElementById('action_paste_brief')?.addEventListener('click', () => {
         selectTool('paste');
@@ -2406,6 +2685,20 @@ const hasWireStories =
         selectTool('rss');
       });
 
+      document.getElementById('action_about')?.addEventListener('click', () => {
+        alert('Visteras Publish — Personal Morning Newspaper Publisher.\nVersion 1.0.0');
+      });
+
+      document.getElementById('action_guide')?.addEventListener('click', () => {
+        selectTool('paste');
+        const guideSection = document.getElementById('grok-guide-section');
+        if (guideSection && guideSection.classList.contains('collapsed')) {
+          guideSection.classList.remove('collapsed');
+          const arrow = guideSection.querySelector('.panel_section_arrow');
+          if (arrow) arrow.textContent = '▼';
+        }
+      });
+
       document.getElementById('action_refresh_rss')?.addEventListener('click', () => {
         void refreshStories(settings);
       });
@@ -2424,11 +2717,20 @@ const hasWireStories =
       typoNameInput?.addEventListener('input', () => {
         settings.paperName = typoNameInput.value;
         saveSettings(settings);
+        docManager?.updateActiveDocument({
+          settings,
+          title: settings.paperName || 'The Daily Mike',
+          isDirty: true,
+        });
         applyPaperIdentity(settings.paperName, settings.paperTagline);
       });
       typoTaglineInput?.addEventListener('input', () => {
         settings.paperTagline = typoTaglineInput.value;
         saveSettings(settings);
+        docManager?.updateActiveDocument({
+          settings,
+          isDirty: true,
+        });
         applyPaperIdentity(settings.paperName, settings.paperTagline);
       });
 
@@ -2448,6 +2750,36 @@ const hasWireStories =
       document.addEventListener('keydown', (e) => {
         const activeEl = document.activeElement;
         const isInput = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable);
+
+        // Command / Ctrl Shortcuts
+        if (e.metaKey || e.ctrlKey) {
+          if (e.key === 's' || e.key === 'S') {
+            e.preventDefault();
+            docManager.exportEdition();
+            return;
+          }
+          if (e.key === 'o' || e.key === 'O') {
+            e.preventDefault();
+            openFileInput?.click();
+            return;
+          }
+          if (e.key === 'n' || e.key === 'N') {
+            e.preventDefault();
+            const newDoc = docManager.createDocument();
+            loadDocumentIntoView(newDoc);
+            selectTool('paste');
+            return;
+          }
+          if (e.key === 'w' || e.key === 'W') {
+            e.preventDefault();
+            const active = docManager.getActiveDocument();
+            if (active) {
+              docManager.closeDocument(active.id);
+            }
+            return;
+          }
+        }
+
         if (isInput) return;
 
         if (e.key === 'p' || e.key === 'P') {

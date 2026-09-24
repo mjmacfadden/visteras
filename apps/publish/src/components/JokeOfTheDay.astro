@@ -1,0 +1,17 @@
+---
+import type { JokeEntry } from '../data/types';
+
+interface Props {
+  joke: JokeEntry;
+}
+
+const { joke } = Astro.props;
+---
+<section class="joke-box" aria-label="Joke of the day">
+  <h2 class="section-label">Joke of the Day</h2>
+  <div class="joke-content">
+    {joke.category && <span class="joke-cat">{joke.category}</span>}
+    <p class="joke-setup">{joke.setup}</p>
+    <p class="joke-punchline">{joke.punchline}</p>
+  </div>
+</section>

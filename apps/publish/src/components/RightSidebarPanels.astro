@@ -64,6 +64,7 @@ const feedsBySection = {
           <strong>Byline / Source:</strong> <code>*Named source: Outlet, Date*</code><br/>
           <strong>Images:</strong> <code>![caption](https://...)</code> or <code>****https://...****</code><br/>
           <strong>Weather / Markets:</strong> Prose paragraphs<br/>
+          <strong>At a Glance / Cool Things Today:</strong> <code>- Bullet points</code><br/>
           <strong>What to Watch:</strong> <code>- Bullet points</code>
         </p>
       </div>
@@ -201,6 +202,48 @@ const feedsBySection = {
             Add Calendar
           </button>
         </div>
+      </div>
+    </div>
+
+    <div class="panel_section">
+      <div class="panel_section_header" data-toggle-target="settings_features_body">
+        <span class="panel_section_arrow">▼</span>
+        <span>Back Page Features (Page 3)</span>
+      </div>
+      <div class="panel_section_body" id="settings_features_body">
+        <p class="panel_help">Toggle elements to include or exclude on the back page:</p>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-comics" name="feature" value="comics" data-feature-id="comics" checked />
+          <span>Comic Strips</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-crossword" name="feature" value="crossword" data-feature-id="crossword" checked />
+          <span>Crossword</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-jumble" name="feature" value="jumble" data-feature-id="jumble" checked />
+          <span>Jumble</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-joke" name="feature" value="joke" data-feature-id="joke" checked />
+          <span>Joke of the Day</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-trivia" name="feature" value="trivia" data-feature-id="trivia" checked />
+          <span>Sports Trivia</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-history" name="feature" value="history" data-feature-id="history" checked />
+          <span>Today in History</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-birthdays" name="feature" value="birthdays" data-feature-id="birthdays" checked />
+          <span>Famous Birthdays</span>
+        </label>
+        <label class="panel_checkbox_row">
+          <input type="checkbox" id="feature-answers" name="feature" value="answers" data-feature-id="answers" checked />
+          <span>Puzzle Answers QR</span>
+        </label>
       </div>
     </div>
 
