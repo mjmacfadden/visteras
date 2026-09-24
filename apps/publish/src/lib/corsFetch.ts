@@ -27,7 +27,9 @@ export async function fetchWithCorsFallback(
 
     if (/^https?:\/\//i.test(url)) {
       const proxies = [
+        `https://r.jina.ai/${url}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
       ];
 
       for (const proxyUrl of proxies) {
@@ -38,7 +40,7 @@ export async function fetchWithCorsFallback(
               ...(options.headers || {}),
               Accept: '*/*',
             },
-            signal: AbortSignal.timeout(4000),
+            signal: AbortSignal.timeout(8000),
           });
           if (proxyRes.ok) {
             return proxyRes;

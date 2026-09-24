@@ -140,3 +140,12 @@ export interface CrosswordEntry {
   solution: string[];
   clues: CrosswordClue[];
 }
+
+export interface JokeEntry {
+  dayOfYear: number;
+  dateKey: string;
+  setup: string;
+  punchline: string;
+  category?: string;
+}
+

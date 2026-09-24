@@ -50,11 +50,12 @@ html {
 
   #visteras_app_container {
     display: grid;
-    grid-template-rows: 28px 45px 1fr 24px;
+    grid-template-rows: 28px 45px 28px 1fr 24px;
     grid-template-columns: 36px 1fr 310px;
     grid-template-areas:
       "menu menu menu"
       "options options options"
+      "tools tabs panels"
       "tools workarea panels"
       "status status status";
     width: 100vw;
@@ -122,7 +123,8 @@ html {
   color: #ffffff;
 }
 
-.menu_entry.open .menu_entry_title {
+.menu_entry.open .menu_entry_title,
+.menu_entry.active .menu_entry_title {
   background: var(--news-teal);
   color: #ffffff;
 }
@@ -140,7 +142,8 @@ html {
   z-index: 3001;
 }
 
-.menu_entry.open > .menu_dropdown_list {
+.menu_entry.open > .menu_dropdown_list,
+.menu_entry.active > .menu_dropdown_list {
   display: block;
 }
 
@@ -225,6 +228,128 @@ html {
   padding: 0 12px 0 0;
   z-index: 500;
   user-select: none;
+}
+
+/* ==========================================================================
+   Document Tabs (Studio & Vector Parity)
+   ========================================================================== */
+#publish_document_tabs,
+.document_tabs {
+  grid-area: tabs;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  background-color: #242424;
+  border-bottom: 1px solid #181818;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  z-index: 100;
+  user-select: none;
+  cursor: default;
+}
+
+#publish_document_tabs::-webkit-scrollbar,
+.document_tabs::-webkit-scrollbar {
+  height: 3px;
+}
+
+#publish_document_tabs::-webkit-scrollbar-thumb,
+.document_tabs::-webkit-scrollbar-thumb {
+  background: #444444;
+}
+
+#publish_document_tabs .document_tab,
+.document_tabs .document_tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  height: 100%;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  color: #999999;
+  background-color: #202020;
+  border-right: 1px solid #1a1a1a;
+  border-top: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  min-width: 100px;
+  box-sizing: border-box;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+#publish_document_tabs .document_tab:hover:not(.active),
+.document_tabs .document_tab:hover:not(.active) {
+  background-color: #2c2c2c;
+  color: #cccccc;
+}
+
+#publish_document_tabs .document_tab.active,
+.document_tabs .document_tab.active {
+  background-color: #383838;
+  color: #ffffff;
+  border-top-color: var(--news-teal);
+}
+
+#publish_document_tabs .document_tab .tab_title,
+.document_tabs .document_tab .tab_title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-grow: 1;
+  margin-right: 6px;
+}
+
+#publish_document_tabs .document_tab .tab_dirty,
+.document_tabs .document_tab .tab_dirty {
+  color: var(--news-teal);
+  font-weight: bold;
+}
+
+#publish_document_tabs .document_tab .tab_close,
+.document_tabs .document_tab .tab_close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+  color: #888888;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+#publish_document_tabs .document_tab .tab_close:hover,
+.document_tabs .document_tab .tab_close:hover {
+  background-color: #555555;
+  color: #ffffff;
+}
+
+#publish_document_tabs .new_tab_btn,
+.document_tabs .new_tab_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #888888;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+#publish_document_tabs .new_tab_btn:hover,
+.document_tabs .new_tab_btn:hover {
+  background-color: #333333;
+  color: #ffffff;
 }
 
 .visteras_publish_logo_wrap {

@@ -65,7 +65,7 @@ function classifyHeading(heading: string): GrokSectionKind {
   const h = heading.toLowerCase();
   if (/\bweather\b/.test(h)) return 'weather';
   if (/what to watch|to watch today|watch today|agenda/.test(h)) return 'watch';
-  if (/at a glance|quick hits|\bglance\b/.test(h)) return 'glance';
+  if (/at a glance|quick hits|cool things today|\bglance\b/.test(h)) return 'glance';
   if (/\bsports?\b/.test(h)) return 'sports';
   if (/\bmarkets?\b|business|tech\b|video|recap/.test(h)) return 'markets';
   if (/illinois|chicago|united states|local|northbrook|metro/.test(h)) return 'local';
@@ -250,7 +250,7 @@ function isAtxHeadline(line: string): { headline: string; rest: string } | null 
 
 /** Known section titles when paste lost ## / *** markers. */
 const BARE_SECTION_RE =
-  /^(weather(?:\s*[—–-].*)?|national(?:\s*&\s*world)?|world|united states(?:\s*\/\s*illinois(?:\s*\/\s*chicago)?)?|illinois(?:\s*\/\s*chicago)?|chicago|local|sports|markets|business(?:\s*[·•]\s*tech)?|what to watch(?:\s+today)?|at a glance|quick hits|glance)$/i;
+  /^(weather(?:\s*[—–-].*)?|national(?:\s*&\s*world)?|world|united states(?:\s*\/\s*illinois(?:\s*\/\s*chicago)?)?|illinois(?:\s*\/\s*chicago)?|chicago|local|sports|markets|business(?:\s*[·•]\s*tech)?|what to watch(?:\s+today)?|at a glance|quick hits|cool things today|glance)$/i;
 
 /** Extract inner text from a lone ***…*** line, or null. */
 function tripleAsteriskInner(line: string): string | null {

@@ -65,6 +65,28 @@ export interface GrokBriefStore {
   savedAt: string;
 }
 
+export interface BackPageFeatureSettings {
+  comics: boolean;
+  crossword: boolean;
+  jumble: boolean;
+  trivia: boolean;
+  history: boolean;
+  birthdays: boolean;
+  answers: boolean;
+  joke: boolean;
+}
+
+export const DEFAULT_BACK_PAGE_FEATURES: BackPageFeatureSettings = {
+  comics: true,
+  crossword: true,
+  jumble: true,
+  trivia: true,
+  history: true,
+  birthdays: true,
+  answers: true,
+  joke: true,
+};
+
 export interface PaperSettings {
   paperName: string;
   paperTagline: string;
@@ -81,6 +103,8 @@ export interface PaperSettings {
   enabledComicIds: string[];
   /** Public ICS calendar URLs */
   calendars: CalendarSource[];
+  /** Page 3 back page feature visibility */
+  features?: BackPageFeatureSettings;
 }
 
 /** Sensible defaults — Northbrook ZIP, RSS off (Grok is the news backbone). */
@@ -94,6 +118,7 @@ export function defaultSettings(): PaperSettings {
     customFeeds: [],
     enabledComicIds: [...DEFAULT_ENABLED_COMIC_IDS],
     calendars: [],
+    features: { ...DEFAULT_BACK_PAGE_FEATURES },
   };
 }
 
@@ -120,6 +145,16 @@ export function loadSettings(): PaperSettings {
           }))
       : [];
     const rssEnabled = enabledFeedIds.length > 0 || customFeeds.some((f) => f.enabled);
+    const features: BackPageFeatureSettings = {
+      comics: parsed.features?.comics !== false,
+      crossword: parsed.features?.crossword !== false,
+      jumble: parsed.features?.jumble !== false,
+      trivia: parsed.features?.trivia !== false,
+      history: parsed.features?.history !== false,
+      birthdays: parsed.features?.birthdays !== false,
+      answers: parsed.features?.answers !== false,
+      joke: parsed.features?.joke !== false,
+    };
     return {
       paperName: typeof parsed.paperName === 'string' && parsed.paperName.trim() ? parsed.paperName.trim() : base.paperName,
       paperTagline: typeof parsed.paperTagline === 'string' && parsed.paperTagline.trim() ? parsed.paperTagline.trim() : base.paperTagline,
@@ -137,6 +172,7 @@ export function loadSettings(): PaperSettings {
             (c) => c && typeof c.url === 'string' && c.url.startsWith('http'),
           )
         : [],
+      features,
     };
   } catch {
     return defaultSettings();
@@ -226,11 +262,21 @@ export function normalizePaperSettings(parsed: Partial<PaperSettings> | null | u
         ? parsed.enabledComicIds.filter((id) => typeof id === 'string')
         : base.enabledComicIds,
     ),
-    calendars: Array.isArray(parsed.calendars)
+    calendars: Array.isArray(parsed?.calendars)
       ? parsed.calendars.filter(
           (c) => c && typeof c.url === 'string' && c.url.startsWith('http'),
         )
       : [],
+    features: {
+      comics: parsed?.features?.comics !== false,
+      crossword: parsed?.features?.crossword !== false,
+      jumble: parsed?.features?.jumble !== false,
+      trivia: parsed?.features?.trivia !== false,
+      history: parsed?.features?.history !== false,
+      birthdays: parsed?.features?.birthdays !== false,
+      answers: parsed?.features?.answers !== false,
+      joke: parsed?.features?.joke !== false,
+    },
   };
 }
 

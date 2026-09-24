@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 import { puzzlesForDate } from '../data/puzzles';
 import { getBirthdaysForDate } from '../data/birthdays';
 import { getHistoryForDate } from '../data/history';
-import type { CrosswordEntry, JumbleEntry, TriviaEntry, HistoryItem, BirthdayItem } from '../data/types';
+import type { CrosswordEntry, JumbleEntry, TriviaEntry, HistoryItem, BirthdayItem, JokeEntry } from '../data/types';
 import { chicagoDateKey } from './dateFilter';
 import { formatChicagoDateDisplay } from './edition';
 import { answersUrlForDate } from './site';
@@ -18,6 +18,18 @@ function escapeHtml(t: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function jokeHtml(joke: JokeEntry): string {
+  const cat = joke.category ? `<span class="joke-cat">${escapeHtml(joke.category)}</span>` : '';
+  return `<section class="joke-box" aria-label="Joke of the day">
+  <h2 class="section-label">Joke of the Day</h2>
+  <div class="joke-content">
+    ${cat}
+    <p class="joke-setup">${escapeHtml(joke.setup)}</p>
+    <p class="joke-punchline">${escapeHtml(joke.punchline)}</p>
+  </div>
+</section>`;
 }
 
 function crosswordHtml(puzzle: CrosswordEntry): string {
@@ -180,7 +192,7 @@ function updateDateDisplays(isoDate: string, dateDisplay: string) {
 
 function updatePuzzles(isoDate: string) {
   const dateObj = new Date(`${isoDate}T12:00:00`);
-  const { crossword, jumbles, trivia } = puzzlesForDate(dateObj);
+  const { crossword, jumbles, trivia, joke } = puzzlesForDate(dateObj);
 
   document.querySelectorAll('.game-cell.game-crossword').forEach((cell) => {
     cell.innerHTML = crosswordHtml(crossword);
@@ -194,6 +206,10 @@ function updatePuzzles(isoDate: string) {
 
   document.querySelectorAll('.game-cell.game-trivia').forEach((cell) => {
     cell.innerHTML = triviaHtml(trivia);
+  });
+
+  document.querySelectorAll('.feature-cell.feature-joke').forEach((cell) => {
+    cell.innerHTML = jokeHtml(joke);
   });
 }
 

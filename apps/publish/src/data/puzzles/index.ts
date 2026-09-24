@@ -2,9 +2,10 @@ import { pickByDate } from '../dayIndex';
 import { jumbleBank } from './jumble';
 import { triviaBank } from './trivia';
 import { crosswordBank } from './crossword';
-import type { CrosswordEntry, JumbleEntry, TriviaEntry } from '../types';
+import { jokeBank } from './jokes';
+import type { CrosswordEntry, JokeEntry, JumbleEntry, TriviaEntry } from '../types';
 
-export { jumbleBank, triviaBank, crosswordBank };
+export { jumbleBank, triviaBank, crosswordBank, jokeBank };
 
 /** Three distinct jumbles for a date (day pick, then next bank slots). */
 export function jumbleTrioForDate(date: Date = new Date()): JumbleEntry[] {
@@ -55,6 +56,7 @@ export function puzzlesForDate(date: Date = new Date()): {
   jumbles: JumbleEntry[];
   trivia: TriviaEntry[];
   crossword: CrosswordEntry;
+  joke: JokeEntry;
 } {
   const jumbles = jumbleTrioForDate(date);
   return {
@@ -62,5 +64,6 @@ export function puzzlesForDate(date: Date = new Date()): {
     jumbles,
     trivia: triviaTrioForDate(date),
     crossword: pickByDate(crosswordBank, date),
+    joke: pickByDate(jokeBank, date),
   };
 }
