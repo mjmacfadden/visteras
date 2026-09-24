@@ -283,9 +283,28 @@ class Base_layers_class {
 		documentCtx.setTransform(1, 0, 0, 1, 0, 0);
 		documentCtx.clearRect(0, 0, config.WIDTH, config.HEIGHT);
 		documentCtx.drawImage(cache.prefixCanvas, 0, 0);
-		documentCtx.globalAlpha = layer.opacity / 100;
-		documentCtx.globalCompositeOperation = get_render_composition(layer);
-		this.render_object(documentCtx, layer);
+		const comp = get_render_composition(layer);
+		if (this._is_custom_blend(comp)) {
+			if (!this._custom_blend_canvas) {
+				this._custom_blend_canvas = document.createElement('canvas');
+			}
+			const bCanvas = this._custom_blend_canvas;
+			if (bCanvas.width !== config.WIDTH || bCanvas.height !== config.HEIGHT) {
+				bCanvas.width = config.WIDTH;
+				bCanvas.height = config.HEIGHT;
+			}
+			const bCtx = bCanvas.getContext('2d');
+			bCtx.setTransform(1, 0, 0, 1, 0, 0);
+			bCtx.clearRect(0, 0, config.WIDTH, config.HEIGHT);
+			bCtx.globalAlpha = layer.opacity / 100;
+			bCtx.globalCompositeOperation = 'source-over';
+			this.render_object(bCtx, layer);
+			this._composite_custom_blend(documentCtx, bCanvas, comp);
+		} else {
+			documentCtx.globalAlpha = layer.opacity / 100;
+			documentCtx.globalCompositeOperation = comp;
+			this.render_object(documentCtx, layer);
+		}
 		documentCtx.globalAlpha = 1;
 		documentCtx.globalCompositeOperation = 'source-over';
 		cache.mark_interactive(layer.id);
@@ -681,9 +700,13 @@ class Base_layers_class {
 				layerCtx.drawImage(tempCanvas, 0, 0);
 
 				// Composite masked pixels with the layer's real blend mode.
-				ctx.globalAlpha = 1;
-				ctx.globalCompositeOperation = blend;
-				ctx.drawImage(layerCanvas, 0, 0);
+				if (this._is_custom_blend(blend)) {
+					this._composite_custom_blend(ctx, layerCanvas, blend);
+				} else {
+					ctx.globalAlpha = 1;
+					ctx.globalCompositeOperation = blend;
+					ctx.drawImage(layerCanvas, 0, 0);
+				}
 
 				// End of clip group when the next (above) layer is not clipped.
 				if (!nextLayer || !is_layer_clipped(nextLayer)) {
@@ -696,11 +719,29 @@ class Base_layers_class {
 				// Clip BASE — paint with its real blend; copy alpha into temp
 				// (without drop-shadow) so clipped siblings can mask to it.
 				var baseComp = get_render_composition(layer);
-				ctx.globalAlpha = layer.opacity / 100;
-				ctx.globalCompositeOperation = baseComp;
+				if (this._is_custom_blend(baseComp)) {
+					if (!this._custom_blend_canvas) {
+						this._custom_blend_canvas = document.createElement('canvas');
+					}
+					var bCanvas = this._custom_blend_canvas;
+					if (bCanvas.width !== ctx.canvas.width || bCanvas.height !== ctx.canvas.height) {
+						bCanvas.width = ctx.canvas.width;
+						bCanvas.height = ctx.canvas.height;
+					}
+					var bCtx = bCanvas.getContext('2d');
+					bCtx.setTransform(1, 0, 0, 1, 0, 0);
+					bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
+					bCtx.globalAlpha = layer.opacity / 100;
+					bCtx.globalCompositeOperation = 'source-over';
+					this.render_object(bCtx, layer);
+					this._composite_custom_blend(ctx, bCanvas, baseComp);
+				} else {
+					ctx.globalAlpha = layer.opacity / 100;
+					ctx.globalCompositeOperation = baseComp;
+					this.render_object(ctx, layer);
+				}
 				tempCtx.globalAlpha = layer.opacity / 100;
 				tempCtx.globalCompositeOperation = 'source-over';
-				this.render_object(ctx, layer);
 				const filters = (layer.filters || []).filter((filter) => {
 					return filter.name !== "shadow";
 				});
@@ -709,9 +750,28 @@ class Base_layers_class {
 					filters,
 				});
 			} else {
-				ctx.globalAlpha = layer.opacity / 100;
-				ctx.globalCompositeOperation = get_render_composition(layer);
-				this.render_object(ctx, layer);
+				var comp = get_render_composition(layer);
+				if (this._is_custom_blend(comp)) {
+					if (!this._custom_blend_canvas) {
+						this._custom_blend_canvas = document.createElement('canvas');
+					}
+					var bCanvas = this._custom_blend_canvas;
+					if (bCanvas.width !== ctx.canvas.width || bCanvas.height !== ctx.canvas.height) {
+						bCanvas.width = ctx.canvas.width;
+						bCanvas.height = ctx.canvas.height;
+					}
+					var bCtx = bCanvas.getContext('2d');
+					bCtx.setTransform(1, 0, 0, 1, 0, 0);
+					bCtx.clearRect(0, 0, bCanvas.width, bCanvas.height);
+					bCtx.globalAlpha = layer.opacity / 100;
+					bCtx.globalCompositeOperation = 'source-over';
+					this.render_object(bCtx, layer);
+					this._composite_custom_blend(ctx, bCanvas, comp);
+				} else {
+					ctx.globalAlpha = layer.opacity / 100;
+					ctx.globalCompositeOperation = comp;
+					this.render_object(ctx, layer);
+				}
 			}
 		}
 
@@ -758,18 +818,24 @@ class Base_layers_class {
 	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
 	 */
 	_draw_layer_content(ctx, object, is_preview) {
-		if (object.type == "image") {
+		const hasRotate = object.rotate != null && object.rotate !== 0;
+		if (hasRotate) {
 			ctx.save();
-			ctx.translate(object.x + object.width / 2, object.y + object.height / 2);
+			const cx = (object.x || 0) + (object.width || 0) / 2;
+			const cy = (object.y || 0) + (object.height || 0) / 2;
+			ctx.translate(cx, cy);
 			ctx.rotate((object.rotate * Math.PI) / 180);
+			ctx.translate(-cx, -cy);
+		}
+
+		if (object.type == "image") {
 			ctx.drawImage(
 				object.link_canvas != null ? object.link_canvas : object.link,
-				-object.width / 2,
-				-object.height / 2,
+				object.x || 0,
+				object.y || 0,
 				object.width,
 				object.height
 			);
-			ctx.restore();
 		} else if (object.render_function) {
 			var render_class = object.render_function[0];
 			var render_function = object.render_function[1];
@@ -785,6 +851,10 @@ class Base_layers_class {
 					render_function
 				](ctx, object, is_preview);
 			}
+		}
+
+		if (hasRotate) {
+			ctx.restore();
 		}
 	}
 
@@ -1171,6 +1241,43 @@ class Base_layers_class {
 				data[i + 2] = applyChannel(data[i + 2]);
 			}
 			destCtx.putImageData(imgData, 0, 0);
+		} else if (type === 'hue-saturation' || type === 'hue/saturation' || type === 'huesaturation') {
+			const p = layer.params || {};
+			const hue = (p.hue !== undefined) ? Number(p.hue) : 0;
+			const sat = (p.saturation !== undefined) ? Number(p.saturation) : 0;
+			const light = (p.lightness !== undefined) ? Number(p.lightness) : 0;
+
+			let parts = [];
+			if (hue !== 0) parts.push(`hue-rotate(${hue}deg)`);
+			if (sat !== 0) parts.push(`saturate(${(sat / 100) + 1})`);
+			if (parts.length > 0) {
+				destCtx.filter = parts.join(' ');
+			}
+			destCtx.drawImage(srcCanvas, 0, 0);
+			destCtx.filter = 'none';
+
+			if (light !== 0) {
+				const imgData = destCtx.getImageData(0, 0, W, H);
+				const data = imgData.data;
+				const l = light / 100;
+				if (l >= 0) {
+					for (let i = 0; i < data.length; i += 4) {
+						if (data[i + 3] === 0) continue;
+						data[i] = Math.round(data[i] + (255 - data[i]) * l);
+						data[i + 1] = Math.round(data[i + 1] + (255 - data[i + 1]) * l);
+						data[i + 2] = Math.round(data[i + 2] + (255 - data[i + 2]) * l);
+					}
+				} else {
+					const factor = 1 + l;
+					for (let i = 0; i < data.length; i += 4) {
+						if (data[i + 3] === 0) continue;
+						data[i] = Math.round(data[i] * factor);
+						data[i + 1] = Math.round(data[i + 1] * factor);
+						data[i + 2] = Math.round(data[i + 2] * factor);
+					}
+				}
+				destCtx.putImageData(imgData, 0, 0);
+			}
 		} else {
 			const filterString = this.get_adjustment_filter_string(layer);
 			destCtx.filter = filterString;
@@ -1235,11 +1342,8 @@ class Base_layers_class {
 			case 'huesaturation': {
 				let hue = (params && params.hue !== undefined) ? params.hue : ((value !== undefined) ? value : 0);
 				let sat = (params && params.saturation !== undefined) ? params.saturation : 0;
-				let light = (params && params.lightness !== undefined) ? params.lightness : 0;
 				let parts = [`hue-rotate(${hue}deg)`];
 				parts.push(`saturate(${(sat / 100) + 1})`);
-				// Approximate lightness with brightness (CSS has no direct lightness filter)
-				if (light) parts.push(`brightness(${(light / 100) + 1})`);
 				return parts.join(' ');
 			}
 			case 'hue-rotate':
@@ -1794,6 +1898,178 @@ class Base_layers_class {
 			renderer.on_mask_changed(layerId);
 		}
 		config.need_render = true;
+	}
+
+	/**
+	 * Returns true if blend mode requires software pixel compositing in Canvas2D.
+	 */
+	_is_custom_blend(mode) {
+		return mode === 'linear-burn' ||
+			mode === 'darker-color' ||
+			mode === 'lighter-color' ||
+			mode === 'linear-light' ||
+			mode === 'vivid-light' ||
+			mode === 'pin-light' ||
+			mode === 'hard-mix' ||
+			mode === 'subtract' ||
+			mode === 'divide' ||
+			mode === 'luminosity';
+	}
+
+	/**
+	 * Composites srcCanvas onto destCtx with exact Photoshop math and Porter-Duff alpha.
+	 */
+	_composite_custom_blend(destCtx, srcCanvas, blendMode) {
+		const W = destCtx.canvas.width;
+		const H = destCtx.canvas.height;
+		if (W === 0 || H === 0) return;
+
+		const imgDest = destCtx.getImageData(0, 0, W, H);
+		const d = imgDest.data;
+		const s = srcCanvas.getContext('2d').getImageData(0, 0, W, H).data;
+
+		const lum601 = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+		const clipColor = (r, g, b) => {
+			let l = lum601(r, g, b);
+			let n = Math.min(r, Math.min(g, b));
+			let mx = Math.max(r, Math.max(g, b));
+			if (n < 0) {
+				const denom = Math.max(l - n, 0.00001);
+				r = l + (((r - l) * l) / denom);
+				g = l + (((g - l) * l) / denom);
+				b = l + (((b - l) * l) / denom);
+			}
+			mx = Math.max(r, Math.max(g, b));
+			if (mx > 1.0) {
+				const denom = Math.max(mx - l, 0.00001);
+				r = l + (((r - l) * (1.0 - l)) / denom);
+				g = l + (((g - l) * (1.0 - l)) / denom);
+				b = l + (((b - l) * (1.0 - l)) / denom);
+			}
+			return [Math.max(0, Math.min(1.0, r)), Math.max(0, Math.min(1.0, g)), Math.max(0, Math.min(1.0, b))];
+		};
+
+		for (let i = 0; i < d.length; i += 4) {
+			const as = s[i + 3] / 255;
+			if (as <= 0) continue;
+
+			const ab = d[i + 3] / 255;
+			const csr = s[i] / 255;
+			const csg = s[i + 1] / 255;
+			const csb = s[i + 2] / 255;
+
+			if (ab <= 0) {
+				d[i] = s[i];
+				d[i + 1] = s[i + 1];
+				d[i + 2] = s[i + 2];
+				d[i + 3] = s[i + 3];
+				continue;
+			}
+
+			const cbr = d[i] / 255;
+			const cbg = d[i + 1] / 255;
+			const cbb = d[i + 2] / 255;
+
+			let br = 0, bg = 0, bb = 0;
+
+			switch (blendMode) {
+				case 'linear-burn':
+					br = Math.max(0, cbr + csr - 1.0);
+					bg = Math.max(0, cbg + csg - 1.0);
+					bb = Math.max(0, cbb + csb - 1.0);
+					break;
+				case 'linear-light':
+					br = Math.max(0, Math.min(1.0, cbr + 2.0 * csr - 1.0));
+					bg = Math.max(0, Math.min(1.0, cbg + 2.0 * csg - 1.0));
+					bb = Math.max(0, Math.min(1.0, cbb + 2.0 * csb - 1.0));
+					break;
+				case 'vivid-light': {
+					const vl = (b, sc) => {
+						if (sc <= 0.5) {
+							if (b >= 1.0) return 1.0;
+							if (sc <= 0.0) return 0.0;
+							return Math.max(0.0, 1.0 - (1.0 - b) / (2.0 * sc));
+						} else {
+							if (b <= 0.0) return 0.0;
+							if (sc >= 1.0) return 1.0;
+							return Math.min(1.0, b / (2.0 * (1.0 - sc)));
+						}
+					};
+					br = vl(cbr, csr);
+					bg = vl(cbg, csg);
+					bb = vl(cbb, csb);
+					break;
+				}
+				case 'pin-light': {
+					const pl = (b, sc) => (sc <= 0.5) ? Math.min(b, 2.0 * sc) : Math.max(b, 2.0 * (sc - 0.5));
+					br = pl(cbr, csr);
+					bg = pl(cbg, csg);
+					bb = pl(cbb, csb);
+					break;
+				}
+				case 'hard-mix':
+					br = (cbr + csr >= 1.0) ? 1.0 : 0.0;
+					bg = (cbg + csg >= 1.0) ? 1.0 : 0.0;
+					bb = (cbb + csb >= 1.0) ? 1.0 : 0.0;
+					break;
+				case 'subtract':
+					br = Math.max(0, cbr - csr);
+					bg = Math.max(0, cbg - csg);
+					bb = Math.max(0, cbb - csb);
+					break;
+				case 'divide': {
+					const div = (b, sc) => (b <= 0.0) ? 0.0 : ((sc <= 0.0) ? 1.0 : Math.min(1.0, b / sc));
+					br = div(cbr, csr);
+					bg = div(cbg, csg);
+					bb = div(cbb, csb);
+					break;
+				}
+				case 'darker-color': {
+					if (lum601(csr, csg, csb) < lum601(cbr, cbg, cbb)) {
+						br = csr; bg = csg; bb = csb;
+					} else {
+						br = cbr; bg = cbg; bb = cbb;
+					}
+					break;
+				}
+				case 'lighter-color': {
+					if (lum601(csr, csg, csb) > lum601(cbr, cbg, cbb)) {
+						br = csr; bg = csg; bb = csb;
+					} else {
+						br = cbr; bg = cbg; bb = cbb;
+					}
+					break;
+				}
+				case 'luminosity': {
+					const lumS = lum601(csr, csg, csb);
+					const diff = lumS - lum601(cbr, cbg, cbb);
+					const clipped = clipColor(cbr + diff, cbg + diff, cbb + diff);
+					br = clipped[0];
+					bg = clipped[1];
+					bb = clipped[2];
+					break;
+				}
+				default:
+					br = csr; bg = csg; bb = csb;
+			}
+
+			const ao = as + ab * (1.0 - as);
+			if (ao <= 0.0001) {
+				d[i + 3] = 0;
+				continue;
+			}
+
+			const cor = (as * (1.0 - ab) * csr + ab * (1.0 - as) * cbr + as * ab * br) / ao;
+			const cog = (as * (1.0 - ab) * csg + ab * (1.0 - as) * cbg + as * ab * bg) / ao;
+			const cob = (as * (1.0 - ab) * csb + ab * (1.0 - as) * cbb + as * ab * bb) / ao;
+
+			d[i] = Math.round(Math.max(0, Math.min(1.0, cor)) * 255);
+			d[i + 1] = Math.round(Math.max(0, Math.min(1.0, cog)) * 255);
+			d[i + 2] = Math.round(Math.max(0, Math.min(1.0, cob)) * 255);
+			d[i + 3] = Math.round(Math.max(0, Math.min(1.0, ao)) * 255);
+		}
+
+		destCtx.putImageData(imgDest, 0, 0);
 	}
 }
 

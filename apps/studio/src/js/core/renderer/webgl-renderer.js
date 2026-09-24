@@ -64,6 +64,20 @@ var BLEND_SOFT_LIGHT = 9;
 var BLEND_COLOR_BURN = 10;
 var BLEND_EXCLUSION = 11;
 var BLEND_SOURCE_ATOP = 12;
+var BLEND_LINEAR_BURN = 13;
+var BLEND_LIGHTER = 14;
+var BLEND_VIVID_LIGHT = 15;
+var BLEND_LINEAR_LIGHT = 16;
+var BLEND_PIN_LIGHT = 17;
+var BLEND_HARD_MIX = 18;
+var BLEND_SUBTRACT = 19;
+var BLEND_DIVIDE = 20;
+var BLEND_DARKER_COLOR = 21;
+var BLEND_LIGHTER_COLOR = 22;
+var BLEND_HUE = 23;
+var BLEND_SATURATION = 24;
+var BLEND_COLOR = 25;
+var BLEND_LUMINOSITY = 26;
 
 var GPU_BLEND_MODES = {
 	'source-over': BLEND_NORMAL,
@@ -79,6 +93,20 @@ var GPU_BLEND_MODES = {
 	'color-burn': BLEND_COLOR_BURN,
 	'exclusion': BLEND_EXCLUSION,
 	'source-atop': BLEND_SOURCE_ATOP,
+	'linear-burn': BLEND_LINEAR_BURN,
+	'lighter': BLEND_LIGHTER,
+	'vivid-light': BLEND_VIVID_LIGHT,
+	'linear-light': BLEND_LINEAR_LIGHT,
+	'pin-light': BLEND_PIN_LIGHT,
+	'hard-mix': BLEND_HARD_MIX,
+	'subtract': BLEND_SUBTRACT,
+	'divide': BLEND_DIVIDE,
+	'darker-color': BLEND_DARKER_COLOR,
+	'lighter-color': BLEND_LIGHTER_COLOR,
+	'hue': BLEND_HUE,
+	'saturation': BLEND_SATURATION,
+	'color': BLEND_COLOR,
+	'luminosity': BLEND_LUMINOSITY,
 };
 
 // Layer.filters names that can be baked via Canvas2D CSS filter on upload.
@@ -204,16 +232,47 @@ float mask_alpha_at(vec2 docPos) {
 	return m.r * 0.2126 + m.g * 0.7152 + m.b * 0.0722;
 }
 
+float blend_lum(vec3 c) {
+	return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+vec3 clip_color(vec3 c) {
+	float l = blend_lum(c);
+	float n = min(c.r, min(c.g, c.b));
+	float mx = max(c.r, max(c.g, c.b));
+	if (n < 0.0) {
+		c = l + (((c - l) * l) / max(l - n, 0.00001));
+	}
+	mx = max(c.r, max(c.g, c.b));
+	if (mx > 1.0) {
+		c = l + (((c - l) * (1.0 - l)) / max(mx - l, 0.00001));
+	}
+	return clamp(c, 0.0, 1.0);
+}
+
+vec3 set_lum(vec3 c, float l) {
+	float d = l - blend_lum(c);
+	return clip_color(c + vec3(d));
+}
+
+float blend_sat(vec3 c) {
+	return max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
+}
+
+vec3 set_sat(vec3 c, float s) {
+	float minVal = min(c.r, min(c.g, c.b));
+	float maxVal = max(c.r, max(c.g, c.b));
+	if (maxVal > minVal) {
+		return (c - vec3(minVal)) * s / (maxVal - minVal);
+	} else {
+		return vec3(0.0);
+	}
+}
+
 vec3 blend_channel(vec3 cb, vec3 cs, float mode) {
-	if (mode < 0.5) {
-		return cs;
-	}
-	if (mode < 1.5) {
-		return cb * cs;
-	}
-	if (mode < 2.5) {
-		return cb + cs - cb * cs;
-	}
+	if (mode < 0.5) return cs;
+	if (mode < 1.5) return cb * cs;
+	if (mode < 2.5) return cb + cs - cb * cs;
 	if (mode < 3.5) {
 		return vec3(
 			cb.r <= 0.5 ? (2.0 * cb.r * cs.r) : (1.0 - 2.0 * (1.0 - cb.r) * (1.0 - cs.r)),
@@ -221,17 +280,10 @@ vec3 blend_channel(vec3 cb, vec3 cs, float mode) {
 			cb.b <= 0.5 ? (2.0 * cb.b * cs.b) : (1.0 - 2.0 * (1.0 - cb.b) * (1.0 - cs.b))
 		);
 	}
-	if (mode < 4.5) {
-		return min(cb, cs);
-	}
-	if (mode < 5.5) {
-		return max(cb, cs);
-	}
-	if (mode < 6.5) {
-		return abs(cb - cs);
-	}
+	if (mode < 4.5) return min(cb, cs);
+	if (mode < 5.5) return max(cb, cs);
+	if (mode < 6.5) return abs(cb - cs);
 	if (mode < 7.5) {
-		// hard-light = overlay with src/dst swapped
 		return vec3(
 			cs.r <= 0.5 ? (2.0 * cb.r * cs.r) : (1.0 - 2.0 * (1.0 - cb.r) * (1.0 - cs.r)),
 			cs.g <= 0.5 ? (2.0 * cb.g * cs.g) : (1.0 - 2.0 * (1.0 - cb.g) * (1.0 - cs.g)),
@@ -239,7 +291,6 @@ vec3 blend_channel(vec3 cb, vec3 cs, float mode) {
 		);
 	}
 	if (mode < 8.5) {
-		// color-dodge
 		return vec3(
 			cs.r >= 1.0 ? 1.0 : min(1.0, cb.r / max(1.0 - cs.r, 0.0001)),
 			cs.g >= 1.0 ? 1.0 : min(1.0, cb.g / max(1.0 - cs.g, 0.0001)),
@@ -247,7 +298,6 @@ vec3 blend_channel(vec3 cb, vec3 cs, float mode) {
 		);
 	}
 	if (mode < 9.5) {
-		// soft-light (W3C / Canvas compositing)
 		float dr = cb.r <= 0.25 ? ((16.0 * cb.r - 12.0) * cb.r + 4.0) * cb.r : sqrt(cb.r);
 		float dg = cb.g <= 0.25 ? ((16.0 * cb.g - 12.0) * cb.g + 4.0) * cb.g : sqrt(cb.g);
 		float db = cb.b <= 0.25 ? ((16.0 * cb.b - 12.0) * cb.b + 4.0) * cb.b : sqrt(cb.b);
@@ -258,15 +308,52 @@ vec3 blend_channel(vec3 cb, vec3 cs, float mode) {
 		);
 	}
 	if (mode < 10.5) {
-		// color-burn
 		return vec3(
 			cs.r <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - cb.r) / max(cs.r, 0.0001)),
 			cs.g <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - cb.g) / max(cs.g, 0.0001)),
 			cs.b <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - cb.b) / max(cs.b, 0.0001))
 		);
 	}
-	// exclusion
-	return cb + cs - 2.0 * cb * cs;
+	if (mode < 11.5) return cb + cs - 2.0 * cb * cs;
+	if (mode < 12.5) return cs;
+	if (mode < 13.5) return max(vec3(0.0), cb + cs - vec3(1.0));
+	if (mode < 14.5) return min(vec3(1.0), cb + cs);
+	if (mode < 15.5) {
+		vec3 res;
+		res.r = cs.r <= 0.5 ? (cb.r >= 1.0 ? 1.0 : (cs.r <= 0.0 ? 0.0 : max(0.0, 1.0 - (1.0 - cb.r) / (2.0 * cs.r)))) : (cb.r <= 0.0 ? 0.0 : (cs.r >= 1.0 ? 1.0 : min(1.0, cb.r / (2.0 * (1.0 - cs.r)))));
+		res.g = cs.g <= 0.5 ? (cb.g >= 1.0 ? 1.0 : (cs.g <= 0.0 ? 0.0 : max(0.0, 1.0 - (1.0 - cb.g) / (2.0 * cs.g)))) : (cb.g <= 0.0 ? 0.0 : (cs.g >= 1.0 ? 1.0 : min(1.0, cb.g / (2.0 * (1.0 - cs.g)))));
+		res.b = cs.b <= 0.5 ? (cb.b >= 1.0 ? 1.0 : (cs.b <= 0.0 ? 0.0 : max(0.0, 1.0 - (1.0 - cb.b) / (2.0 * cs.b)))) : (cb.b <= 0.0 ? 0.0 : (cs.b >= 1.0 ? 1.0 : min(1.0, cb.b / (2.0 * (1.0 - cs.b)))));
+		return res;
+	}
+	if (mode < 16.5) return clamp(cb + 2.0 * cs - vec3(1.0), 0.0, 1.0);
+	if (mode < 17.5) {
+		return vec3(
+			cs.r <= 0.5 ? min(cb.r, 2.0 * cs.r) : max(cb.r, 2.0 * (cs.r - 0.5)),
+			cs.g <= 0.5 ? min(cb.g, 2.0 * cs.g) : max(cb.g, 2.0 * (cs.g - 0.5)),
+			cs.b <= 0.5 ? min(cb.b, 2.0 * cs.b) : max(cb.b, 2.0 * (cs.b - 0.5))
+		);
+	}
+	if (mode < 18.5) {
+		return vec3(
+			(cb.r + cs.r >= 1.0) ? 1.0 : 0.0,
+			(cb.g + cs.g >= 1.0) ? 1.0 : 0.0,
+			(cb.b + cs.b >= 1.0) ? 1.0 : 0.0
+		);
+	}
+	if (mode < 19.5) return max(vec3(0.0), cb - cs);
+	if (mode < 20.5) {
+		return vec3(
+			cb.r <= 0.0 ? 0.0 : (cs.r <= 0.0 ? 1.0 : min(1.0, cb.r / cs.r)),
+			cb.g <= 0.0 ? 0.0 : (cs.g <= 0.0 ? 1.0 : min(1.0, cb.g / cs.g)),
+			cb.b <= 0.0 ? 0.0 : (cs.b <= 0.0 ? 1.0 : min(1.0, cb.b / cs.b))
+		);
+	}
+	if (mode < 21.5) return blend_lum(cs) < blend_lum(cb) ? cs : cb;
+	if (mode < 22.5) return blend_lum(cs) > blend_lum(cb) ? cs : cb;
+	if (mode < 23.5) return set_lum(set_sat(cs, blend_sat(cb)), blend_lum(cb));
+	if (mode < 24.5) return set_lum(set_sat(cb, blend_sat(cs)), blend_lum(cb));
+	if (mode < 25.5) return set_lum(cs, blend_lum(cb));
+	return set_lum(cb, blend_lum(cs));
 }
 
 vec3 hue_rotate(vec3 color, float angleDeg) {
@@ -296,7 +383,12 @@ vec3 apply_adjustment(vec3 color) {
 		color = hue_rotate(color, p.x);
 		float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
 		color = mix(vec3(luma), color, p.y);
-		color *= p.z;
+		float l = p.z;
+		if (l >= 0.0) {
+			color = color + (vec3(1.0) - color) * l;
+		} else {
+			color = color * (1.0 + l);
+		}
 		return clamp(color, 0.0, 1.0);
 	}
 	if (t < 3.5) {
@@ -820,7 +912,7 @@ class WebGL_renderer_class {
 				var hue = (p.hue !== undefined) ? Number(p.hue) : ((value !== undefined) ? Number(value) : 0);
 				var sat = (p.saturation !== undefined) ? Number(p.saturation) : 0;
 				var light = (p.lightness !== undefined) ? Number(p.lightness) : 0;
-				return { type: ADJ_HUE_SAT, params: [hue, sat / 100 + 1, light / 100 + 1, 0] };
+				return { type: ADJ_HUE_SAT, params: [hue, sat / 100 + 1, light / 100, 0] };
 			}
 			case 'exposure': {
 				var exposure = (p.exposure !== undefined) ? Number(p.exposure) : 0;

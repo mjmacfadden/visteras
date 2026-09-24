@@ -90,8 +90,7 @@ class Image_rotate_class {
 				new app.Actions.Bundle_action('rotate_layer', 'Rotate Layer', [
 					new app.Actions.Update_layer_action(config.layer.id, {
 						rotate: new_rotate
-					}),
-					...this.check_sizes(new_rotate)
+					})
 				])
 			);
 		} else {
@@ -110,8 +109,7 @@ class Image_rotate_class {
 			new app.Actions.Bundle_action('rotate_layer', 'Rotate Layer', [
 				new app.Actions.Update_layer_action(config.layer.id, {
 					rotate: new_rotate
-				}),
-				...this.check_sizes(new_rotate)
+				})
 			])
 		);
 	}
@@ -126,8 +124,7 @@ class Image_rotate_class {
 			new app.Actions.Bundle_action('rotate_layer', 'Rotate Layer', [
 				new app.Actions.Update_layer_action(config.layer.id, {
 					rotate: new_rotate
-				}),
-				...this.check_sizes(new_rotate)
+				})
 			])
 		);
 	}
