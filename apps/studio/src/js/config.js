@@ -80,6 +80,11 @@ config.RENDERER = 'auto';
 //   'onnx-community/ISNet-ONNX'          (default — Hugging Face CDN)
 //   'https://models.example.com/ISNet-ONNX'  (mirror root containing config.json + *.onnx)
 config.BG_AUTO_MODEL_LOCATION = 'onnx-community/ISNet-ONNX';
+// Pinned runtime CDN (must match apps/studio package.json / lockfile versions).
+// jsDelivr /+esm rewrites bare `onnxruntime-web/webgpu` imports so module workers can load them.
+config.BG_AUTO_TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
+config.BG_AUTO_ORT_VERSION = '1.31.0-dev.20260914-8d85527a0';
+config.BG_AUTO_ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist/';
 
 //requires styles in reset.css
 config.themes = [

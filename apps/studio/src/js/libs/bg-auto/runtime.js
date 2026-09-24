@@ -18,6 +18,18 @@ function get_model_location() {
 		: 'onnx-community/ISNet-ONNX';
 }
 
+function get_transformers_cdn() {
+	return (config.BG_AUTO_TRANSFORMERS_CDN != null && String(config.BG_AUTO_TRANSFORMERS_CDN).trim() !== '')
+		? String(config.BG_AUTO_TRANSFORMERS_CDN).trim()
+		: 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
+}
+
+function get_ort_wasm_cdn() {
+	return (config.BG_AUTO_ORT_WASM_CDN != null && String(config.BG_AUTO_ORT_WASM_CDN).trim() !== '')
+		? String(config.BG_AUTO_ORT_WASM_CDN).trim()
+		: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist/';
+}
+
 function ensure_worker() {
 	if (worker) return worker;
 	worker = new Worker(new URL('./../../workers/bg-auto-worker.js', import.meta.url));
@@ -69,7 +81,11 @@ function call_worker(payload, onProgress) {
 		if (payload.pixels && payload.pixels.buffer) {
 			transfer.push(payload.pixels.buffer);
 		}
-		worker.postMessage(Object.assign({ id: id }, payload), transfer);
+		worker.postMessage(Object.assign({
+			id: id,
+			transformersCdn: get_transformers_cdn(),
+			ortWasmCdn: get_ort_wasm_cdn(),
+		}, payload), transfer);
 	});
 }
 

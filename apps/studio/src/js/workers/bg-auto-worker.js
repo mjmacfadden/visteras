@@ -1,26 +1,34 @@
 /**
  * Studio background-auto Web Worker.
  * Loads onnx-community/ISNet-ONNX via @huggingface/transformers (WebGPU → WASM).
- * Transformers.js is imported from jsDelivr at runtime so the multi‑MB vendor
- * bundle (and false-positive secret scanners on model-name strings) never lands
- * in apps/studio/dist.
+ *
+ * Transformers.js is imported from jsDelivr `/+esm` (not the raw dist file) so bare
+ * package imports like `onnxruntime-web/webgpu` are rewritten to absolute CDN URLs.
+ * That is required in module workers (import maps do not apply). Versions are pinned
+ * in config.js to match the npm dependency; the URLs are passed from the main thread.
  */
-var TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.web.min.js';
+var DEFAULT_TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
+var DEFAULT_ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist/';
 
 var pipe = null;
 var loadedDevice = null;
 var loadedModelId = null;
 var transformersPromise = null;
+var transformersCdn = DEFAULT_TRANSFORMERS_CDN;
+var ortWasmCdn = DEFAULT_ORT_WASM_CDN;
 
 function load_transformers() {
 	if (!transformersPromise) {
-		transformersPromise = import(/* webpackIgnore: true */ TRANSFORMERS_CDN).then(function (mod) {
+		transformersPromise = import(/* webpackIgnore: true */ transformersCdn).then(function (mod) {
 			var env = mod.env;
 			env.allowLocalModels = false;
 			env.useBrowserCache = true;
 			env.useFS = false;
 			env.useFSCache = false;
-			// Leave onnx.wasm.wasmPaths unset so Transformers.js picks jsDelivr ORT WASM.
+			// Pin ORT WASM/JSEP factory to the same onnxruntime-web version as npm.
+			env.backends.onnx = env.backends.onnx || {};
+			env.backends.onnx.wasm = env.backends.onnx.wasm || {};
+			env.backends.onnx.wasm.wasmPaths = ortWasmCdn;
 			return mod;
 		});
 	}
@@ -119,6 +127,16 @@ self.onmessage = async function (event) {
 	var msg = event.data || {};
 	var id = msg.id;
 	try {
+		if (msg.transformersCdn) {
+			transformersCdn = String(msg.transformersCdn);
+		}
+		if (msg.ortWasmCdn) {
+			ortWasmCdn = String(msg.ortWasmCdn);
+			// Reset loader if CDN pin changes before first successful import.
+			if (!pipe) {
+				transformersPromise = null;
+			}
+		}
 		if (msg.type === 'ping') {
 			self.postMessage({ id: id, type: 'pong' });
 			return;
@@ -167,7 +185,7 @@ self.onmessage = async function (event) {
 	} catch (err) {
 		var message = (err && err.message) ? err.message : String(err);
 		var code = 'infer_failed';
-		if (/fetch|network|Failed to fetch|Load failed|HTTP/i.test(message)) {
+		if (/fetch|network|Failed to fetch|Load failed|HTTP|Failed to resolve module/i.test(message)) {
 			code = 'download_failed';
 		} else if (/memory|out of memory|OOM|allocation/i.test(message)) {
 			code = 'oom';
