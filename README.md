@@ -32,6 +32,15 @@ Studio’s **Raw Develop** modal (Camera Raw–style layout: large preview, coll
 - **v1 sources**: JPEG/PNG and other already-rasterized Studio image layers via canvas `ImageData`.
 - **Future RAW files**: decode is routed through `apps/studio/src/js/libs/raw-source.js` so a LibRaw (or similar) WASM decoder can be registered later without rewriting the UI. LibRaw itself is not bundled yet.
 
+## Studio background removal credits
+
+Client-side **Remove Background** / **Select Subject** use
+[`onnx-community/ISNet-ONNX`](https://huggingface.co/onnx-community/ISNet-ONNX)
+via Transformers.js. See `apps/studio/NOTICE-bg-auto.md` for license notes
+(Apache-2.0 attribution via rembg; upstream DIS LICENSE not independently confirmed).
+
+Model location (single setting): `apps/studio/src/js/config.js` → `config.BG_AUTO_MODEL_LOCATION`.
+
 ## Based on miniPaint / SVG-Edit
 
 Studio is a heavily forked descendant of miniPaint by Vilius L. (MIT License).

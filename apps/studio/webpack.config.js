@@ -12,6 +12,7 @@ module.exports = function (env, argv) {
 	output: {
 		path: path.resolve(__dirname, 'dist'),
 		filename: 'bundle.js',
+		chunkFilename: '[name].js',
 		publicPath: 'auto',
 		clean: true
 	},
@@ -22,7 +23,12 @@ module.exports = function (env, argv) {
 			Utilities: path.resolve(__dirname, 'node_modules'),
 			'vp-local-keys': fs.existsSync(path.resolve(__dirname, 'src/js/config.keys.local.js'))
 				? path.resolve(__dirname, 'src/js/config.keys.local.js')
-				: path.resolve(__dirname, 'src/js/config.keys.stub.js')
+				: path.resolve(__dirname, 'src/js/config.keys.stub.js'),
+			sharp$: false,
+			'onnxruntime-node$': false,
+			'fs': false,
+			'path': false,
+			'crypto': false,
 		}
 	},
 	module: {
@@ -43,10 +49,20 @@ module.exports = function (env, argv) {
 				use: ['babel-loader']
 			},
 			{
+				// Studio ships hokusai WASM; ONNX Runtime WASM stays on jsDelivr (see bg-auto-worker).
 				test: /\.wasm$/,
+				exclude: /onnxruntime-web/,
 				type: 'asset/resource',
 				generator: {
 					filename: '[name][ext]'
+				}
+			},
+			{
+				test: /onnxruntime-web[/\\].*\.wasm$/,
+				type: 'asset/resource',
+				generator: {
+					filename: '[name][ext]',
+					emit: false,
 				}
 			},
 			{

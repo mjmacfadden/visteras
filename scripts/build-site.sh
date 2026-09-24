@@ -92,6 +92,8 @@ echo "==> Copying Studio static tree → site/studio/"
 # Exclude node_modules, src, archived, webpack, package files, scripts.
 copy_tree "$STUDIO" "$SITE/studio" \
   --exclude 'node_modules' \
+  --exclude 'dist/ort-*.wasm' \
+  --exclude 'ort-*.wasm' \
   --exclude '.git' \
   --exclude 'src' \
   --exclude 'archived' \

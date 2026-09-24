@@ -546,6 +546,39 @@ class Selection_class extends Base_tools_class {
 		return [];
 	}
 
+
+	/**
+	 * Options-bar attribute handler (Select Subject quick action).
+	 */
+	async on_params_update(data) {
+		var key = data && data.key;
+		if (key !== 'select_subject') {
+			return;
+		}
+		// Keep the button pressed-in look like Crop's Commit button
+		var attrs = (config.TOOL && config.TOOL.attributes) ? config.TOOL.attributes : null;
+		if (attrs && attrs.select_subject !== undefined) {
+			if (typeof attrs.select_subject === 'object') {
+				attrs.select_subject.value = true;
+			} else {
+				attrs.select_subject = true;
+			}
+		}
+		if (this.GUI_tools && typeof this.GUI_tools.show_action_attributes === 'function') {
+			this.GUI_tools.show_action_attributes();
+		}
+		var Bg = null;
+		try {
+			var BgMod = (await import(/* webpackChunkName: "bg-auto" */ './../modules/tools/bg_auto.js')).default;
+			Bg = new BgMod();
+		} catch (err) {
+			alertify.error('Could not load background-removal tools.');
+			console.error(err);
+			return;
+		}
+		await Bg.select_subject();
+	}
+
 	clear_selection_actions() {
 		this.Base_selection.bake_selection_clips();
 		return [new app.Actions.Reset_selection_action(this.selection)];

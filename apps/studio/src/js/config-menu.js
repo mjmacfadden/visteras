@@ -192,6 +192,15 @@ const menuDefinition = [
 		]
 	},
 	{
+		name: 'Select',
+		children: [
+			{
+				name: 'Subject',
+				target: 'tools/bg_auto.select_subject'
+			}
+		]
+	},
+	{
 		name: 'View',
 		children: [
 			{
@@ -459,6 +468,10 @@ const menuDefinition = [
 			{
 				name: 'Convert to Raster',
 				target: 'layer/raster.raster'
+			},
+			{
+				name: 'Remove Background',
+				target: 'tools/bg_auto.remove_background'
 			},
 			{
 				divider: true

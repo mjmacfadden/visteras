@@ -1,4 +1,4 @@
-var CACHE_NAME = 'visteras-studio-shell-v77';
+var CACHE_NAME = 'visteras-studio-shell-v78';
 var APP_SHELL = [
 	'./',
 	'./index.html',
@@ -32,6 +32,16 @@ self.addEventListener('activate', function (event) {
 self.addEventListener('fetch', function (event) {
 	if (event.request.method !== 'GET' || event.request.url.indexOf(self.location.origin) !== 0)
 		return;
+
+	// Never precache / runtime-cache ML model weights or ONNX/WASM binaries.
+	// Transformers.js uses its own Cache Storage; the shell SW must not double-cache.
+	var reqUrl = event.request.url;
+	if (/\.(onnx|wasm)$/i.test(reqUrl)
+		|| reqUrl.indexOf('/onnx-community/') !== -1
+		|| reqUrl.indexOf('/ISNet') !== -1
+		|| /\/models\//i.test(reqUrl)) {
+		return;
+	}
 
 	event.respondWith(caches.match(event.request).then(function (cached) {
 		var refresh = fetch(event.request).then(function (response) {

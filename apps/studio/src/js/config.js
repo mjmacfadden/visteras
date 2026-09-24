@@ -73,6 +73,14 @@ config.TRANSFORM_MARGIN = 300;
 // 'auto' tries WebGL first, falls back to Canvas 2D
 config.RENDERER = 'auto';
 
+// Client-side background removal / Select Subject (ISNet via Transformers.js).
+// ONE setting for model location: Hugging Face model id OR absolute base URL of a
+// self-hosted mirror (e.g. Cloudflare R2). Weights are never shipped in the Pages tree.
+// Examples:
+//   'onnx-community/ISNet-ONNX'          (default — Hugging Face CDN)
+//   'https://models.example.com/ISNet-ONNX'  (mirror root containing config.json + *.onnx)
+config.BG_AUTO_MODEL_LOCATION = 'onnx-community/ISNet-ONNX';
+
 //requires styles in reset.css
 config.themes = [
 	'dark',
@@ -98,7 +106,13 @@ config.TOOLS = [
 	{
 		name: 'selection',
 		title: 'Rectangular Marquee Tool',
-		attributes: {},
+		on_update: 'on_params_update',
+		attributes: {
+			select_subject: {
+				title: 'Select Subject',
+				value: true,
+			},
+		},
 		on_leave: 'on_leave',
 		tool_group: {
 			label: 'Selection Tools',

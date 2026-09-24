@@ -5,6 +5,7 @@ import Helper_class from './../../libs/helpers.js';
 import Tools_translate_class from './../../modules/tools/translate.js';
 import Vector_manager from './../vector/vector-manager.js';
 import { Update_vector_action } from './../../actions/vector/update-vector.js';
+import Tools_bg_auto_class from './../../modules/tools/bg_auto.js';
 
 /**
  * GUI class responsible for the Properties panel.
@@ -25,7 +26,7 @@ class GUI_properties_class {
 		this.Base_layers = new Base_layers_class();
 		this.Tools_translate = new Tools_translate_class();
 		this.bound_layer_id = null;
-		this.bound_kind = null; // 'adjustment' | 'text' | null
+		this.bound_kind = null; // 'adjustment' | 'text' | 'image' | null
 		this.params_at_interaction_start = null;
 		this._events_bound = false;
 		this._applying_text = false;
@@ -121,6 +122,11 @@ class GUI_properties_class {
 
 		if (activeVec) {
 			this.render_vector_properties(target, activeVec, bind_events);
+			return;
+		}
+
+		if (layer && layer.type === 'image') {
+			this.render_image_properties(target, layer, bind_events);
 			return;
 		}
 
@@ -1072,6 +1078,47 @@ class GUI_properties_class {
 	 * Properties stays two-way bound. No-op while Properties is driving the change,
 	 * or when Properties isn't showing text controls / text isn't selected.
 	 */
+
+	/**
+	 * Raster image layer Properties: Quick Actions (Remove Background, etc.).
+	 */
+	render_image_properties(target, layer, bind_events = false) {
+		const sig = String(layer.id) + ':image';
+		if (!bind_events && this.bound_kind === 'image' && this.bound_layer_id === layer.id
+			&& target.querySelector('.properties_image_controls')) {
+			return;
+		}
+
+		let html = '<div class="properties_controls properties_image_controls">';
+		html += '<div class="properties_title trn">Layer</div>';
+		html += `<div class="properties_row"><span class="properties_subinfo_text">${this.esc(layer.name || 'Image')}</span></div>`;
+		html += '<div class="properties_group_title trn">Quick Actions</div>';
+		html += `<div class="properties_row">
+			<button type="button" class="button trn" id="prop_remove_background">Remove Background</button>
+		</div>`;
+		html += '<div class="properties_row"><span class="properties_subinfo_text trn">Writes a soft layer mask (nondestructive).</span></div>';
+		html += '</div>';
+		target.innerHTML = html;
+		this.bound_layer_id = layer.id;
+		this.bound_kind = 'image';
+		delete target.dataset.adjType;
+		delete target.dataset.textSig;
+
+		if (bind_events) {
+			const btn = target.querySelector('#prop_remove_background');
+			if (btn) {
+				btn.addEventListener('click', () => {
+					const Bg = new Tools_bg_auto_class();
+					Bg.remove_background();
+				});
+			}
+		}
+
+		if (config.LANG != 'en') {
+			this.Tools_translate.translate(config.LANG, target);
+		}
+	}
+
 	on_text_attributes_changed() {
 		if (this._applying_text) return;
 		const layer = config.layer;
