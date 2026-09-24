@@ -65,7 +65,7 @@ class Select_tool_class extends Base_tools_class {
 
 				const current_signature = this.get_selection_signature();
 				const isMultiOrGroup = movable_layers.length > 1 || (config.layer && is_group(config.layer))
-					|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id))));
+					|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id, true))));
 
 				if (isMultiOrGroup) {
 					if (this.selection_transform_box && this.last_selection_signature === current_signature) {
@@ -387,7 +387,7 @@ class Select_tool_class extends Base_tools_class {
 
 		// Capture the multi-selection / group center for rotation pivot
 		const isAnyGroup = (config.layer && is_group(config.layer))
-			|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id))));
+			|| (Array.isArray(config.selected_layer_ids) && config.selected_layer_ids.some(id => is_group(app.Layers.get_layer(id, true))));
 		if (movable_layers.length > 1 || (movable_layers.length > 0 && isAnyGroup)) {
 			if (this.selection_transform_box) {
 				this.mousedown_group_center = {
@@ -500,7 +500,7 @@ class Select_tool_class extends Base_tools_class {
 						const sinA = Math.sin(rad);
 
 						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-							const layer = app.Layers.get_layer(layer_id);
+							const layer = app.Layers.get_layer(layer_id, true);
 							if (!layer) continue;
 
 							// Rotate position around group center
@@ -539,7 +539,7 @@ class Select_tool_class extends Base_tools_class {
 
 					if (this.mousedown_multi_positions && this.mousedown_multi_positions.size > 0) {
 						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-							const layer = app.Layers.get_layer(layer_id);
+							const layer = app.Layers.get_layer(layer_id, true);
 							if (!layer) continue;
 
 							layer.width = Math.round(init_pos.width * scale_x);
@@ -611,7 +611,7 @@ class Select_tool_class extends Base_tools_class {
 				}
 
 				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-					const layer = app.Layers.get_layer(layer_id);
+					const layer = app.Layers.get_layer(layer_id, true);
 					if (!layer) continue;
 
 					const prevMoveX = layer.x;
@@ -706,7 +706,7 @@ class Select_tool_class extends Base_tools_class {
 
 						let rotate_actions = [];
 						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-							const layer = app.Layers.get_layer(layer_id);
+							const layer = app.Layers.get_layer(layer_id, true);
 							if (!layer) continue;
 
 							// Reset to initial state so Update_layer_action captures correct old values
@@ -759,7 +759,7 @@ class Select_tool_class extends Base_tools_class {
 					// No rotation change: restore initial positions
 					if (this.mousedown_multi_positions) {
 						for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-							const layer = app.Layers.get_layer(layer_id);
+							const layer = app.Layers.get_layer(layer_id, true);
 							if (layer) {
 								layer.x = init_pos.x;
 								layer.y = init_pos.y;
@@ -779,7 +779,7 @@ class Select_tool_class extends Base_tools_class {
 				const finalPositions = new Map();
 				if (this.mousedown_multi_positions) {
 					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-						const layer = app.Layers.get_layer(layer_id);
+						const layer = app.Layers.get_layer(layer_id, true);
 						if (layer) {
 							finalPositions.set(layer_id, {
 								x: layer.x,
@@ -794,7 +794,7 @@ class Select_tool_class extends Base_tools_class {
 				// Reset to mousedown values so Update_layer_action captures correct previous state
 				if (this.mousedown_multi_positions) {
 					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-						const layer = app.Layers.get_layer(layer_id);
+						const layer = app.Layers.get_layer(layer_id, true);
 						if (layer) {
 							layer.x = init_pos.x;
 							layer.y = init_pos.y;
@@ -820,7 +820,7 @@ class Select_tool_class extends Base_tools_class {
 						if (init_pos.x !== finalPos.x || init_pos.y !== finalPos.y ||
 							init_pos.width !== finalPos.width || init_pos.height !== finalPos.height
 						) {
-							const layer = app.Layers.get_layer(layer_id);
+							const layer = app.Layers.get_layer(layer_id, true);
 							let layerUpdate = {
 								x: finalPos.x,
 								y: finalPos.y,
@@ -986,7 +986,7 @@ class Select_tool_class extends Base_tools_class {
 				}
 
 				for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-					const layer = app.Layers.get_layer(layer_id);
+					const layer = app.Layers.get_layer(layer_id, true);
 					if (!layer) continue;
 
 					layer.x = init_pos.x;
@@ -1010,7 +1010,7 @@ class Select_tool_class extends Base_tools_class {
 				if (delta_x !== 0 || delta_y !== 0) {
 					let move_actions = [];
 					for (const [layer_id, init_pos] of this.mousedown_multi_positions.entries()) {
-						const layer = app.Layers.get_layer(layer_id);
+						const layer = app.Layers.get_layer(layer_id, true);
 						if (!layer) continue;
 
 						const new_x = init_pos.x + delta_x;
@@ -1320,14 +1320,14 @@ class Select_tool_class extends Base_tools_class {
 
 		for (const raw_id of selected_ids) {
 			const id = parseInt(raw_id, 10);
-			const layer = app.Layers.get_layer(id);
+			const layer = app.Layers.get_layer(id, true);
 			if (!layer) continue;
 
 			if (is_group(layer)) {
 				const desc_ids = get_descendant_ids(layer.id, config.layers);
 				for (const desc_id of desc_ids) {
 					if (visited_ids.has(desc_id)) continue;
-					const child = app.Layers.get_layer(desc_id);
+					const child = app.Layers.get_layer(desc_id, true);
 					if (child && !is_group(child)) {
 						visited_ids.add(desc_id);
 						if (!this.is_layer_locked(child)) {
@@ -1464,6 +1464,22 @@ class Select_tool_class extends Base_tools_class {
 		}
 
 		return false;
+	}
+
+	reset_selection() {
+		this.selection_transform_box = null;
+		this.last_selection_signature = null;
+		this.mousedown_dimensions = { x: null, y: null, width: null, height: null };
+		this.mousedown_mask_dimensions = null;
+		this.mousedown_multi_positions = null;
+		this.mousedown_content_bounds = null;
+		this.mousedown_group_center = null;
+		this.mousedown_transform_box = null;
+		this.keyboard_move_start_position = null;
+		this.keyboard_move_start_positions = null;
+		this.moving = false;
+		this.resizing = false;
+		this.is_rotating = false;
 	}
 
 }

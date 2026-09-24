@@ -229,7 +229,8 @@ class GUI_details_class {
 				else {
 					var value = parseInt(this.value);
 				}
-				var layer = _this.Base_layers.get_layer(e.target.dataset.layer);
+				var layer = _this.Base_layers.get_layer(e.target.dataset.layer, true);
+				if (!layer) return;
 				layer[key] = focus_value;
 				if (focus_value !== value) {
 					app.State.do_action(

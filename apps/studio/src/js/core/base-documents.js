@@ -121,6 +121,7 @@ class Base_documents_class {
 			resolution: options.resolution || (this.Tools_settings ? this.Tools_settings.get_setting('resolution') : 72) || 72,
 			layers: layers,
 			layer: layer || layers[0],
+			selected_layer_ids: options.selected_layer_ids || (layer ? [layer.id] : (layers && layers[0] ? [layers[0].id] : [])),
 			zoom: options.zoom || 1,
 			zoom_data: options.zoom_data || null,
 			guides: options.guides || [],
@@ -181,6 +182,7 @@ class Base_documents_class {
 		doc.height = config.HEIGHT;
 		doc.layers = config.layers;
 		doc.layer = config.layer;
+		doc.selected_layer_ids = (config.selected_layer_ids || []).slice();
 		doc.zoom = config.ZOOM;
 		doc.guides = config.guides;
 		doc.user_fonts = config.user_fonts;
@@ -273,7 +275,19 @@ class Base_documents_class {
 				migrate_layer_clipping(config.layers[mi]);
 			}
 		}
+		const validLayerIds = new Set((config.layers || []).map(l => l.id));
 		config.layer = doc.layer || (config.layers ? config.layers[0] : null);
+		if (config.layer && !validLayerIds.has(config.layer.id)) {
+			config.layer = (config.layers && config.layers[0]) ? config.layers[0] : null;
+		}
+		if (doc.selected_layer_ids && Array.isArray(doc.selected_layer_ids)) {
+			config.selected_layer_ids = doc.selected_layer_ids.filter(id => validLayerIds.has(parseInt(id, 10)));
+		} else {
+			config.selected_layer_ids = [];
+		}
+		if (!config.selected_layer_ids || config.selected_layer_ids.length === 0) {
+			config.selected_layer_ids = config.layer ? [config.layer.id] : [];
+		}
 		config.vectors = (doc.vectors && Array.isArray(doc.vectors)) ? doc.vectors : [];
 		config.active_vector_id = doc.active_vector_id || (config.vectors[0] ? config.vectors[0].id : null);
 		config.ZOOM = doc.zoom || 1;
@@ -338,6 +352,13 @@ class Base_documents_class {
 					selSettings.data = restoredSel;
 				}
 			}
+		}
+
+		const selectTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'])
+			? app.GUI.GUI_tools.tools_modules['select'].object
+			: null;
+		if (selectTool && typeof selectTool.reset_selection === 'function') {
+			selectTool.reset_selection();
 		}
 
 		// 7. Resize canvas and init zoom
@@ -490,6 +511,7 @@ class Base_documents_class {
 					doc.height = h;
 					doc.layers = [new_layer];
 					doc.layer = new_layer;
+					doc.selected_layer_ids = [new_layer.id];
 					doc.auto_increment = 2;
 					doc.action_history = [];
 					doc.action_history_index = 0;
@@ -510,6 +532,7 @@ class Base_documents_class {
 						height: h,
 						layers: [new_layer],
 						layer: new_layer,
+						selected_layer_ids: [new_layer.id],
 						auto_increment: 2,
 						action_history: [],
 						action_history_index: 0,
@@ -816,6 +839,7 @@ class Base_documents_class {
 			doc.height = h;
 			doc.layers = layers;
 			doc.layer = activeLayer;
+			doc.selected_layer_ids = activeLayer ? [activeLayer.id] : [1];
 			doc.auto_increment = max_id_order + 1;
 			doc.guides = [];
 			doc.user_fonts = {};
@@ -840,6 +864,7 @@ class Base_documents_class {
 				height: h,
 				layers: layers,
 				layer: activeLayer,
+				selected_layer_ids: activeLayer ? [activeLayer.id] : [1],
 				auto_increment: max_id_order + 1,
 				action_history: [],
 				action_history_index: 0,
@@ -1035,7 +1060,15 @@ class Base_documents_class {
 
 			doc.layers = [bgLayer];
 			doc.layer = bgLayer;
+			doc.selected_layer_ids = [1];
 			doc.auto_increment = 2;
+
+			const selectTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'])
+				? app.GUI.GUI_tools.tools_modules['select'].object
+				: null;
+			if (selectTool && typeof selectTool.reset_selection === 'function') {
+				selectTool.reset_selection();
+			}
 
 			await this.restore_state(doc);
 			this.render_tabs();
@@ -1052,6 +1085,12 @@ class Base_documents_class {
 		this.documents.splice(idx, 1);
 
 		if (isClosingActive && targetId) {
+			const selectTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'])
+				? app.GUI.GUI_tools.tools_modules['select'].object
+				: null;
+			if (selectTool && typeof selectTool.reset_selection === 'function') {
+				selectTool.reset_selection();
+			}
 			this.active_id = targetId;
 			const nextDoc = this.documents.find(d => d.id === targetId);
 			await this.restore_state(nextDoc);

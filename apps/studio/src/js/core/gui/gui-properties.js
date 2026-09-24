@@ -466,7 +466,7 @@ class GUI_properties_class {
 				const name = number.name;
 				let val = this.parse_input_value(number);
 				if (val === null) {
-					const layer = this.Base_layers.get_layer(layer_id);
+					const layer = this.Base_layers.get_layer(layer_id, true);
 					val = layer && layer.params ? layer.params[name] : 0;
 				}
 				const min = parseFloat(number.min);
@@ -485,7 +485,7 @@ class GUI_properties_class {
 					const name = number.name;
 					let val = this.parse_input_value(number);
 					if (val === null) {
-						const layer = this.Base_layers.get_layer(layer_id);
+						const layer = this.Base_layers.get_layer(layer_id, true);
 						val = layer && layer.params ? layer.params[name] : 0;
 					}
 					const step = parseFloat(number.step) || 1;
@@ -510,7 +510,7 @@ class GUI_properties_class {
 						const name = number.name;
 						let val = this.parse_input_value(number);
 						if (val === null) {
-							const layer = this.Base_layers.get_layer(layer_id);
+							const layer = this.Base_layers.get_layer(layer_id, true);
 							val = layer && layer.params ? layer.params[name] : 0;
 						}
 						const step = parseFloat(number.step) || 1;
@@ -568,13 +568,13 @@ class GUI_properties_class {
 	}
 
 	snapshot_params(layer_id) {
-		const layer = this.Base_layers.get_layer(layer_id);
+		const layer = this.Base_layers.get_layer(layer_id, true);
 		if (!layer) return;
 		this.params_at_interaction_start = JSON.parse(JSON.stringify(layer.params || {}));
 	}
 
 	apply_live(layer_id, name, val) {
-		const layer = this.Base_layers.get_layer(layer_id);
+		const layer = this.Base_layers.get_layer(layer_id, true);
 		if (!layer || layer.type !== 'adjustment') return;
 		if (!layer.params) layer.params = {};
 		layer.params[name] = val;
@@ -583,7 +583,7 @@ class GUI_properties_class {
 	}
 
 	commit_params(layer_id) {
-		const layer = this.Base_layers.get_layer(layer_id);
+		const layer = this.Base_layers.get_layer(layer_id, true);
 		if (!layer || layer.type !== 'adjustment') return;
 
 		const next = JSON.parse(JSON.stringify(layer.params || {}));

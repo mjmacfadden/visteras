@@ -1428,7 +1428,7 @@ class Base_layers_class {
 			}
 		}
 		if (!quiet) {
-			alertify.error("Error: can not find layer with id:" + id);
+			console.warn("can not find layer with id:" + id);
 		}
 		return null;
 	}
@@ -1556,7 +1556,8 @@ class Base_layers_class {
 	 * @returns {Boolean}
 	 */
 	is_layer_empty(id) {
-		var link = this.get_layer(id);
+		var link = this.get_layer(id, true);
+		if (!link) return true;
 
 		if (
 			(link.width == 0 || link.width === null) &&
@@ -1577,7 +1578,8 @@ class Base_layers_class {
 	 */
 	find_next(id) {
 		id = parseInt(id);
-		var link = this.get_layer(id);
+		var link = this.get_layer(id, true);
+		if (!link) return null;
 		var layers_sorted = this.get_sorted_layers();
 
 		var last = null;
@@ -1601,7 +1603,8 @@ class Base_layers_class {
 	 */
 	find_previous(id) {
 		id = parseInt(id);
-		var link = this.get_layer(id);
+		var link = this.get_layer(id, true);
+		if (!link) return null;
 		var layers_sorted = this.get_sorted_layers();
 
 		var last = null;
@@ -1686,7 +1689,7 @@ class Base_layers_class {
 	convert_layer_to_canvas(layer_id, actual_area = false, can_trim) {
 		if (actual_area == null) actual_area = false;
 		if (layer_id == null) layer_id = config.layer ? config.layer.id : null;
-		var link = this.get_layer(layer_id);
+		var link = this.get_layer(layer_id, true);
 		if (!link || is_group(link) || link.type == null) {
 			var emptyCanvas = document.createElement("canvas");
 			emptyCanvas.width = 1;
@@ -1796,10 +1799,13 @@ class Base_layers_class {
 		if (typeof layer_id == "undefined") {
 			var layer = config.layer;
 		} else {
-			var layer = this.get_layer(layer_id);
+			var layer = this.get_layer(layer_id, true);
 		}
 
 		var filter = {};
+		if (!layer || !layer.filters) {
+			return filter;
+		}
 		for (var i in layer.filters) {
 			if (
 				layer.filters[i].name == filter_name &&
