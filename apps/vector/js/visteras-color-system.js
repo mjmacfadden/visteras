@@ -2207,3 +2207,239 @@ function mountAppearanceColors(ctrl, svgEditor) {
     chainCanvasEvent(sc, 'changed', onChanged);
     chainCanvasEvent(sc, 'transition', onTransition);
   } catch { /* ignore */ }
+
+  // When SVG-Edit refreshes the context panel (select / create), keep Appearance
+  // chips in lockstep — covers paths that update topPanel without re-firing bind.
+  try {
+    const top = svgEditor?.topPanel;
+    if (top && typeof top.updateContextPanel === 'function' && !top.__vcsAppearanceHooked) {
+      const prevUpdate = top.updateContextPanel.bind(top);
+      top.updateContextPanel = function vcsAppearanceUpdateContextPanel(...args) {
+        const ret = prevUpdate(...args);
+        try { syncSelectionUi(); } catch { /* ignore */ }
+        return ret;
+      };
+      top.__vcsAppearanceHooked = true;
+    }
+  } catch { /* ignore */ }
+
+  refresh();
+}
+
+// ---------------------------------------------------------------------------
+// Picker modal
+// ---------------------------------------------------------------------------
+
+function mountPickerModal(ctrl) {
+  if (document.getElementById('vcs_picker_modal')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'vcs_picker_overlay';
+  overlay.className = 'vcs-picker-overlay';
+
+  const modal = document.createElement('div');
+  modal.id = 'vcs_picker_modal';
+  modal.className = 'vcs-picker-modal';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.innerHTML = `
+    <div class="vcs-picker-header">
+      <span class="vcs-picker-title">Color Picker</span>
+      <span class="vcs-picker-target-label" id="vcs_picker_target_label">Fill</span>
+      <button type="button" class="vcs-picker-close" id="vcs_picker_close" title="Close">×</button>
+    </div>
+    <div class="vcs-picker-body">
+      <div class="vcs-picker-spectrum" id="vcs_picker_spectrum_slot"></div>
+      <div class="vcs-picker-side">
+        <div class="vcs-preview-row">
+          <div class="vcs-preview vcs-preview-lg" id="vcs_picker_preview"></div>
+          <button type="button" class="vcs-btn-ghost vcs-none-swatch-btn" id="vcs_picker_none" title="No color" aria-label="No color"></button>
+          <span class="vcs-none-label">None</span>
+        </div>
+        <div class="vcs-fields">
+          <label class="vcs-field"><span>Hex</span><input id="vcs_picker_hex" type="text" spellcheck="false" maxlength="7" /></label>
+        </div>
+        <div class="vcs-picker-actions">
+          <button type="button" class="vcs-btn" id="vcs_picker_apply">OK</button>
+          <button type="button" class="vcs-btn vcs-btn-secondary" id="vcs_picker_cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.append(overlay, modal);
+
+  let draftHex = '#cccccc';
+  let draftNone = false;
+  let openSnapshot = { hex: '#cccccc', none: false, target: 'fill' };
+  let applying = false;
+  let liveApply = true; // live apply while dragging; Cancel restores snapshot
+
+  const spectrum = createSpectrumWidget({
+    size: 260,
+    hueHeight: 16,
+    onChange: ({ hex }) => {
+      draftNone = false;
+      draftHex = hex;
+      refreshDraft();
+      if (liveApply) ctrl.setWorkingColor(hex, { apply: true, recordRecent: false, noUndo: true });
+    },
+    onCommit: ({ hex }) => {
+      draftHex = hex;
+      if (liveApply) {
+        ctrl.setWorkingColor(hex, { apply: true, recordRecent: true, noUndo: false });
+      }
+    },
+  });
+  modal.querySelector('#vcs_picker_spectrum_slot').appendChild(spectrum.el);
+
+  const hexInput = modal.querySelector('#vcs_picker_hex');
+  const preview = modal.querySelector('#vcs_picker_preview');
+  const targetLabel = modal.querySelector('#vcs_picker_target_label');
+
+  function refreshDraft() {
+    applying = true;
+    const target = ctrl.getActiveTarget();
+    targetLabel.textContent = target === 'fill' ? 'Fill' : 'Stroke';
+    if (draftNone) {
+      preview.classList.add('is-none');
+      preview.style.backgroundColor = '';
+      hexInput.value = 'none';
+    } else {
+      preview.classList.remove('is-none');
+      preview.style.backgroundColor = draftHex;
+      hexInput.value = draftHex.toUpperCase();
+      if (!spectrum.isDragging()) spectrum.setFromHex(draftHex);
+    }
+    applying = false;
+  }
+
+  function close() {
+    overlay.classList.remove('open');
+    modal.classList.remove('open');
+  }
+
+  function open(target) {
+    if (target) ctrl.setActiveTarget(target, { syncColor: true });
+    const st = ctrl.getState();
+    openSnapshot = {
+      hex: st.workingHex,
+      none: st.workingNone,
+      target: st.activeTarget,
+    };
+    draftHex = st.workingHex;
+    draftNone = st.workingNone;
+    refreshDraft();
+    overlay.classList.add('open');
+    modal.classList.add('open');
+    hexInput.focus();
+    hexInput.select();
+  }
+
+  function cancel() {
+    try {
+      // Restore snapshot
+      ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
+      if (openSnapshot.none) ctrl.setWorkingColor('none', { recordRecent: false });
+      else ctrl.setWorkingColor(openSnapshot.hex, { recordRecent: false });
+    } catch (err) {
+      console.warn('[visteras-color-system] cancel restore failed', err);
+    } finally {
+      close();
+    }
+  }
+
+  function applyAndClose() {
+    try {
+      if (draftNone) ctrl.setWorkingColor('none');
+      else ctrl.setWorkingColor(draftHex, { recordRecent: true });
+    } catch (err) {
+      console.warn('[visteras-color-system] apply failed', err);
+    } finally {
+      close();
+    }
+  }
+
+  modal.querySelector('#vcs_picker_none').addEventListener('click', () => {
+    draftNone = true;
+    refreshDraft();
+    if (liveApply) ctrl.setWorkingColor('none');
+  });
+  modal.querySelector('#vcs_picker_close').addEventListener('click', applyAndClose);
+  modal.querySelector('#vcs_picker_apply').addEventListener('click', applyAndClose);
+  modal.querySelector('#vcs_picker_cancel').addEventListener('click', cancel);
+  overlay.addEventListener('click', cancel);
+
+  hexInput.addEventListener('change', () => {
+    if (applying) return;
+    const v = hexInput.value.trim();
+    if (v.toLowerCase() === 'none') {
+      draftNone = true;
+    } else {
+      const hex = normalizeHex(v);
+      if (!hex) { refreshDraft(); return; }
+      draftNone = false;
+      draftHex = hex;
+    }
+    refreshDraft();
+    if (liveApply) ctrl.setWorkingColor(draftNone ? 'none' : draftHex, { recordRecent: false });
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!modal.classList.contains('open')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      cancel();
+    } else if (e.key === 'Enter' && e.target?.id?.startsWith('vcs_picker_')) {
+      e.preventDefault();
+      applyAndClose();
+    }
+  }, true); // capture so we win over Direct Selection's Escape handler
+
+  window.__visterasOpenColorPicker = open;
+  ctrl.subscribe(() => {
+    if (!modal.classList.contains('open')) return;
+    // Keep target chrome in sync if changed externally
+    targetLabel.textContent = ctrl.getActiveTarget() === 'fill' ? 'Fill' : 'Stroke';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public mount
+// ---------------------------------------------------------------------------
+
+/**
+ * @param {{ svgEditor: any }} opts
+ */
+export function mountVisterasColorSystem({ svgEditor } = {}) {
+  if (!svgEditor?.svgCanvas) {
+    console.warn('[visteras-color-system] svgEditor not ready');
+    return null;
+  }
+  if (window.__visterasColorSystemMounted) {
+    return window.__visterasColorSystem;
+  }
+
+  const ctrl = createColorController(svgEditor);
+
+  const tryMount = () => {
+    mountToolbarColorSwatches(svgEditor, ctrl);
+    mountColorSwatchesTabs(ctrl, svgEditor);
+    mountAppearanceColors(ctrl, svgEditor);
+    mountPickerModal(ctrl);
+  };
+
+  tryMount();
+  setTimeout(tryMount, 100);
+  setTimeout(tryMount, 500);
+  setTimeout(() => {
+    ctrl.syncFromCanvas();
+  }, 600);
+
+  window.__visterasColorSystemMounted = true;
+  console.info('[visteras-color-system] mounted');
+  return ctrl;
+}
+
+export default mountVisterasColorSystem;
