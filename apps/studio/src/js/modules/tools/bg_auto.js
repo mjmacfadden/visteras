@@ -44,6 +44,17 @@ class Tools_bg_auto_class {
 		return 'Background removal failed: ' + message;
 	}
 
+
+	log_build_once() {
+		if (Tools_bg_auto_class._logged_build)
+			return;
+		Tools_bg_auto_class._logged_build = true;
+		console.info(
+			'[bg-auto] build=' + (config.BG_AUTO_BUILD_ID || 'unknown'),
+			'cdn=' + (config.BG_AUTO_TRANSFORMERS_CDN || ''),
+		);
+	}
+
 	require_raster_layer() {
 		if (config.layer == null) {
 			alertify.error('No active layer.');
@@ -88,6 +99,7 @@ class Tools_bg_auto_class {
 
 		busy = true;
 		try {
+			this.log_build_once();
 			var source = this.layer_source_canvas(layer);
 			var result = await compute_matte(source, { device: config.BG_AUTO_DEVICE || 'auto' });
 			var maskCanvas = result.maskCanvas;
@@ -127,6 +139,7 @@ class Tools_bg_auto_class {
 
 		busy = true;
 		try {
+			this.log_build_once();
 			var source = this.layer_source_canvas(layer);
 			var result = await compute_matte(source, { device: config.BG_AUTO_DEVICE || 'auto' });
 			var layerMask = result.maskCanvas;

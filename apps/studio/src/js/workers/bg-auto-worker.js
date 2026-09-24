@@ -3,7 +3,7 @@
  * Loads onnx-community/ISNet-ONNX via @huggingface/transformers (WebGPU → WASM).
  *
  * Transformers.js is imported from jsDelivr `/+esm` (not the raw dist file) so bare
- * package imports like `onnxruntime-web/webgpu` are rewritten to absolute CDN URLs.
+ * bare package subpath imports (ort webgpu entry) are rewritten to absolute CDN URLs.
  * That is required in module workers (import maps do not apply). Versions are pinned
  * in config.js to match the npm dependency; the URLs are passed from the main thread.
  */
@@ -65,8 +65,12 @@ async function ensure_pipeline(modelLocation, preferDevice, progressPort) {
 		devices = ['webgpu', 'wasm'];
 	}
 
-	if (pipe && loadedModelId === modelId && devices.indexOf(loadedDevice) >= 0) {
-		return { device: loadedDevice, modelId: modelId };
+	// Reuse only when the caller asked for this device (or auto). A forced
+	// webgpu/wasm switch must reload so BG_AUTO_DEVICE overrides work.
+	if (pipe && loadedModelId === modelId) {
+		if (!preferDevice || preferDevice === 'auto' || preferDevice === loadedDevice) {
+			return { device: loadedDevice, modelId: modelId };
+		}
 	}
 
 	if (pipe && typeof pipe.dispose === 'function') {

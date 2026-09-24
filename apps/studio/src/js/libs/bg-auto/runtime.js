@@ -32,7 +32,7 @@ function get_ort_wasm_cdn() {
 
 function ensure_worker() {
 	if (worker) return worker;
-	worker = new Worker(new URL('./../../workers/bg-auto-worker.js', import.meta.url));
+	worker = new Worker(new URL(/* webpackChunkName: "bg-auto-worker" */ './../../workers/bg-auto-worker.js', import.meta.url));
 	worker.onmessage = function (event) {
 		var msg = event.data || {};
 		var entry = pending.get(msg.id);

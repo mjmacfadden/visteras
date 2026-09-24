@@ -81,10 +81,12 @@ config.RENDERER = 'auto';
 //   'https://models.example.com/ISNet-ONNX'  (mirror root containing config.json + *.onnx)
 config.BG_AUTO_MODEL_LOCATION = 'onnx-community/ISNet-ONNX';
 // Pinned runtime CDN (must match apps/studio package.json / lockfile versions).
-// jsDelivr /+esm rewrites bare `onnxruntime-web/webgpu` imports so module workers can load them.
+// jsDelivr /+esm rewrites bare ort package subpath imports so module workers can load them.
 config.BG_AUTO_TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/+esm';
 config.BG_AUTO_ORT_VERSION = '1.31.0-dev.20260914-8d85527a0';
 config.BG_AUTO_ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-dev.20260914-8d85527a0/dist/';
+// Injected at webpack build time — log this to confirm which build Chrome is running.
+config.BG_AUTO_BUILD_ID = (typeof BG_AUTO_BUILD_ID !== 'undefined') ? BG_AUTO_BUILD_ID : 'dev';
 
 //requires styles in reset.css
 config.themes = [

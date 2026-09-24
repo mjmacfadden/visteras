@@ -1,5 +1,5 @@
-var CACHE_NAME = 'visteras-studio-shell-v79';
-var CDN_ML_CACHE = 'visteras-studio-cdn-ml-v79';
+var CACHE_NAME = 'visteras-studio-shell-v80';
+var CDN_ML_CACHE = 'visteras-studio-cdn-ml-v80';
 var APP_SHELL = [
 	'./',
 	'./index.html',
@@ -13,8 +13,7 @@ var APP_SHELL = [
 ];
 
 // Pinned Transformers.js / ONNX Runtime Web CDN (must match config.BG_AUTO_* pins).
-// After first online use these are runtime-cached so Remove Background works offline.
-// Model weights (Hugging Face / mirrors) are NOT cached here — Transformers.js owns that.
+// Runtime-cached after first use for offline. Model weights stay in transformers-cache.
 function is_ml_runtime_cdn(url) {
 	return url.indexOf('https://cdn.jsdelivr.net/npm/@huggingface/transformers@') === 0
 		|| url.indexOf('https://cdn.jsdelivr.net/npm/onnxruntime-web@') === 0
@@ -23,13 +22,17 @@ function is_ml_runtime_cdn(url) {
 }
 
 function is_model_weight_url(url) {
-	// Same-origin mirrors + HF-style weight paths — leave to Transformers.js cache.
 	return /\.onnx$/i.test(url)
 		|| url.indexOf('/onnx-community/') !== -1
 		|| url.indexOf('/ISNet') !== -1
 		|| /\/models\//i.test(url)
 		|| url.indexOf('https://huggingface.co/') === 0
 		|| url.indexOf('https://cdn-lfs') === 0;
+}
+
+function is_dist_script(url) {
+	// Async chunks + workers under /dist/ — must not be served cache-first across upgrades.
+	return /\/dist\/[^?]+\.js(\?|$)/.test(url);
 }
 
 self.addEventListener('install', function (event) {
@@ -42,14 +45,20 @@ self.addEventListener('install', function (event) {
 self.addEventListener('activate', function (event) {
 	event.waitUntil(caches.keys().then(function (keys) {
 		return Promise.all(keys.filter(function (key) {
-			var isShell = (key.indexOf('visteras-studio-shell-') === 0 || key.indexOf('photochop-shell-') === 0) && key !== CACHE_NAME;
-			var isCdn = key.indexOf('visteras-studio-cdn-ml-') === 0 && key !== CDN_ML_CACHE;
-			return isShell || isCdn;
+			// Never delete Transformers.js model weight cache.
+			if (key === 'transformers-cache')
+				return false;
+			if (key === CACHE_NAME || key === CDN_ML_CACHE)
+				return false;
+			return key.indexOf('visteras-studio-shell-') === 0
+				|| key.indexOf('visteras-studio-cdn-ml-') === 0
+				|| key.indexOf('photochop-shell-') === 0;
 		}).map(function (key) {
 			return caches.delete(key);
 		}));
+	}).then(function () {
+		return self.clients.claim();
 	}));
-	self.clients.claim();
 });
 
 self.addEventListener('fetch', function (event) {
@@ -79,10 +88,27 @@ self.addEventListener('fetch', function (event) {
 		return;
 	}
 
-	// Same-origin: never SW-cache model weights / local ONNX (Transformers.js cache).
 	if (is_model_weight_url(reqUrl))
 		return;
 
+	// Network-first for /dist/*.js (bundle, hashed chunks, hashed workers).
+	// Prevents an old SW entry for 987.js / bg-auto.js from masking a fixed build.
+	if (is_dist_script(reqUrl)) {
+		event.respondWith(fetch(event.request).then(function (response) {
+			if (response && response.ok && response.type === 'basic') {
+				var responseToCache = response.clone();
+				caches.open(CACHE_NAME).then(function (cache) {
+					cache.put(event.request, responseToCache);
+				});
+			}
+			return response;
+		}).catch(function () {
+			return caches.match(event.request);
+		}));
+		return;
+	}
+
+	// Other same-origin GETs: cache-first with network refresh (app shell).
 	event.respondWith(caches.match(event.request).then(function (cached) {
 		var refresh = fetch(event.request).then(function (response) {
 			if (response.ok && response.type === 'basic') {

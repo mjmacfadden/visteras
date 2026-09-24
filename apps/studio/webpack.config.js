@@ -12,7 +12,9 @@ module.exports = function (env, argv) {
 	output: {
 		path: path.resolve(__dirname, 'dist'),
 		filename: 'bundle.js',
-		chunkFilename: '[name].js',
+		// Content-hash async chunks + workers so SW / HTTP caches cannot keep a stale bg-auto worker
+		// after an upgrade (non-hashed 987.js previously pinned the broken web.min.js import).
+		chunkFilename: is_production ? '[name].[contenthash:8].js' : '[name].js',
 		publicPath: 'auto',
 		clean: true
 	},
@@ -81,7 +83,8 @@ module.exports = function (env, argv) {
             "window.jQuery": "jquery"
 		}),
 		new webpack.DefinePlugin({
-			VERSION: JSON.stringify(require("./package.json").version)
+			VERSION: JSON.stringify(require("./package.json").version),
+			BG_AUTO_BUILD_ID: JSON.stringify('481853a5b11e-1790271012'),
 		}),
 	],
 	devtool: is_production ? false : "cheap-module-source-map",
