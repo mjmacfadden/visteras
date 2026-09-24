@@ -1117,3 +1117,9 @@
   opacity: 0.45 !important;
   cursor: default !important;
 }
+
+/* Outside-align stroke helper: never selectable / never hit-testable */
+.visteras-stroke-align-helper,
+[data-visteras-stroke-align-helper] {
+  pointer-events: none !important;
+}

@@ -176,37 +176,63 @@ function resolvePaintTargets(sc) {
   const selected = (typeof sc.getSelectedElements === 'function'
     ? sc.getSelectedElements()
     : [])?.filter(Boolean) || [];
-  if (selected.length) return selected;
-  const ds = sc.directSelection;
-  if (ds?.active) {
-    const els = (typeof ds.getPaintTargets === 'function'
-      ? ds.getPaintTargets()
-      : typeof ds.getSelectedElements === 'function'
-        ? ds.getSelectedElements()
-        : []) || [];
-    if (els.length) return els;
+  let raw = selected;
+  if (!raw.length) {
+    const ds = sc.directSelection;
+    if (ds?.active) {
+      const els = (typeof ds.getPaintTargets === 'function'
+        ? ds.getPaintTargets()
+        : typeof ds.getSelectedElements === 'function'
+          ? ds.getSelectedElements()
+          : []) || [];
+      if (els.length) raw = els;
+    }
   }
-  const path = sc.getPathObj?.();
-  if (path?.elem?.isConnected) return [path.elem];
-  return [];
+  if (!raw.length) {
+    const path = sc.getPathObj?.();
+    if (path?.elem?.isConnected) raw = [path.elem];
+  }
+  // Remap stroke-align wrap/helper → body so selection never paints/reads the 2× helper.
+  return raw.map((el) => resolveStrokeAlignBody(el) || el).filter(Boolean);
 }
 
 function flattenPaintTargets(elements, { attr = null } = {}) {
   const out = [];
+  const seen = new Set();
   const skipFill = attr === 'fill';
+  const push = (el) => {
+    if (!el || seen.has(el)) return;
+    if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
+    seen.add(el);
+    out.push(el);
+  };
   for (const el of elements) {
     if (!el) continue;
+    // Helper / wrap → body (user stroke-width lives on the body only).
+    if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+      const body = resolveStrokeAlignBody(el);
+      if (body) push(body);
+      continue;
+    }
     if (el.getAttribute?.('data-visteras-stroke-align-helper')) continue;
     if (el.tagName === 'g') {
+      // Stroke-align wrap: only the body child (never the 2× helper).
+      if (el.getAttribute?.('data-visteras-sa-wrap')) {
+        const body = resolveStrokeAlignBody(el);
+        if (body) push(body);
+        continue;
+      }
       for (const child of el.querySelectorAll('*')) {
         if (child.nodeName === 'g') continue;
+        if (isStrokeAlignHelper(child)) continue;
+        if (child.getAttribute?.('data-visteras-stroke-align-helper')) continue;
         if (skipFill && (child.tagName === 'polyline' || child.tagName === 'line')) continue;
-        out.push(child);
+        push(child);
       }
     } else if (skipFill && (el.tagName === 'polyline' || el.tagName === 'line')) {
       continue;
     } else {
-      out.push(el);
+      push(el);
     }
   }
   return out;
@@ -289,9 +315,28 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
 // Stroke alignment (Center / Inside / Outside)
 // SVG has no native Illustrator-style stroke alignment. We approximate:
 //   center  — default SVG stroke (centered on path)
-//   inside  — 2× stroke-width + clipPath to the path geometry (closed shapes)
-//   outside — 2× stroke on a non-selectable helper path + mask punching the
-//             interior so the main element keeps its fill
+//   inside  — wrap <g> + helper path with 2× stroke, clipped to the body's
+//             LOCAL geometry. Body keeps fill and the USER stroke-width /
+//             stroke paint attrs (stroke painted none; helper draws the ring).
+//             Never mutate stroke-width to 2× (that doubled the Appearance /
+//             SVG-Edit UI on every align switch and select mouseup).
+//   outside — wrap <g> + helper with 2× stroke + mask punching the interior.
+//
+// Why a helper (not clip on the body)?
+//   SVG-Edit select-drag applies a live translate transform, then on mouseup
+//   `recalculateDimensions` bakes it into x/y and REMOVES transform — without
+//   firing `changed`. A clipPath on the body keyed to pre-bake local geom goes
+//   stale → Mike's L-clip (fill only in the old region, selection at new bounds).
+//   Helper mirrors body geom (incl. transform) on transition + pointerup sync,
+//   so after bake we rewrite helper x/y + rebuild clip/mask from current geom.
+//
+// Wrap / unwrap position invariant:
+//   SVG-Edit often selects the wrap <g> (not the body), so drag transform can
+//   land on the wrap. Switching to Center must bake wrap×body onto the body
+//   before removing the wrap, or the shape nudges on the artboard.
+//
+// Clip/mask clones use LOCAL geometry only (no transform). During drag the
+// helper carries the same transform as the body; after bake both share x/y.
 // Open paths, lines, polylines, text, images: fall back to center rendering
 // (attribute is still stored; UI may show the choice).
 // ---------------------------------------------------------------------------
@@ -304,7 +349,20 @@ const STROKE_MASK_ATTR = 'data-visteras-sa-mask';
 const STROKE_HELPER_ATTR = 'data-visteras-stroke-align-helper';
 const STROKE_HELPER_FOR_ATTR = 'data-visteras-helper-for';
 const STROKE_PAINT_ATTR = 'data-visteras-stroke-paint';
+const STROKE_WRAP_ATTR = 'data-visteras-sa-wrap';
+const STROKE_BODY_ATTR = 'data-visteras-sa-body';
 
+/** Local geometry attrs — NEVER include transform (clip/mask stay local). */
+const STROKE_ALIGN_LOCAL_GEOM_ATTRS = {
+  path: ['d'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry'],
+  circle: ['cx', 'cy', 'r'],
+  ellipse: ['cx', 'cy', 'rx', 'ry'],
+  polygon: ['points'],
+  polyline: ['points'],
+};
+
+/** Full geom incl. transform — used to mirror body → helper. */
 const STROKE_ALIGN_GEOM_ATTRS = {
   path: ['d', 'transform'],
   rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'transform'],
@@ -355,8 +413,50 @@ function isStrokeAlignHelper(el) {
   return !!el?.getAttribute?.(STROKE_HELPER_ATTR);
 }
 
+function isStrokeAlignWrap(el) {
+  return !!el?.getAttribute?.(STROKE_WRAP_ATTR);
+}
+
+/**
+ * Map a stroke-align wrap or helper back to the USER body element.
+ * Helper keeps 2× stroke-width for visual Inside/Outside compensation; that
+ * value must never leak into Appearance UI, curProperties, or align writes.
+ */
+function resolveStrokeAlignBody(el) {
+  if (!el) return null;
+  if (isStrokeAlignHelper(el)) {
+    const forId = el.getAttribute(STROKE_HELPER_FOR_ATTR);
+    if (forId) {
+      try {
+        const root = el.ownerSVGElement || document;
+        const body = root.getElementById?.(forId) || document.getElementById(forId);
+        if (body) return body;
+      } catch { /* fall through */ }
+    }
+    // Sibling body inside the same wrap (helper-for missing / stale).
+    const parent = el.parentNode;
+    if (parent && isStrokeAlignWrap(parent)) {
+      for (const child of parent.children) {
+        if (child.getAttribute?.(STROKE_BODY_ATTR)) return child;
+      }
+    }
+    return null;
+  }
+  if (isStrokeAlignWrap(el)) {
+    for (const child of el.children || []) {
+      if (child.getAttribute?.(STROKE_BODY_ATTR)) return child;
+    }
+    // Fallback: first non-helper shape child
+    for (const child of el.children || []) {
+      if (!isStrokeAlignHelper(child) && child.nodeName !== 'g') return child;
+    }
+    return null;
+  }
+  return el;
+}
+
 function isClosedStrokeTarget(el) {
-  if (!el || isStrokeAlignHelper(el)) return false;
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return false;
   const tag = el.tagName?.toLowerCase?.() || '';
   if (tag === 'rect' || tag === 'circle' || tag === 'ellipse' || tag === 'polygon') return true;
   if (tag === 'path') {
@@ -367,10 +467,11 @@ function isClosedStrokeTarget(el) {
   return false;
 }
 
-function cloneStrokeGeometry(el) {
+/** Clone LOCAL geometry only (no transform) for clipPath / mask holes. */
+function cloneStrokeLocalGeometry(el) {
   const tag = el.tagName.toLowerCase();
   const clone = document.createElementNS(el.namespaceURI || SVG_NS, tag);
-  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+  for (const a of (STROKE_ALIGN_LOCAL_GEOM_ATTRS[tag] || [])) {
     const v = el.getAttribute(a);
     if (v != null) clone.setAttribute(a, v);
   }
@@ -379,17 +480,36 @@ function cloneStrokeGeometry(el) {
 
 function findStrokeAlignHelper(el) {
   if (!el?.id) return null;
+  // Prefer sibling inside wrap, then parent children, then document query.
   const parent = el.parentNode;
-  if (!parent) return null;
-  for (const child of parent.children) {
-    if (child.getAttribute?.(STROKE_HELPER_FOR_ATTR) === el.id) return child;
+  if (parent) {
+    for (const child of parent.children) {
+      if (child.getAttribute?.(STROKE_HELPER_FOR_ATTR) === el.id) return child;
+    }
   }
-  return null;
+  try {
+    const root = el.ownerSVGElement || document;
+    return root.querySelector?.(`[${STROKE_HELPER_FOR_ATTR}="${CSS.escape(el.id)}"]`) || null;
+  } catch {
+    return null;
+  }
 }
 
-function removeStrokeAlignHelper(el) {
+function removeStrokeAlignHelper(el, sc) {
   const helper = findStrokeAlignHelper(el);
-  if (helper?.parentNode) helper.parentNode.removeChild(helper);
+  if (!helper) return;
+  // Drop clip/mask defs owned by the helper
+  if (helper.getAttribute?.(STROKE_CLIP_ATTR)) {
+    helper.removeAttribute('clip-path');
+    removeDefsResource(sc, STROKE_CLIP_ATTR, helper);
+  } else if ((helper.getAttribute?.('clip-path') || '').includes('visteras-sa-clip')) {
+    helper.removeAttribute('clip-path');
+  }
+  if (helper.getAttribute?.(STROKE_MASK_ATTR)) {
+    helper.removeAttribute('mask');
+    removeDefsResource(sc, STROKE_MASK_ATTR, helper);
+  }
+  if (helper.parentNode) helper.parentNode.removeChild(helper);
 }
 
 function removeDefsResource(sc, attrName, el) {
@@ -401,10 +521,109 @@ function removeDefsResource(sc, attrName, el) {
   el.removeAttribute(attrName);
 }
 
+/**
+ * Ensure body lives in a stroke-align wrapper <g> so the helper is not an
+ * orphan layer sibling. Wrap is identity (no transform) so wrapping never
+ * introduces an artboard delta; body keeps its own transform (mirrored to the
+ * helper). If a prior wrap already holds a transform (SVG-Edit selected the
+ * <g>), leave it — unwrap will bake it back onto the body.
+ */
+function ensureStrokeAlignWrap(el) {
+  if (!el?.parentNode) return null;
+  if (isStrokeAlignWrap(el.parentNode)) {
+    el.setAttribute(STROKE_BODY_ATTR, '1');
+    return el.parentNode;
+  }
+  const wrap = document.createElementNS(el.namespaceURI || SVG_NS, 'g');
+  wrap.setAttribute(STROKE_WRAP_ATTR, '1');
+  // Identity wrap only — do not move body transform onto the wrap here.
+  el.parentNode.insertBefore(wrap, el);
+  wrap.appendChild(el);
+  el.setAttribute(STROKE_BODY_ATTR, '1');
+  return wrap;
+}
+
+/** Read an element's SVG transform list as a DOMMatrix (identity if none). */
+function elementTransformMatrix(el) {
+  let m = new DOMMatrix();
+  if (!el) return m;
+  try {
+    const list = el.transform?.baseVal;
+    if (list && list.numberOfItems > 0) {
+      for (let i = 0; i < list.numberOfItems; i++) {
+        const tm = list.getItem(i).matrix;
+        m = m.multiply(new DOMMatrix([tm.a, tm.b, tm.c, tm.d, tm.e, tm.f]));
+      }
+      return m;
+    }
+  } catch { /* fall through to attribute parse */ }
+  const attr = el.getAttribute?.('transform');
+  if (!attr) return m;
+  try {
+    return new DOMMatrix(attr);
+  } catch {
+    return new DOMMatrix();
+  }
+}
+
+function isIdentityMatrix(m, eps = 1e-9) {
+  if (!m) return true;
+  return Math.abs(m.a - 1) < eps && Math.abs(m.b) < eps && Math.abs(m.c) < eps
+    && Math.abs(m.d - 1) < eps && Math.abs(m.e) < eps && Math.abs(m.f) < eps;
+}
+
+function matrixToTransformAttr(m) {
+  if (isIdentityMatrix(m)) return null;
+  // Use matrix() so compose/bake round-trips cleanly.
+  const n = (v) => {
+    const r = Math.round(v * 1e6) / 1e6;
+    return Object.is(r, -0) ? 0 : r;
+  };
+  return `matrix(${n(m.a)} ${n(m.b)} ${n(m.c)} ${n(m.d)} ${n(m.e)} ${n(m.f)})`;
+}
+
+/**
+ * Bake wrap's transform onto one child so artboard position is preserved when
+ * the wrap is removed. SVG-Edit often selects the wrap <g> (not the body) on
+ * click-drag, so the live/baked translate lands on the wrap; dropping the wrap
+ * without this compose would nudge the shape back.
+ * Combined CTM: wrapMatrix × childMatrix (parent then child).
+ * Caller snapshots wrapM once and clears the wrap transform after all children.
+ */
+function bakeMatrixOntoElement(wrapM, el) {
+  if (!el || el.nodeType !== 1) return;
+  if (isIdentityMatrix(wrapM)) return;
+  const childM = elementTransformMatrix(el);
+  const combined = wrapM.multiply(childM);
+  const attr = matrixToTransformAttr(combined);
+  if (attr) el.setAttribute('transform', attr);
+  else el.removeAttribute('transform');
+}
+
+function unwrapStrokeAlignIfEmpty(el) {
+  const wrap = el?.parentNode;
+  if (!wrap || !isStrokeAlignWrap(wrap)) return;
+  // Only unwrap when the wrap no longer has a helper (center mode).
+  const hasHelper = [...wrap.children].some((c) => isStrokeAlignHelper(c));
+  if (hasHelper) return;
+  const parent = wrap.parentNode;
+  if (!parent) return;
+  // Keep artboard position: wrap may hold the select-drag transform.
+  // Snapshot once so every child gets the same bake before reparent.
+  const wrapM = elementTransformMatrix(wrap);
+  for (const child of [...wrap.children]) bakeMatrixOntoElement(wrapM, child);
+  if (wrap.hasAttribute?.('transform')) wrap.removeAttribute('transform');
+  el.removeAttribute(STROKE_BODY_ATTR);
+  parent.insertBefore(el, wrap);
+  // Move any leftover non-helper children out just in case.
+  while (wrap.firstChild) parent.insertBefore(wrap.firstChild, wrap);
+  parent.removeChild(wrap);
+}
+
 function clearStrokeAlignRendering(el, sc) {
   if (!el) return;
-  removeStrokeAlignHelper(el);
-  // Clear clip/mask presentation attrs we own
+  removeStrokeAlignHelper(el, sc);
+  // Clear legacy body clip/mask presentation attrs we may still own
   const clipId = el.getAttribute(STROKE_CLIP_ATTR);
   if (clipId) {
     el.removeAttribute('clip-path');
@@ -417,24 +636,32 @@ function clearStrokeAlignRendering(el, sc) {
     el.removeAttribute('mask');
     removeDefsResource(sc, STROKE_MASK_ATTR, el);
   }
-  // Restore user stroke-width if we had doubled it
+  // Restore user stroke-width (idempotent — we no longer double the attr, but
+  // old docs / partial states may still have a stored weight).
   const userW = el.getAttribute(STROKE_WEIGHT_ATTR);
   if (userW != null && userW !== '') {
     el.setAttribute('stroke-width', userW);
   }
-  // Restore stroke paint if outside mode hid it on the main element
+  // Restore stroke paint if inside/outside hid it on the main element
   const paint = el.getAttribute(STROKE_PAINT_ATTR);
   if (paint != null) {
     if (paint === '') el.removeAttribute('stroke');
     else el.setAttribute('stroke', paint);
     el.removeAttribute(STROKE_PAINT_ATTR);
   }
+  unwrapStrokeAlignIfEmpty(el);
 }
 
-function ensureClipForInside(el, sc) {
+/**
+ * Ensure a clipPath matching shapeEl's LOCAL geometry, applied to clipHost
+ * (the inside stroke helper). clipPathUnits=userSpaceOnUse + local geom:
+ * during drag the helper's own transform moves the clipped stroke with the
+ * body; after bake, live sync rewrites helper x/y and rebuilds the clip.
+ */
+function ensureClipForInside(clipHost, shapeEl, sc) {
   const defs = getSvgDefs(sc);
-  if (!defs) return null;
-  let clipId = el.getAttribute(STROKE_CLIP_ATTR);
+  if (!defs || !clipHost || !shapeEl) return null;
+  let clipId = clipHost.getAttribute(STROKE_CLIP_ATTR);
   let clip = clipId ? (defs.getElementById?.(clipId) || document.getElementById(clipId)) : null;
   if (!clip) {
     clipId = nextSvgId(sc, 'visteras-sa-clip');
@@ -442,11 +669,11 @@ function ensureClipForInside(el, sc) {
     clip.setAttribute('id', clipId);
     clip.setAttribute('clipPathUnits', 'userSpaceOnUse');
     defs.appendChild(clip);
-    el.setAttribute(STROKE_CLIP_ATTR, clipId);
+    clipHost.setAttribute(STROKE_CLIP_ATTR, clipId);
   }
   while (clip.firstChild) clip.removeChild(clip.firstChild);
-  clip.appendChild(cloneStrokeGeometry(el));
-  el.setAttribute('clip-path', `url(#${clipId})`);
+  clip.appendChild(cloneStrokeLocalGeometry(shapeEl));
+  clipHost.setAttribute('clip-path', `url(#${clipId})`);
   return clipId;
 }
 
@@ -465,6 +692,8 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
   }
   while (mask.firstChild) mask.removeChild(mask.firstChild);
 
+  // BBox is local (pre-transform) — correct because mask content is local and
+  // the helper's own transform moves the masked stroke with the body.
   let bbox = null;
   try { bbox = shapeEl.getBBox(); } catch { bbox = null; }
   const p = Math.max(2, Number(pad) || 2);
@@ -485,7 +714,7 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
     bg.setAttribute('fill', '#ffffff');
     mask.appendChild(bg);
   }
-  const hole = cloneStrokeGeometry(shapeEl);
+  const hole = cloneStrokeLocalGeometry(shapeEl);
   hole.setAttribute('fill', '#000000');
   hole.setAttribute('stroke', 'none');
   mask.appendChild(hole);
@@ -493,7 +722,17 @@ function ensureMaskForOutsideHelper(helper, shapeEl, sc, pad) {
   return maskId;
 }
 
-function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
+/** Mirror body local+transform geom onto the helper. */
+function mirrorGeomToHelper(el, helper) {
+  const tag = el.tagName.toLowerCase();
+  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
+    const v = el.getAttribute(a);
+    if (v == null) helper.removeAttribute(a);
+    else helper.setAttribute(a, v);
+  }
+}
+
+function ensureStrokeHelperEl(el, sc, wrap) {
   const id = ensureElementId(el, sc);
   let helper = findStrokeAlignHelper(el);
   const tag = el.tagName.toLowerCase();
@@ -503,25 +742,79 @@ function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
     helper.setAttribute(STROKE_HELPER_FOR_ATTR, id);
     helper.setAttribute('pointer-events', 'none');
     helper.classList.add('visteras-stroke-align-helper');
-    el.parentNode?.insertBefore(helper, el);
   }
-  // Refresh geometry
-  for (const a of (STROKE_ALIGN_GEOM_ATTRS[tag] || [])) {
-    const v = el.getAttribute(a);
-    if (v == null) helper.removeAttribute(a);
-    else helper.setAttribute(a, v);
+  if (wrap && helper.parentNode !== wrap) {
+    // Caller positions before/after body.
+    wrap.appendChild(helper);
   }
-  helper.setAttribute('fill', 'none');
-  helper.setAttribute('stroke', strokePaint && strokePaint !== 'none' ? strokePaint : '#000000');
-  helper.setAttribute('stroke-width', String(Math.max(0, userWidth) * 2));
-  // Copy common stroke presentation
+  return helper;
+}
+
+function copyStrokePresentation(el, helper) {
   for (const a of ['stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray', 'stroke-opacity', 'opacity']) {
     const v = el.getAttribute(a);
     if (v == null) helper.removeAttribute(a);
     else helper.setAttribute(a, v);
   }
+}
+
+function upsertInsideHelper(el, sc, userWidth, strokePaint) {
+  const wrap = ensureStrokeAlignWrap(el);
+  const helper = ensureStrokeHelperEl(el, sc, wrap);
+  // Inside stroke paints over fill at the edge — place helper after body.
+  if (wrap) {
+    if (helper.parentNode !== wrap || helper.previousElementSibling !== el) {
+      if (el.nextSibling) wrap.insertBefore(helper, el.nextSibling);
+      else wrap.appendChild(helper);
+    }
+  }
+  mirrorGeomToHelper(el, helper);
+  helper.setAttribute('fill', 'none');
+  helper.setAttribute('stroke', strokePaint && strokePaint !== 'none' ? strokePaint : '#000000');
+  helper.setAttribute('stroke-width', String(Math.max(0, userWidth) * 2));
+  copyStrokePresentation(el, helper);
+  // Drop outside mask if we reused the helper
+  if (helper.getAttribute(STROKE_MASK_ATTR) || helper.getAttribute('mask')) {
+    helper.removeAttribute('mask');
+    removeDefsResource(sc, STROKE_MASK_ATTR, helper);
+  }
+  ensureClipForInside(helper, el, sc);
+  return helper;
+}
+
+function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
+  const wrap = ensureStrokeAlignWrap(el);
+  const helper = ensureStrokeHelperEl(el, sc, wrap);
+  // Outside stroke paints under fill — place helper before body.
+  if (wrap) {
+    if (helper.parentNode !== wrap || helper.nextElementSibling !== el) {
+      wrap.insertBefore(helper, el);
+    }
+  }
+  mirrorGeomToHelper(el, helper);
+  helper.setAttribute('fill', 'none');
+  helper.setAttribute('stroke', strokePaint && strokePaint !== 'none' ? strokePaint : '#000000');
+  helper.setAttribute('stroke-width', String(Math.max(0, userWidth) * 2));
+  copyStrokePresentation(el, helper);
+  // Drop inside clip if we reused the helper
+  if (helper.getAttribute(STROKE_CLIP_ATTR) || helper.getAttribute('clip-path')) {
+    helper.removeAttribute('clip-path');
+    removeDefsResource(sc, STROKE_CLIP_ATTR, helper);
+  }
   ensureMaskForOutsideHelper(helper, el, sc, userWidth * 2 + 4);
   return helper;
+}
+
+function captureStrokePaint(el) {
+  const currentStroke = el.getAttribute('stroke');
+  if (currentStroke != null && currentStroke !== 'none') {
+    el.setAttribute(STROKE_PAINT_ATTR, currentStroke);
+    return currentStroke;
+  }
+  const stored = el.getAttribute(STROKE_PAINT_ATTR);
+  if (stored != null && stored !== '') return stored;
+  el.setAttribute(STROKE_PAINT_ATTR, '#000000');
+  return '#000000';
 }
 
 /**
@@ -531,13 +824,15 @@ function upsertOutsideHelper(el, sc, userWidth, strokePaint) {
  * @param {{ align?: string, userWidth?: number }} [opts]
  */
 function applyStrokeAlignToElement(el, sc, opts = {}) {
-  if (!el || isStrokeAlignHelper(el)) return { applied: 'center', closed: false };
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+    return { applied: 'center', closed: false };
+  }
 
   const alignRaw = (opts.align ?? el.getAttribute(STROKE_ALIGN_ATTR) ?? 'center').toLowerCase();
   const align = (alignRaw === 'inside' || alignRaw === 'outside') ? alignRaw : 'center';
   const closed = isClosedStrokeTarget(el);
 
-  // Resolve user-facing weight (never treat a doubled inside width as the user value).
+  // Resolve user-facing weight (never treat a doubled legacy inside width as the user value).
   let userWidth = opts.userWidth;
   if (userWidth == null || Number.isNaN(Number(userWidth))) {
     userWidth = readElementStrokeWeight(el);
@@ -551,60 +846,43 @@ function applyStrokeAlignToElement(el, sc, opts = {}) {
   // Open / unsupported → center rendering, keep attribute for UI.
   if (!closed || align === 'center' || userWidth <= 0) {
     clearStrokeAlignRendering(el, sc);
-    if (align === 'center') {
-      el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
-      el.setAttribute('stroke-width', String(userWidth));
-    } else {
-      // Requested inside/outside but unsupported: still store intent + center paint.
-      el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
-      el.setAttribute('stroke-width', String(userWidth));
-    }
+    el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
+    el.setAttribute('stroke-width', String(userWidth));
     return { applied: 'center', closed, requested: align };
   }
 
   if (align === 'inside') {
-    removeStrokeAlignHelper(el);
-    // Restore any paint hidden by a prior outside mode
-    const paint = el.getAttribute(STROKE_PAINT_ATTR);
-    if (paint != null) {
-      if (paint === '') el.removeAttribute('stroke');
-      else el.setAttribute('stroke', paint);
-      el.removeAttribute(STROKE_PAINT_ATTR);
-    }
+    const paint = captureStrokePaint(el);
+    // Hide stroke on body — helper draws the clipped inside ring.
+    el.setAttribute('stroke', 'none');
     el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
-    el.setAttribute('stroke-width', String(userWidth * 2));
-    ensureClipForInside(el, sc);
+    // CRITICAL: keep stroke-width as the user value (never 2× on the body).
+    el.setAttribute('stroke-width', String(userWidth));
+    // Drop legacy body clip from older inside implementation
+    if (el.getAttribute(STROKE_CLIP_ATTR) || (el.getAttribute('clip-path') || '').includes('visteras-sa-clip')) {
+      el.removeAttribute('clip-path');
+      removeDefsResource(sc, STROKE_CLIP_ATTR, el);
+    }
+    upsertInsideHelper(el, sc, userWidth, paint);
     return { applied: 'inside', closed, requested: align };
   }
 
   // outside
-  const currentStroke = el.getAttribute('stroke');
-  // If paint just landed on the element (not yet hidden), capture it; otherwise
-  // keep the stored outside paint used by the helper ring.
-  let paint;
-  if (currentStroke != null && currentStroke !== 'none') {
-    paint = currentStroke;
-    el.setAttribute(STROKE_PAINT_ATTR, currentStroke);
-  } else {
-    paint = el.getAttribute(STROKE_PAINT_ATTR) || '#000000';
-    if (!el.hasAttribute(STROKE_PAINT_ATTR)) el.setAttribute(STROKE_PAINT_ATTR, paint);
-  }
-  // Hide stroke on main element so fill stays; helper draws the outside ring.
+  const paint = captureStrokePaint(el);
   el.setAttribute('stroke', 'none');
   el.setAttribute(STROKE_WEIGHT_ATTR, String(userWidth));
-  // Keep stroke-width as user width for SVG-Edit inspectors / new ops.
   el.setAttribute('stroke-width', String(userWidth));
-  // Drop inside clip if any
+  // Drop legacy body clip if any
   if (el.getAttribute(STROKE_CLIP_ATTR) || el.getAttribute('clip-path')) {
     el.removeAttribute('clip-path');
     removeDefsResource(sc, STROKE_CLIP_ATTR, el);
   }
-  upsertOutsideHelper(el, sc, userWidth, el.getAttribute(STROKE_PAINT_ATTR) || paint);
+  upsertOutsideHelper(el, sc, userWidth, paint);
   return { applied: 'outside', closed, requested: align };
 }
 
 function syncStrokeAlignRendering(el, sc) {
-  if (!el || isStrokeAlignHelper(el)) return;
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
   const align = (el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
   if (align === 'center' || !el.hasAttribute(STROKE_ALIGN_ATTR)) {
     // Still refresh helper cleanup if a stale helper exists
@@ -612,6 +890,73 @@ function syncStrokeAlignRendering(el, sc) {
     return;
   }
   applyStrokeAlignToElement(el, sc, { align });
+}
+
+/**
+ * Lightweight live sync during drag/transform: mirror body geom → helper and
+ * refresh local clip/mask without rewriting stroke paint. Called from
+ * `transition`, selection grip drag, and pointerup (SVG-Edit select-drag
+ * mouseup bakes transform → x/y WITHOUT firing `changed`).
+ */
+function liveSyncStrokeAlignGeometry(el, sc) {
+  if (!el || isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) return;
+  const align = (el.getAttribute(STROKE_ALIGN_ATTR) || '').toLowerCase();
+  if (align !== 'inside' && align !== 'outside') return;
+  if (!isClosedStrokeTarget(el)) return;
+
+  const helper = findStrokeAlignHelper(el);
+  if (!helper) {
+    syncStrokeAlignRendering(el, sc);
+    return;
+  }
+  mirrorGeomToHelper(el, helper);
+  const userWidth = readElementStrokeWeight(el) ?? 1;
+
+  if (align === 'inside') {
+    // Ensure no leftover outside mask
+    if (helper.getAttribute(STROKE_MASK_ATTR) || helper.getAttribute('mask')) {
+      helper.removeAttribute('mask');
+      removeDefsResource(sc, STROKE_MASK_ATTR, helper);
+    }
+    ensureClipForInside(helper, el, sc);
+    return;
+  }
+
+  // outside — refresh local mask; ensure no leftover inside clip
+  if (helper.getAttribute(STROKE_CLIP_ATTR) || helper.getAttribute('clip-path')) {
+    helper.removeAttribute('clip-path');
+    removeDefsResource(sc, STROKE_CLIP_ATTR, helper);
+  }
+  ensureMaskForOutsideHelper(helper, el, sc, userWidth * 2 + 4);
+}
+
+/** Sync every stroke-aligned descendant under svgcontent (or given roots). */
+function syncAllStrokeAlignGeometry(sc, roots) {
+  const list = [];
+  const addFrom = (root) => {
+    if (!root?.querySelectorAll) return;
+    for (const el of root.querySelectorAll(`[${STROKE_ALIGN_ATTR}]`)) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
+      list.push(el);
+    }
+  };
+  if (roots?.length) {
+    for (const r of roots) {
+      if (!r) continue;
+      if (r.getAttribute?.(STROKE_ALIGN_ATTR) && !isStrokeAlignHelper(r) && !isStrokeAlignWrap(r)) {
+        list.push(r);
+      }
+      addFrom(r);
+    }
+  } else {
+    addFrom(getSvgContent(sc));
+  }
+  const seen = new Set();
+  for (const el of list) {
+    if (seen.has(el)) continue;
+    seen.add(el);
+    try { liveSyncStrokeAlignGeometry(el, sc); } catch { /* ignore */ }
+  }
 }
 
 function readElementStrokeAlign(el) {
@@ -622,6 +967,12 @@ function readElementStrokeAlign(el) {
 
 function readElementStrokeWeight(el) {
   if (!el) return null;
+  // Never read stroke-width from the helper (2×) or the structural wrap.
+  if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) {
+    const body = resolveStrokeAlignBody(el);
+    if (body && body !== el) return readElementStrokeWeight(body);
+    return null;
+  }
   const stored = el.getAttribute(STROKE_WEIGHT_ATTR);
   if (stored != null && stored !== '') {
     const n = Number(stored);
@@ -631,8 +982,11 @@ function readElementStrokeWeight(el) {
   if (w != null && w !== '') {
     const n = Number(w);
     if (!Number.isNaN(n)) {
-      // If inside align with doubled width and no stored weight, half it.
-      if ((el.getAttribute(STROKE_ALIGN_ATTR) || '') === 'inside' && !el.hasAttribute(STROKE_WEIGHT_ATTR)) {
+      // Legacy migration: older inside mode doubled stroke-width on the body
+      // and may lack a stored weight. Halve once so UI doesn't inherit 2×.
+      if ((el.getAttribute(STROKE_ALIGN_ATTR) || '') === 'inside'
+        && !el.hasAttribute(STROKE_WEIGHT_ATTR)
+        && !findStrokeAlignHelper(el)) {
         return n / 2;
       }
       return n;
@@ -644,7 +998,7 @@ function readElementStrokeWeight(el) {
 function applyStrokeAlignToTargets(sc, align, { noUndo = false, userWidth = null } = {}) {
   if (!sc) return false;
   const elems = flattenPaintTargets(resolvePaintTargets(sc))
-    .filter((el) => el && !isStrokeAlignHelper(el));
+    .filter((el) => el && !isStrokeAlignHelper(el) && !isStrokeAlignWrap(el));
   if (!elems.length) {
     // Still store as current preference on canvas if possible
     try { sc.curShape && (sc.curShape._visterasStrokeAlign = align); } catch { /* ignore */ }
@@ -685,8 +1039,16 @@ function applyStrokeAlignToTargets(sc, align, { noUndo = false, userWidth = null
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// Shared color controller
+// Live geometry hook for selection grip drag (visteras-selection.js).
+window.__visterasLiveSyncStrokeAlign = (els, sc) => {
+  try {
+    const canvas = sc || window.svgEditor?.svgCanvas || window.svgCanvas;
+    if (!canvas) return;
+    if (els?.length) syncAllStrokeAlignGeometry(canvas, els);
+    else syncAllStrokeAlignGeometry(canvas);
+  } catch { /* ignore */ }
+};
+
 // ---------------------------------------------------------------------------
 
 function createColorController(svgEditor) {
@@ -1773,10 +2135,13 @@ function mountAppearanceColors(ctrl, svgEditor) {
   }
 
   function readStrokeWidth() {
+    // Prefer body-stored user weight. flattenPaintTargets already drops helpers,
+    // but defense-in-depth: never accept a helper/wrap read.
     const targets = flattenPaintTargets(resolvePaintTargets(sc));
     for (const el of targets) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
       const w = readElementStrokeWeight(el);
-      if (w != null) return w;
+      if (w != null && !Number.isNaN(Number(w))) return Number(w);
     }
     if (typeof sc?.getStrokeWidth === 'function') {
       const w = sc.getStrokeWidth();
@@ -1874,12 +2239,29 @@ function mountAppearanceColors(ctrl, svgEditor) {
 
   function writeStrokeAlign(align) {
     const a = (align === 'inside' || align === 'outside') ? align : 'center';
-    const w = readStrokeWidth();
+    // Always take user width from the BODY (data-visteras-stroke-weight / body
+    // stroke-width). Never from the helper's 2×, Appearance input, or a stale
+    // curProperties value left over from SVG-Edit's group stroke-width scan.
+    const targets = flattenPaintTargets(resolvePaintTargets(sc));
+    let w = null;
+    for (const el of targets) {
+      if (isStrokeAlignHelper(el) || isStrokeAlignWrap(el)) continue;
+      w = readElementStrokeWeight(el);
+      if (w != null) break;
+    }
+    if (w == null || Number.isNaN(Number(w))) w = readStrokeWidth();
+    w = Math.max(0, Number(w) || 0);
     applyStrokeAlignToTargets(sc, a, { userWidth: w, noUndo: false });
     setAlignButtons(a);
-    // Keep SVG-Edit current style weight as user weight
+    // Keep SVG-Edit current style + Appearance input as the USER weight (idempotent).
     if (typeof sc?.setCurProperties === 'function') sc.setCurProperties('stroke_width', w);
     else if (sc?.curProperties) sc.curProperties.stroke_width = w;
+    if (sc?.curShape) sc.curShape.stroke_width = w;
+    const native = document.getElementById('stroke_width');
+    if (native) native.value = formatStrokeWeight(w);
+    if (weightInput && document.activeElement !== weightInput) {
+      weightInput.value = formatStrokeWeight(w);
+    }
   }
 
   function refresh() {
@@ -1892,8 +2274,19 @@ function mountAppearanceColors(ctrl, svgEditor) {
     rowStroke?.classList.toggle('active', active === 'stroke');
     fillTarget?.classList.toggle('active', active === 'fill');
     strokeTarget?.classList.toggle('active', active === 'stroke');
+    const userW = readStrokeWidth();
     if (weightInput && document.activeElement !== weightInput) {
-      weightInput.value = formatStrokeWeight(readStrokeWidth());
+      weightInput.value = formatStrokeWeight(userW);
+    }
+    // SVG-Edit's group updateContextPanel may scan wrap children and briefly
+    // surface the helper's 2× into #stroke_width / curProperties. Re-assert the
+    // USER body weight on every selection refresh so align switches stay idempotent.
+    if (typeof sc?.setCurProperties === 'function') sc.setCurProperties('stroke_width', userW);
+    else if (sc?.curProperties) sc.curProperties.stroke_width = userW;
+    if (sc?.curShape) sc.curShape.stroke_width = userW;
+    const native = document.getElementById('stroke_width');
+    if (native && document.activeElement !== native) {
+      native.value = formatStrokeWeight(userW);
     }
     setAlignButtons(readStrokeAlign());
   }
@@ -2042,6 +2435,14 @@ function mountAppearanceColors(ctrl, svgEditor) {
       alignSyncing = false;
     }
   };
+  const onTransition = () => {
+    if (alignSyncing) return;
+    try {
+      // SVG-Edit fires transition during live drag — keep helper/clip coincident.
+      const targets = flattenPaintTargets(resolvePaintTargets(sc));
+      syncAllStrokeAlignGeometry(sc, targets);
+    } catch { /* ignore */ }
+  };
   try {
     chainCanvasEvent(sc, 'selected', syncSelectionUi);
     // selectedChanged is used by some Visteras callers / extensions; canvas itself
@@ -2049,6 +2450,25 @@ function mountAppearanceColors(ctrl, svgEditor) {
     chainCanvasEvent(sc, 'selectedChanged', syncSelectionUi);
     chainCanvasEvent(sc, 'elementChanged', syncSelectionUi);
     chainCanvasEvent(sc, 'changed', onChanged);
+    chainCanvasEvent(sc, 'transition', onTransition);
+  } catch { /* ignore */ }
+
+  // Select-tool mouseup recalculateDimensions bakes transform → x/y WITHOUT
+  // firing `changed`. Rebuild helper geom + clip/mask after the bake settles.
+  const onPointerUpAlignSync = () => {
+    requestAnimationFrame(() => {
+      if (alignSyncing) return;
+      try {
+        syncAllStrokeAlignGeometry(sc);
+      } catch { /* ignore */ }
+    });
+  };
+  try {
+    if (!window.__visterasStrokeAlignPointerUpBound) {
+      document.addEventListener('pointerup', onPointerUpAlignSync, true);
+      document.addEventListener('mouseup', onPointerUpAlignSync, true);
+      window.__visterasStrokeAlignPointerUpBound = true;
+    }
   } catch { /* ignore */ }
 
   // When SVG-Edit refreshes the context panel (select / create), keep Appearance
