@@ -35,7 +35,6 @@ class GUI_shortcuts_class {
 			'c': 'crop',
 			's': 'clone',
 			'l': 'lasso',
-			'n': 'pencil',
 			'm': 'selection',
 			'w': 'magic_wand',
 			'u': 'rectangle',
@@ -504,7 +503,15 @@ class GUI_shortcuts_class {
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				var targetTool = this.keymap[key];
-				if (targetTool === 'lasso') {
+				if (targetTool === 'brush') {
+					if (app.GUI && app.GUI.GUI_tools) {
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('brush');
+						} else {
+							app.GUI.GUI_tools.activate_tool('brush');
+						}
+					}
+				} else if (targetTool === 'lasso') {
 					if (app.GUI && app.GUI.GUI_tools) {
 						if (event.shiftKey) {
 							app.GUI.GUI_tools.cycle_tool_group('lasso');

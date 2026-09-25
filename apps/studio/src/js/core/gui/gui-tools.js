@@ -95,6 +95,7 @@ class GUI_tools_class {
 		for (var key in shortcuts.keymap) {
 			this.tool_shortcuts[shortcuts.keymap[key]] = key.toUpperCase();
 		}
+		this.tool_shortcuts['pencil'] = 'B';
 
 		this.render_tools();
 		this.render_color_swatches();

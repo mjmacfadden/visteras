@@ -17,6 +17,7 @@ class Help_shortcuts_class {
 			params: [
 				{title: "V", value: 'Move Tool'},
 				{title: "B", value: 'Brush Tool'},
+				{title: "Shift + B", value: 'Cycle Brush ↔ Pencil'},
 				{title: "E", value: 'Eraser Tool'},
 				{title: "I", value: 'Eyedropper Tool'},
 				{title: "G", value: 'Gradient Tool (last-used in Gradient / Paint Bucket group)'},
@@ -29,7 +30,6 @@ class Help_shortcuts_class {
 				{title: "M", value: 'Marquee Selection Tool (Shift+M to cycle)'},
 				{title: "L", value: 'Lasso Tool (Shift+L to cycle)'},
 				{title: "W", value: 'Magic Wand / Quick Selection Tool (Shift+W to cycle)'},
-				{title: "N", value: 'Pencil Tool'},
 				{title: "U", value: 'Rectangle / Shape Tool'},
 				{title: "J", value: 'Desaturate Tool'},
 				{title: "O", value: 'Bulge/Pinch Tool'},
