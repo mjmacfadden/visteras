@@ -327,7 +327,9 @@ class Lasso_tool_class extends Base_tools_class {
 			this.Base_selection._preview_lasso_path = null;
 
 			if (path && path.length >= 3) {
-				this.Base_selection.apply_shape_to_mask('lasso', 0, 0, 0, 0, path, this.mode);
+				var params = this.getParams();
+				var anti_alias = (params.anti_aliasing?.value ?? params.anti_aliasing) !== false;
+				this.Base_selection.apply_shape_to_mask('lasso', 0, 0, 0, 0, path, this.mode, this.Base_selection.mask_ctx, anti_alias);
 				this.Base_selection.update_mask_state();
 				app.State.do_action(
 					new app.Actions.Bundle_action('lasso_selection', 'Lasso Selection', [
@@ -372,7 +374,9 @@ class Lasso_tool_class extends Base_tools_class {
 		this.old_mask_snapshot = null;
 		this.Base_selection._preview_lasso_path = null;
 
-		this.Base_selection.apply_shape_to_mask('lasso', 0, 0, 0, 0, path, mode);
+		var params = this.getParams();
+		var anti_alias = (params.anti_aliasing?.value ?? params.anti_aliasing) !== false;
+		this.Base_selection.apply_shape_to_mask('polygonal_lasso', 0, 0, 0, 0, path, mode, this.Base_selection.mask_ctx, anti_alias);
 		this.Base_selection.update_mask_state();
 
 		await app.State.do_action(

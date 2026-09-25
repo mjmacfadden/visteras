@@ -115,6 +115,7 @@ config.TOOLS = [
 		title: 'Rectangular Marquee Tool',
 		on_update: 'on_params_update',
 		attributes: {
+			anti_aliasing: true,
 			select_subject: {
 				title: 'Select Subject',
 				value: true,
@@ -144,6 +145,7 @@ config.TOOLS = [
 		on_update: 'on_params_update',
 		on_leave: 'on_leave',
 		attributes: {
+			anti_aliasing: true,
 			select_subject: {
 				title: 'Select Subject',
 				value: true,

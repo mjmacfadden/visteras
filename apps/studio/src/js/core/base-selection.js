@@ -677,7 +677,7 @@ class Base_selection_class {
 			return false;
 		}
 		var pixel = this.mask_ctx.getImageData(bx, by, 1, 1).data;
-		return pixel[3] > 127 || pixel[0] > 127;
+		return pixel[3] >= 128;
 	}
 
 	translate_selection(dx, dy) {
@@ -695,29 +695,256 @@ class Base_selection_class {
 		config.need_render = true;
 	}
 
-	apply_shape_to_mask(shape, x, y, width, height, path, mode = null, targetCtx = this.mask_ctx) {
+	apply_shape_to_mask(shape, x, y, width, height, path, mode = null, targetCtx = this.mask_ctx, anti_alias = true) {
+		var W = targetCtx.canvas.width;
+		var H = targetCtx.canvas.height;
+
+		var bx0 = 0, by0 = 0, bx1 = W, by1 = H;
+		var bw = 0, bh = 0;
+		var newMaskData = null;
+
+		if (shape === 'ellipse') {
+			var rx = Math.abs(width) / 2;
+			var ry = Math.abs(height) / 2;
+			var cx = (width < 0 ? x + width : x) + rx;
+			var cy = (height < 0 ? y + height : y) + ry;
+			if (rx <= 0 || ry <= 0) return;
+
+			bx0 = Math.max(0, Math.floor(cx - rx - 2));
+			by0 = Math.max(0, Math.floor(cy - ry - 2));
+			bx1 = Math.min(W, Math.ceil(cx + rx + 2));
+			by1 = Math.min(H, Math.ceil(cy + ry + 2));
+			bw = bx1 - bx0;
+			bh = by1 - by0;
+			if (bw <= 0 || bh <= 0) return;
+
+			newMaskData = new Uint8Array(bw * bh);
+
+			if (anti_alias) {
+				var SS = (bw * bh * 16 > 16000000) ? 2 : 4;
+				var hiW = bw * SS;
+				var hiH = bh * SS;
+				var hiCanvas = document.createElement('canvas');
+				hiCanvas.width = hiW;
+				hiCanvas.height = hiH;
+				var hctx = hiCanvas.getContext('2d');
+				hctx.fillStyle = '#ffffff';
+				hctx.beginPath();
+				hctx.ellipse((cx - bx0) * SS, (cy - by0) * SS, rx * SS, ry * SS, 0, 0, 2 * Math.PI);
+				hctx.fill();
+
+				var hiData = hctx.getImageData(0, 0, hiW, hiH).data;
+				var ss2 = SS * SS;
+				for (var dy = 0; dy < bh; dy++) {
+					var loRow = dy * bw;
+					var hiBaseY = dy * SS;
+					for (var dx = 0; dx < bw; dx++) {
+						var sum = 0;
+						var hiBaseX = dx * SS;
+						for (var sy = 0; sy < SS; sy++) {
+							var hiRow = (hiBaseY + sy) * hiW;
+							for (var sx = 0; sx < SS; sx++) {
+								sum += hiData[(hiRow + hiBaseX + sx) * 4 + 3];
+							}
+						}
+						newMaskData[loRow + dx] = Math.round(sum / ss2);
+					}
+				}
+				hiCanvas.width = 1;
+				hiCanvas.height = 1;
+			} else {
+				var flatCanvas = document.createElement('canvas');
+				flatCanvas.width = bw;
+				flatCanvas.height = bh;
+				var fctx = flatCanvas.getContext('2d');
+				fctx.fillStyle = '#ffffff';
+				fctx.beginPath();
+				fctx.ellipse(cx - bx0, cy - by0, rx, ry, 0, 0, 2 * Math.PI);
+				fctx.fill();
+
+				var fData = fctx.getImageData(0, 0, bw, bh).data;
+				for (var i = 0; i < newMaskData.length; i++) {
+					newMaskData[i] = fData[i * 4 + 3] >= 128 ? 255 : 0;
+				}
+				flatCanvas.width = 1;
+				flatCanvas.height = 1;
+			}
+		}
+		else if ((shape === 'lasso' || shape === 'polygonal_lasso') && path != null && path.length > 1) {
+			var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+			for (var p = 0; p < path.length; p++) {
+				minX = Math.min(minX, path[p][0]);
+				minY = Math.min(minY, path[p][1]);
+				maxX = Math.max(maxX, path[p][0]);
+				maxY = Math.max(maxY, path[p][1]);
+			}
+			bx0 = Math.max(0, Math.floor(minX - 2));
+			by0 = Math.max(0, Math.floor(minY - 2));
+			bx1 = Math.min(W, Math.ceil(maxX + 2));
+			by1 = Math.min(H, Math.ceil(maxY + 2));
+			bw = bx1 - bx0;
+			bh = by1 - by0;
+			if (bw <= 0 || bh <= 0) return;
+
+			newMaskData = new Uint8Array(bw * bh);
+
+			if (anti_alias) {
+				var SS = (bw * bh * 16 > 16000000) ? 2 : 4;
+				var hiW = bw * SS;
+				var hiH = bh * SS;
+				var hiCanvas = document.createElement('canvas');
+				hiCanvas.width = hiW;
+				hiCanvas.height = hiH;
+				var hctx = hiCanvas.getContext('2d');
+				hctx.fillStyle = '#ffffff';
+				hctx.beginPath();
+				hctx.moveTo((path[0][0] - bx0) * SS, (path[0][1] - by0) * SS);
+				for (var i = 1; i < path.length; i++) {
+					hctx.lineTo((path[i][0] - bx0) * SS, (path[i][1] - by0) * SS);
+				}
+				hctx.closePath();
+				hctx.fill();
+
+				var hiData = hctx.getImageData(0, 0, hiW, hiH).data;
+				var ss2 = SS * SS;
+				for (var dy = 0; dy < bh; dy++) {
+					var loRow = dy * bw;
+					var hiBaseY = dy * SS;
+					for (var dx = 0; dx < bw; dx++) {
+						var sum = 0;
+						var hiBaseX = dx * SS;
+						for (var sy = 0; sy < SS; sy++) {
+							var hiRow = (hiBaseY + sy) * hiW;
+							for (var sx = 0; sx < SS; sx++) {
+								sum += hiData[(hiRow + hiBaseX + sx) * 4 + 3];
+							}
+						}
+						newMaskData[loRow + dx] = Math.round(sum / ss2);
+					}
+				}
+				hiCanvas.width = 1;
+				hiCanvas.height = 1;
+			} else {
+				var flatCanvas = document.createElement('canvas');
+				flatCanvas.width = bw;
+				flatCanvas.height = bh;
+				var fctx = flatCanvas.getContext('2d');
+				fctx.fillStyle = '#ffffff';
+				fctx.beginPath();
+				fctx.moveTo(path[0][0] - bx0, path[0][1] - by0);
+				for (var i = 1; i < path.length; i++) {
+					fctx.lineTo(path[i][0] - bx0, path[i][1] - by0);
+				}
+				fctx.closePath();
+				fctx.fill();
+
+				var fData = fctx.getImageData(0, 0, bw, bh).data;
+				for (var i = 0; i < newMaskData.length; i++) {
+					newMaskData[i] = fData[i * 4 + 3] >= 128 ? 255 : 0;
+				}
+				flatCanvas.width = 1;
+				flatCanvas.height = 1;
+			}
+		}
+		else {
+			// Normal axis-aligned rectangle marquee
+			var rx = width < 0 ? x + width : x;
+			var ry = height < 0 ? y + height : y;
+			var rw = Math.abs(width);
+			var rh = Math.abs(height);
+			bx0 = Math.max(0, Math.floor(rx));
+			by0 = Math.max(0, Math.floor(ry));
+			bx1 = Math.min(W, Math.ceil(rx + rw));
+			by1 = Math.min(H, Math.ceil(ry + rh));
+			bw = bx1 - bx0;
+			bh = by1 - by0;
+			if (bw <= 0 || bh <= 0) return;
+
+			newMaskData = new Uint8Array(bw * bh);
+			for (var dy = 0; dy < bh; dy++) {
+				var docY = by0 + dy;
+				var loRow = dy * bw;
+				for (var dx = 0; dx < bw; dx++) {
+					var docX = bx0 + dx;
+					if (docX >= rx && docX < rx + rw && docY >= ry && docY < ry + rh) {
+						newMaskData[loRow + dx] = 255;
+					}
+				}
+			}
+		}
+
+		if (!newMaskData) return;
+
+		// Combine newMaskData into targetCtx using exact grayscale mask math
 		if (mode == null || mode === 'replace') {
-			targetCtx.clearRect(0, 0, this.mask_canvas.width, this.mask_canvas.height);
-			targetCtx.globalCompositeOperation = 'source-over';
+			targetCtx.clearRect(0, 0, W, H);
+			var imgData = targetCtx.createImageData(bw, bh);
+			var d = imgData.data;
+			for (var i = 0; i < newMaskData.length; i++) {
+				var val = newMaskData[i];
+				var k = i * 4;
+				d[k] = val;
+				d[k + 1] = val;
+				d[k + 2] = val;
+				d[k + 3] = val;
+			}
+			targetCtx.putImageData(imgData, bx0, by0);
 		}
 		else if (mode === 'add') {
-			targetCtx.globalCompositeOperation = 'source-over';
+			var imgData = targetCtx.getImageData(bx0, by0, bw, bh);
+			var d = imgData.data;
+			for (var i = 0; i < newMaskData.length; i++) {
+				var n = newMaskData[i];
+				if (n === 0) continue;
+				var k = i * 4;
+				var old_a = d[k + 3];
+				var out_a = Math.min(255, Math.round(old_a + n - (old_a * n) / 255));
+				d[k] = out_a;
+				d[k + 1] = out_a;
+				d[k + 2] = out_a;
+				d[k + 3] = out_a;
+			}
+			targetCtx.putImageData(imgData, bx0, by0);
 		}
 		else if (mode === 'subtract') {
-			targetCtx.globalCompositeOperation = 'destination-out';
+			var imgData = targetCtx.getImageData(bx0, by0, bw, bh);
+			var d = imgData.data;
+			for (var i = 0; i < newMaskData.length; i++) {
+				var n = newMaskData[i];
+				if (n === 0) continue;
+				var k = i * 4;
+				var old_a = d[k + 3];
+				var out_a = Math.max(0, Math.round(old_a * (1 - n / 255)));
+				d[k] = out_a;
+				d[k + 1] = out_a;
+				d[k + 2] = out_a;
+				d[k + 3] = out_a;
+			}
+			targetCtx.putImageData(imgData, bx0, by0);
 		}
 		else if (mode === 'intersect') {
-			targetCtx.globalCompositeOperation = 'destination-in';
-		}
+			if (by0 > 0) targetCtx.clearRect(0, 0, W, by0);
+			if (by1 < H) targetCtx.clearRect(0, by1, W, H - by1);
+			if (bx0 > 0) targetCtx.clearRect(0, by0, bx0, bh);
+			if (bx1 < W) targetCtx.clearRect(bx1, by0, W - bx1, bh);
 
-		targetCtx.beginPath();
-		this._build_shape_path(targetCtx, { shape, x, y, width, height, path });
-		targetCtx.fillStyle = '#ffffff';
-		targetCtx.fill();
-		targetCtx.globalCompositeOperation = 'source-over';
+			var imgData = targetCtx.getImageData(bx0, by0, bw, bh);
+			var d = imgData.data;
+			for (var i = 0; i < newMaskData.length; i++) {
+				var n = newMaskData[i];
+				var k = i * 4;
+				var old_a = d[k + 3];
+				var out_a = Math.round((old_a * n) / 255);
+				d[k] = out_a;
+				d[k + 1] = out_a;
+				d[k + 2] = out_a;
+				d[k + 3] = out_a;
+			}
+			targetCtx.putImageData(imgData, bx0, by0);
+		}
 	}
 
-	compute_preview_contours(shape, x, y, width, height, path, mode = null) {
+	compute_preview_contours(shape, x, y, width, height, path, mode = null, anti_alias = true) {
 		if (!this._preview_canvas) {
 			this._preview_canvas = document.createElement('canvas');
 		}
@@ -734,7 +961,7 @@ class Base_selection_class {
 			pctx.drawImage(this.mask_canvas, 0, 0);
 		}
 
-		this.apply_shape_to_mask(shape, x, y, width, height, path, mode, pctx);
+		this.apply_shape_to_mask(shape, x, y, width, height, path, mode, pctx, anti_alias);
 		this._preview_contours = this._trace_mask_contours(this._preview_canvas);
 		config.need_render = true;
 	}
@@ -797,6 +1024,23 @@ class Base_selection_class {
 		this.mask_ctx.clearRect(0, 0, W, H);
 		if (src) {
 			this.mask_ctx.drawImage(src, 0, 0);
+			var img = this.mask_ctx.getImageData(0, 0, W, H);
+			var d = img.data;
+			var changed = false;
+			for (var i = 0; i < d.length; i += 4) {
+				var a = d[i + 3];
+				var val = (a === 0) ? 0 : (a < 255 ? a : d[i]);
+				if (d[i] !== val || d[i + 1] !== val || d[i + 2] !== val || d[i + 3] !== val) {
+					d[i] = val;
+					d[i + 1] = val;
+					d[i + 2] = val;
+					d[i + 3] = val;
+					changed = true;
+				}
+			}
+			if (changed) {
+				this.mask_ctx.putImageData(img, 0, 0);
+			}
 		}
 		this.update_mask_state();
 	}
@@ -845,7 +1089,7 @@ class Base_selection_class {
 		var img = this.mask_ctx.getImageData(0, 0, W, H);
 		var d = img.data;
 		for (var i = 0; i < d.length; i += 4) {
-			var currentStrength = Math.round(d[i] * (d[i + 3] / 255));
+			var currentStrength = d[i + 3];
 			var inv = 255 - currentStrength;
 			d[i] = inv;
 			d[i + 1] = inv;
@@ -938,7 +1182,7 @@ class Base_selection_class {
 
 		function is_opaque(x, y) {
 			if (x < 0 || y < 0 || x >= W || y >= H) return false;
-			return d[(y * W + x) * 4] > 127;
+			return d[(y * W + x) * 4 + 3] >= 128;
 		}
 
 		var all_edges = [];
@@ -1114,26 +1358,68 @@ class Base_selection_class {
 		if (!this.has_selection)
 			return;
 
+		var W = edited.width;
+		var H = edited.height;
 		var clip = this.create_layer_selection_alpha(layer);
-		var keep = document.createElement('canvas');
-		keep.width = edited.width;
-		keep.height = edited.height;
-		var kctx = keep.getContext('2d');
-		kctx.drawImage(edited, 0, 0);
-		kctx.globalCompositeOperation = 'destination-in';
-		kctx.drawImage(clip, 0, 0, edited.width, edited.height);
 
 		var ectx = edited.getContext('2d');
-		ectx.save();
-		ectx.setTransform(1, 0, 0, 1, 0, 0);
-		ectx.globalCompositeOperation = 'source-over';
-		ectx.clearRect(0, 0, edited.width, edited.height);
-		ectx.drawImage(original, 0, 0, edited.width, edited.height);
-		ectx.drawImage(keep, 0, 0);
-		ectx.restore();
+		var octx = original.getContext('2d');
+		var cctx = clip.getContext('2d');
 
-		keep.width = 1;
-		keep.height = 1;
+		var eImg = ectx.getImageData(0, 0, W, H);
+		var oImg = octx.getImageData(0, 0, W, H);
+		var cImg = cctx.getImageData(0, 0, W, H);
+
+		var ed = eImg.data;
+		var od = oImg.data;
+		var cd = cImg.data;
+
+		for (var i = 0; i < ed.length; i += 4) {
+			var maskVal = cd[i + 3];
+			if (maskVal === 0) {
+				ed[i] = od[i];
+				ed[i + 1] = od[i + 1];
+				ed[i + 2] = od[i + 2];
+				ed[i + 3] = od[i + 3];
+			} else if (maskVal === 255) {
+				continue;
+			} else {
+				var s = maskVal / 255;
+				var invS = 1 - s;
+
+				var a0 = od[i + 3] / 255;
+				var a1 = ed[i + 3] / 255;
+
+				var out_a = a0 * invS + a1 * s;
+
+				if (out_a <= 0.0001) {
+					ed[i] = 0;
+					ed[i + 1] = 0;
+					ed[i + 2] = 0;
+					ed[i + 3] = 0;
+				} else {
+					var pr0 = od[i] * a0;
+					var pg0 = od[i + 1] * a0;
+					var pb0 = od[i + 2] * a0;
+
+					var pr1 = ed[i] * a1;
+					var pg1 = ed[i + 1] * a1;
+					var pb1 = ed[i + 2] * a1;
+
+					var out_pr = pr0 * invS + pr1 * s;
+					var out_pg = pg0 * invS + pg1 * s;
+					var out_pb = pb0 * invS + pb1 * s;
+
+					ed[i] = Math.round(Math.min(255, Math.max(0, out_pr / out_a)));
+					ed[i + 1] = Math.round(Math.min(255, Math.max(0, out_pg / out_a)));
+					ed[i + 2] = Math.round(Math.min(255, Math.max(0, out_pb / out_a)));
+					ed[i + 3] = Math.round(Math.min(255, Math.max(0, out_a * 255)));
+				}
+			}
+		}
+
+		ectx.putImageData(eImg, 0, 0);
+
 		clip.width = 1;
 		clip.height = 1;
 	}
