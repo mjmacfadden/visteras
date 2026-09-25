@@ -93,7 +93,7 @@ export class Activate_tool_action extends Base_action {
 			} else if (config.TOOL && config.TOOL.name === 'text') {
 				defaultCursor = 'text';
 			} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
-				defaultCursor = "url('images/icons/cursor-magic-wand.svg') 3 3, crosshair";
+				defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
 			} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 				defaultCursor = 'crosshair';
 			} else if (config.TOOL && config.TOOL.name === 'pick_color') {
@@ -277,7 +277,7 @@ export class Activate_tool_action extends Base_action {
 		} else if (config.TOOL && config.TOOL.name === 'text') {
 			defaultCursor = 'text';
 		} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
-			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 3 3, crosshair";
+			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
 		} else if (config.TOOL && config.TOOL.name === 'pick_color') {

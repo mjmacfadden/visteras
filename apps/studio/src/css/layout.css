@@ -1707,7 +1707,7 @@ crop handles) win over the default crosshair - not !important so inline styles a
 }
 .middle_area.tool-magic_wand #main_wrapper,
 .middle_area.tool-magic_wand #main_wrapper * {
-	cursor: url('../images/icons/cursor-magic-wand.svg') 3 3, crosshair !important;
+	cursor: url('../images/icons/cursor-magic-wand.svg') 7 7, crosshair !important;
 }
 .middle_area.tool-pen #main_wrapper,
 .middle_area.tool-pen #main_wrapper * {
