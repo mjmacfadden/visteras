@@ -14,9 +14,9 @@
 function boxBlurH(scl, tcl, w, h, r) {
 	const iarr = 1 / (r + r + 1);
 	for (let i = 0; i < h; i++) {
-		const ti = i * w;
-		const li = ti;
-		const ri = ti + r;
+		let ti = i * w;
+		let li = ti;
+		let ri = ti + r;
 		const fv = scl[ti];
 		const lv = scl[ti + w - 1];
 		let val = (r + 1) * fv;
@@ -194,8 +194,8 @@ export function refineStrokeMatting(
 	const roiH = maxY - minY + 1;
 	if (roiW <= 2 || roiH <= 2) return maskPixels;
 
-	// 2. Identify brush stroke influence mask in ROI
-	const strokeMask = new Uint8Array(roiW * roiH);
+	// 2. Identify brush stroke influence mask in ROI with smooth radial falloff
+	const strokeWeights = new Float32Array(roiW * roiH);
 	const brushRadSq = brushRadius * brushRadius;
 	for (let sp = 0; sp < strokePoints.length; sp++) {
 		const pt = strokePoints[sp];
@@ -213,8 +213,19 @@ export function refineStrokeMatting(
 			const row = y * roiW;
 			for (let x = x0; x <= x1; x++) {
 				const dx = x - cx;
-				if (dx * dx + dy2 <= brushRadSq) {
-					strokeMask[row + x] = 1;
+				const dSq = dx * dx + dy2;
+				if (dSq <= brushRadSq) {
+					const dist = Math.sqrt(dSq);
+					const normD = dist / brushRadius;
+					// Smooth falloff towards brush edge so strokes blend seamlessly
+					let w = 1.0;
+					if (normD > 0.4) {
+						w = 0.5 * (1 + Math.cos(Math.PI * ((normD - 0.4) / 0.6)));
+					}
+					const idx = row + x;
+					if (w > strokeWeights[idx]) {
+						strokeWeights[idx] = w;
+					}
 				}
 			}
 		}
@@ -238,8 +249,8 @@ export function refineStrokeMatting(
 			const g = imgPixels[gIdx + 1];
 			const b = imgPixels[gIdx + 2];
 
-			// Only sample outside or on boundary of brush stroke
-			if (strokeMask[rRow + rx] === 0) {
+			// Only sample outside the brush stroke
+			if (strokeWeights[rRow + rx] === 0) {
 				if (mVal >= 220 && fgSamples.length < fgSampleLimit) {
 					fgSamples.push([r, g, b]);
 				} else if (mVal <= 35 && bgSamples.length < bgSampleLimit) {
@@ -311,29 +322,22 @@ export function refineStrokeMatting(
 			guideROI[rIdx] = lum;
 
 			const origMaskNorm = maskPixels[gRow + gx] / 255;
+			const w = strokeWeights[rIdx];
 
-			if (strokeMask[rIdx] === 1) {
+			if (w > 0) {
 				// Pixel is under brush stroke: estimate alpha based on color distance
 				const df = Math.hypot(r - fgR, g - fgG, b - fgB);
 				const db = Math.hypot(r - bgR, g - bgG, b - bgB);
 
-				let estimatedAlpha;
-				if (refineMode === 'object') {
-					// Object aware: heavily prioritize edge gradient affinity
-					const diff = db - df;
-					estimatedAlpha = 1 / (1 + Math.exp(-diff / 20));
-				} else {
-					// Color aware: quadratic distance affinity
-					const df2 = df * df + 1e-4;
-					const db2 = db * db + 1e-4;
-					estimatedAlpha = db2 / (df2 + db2);
-				}
+				const df2 = df * df + 1e-4;
+				const db2 = db * db + 1e-4;
+				const estimatedAlpha = db2 / (df2 + db2);
 
 				if (isErase) {
 					// Erase mode: subtract affinity
 					srcAlphaROI[rIdx] = Math.min(origMaskNorm, Math.max(0, 1 - estimatedAlpha));
 				} else {
-					// Add / refine mode: smooth blend between original and estimated
+					// Add / refine mode: estimate
 					srcAlphaROI[rIdx] = estimatedAlpha;
 				}
 			} else {
@@ -346,18 +350,20 @@ export function refineStrokeMatting(
 	const filterRadius = Math.max(3, Math.min(15, Math.round(brushRadius * 0.35)));
 	const filteredROI = fastGuidedFilter(guideROI, srcAlphaROI, roiW, roiH, filterRadius, 0.005);
 
-	// 6. Write filtered results back to maskPixels (feathering at brush boundary)
+	// 6. Write filtered results back to maskPixels with smooth feather falloff
 	for (let ry = 0; ry < roiH; ry++) {
 		const gy = minY + ry;
 		const gRow = gy * width;
 		const rRow = ry * roiW;
 		for (let rx = 0; rx < roiW; rx++) {
 			const rIdx = rRow + rx;
-			if (strokeMask[rIdx] === 1) {
+			const w = strokeWeights[rIdx];
+			if (w > 0) {
 				const gx = minX + rx;
 				const targetIdx = gRow + gx;
-				const newAlpha = Math.round(filteredROI[rIdx] * 255);
-				maskPixels[targetIdx] = Math.max(0, Math.min(255, newAlpha));
+				const origAlpha = maskPixels[targetIdx];
+				const newAlpha = Math.max(0, Math.min(255, Math.round(filteredROI[rIdx] * 255)));
+				maskPixels[targetIdx] = Math.round(origAlpha * (1 - w) + newAlpha * w);
 			}
 		}
 	}
