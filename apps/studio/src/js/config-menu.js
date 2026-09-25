@@ -521,7 +521,7 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Subject',
+				name: 'Select Subject',
 				target: 'tools/bg_auto.select_subject'
 			},
 			{
