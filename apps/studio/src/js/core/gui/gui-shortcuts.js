@@ -9,6 +9,36 @@ import config from './../../config.js';
 import Helper_class from './../../libs/helpers.js';
 import View_ruler_class from './../../modules/view/ruler.js';
 
+export const BRUSH_SIZE_STEPS = [
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+	15, 20, 25, 30, 35, 40, 45, 50,
+	60, 70, 80, 90, 100,
+	125, 150, 175, 200,
+	300, 400, 500, 600, 700, 800
+];
+for (let s = 900; s <= 5000; s += 100) {
+	BRUSH_SIZE_STEPS.push(s);
+}
+
+export const BRUSH_HARDNESS_STEPS = [0, 25, 50, 75, 100];
+
+export function get_next_step(steps, current, direction) {
+	const val = Number(current);
+	if (Number.isNaN(val)) return steps[0];
+	if (direction > 0) {
+		const next = steps.find(s => s > val);
+		return next !== undefined ? next : steps[steps.length - 1];
+	} else if (direction < 0) {
+		for (let i = steps.length - 1; i >= 0; i--) {
+			if (steps[i] < val) {
+				return steps[i];
+			}
+		}
+		return steps[0];
+	}
+	return val;
+}
+
 class GUI_shortcuts_class {
 
 	constructor() {
@@ -371,12 +401,13 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Shift + [ / ] = Decrease/Increase brush hardness
+			// Shift + [ / ] = Decrease/Increase brush hardness (0, 25, 50, 75, 100)
 			if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
-				&& (event.code === 'BracketLeft' || event.code === 'BracketRight')) {
+				&& (event.code === 'BracketLeft' || event.code === 'BracketRight' || event.key === '{' || event.key === '}' || event.key === '[' || event.key === ']')) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
-				this.adjust_brush_hardness(event.code === 'BracketRight' ? 1 : -1);
+				const isIncrease = (event.code === 'BracketRight' || event.key === '}' || event.key === ']');
+				this.adjust_brush_hardness(isIncrease ? 1 : -1);
 				return;
 			}
 
@@ -563,10 +594,12 @@ class GUI_shortcuts_class {
 			}
 
 			// [ and ] = Decrease/Increase brush size
-			if (key === '[' || key === ']') {
+			if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
+				&& (key === '[' || key === ']' || event.code === 'BracketLeft' || event.code === 'BracketRight')) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
-				this.adjust_brush_size(key === ']' ? 1 : -1);
+				const isIncrease = (key === ']' || event.code === 'BracketRight');
+				this.adjust_brush_size(isIncrease ? 1 : -1);
 			}
 		}, true);
 
@@ -728,7 +761,7 @@ class GUI_shortcuts_class {
 
 		const attr = config.TOOL.attributes.size;
 		const oldSize = (typeof attr === 'object' && attr != null) ? (attr.value ?? 30) : attr;
-		const newSize = Math.max(1, Math.min(999, oldSize + delta));
+		const newSize = get_next_step(BRUSH_SIZE_STEPS, oldSize, delta);
 		if (newSize === oldSize) return;
 
 		if (typeof attr === 'object' && attr != null) {
@@ -775,7 +808,7 @@ class GUI_shortcuts_class {
 		var mouseEl = document.getElementById('mouse');
 		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect') || mouseEl.classList.contains('quick_selection_add') || mouseEl.classList.contains('quick_selection_subtract'))) {
 			var curW = parseFloat(mouseEl.style.width) || 0;
-			var zoomedSize = newSize * config.ZOOM;
+			var zoomedSize = Math.max(newSize * (config.ZOOM || 1), 5);
 			var left = parseFloat(mouseEl.style.left) || 0;
 			var top = parseFloat(mouseEl.style.top) || 0;
 			mouseEl.style.width = zoomedSize + 'px';
@@ -790,13 +823,13 @@ class GUI_shortcuts_class {
 		if (config.TOOL.attributes.hardness == null) return;
 
 		const attr = config.TOOL.attributes.hardness;
-		const oldValue = (typeof attr === 'object' && attr.value != null) ? attr.value : attr;
+		const oldValue = (typeof attr === 'object' && attr != null && attr.value != null) ? attr.value : attr;
 		if (oldValue == null) return;
 
-		const newValue = Math.max(0, Math.min(100, oldValue + delta));
+		const newValue = get_next_step(BRUSH_HARDNESS_STEPS, oldValue, delta);
 		if (newValue === oldValue) return;
 
-		if (typeof attr === 'object') {
+		if (typeof attr === 'object' && attr != null) {
 			attr.value = newValue;
 		} else {
 			config.TOOL.attributes.hardness = newValue;
@@ -806,14 +839,28 @@ class GUI_shortcuts_class {
 		const hardnessItem = document.querySelector('.attributes .item.hardness');
 		if (hardnessItem) {
 			const slider = hardnessItem.querySelector('.ui_range');
-			if (slider) {
-				$(slider).uiRange('set_value', newValue);
+			if (slider && typeof $(slider).uiRange === 'function') {
+				try {
+					$(slider).uiRange('set_value', newValue);
+				} catch (e) { /* ignore */ }
 			}
-const valueLabel = hardnessItem.querySelector('.slider_value');
-		if (valueLabel) {
-			valueLabel.value = String(newValue);
-			valueLabel.innerHTML = String(newValue);
+			const valueLabel = hardnessItem.querySelector('.slider_value, #attribute_value_hardness');
+			if (valueLabel) {
+				valueLabel.value = String(newValue);
+				valueLabel.innerHTML = String(newValue);
+			}
 		}
+
+		// Notify active tool if it listens for param updates
+		if (app.GUI && app.GUI.GUI_tools && config.TOOL) {
+			const mod = app.GUI.GUI_tools.tools_modules[config.TOOL.name];
+			if (mod && mod.object) {
+				if (typeof mod.object.on_params_update === 'function') {
+					mod.object.on_params_update({ key: 'hardness', value: newValue });
+				} else if (typeof mod.object.on_update === 'function') {
+					mod.object.on_update({ key: 'hardness', value: newValue });
+				}
+			}
 		}
 	}
 

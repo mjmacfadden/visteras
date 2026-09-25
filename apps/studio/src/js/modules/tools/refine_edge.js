@@ -22,6 +22,11 @@ import {
 	applyShiftEdge,
 	applyDecontaminateColors,
 } from './../../libs/refine-edge/matting.js';
+import {
+	BRUSH_SIZE_STEPS,
+	BRUSH_HARDNESS_STEPS,
+	get_next_step,
+} from './../../core/gui/gui-shortcuts.js';
 
 const VIEW_MODES = [
 	{ id: 'on_black', name: 'On Black (B)' },
@@ -1170,22 +1175,24 @@ class Tools_refineEdge_class {
 		}
 
 		// 2. Brush size ([ / ]) & Hardness (Shift + [ / ])
-		if (e.code === 'BracketLeft') {
+		const isBracketLeft = e.code === 'BracketLeft' || e.key === '[' || e.key === '{';
+		const isBracketRight = e.code === 'BracketRight' || e.key === ']' || e.key === '}';
+		if (isBracketLeft) {
 			e.preventDefault();
 			if (e.shiftKey) {
-				this._brushHardness = Math.max(0, this._brushHardness - 25);
+				this._brushHardness = get_next_step(BRUSH_HARDNESS_STEPS, this._brushHardness, -1);
 				this._update_ui_brush_values();
 			} else {
-				this._brushSize = Math.max(1, this._brushSize - 5);
+				this._brushSize = get_next_step(BRUSH_SIZE_STEPS.filter(s => s <= 500), this._brushSize, -1);
 				this._update_ui_brush_values();
 			}
-		} else if (e.code === 'BracketRight') {
+		} else if (isBracketRight) {
 			e.preventDefault();
 			if (e.shiftKey) {
-				this._brushHardness = Math.min(100, this._brushHardness + 25);
+				this._brushHardness = get_next_step(BRUSH_HARDNESS_STEPS, this._brushHardness, 1);
 				this._update_ui_brush_values();
 			} else {
-				this._brushSize = Math.min(500, this._brushSize + 5);
+				this._brushSize = get_next_step(BRUSH_SIZE_STEPS.filter(s => s <= 500), this._brushSize, 1);
 				this._update_ui_brush_values();
 			}
 		} else if (e.code === 'KeyX') {
