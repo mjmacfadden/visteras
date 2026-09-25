@@ -448,10 +448,6 @@ const menuDefinition = [
 				target: 'layer/raster.raster'
 			},
 			{
-				name: 'Remove Background',
-				target: 'tools/bg_auto.remove_background'
-			},
-			{
 				divider: true
 			},
 			{
@@ -527,6 +523,10 @@ const menuDefinition = [
 			{
 				name: 'Subject',
 				target: 'tools/bg_auto.select_subject'
+			},
+			{
+				name: 'Remove Background',
+				target: 'tools/bg_auto.remove_background'
 			},
 			{
 				name: 'Select and Mask',
