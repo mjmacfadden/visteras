@@ -122,7 +122,7 @@ config.TOOLS = [
 		},
 		on_leave: 'on_leave',
 		tool_group: {
-			label: 'Selection Tools',
+			label: 'Marquee Tools',
 			hidden: false,
 			items: [
 				{
@@ -135,10 +135,33 @@ config.TOOLS = [
 					title: 'Elliptical Marquee Tool',
 					icon: 'selection_ellipse',
 				},
+			],
+		},
+	},
+	{
+		name: 'lasso',
+		title: 'Lasso Tool',
+		on_update: 'on_params_update',
+		on_leave: 'on_leave',
+		attributes: {
+			select_subject: {
+				title: 'Select Subject',
+				value: true,
+			},
+		},
+		tool_group: {
+			label: 'Lasso Tools',
+			hidden: false,
+			items: [
 				{
 					shape: 'lasso',
 					title: 'Lasso Tool',
 					icon: 'lasso',
+				},
+				{
+					shape: 'polygonal_lasso',
+					title: 'Polygonal Lasso Tool',
+					icon: 'polygonal_lasso',
 				},
 			],
 		},

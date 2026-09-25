@@ -512,7 +512,7 @@ class Base_selection_class {
 				ctx.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
 			}
 		}
-		else if (shape == 'lasso' && data.path != null && data.path.length > 1) {
+		else if ((shape === 'lasso' || shape === 'polygonal_lasso') && data.path != null && data.path.length > 1) {
 			ctx.moveTo(data.path[0][0], data.path[0][1]);
 			for (var i = 1; i < data.path.length; i++) {
 				ctx.lineTo(data.path[i][0], data.path[i][1]);
@@ -565,7 +565,7 @@ class Base_selection_class {
 				pts.push([cx + a * Math.cos(th), cy + b * Math.sin(th)]);
 			}
 			return [pts];
-		} else if (shape === 'lasso' && r.path && r.path.length > 1) {
+		} else if ((shape === 'lasso' || shape === 'polygonal_lasso') && r.path && r.path.length > 1) {
 			return [r.path];
 		}
 		return [];

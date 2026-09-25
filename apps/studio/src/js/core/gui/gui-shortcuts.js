@@ -420,7 +420,7 @@ class GUI_shortcuts_class {
 				&& (event.code === 'Delete' || event.code === 'Backspace'
 					|| event.key === 'Delete' || event.key === 'Backspace'
 					|| event.keyCode === 46 || event.keyCode === 8)) {
-				const hasSelection = (config.TOOL && (config.TOOL.name === 'selection' || config.TOOL.name === 'magic_wand'))
+				const hasSelection = (config.TOOL && (config.TOOL.name === 'selection' || config.TOOL.name === 'lasso' || config.TOOL.name === 'magic_wand'))
 					&& app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection;
 				if (!hasSelection) {
 					event.preventDefault();
@@ -478,20 +478,16 @@ class GUI_shortcuts_class {
 				var targetTool = this.keymap[key];
 				if (targetTool === 'lasso') {
 					if (app.GUI && app.GUI.GUI_tools) {
-						app.GUI.GUI_tools.update_tool_shape('selection', 'lasso');
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('lasso');
+						} else {
+							app.GUI.GUI_tools.activate_tool('lasso');
+						}
 					}
 				} else if (targetTool === 'selection') {
 					if (app.GUI && app.GUI.GUI_tools) {
-						var selDef = null;
-						for (var si in config.TOOLS) {
-							if (config.TOOLS[si].name === 'selection') {
-								selDef = config.TOOLS[si];
-								break;
-							}
-						}
-						var activeShape = (selDef && selDef.tool_group) ? selDef.tool_group.active_shape : 'rect';
-						if (activeShape === 'lasso') {
-							app.GUI.GUI_tools.update_tool_shape('selection', 'rect');
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('selection');
 						} else {
 							app.GUI.GUI_tools.activate_tool('selection');
 						}

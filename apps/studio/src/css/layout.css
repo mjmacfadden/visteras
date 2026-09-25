@@ -482,6 +482,7 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
  */
 .sidebar_left .select:after{ background-image: url('../images/icons/select.svg'); }
 .sidebar_left .selection:after{ background-image: url('../images/icons/selection.svg'); }
+.sidebar_left .lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .brush:after{ background-image: url('../images/icons/brush.svg'); }
 .sidebar_left .pencil:after{ background-image: url('../images/icons/pencil.svg'); }
 .sidebar_left .pick_color:after{ background-image: url('../images/icons/pick_color.svg'); }
@@ -539,6 +540,8 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .sidebar_left .item.has_group{ overflow: visible; }
 .sidebar_left .item.selection.marquee_ellipse:after{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .sidebar_left .item.selection.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
+.sidebar_left .item.lasso.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
+.sidebar_left .item.lasso.marquee_polygonal_lasso:after{ background-image: url('../images/icons/polygonal_lasso.svg'); }
 .sidebar_left .item.brush.marquee_pencil:after{ background-image: url('../images/icons/pencil.svg'); }
 .sidebar_left .item.gradient.marquee_fill:after{
 	background-image: url('../images/icons/fill.svg');
@@ -608,6 +611,7 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.selection{ background-image: url('../images/icons/selection.svg'); }
 .tg_icon.selection_ellipse{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .tg_icon.lasso{ background-image: url('../images/icons/lasso.svg'); }
+.tg_icon.polygonal_lasso{ background-image: url('../images/icons/polygonal_lasso.svg'); }
 .tg_icon.brush{ background-image: url('../images/icons/brush.svg'); }
 .tg_icon.pencil{ background-image: url('../images/icons/pencil.svg'); }
 .tg_icon.rectangle{ background-image: url('../images/icons/rectangle.svg'); }
