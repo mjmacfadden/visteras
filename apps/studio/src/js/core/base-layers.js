@@ -16,7 +16,7 @@ import Mask_class from "./../modules/mask/mask.js";
 import alertify from "./../../../node_modules/alertifyjs/build/alertify.min.js";
 import { create_renderer, get_renderer, switch_renderer } from "./renderer/index.js";
 import Composite_cache_class from "./renderer/composite-cache.js";
-import { is_group, is_effectively_visible } from "./../libs/layer-tree.js";
+import { is_group, is_effectively_visible, get_descendant_ids } from "./../libs/layer-tree.js";
 import { is_layer_clipped, get_render_composition } from './../libs/layer-clip.js';
 import Vector_renderer from "./vector/vector-renderer.js";
 
@@ -1537,6 +1537,198 @@ class Base_layers_class {
 		return app.State.do_action(
 			new app.Actions.Reorder_layer_action(id, direction)
 		);
+	}
+
+	/**
+	 * Creates a selection from the non-transparent pixels on the given layer (or group).
+	 *
+	 * @param {object} layer
+	 * @param {string} mode 'replace' | 'add' | 'subtract' | 'intersect'
+	 */
+	select_layer_pixels(layer, mode = 'replace') {
+		if (!layer) return;
+		if (layer.type === 'adjustment') {
+			if (layer.mask) {
+				return this.select_mask_pixels(layer, mode);
+			}
+			alertify.error('Adjustment layers do not contain pixels.');
+			return;
+		}
+
+		var W = Math.max(1, config.WIDTH || 800);
+		var H = Math.max(1, config.HEIGHT || 600);
+		var scratch = document.createElement('canvas');
+		scratch.width = W;
+		scratch.height = H;
+		var sctx = scratch.getContext('2d', { willReadFrequently: true });
+
+		if (is_group(layer)) {
+			var descIds = get_descendant_ids(layer.id);
+			var layersToDraw = [];
+			for (var i = 0; i < descIds.length; i++) {
+				var l = this.get_layer(descIds[i], true);
+				if (l && !is_group(l) && l.type !== 'adjustment') {
+					layersToDraw.push(l);
+				}
+			}
+			layersToDraw.sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
+			for (var j = 0; j < layersToDraw.length; j++) {
+				this._render_object_body(sctx, layersToDraw[j], false);
+			}
+		} else {
+			this._render_object_body(sctx, layer, false);
+		}
+
+		var imgData = sctx.getImageData(0, 0, W, H);
+		var d = imgData.data;
+		var hasAny = false;
+		for (var k = 0; k < d.length; k += 4) {
+			var a = d[k + 3];
+			if (a > 0) hasAny = true;
+			d[k] = a;
+			d[k + 1] = a;
+			d[k + 2] = a;
+			d[k + 3] = a;
+		}
+		sctx.putImageData(imgData, 0, 0);
+
+		if (!hasAny) {
+			alertify.warning('No pixels on selected layer.');
+			return;
+		}
+
+		this._apply_selection_mask(scratch, mode);
+	}
+
+	/**
+	 * Creates a selection from the visible (revealed) pixels in the layer mask.
+	 *
+	 * @param {object} layer
+	 * @param {string} mode 'replace' | 'add' | 'subtract' | 'intersect'
+	 */
+	select_mask_pixels(layer, mode = 'replace') {
+		if (!layer || !layer.mask) {
+			alertify.error('No layer mask on this layer.');
+			return;
+		}
+
+		if (!this.Mask) {
+			this.Mask = new Mask_class();
+		}
+
+		var mask = layer.mask;
+		var alpha = this.Mask.get_mask_alpha_canvas(layer);
+		if (alpha == null) {
+			alertify.error('Unable to read layer mask.');
+			return;
+		}
+
+		var source = this.Mask.get_mask_source(layer);
+		var sw = source ? source.width : alpha.width;
+		var sh = source ? source.height : alpha.height;
+
+		var lx = (layer.x != null) ? layer.x : 0;
+		var ly = (layer.y != null) ? layer.y : 0;
+		var lw = (layer.width != null && layer.width > 0) ? layer.width : sw;
+		var lh = (layer.height != null && layer.height > 0) ? layer.height : sh;
+		var rotate = layer.rotate || 0;
+		var rad = rotate * Math.PI / 180;
+		var mx = (mask.x != null) ? mask.x : 0;
+		var my = (mask.y != null) ? mask.y : 0;
+		var mw = (mask.width != null && mask.width > 0) ? mask.width : (config.WIDTH || sw);
+		var mh = (mask.height != null && mask.height > 0) ? mask.height : (config.HEIGHT || sh);
+
+		var W = Math.max(1, config.WIDTH || 800);
+		var H = Math.max(1, config.HEIGHT || 600);
+		var scratch = document.createElement('canvas');
+		scratch.width = W;
+		scratch.height = H;
+		var sctx = scratch.getContext('2d', { willReadFrequently: true });
+		sctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0);
+
+		if (rad !== 0 && mask.linked !== false) {
+			sctx.translate(lx + lw / 2, ly + lh / 2);
+			sctx.rotate(rad);
+			sctx.translate(-lw / 2, -lh / 2);
+			sctx.drawImage(alpha, 0, 0, sw, sh, mx - lx, my - ly, mw, mh);
+		}
+		else {
+			sctx.drawImage(alpha, 0, 0, sw, sh, mx, my, mw, mh);
+		}
+
+		var imgData = sctx.getImageData(0, 0, W, H);
+		var d = imgData.data;
+		var hasAny = false;
+		for (var k = 0; k < d.length; k += 4) {
+			var a = d[k + 3];
+			if (a > 0) hasAny = true;
+			d[k] = a;
+			d[k + 1] = a;
+			d[k + 2] = a;
+			d[k + 3] = a;
+		}
+		sctx.putImageData(imgData, 0, 0);
+
+		if (!hasAny) {
+			alertify.warning('No visible mask pixels to select.');
+			return;
+		}
+
+		this._apply_selection_mask(scratch, mode);
+	}
+
+	_apply_selection_mask(newMaskCanvas, mode = 'replace') {
+		var baseSel = (app.Layers && app.Layers.Base_selection) ? app.Layers.Base_selection : this.Base_selection;
+		var oldMask = (baseSel && baseSel.has_selection) ? baseSel.clone_mask_canvas() : null;
+		var W = Math.max(1, config.WIDTH || 800);
+		var H = Math.max(1, config.HEIGHT || 600);
+
+		var finalMask = newMaskCanvas;
+
+		if (mode !== 'replace' && oldMask) {
+			var combined = document.createElement('canvas');
+			combined.width = W;
+			combined.height = H;
+			var cctx = combined.getContext('2d', { willReadFrequently: true });
+
+			if (mode === 'add') {
+				cctx.drawImage(oldMask, 0, 0);
+				cctx.globalCompositeOperation = 'source-over';
+				cctx.drawImage(newMaskCanvas, 0, 0);
+			} else if (mode === 'subtract') {
+				cctx.drawImage(oldMask, 0, 0);
+				cctx.globalCompositeOperation = 'destination-out';
+				cctx.drawImage(newMaskCanvas, 0, 0);
+			} else if (mode === 'intersect') {
+				cctx.drawImage(oldMask, 0, 0);
+				cctx.globalCompositeOperation = 'destination-in';
+				cctx.drawImage(newMaskCanvas, 0, 0);
+			}
+
+			// Ensure RGB channels match alpha
+			var cimg = cctx.getImageData(0, 0, W, H);
+			var cd = cimg.data;
+			for (var i = 0; i < cd.length; i += 4) {
+				var ca = cd[i + 3];
+				cd[i] = ca;
+				cd[i + 1] = ca;
+				cd[i + 2] = ca;
+				cd[i + 3] = ca;
+			}
+			cctx.putImageData(cimg, 0, 0);
+			finalMask = combined;
+		}
+
+		app.State.do_action(
+			new app.Actions.Set_selection_action(finalMask, oldMask)
+		);
+
+		if (baseSel) {
+			if (baseSel.is_marching_ants_active()) {
+				baseSel.start_marching_ants();
+			}
+			baseSel.draw_selection();
+		}
 	}
 
 	/**

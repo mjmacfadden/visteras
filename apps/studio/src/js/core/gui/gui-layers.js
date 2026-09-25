@@ -180,6 +180,19 @@ class GUI_layers_class {
 			else if (target.closest('.mask_thumb') != null) {
 				var layer_id = parseInt(target.closest('.mask_thumb').dataset.id);
 				var mask_layer = app.Layers.get_layer(layer_id, true);
+				var is_ctrl = event.ctrlKey || event.metaKey;
+				if (is_ctrl) {
+					event.preventDefault();
+					event.stopPropagation();
+					if (mask_layer && mask_layer.mask) {
+						var mode = 'replace';
+						if (event.shiftKey && event.altKey) mode = 'intersect';
+						else if (event.shiftKey) mode = 'add';
+						else if (event.altKey) mode = 'subtract';
+						_this.select_mask_pixels(mask_layer, mode);
+					}
+					return;
+				}
 				if (mask_layer != null && mask_layer.mask == null) {
 					//Reveal the selection when present, otherwise reveal the whole layer.
 					app.State.do_action(
@@ -243,7 +256,18 @@ class GUI_layers_class {
 			else if (target.closest('.layer_thumb') != null) {
 				var layer_id = parseInt(target.closest('.layer_thumb').dataset.id);
 				var thumb_layer = app.Layers.get_layer(layer_id, true);
-				var multi = event.shiftKey || event.ctrlKey || event.metaKey;
+				var is_ctrl = event.ctrlKey || event.metaKey;
+				if (is_ctrl) {
+					event.preventDefault();
+					event.stopPropagation();
+					var mode = 'replace';
+					if (event.shiftKey && event.altKey) mode = 'intersect';
+					else if (event.shiftKey) mode = 'add';
+					else if (event.altKey) mode = 'subtract';
+					_this.select_layer_pixels(thumb_layer, mode);
+					return;
+				}
+				var multi = event.shiftKey;
 				if (!multi && thumb_layer && thumb_layer.type === 'adjustment') {
 					if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
 						app.GUI.modules['layer/adjustment'].edit(layer_id);
@@ -574,6 +598,30 @@ class GUI_layers_class {
 		});
 
 		document.getElementById('layers_base').addEventListener('contextmenu', function (event) {
+			var thumb = event.target.closest('.layer_thumb');
+			var maskThumb = event.target.closest('.mask_thumb');
+			if (event.ctrlKey && !event.metaKey && (thumb || maskThumb)) {
+				event.preventDefault();
+				event.stopPropagation();
+				var mode = 'replace';
+				if (event.shiftKey && event.altKey) mode = 'intersect';
+				else if (event.shiftKey) mode = 'add';
+				else if (event.altKey) mode = 'subtract';
+				if (thumb) {
+					var layer_id = parseInt(thumb.dataset.id);
+					var thumb_layer = app.Layers.get_layer(layer_id, true);
+					_this.select_layer_pixels(thumb_layer, mode);
+					return;
+				}
+				if (maskThumb) {
+					var layer_id = parseInt(maskThumb.dataset.id);
+					var mask_layer = app.Layers.get_layer(layer_id, true);
+					if (mask_layer && mask_layer.mask) {
+						_this.select_mask_pixels(mask_layer, mode);
+					}
+					return;
+				}
+			}
 			var item = event.target.closest('.item');
 			if (!item)
 				return;
@@ -1150,6 +1198,26 @@ class GUI_layers_class {
 
 
 	/**
+	 * Selects all pixels on a layer (or group).
+	 *
+	 * @param {object} layer
+	 * @param {string} mode 'replace' | 'add' | 'subtract' | 'intersect'
+	 */
+	select_layer_pixels(layer, mode = 'replace') {
+		return this.Base_layers.select_layer_pixels(layer, mode);
+	}
+
+	/**
+	 * Selects all visible (revealed) pixels in a layer mask.
+	 *
+	 * @param {object} layer
+	 * @param {string} mode 'replace' | 'add' | 'subtract' | 'intersect'
+	 */
+	select_mask_pixels(layer, mode = 'replace') {
+		return this.Base_layers.select_mask_pixels(layer, mode);
+	}
+
+	/**
 	 * Layers panel click selection — plain / Shift range / Ctrl|Cmd toggle.
 	 * Updates config.selected_layer_ids; config.layer remains the primary.
 	 */
@@ -1342,7 +1410,7 @@ class GUI_layers_class {
 				if (selected_ids.indexOf(value.id) !== -1 && !(config.layer && value.id == config.layer.id && config.mask_active === true)) {
 					layer_thumb_class += ' active_thumb';
 				}
-				html += '	<span class="' + layer_thumb_class + '" data-id="' + value.id + '">' + this.get_layer_thumb(value) + '</span>';
+				html += '	<span class="' + layer_thumb_class + '" data-id="' + value.id + '" title="' + this.Helper.format_shortcut('Ctrl + Click to select layer pixels') + '">' + this.get_layer_thumb(value) + '</span>';
 
 				if (!is_group(value)) {
 					if (value.mask != null) {
@@ -1363,7 +1431,7 @@ class GUI_layers_class {
 							mask_class += ' disabled_mask';
 						}
 						var mask_thumb = this.Mask.get_mask_thumb(value);
-						html += '	<span class="' + mask_class + '" id="mask_thumb" data-id="' + value.id + '" title="Layer mask" style="background-image: url(\'' + mask_thumb + '\')"></span>';
+						html += '	<span class="' + mask_class + '" id="mask_thumb" data-id="' + value.id + '" title="' + this.Helper.format_shortcut('Layer mask (Ctrl + Click to select visible pixels)') + '" style="background-image: url(\'' + mask_thumb + '\')"></span>';
 					}
 					else {
 						html += '	<span class="mask_thumb empty" id="mask_thumb" data-id="' + value.id + '" title="Add layer mask"></span>';
