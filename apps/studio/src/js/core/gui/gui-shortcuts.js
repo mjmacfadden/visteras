@@ -331,6 +331,17 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Ctrl/Cmd + Alt/Option + R = Select and Mask
+			if ((event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey
+				&& (event.code === 'KeyR' || event.key === 'R' || event.key === 'r' || event.keyCode === 82)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['tools/refine_edge']) {
+					app.GUI.modules['tools/refine_edge'].open();
+				}
+				return;
+			}
+
 			// Ctrl/Cmd + R = Toggle rulers
 			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.code === 'KeyR') {
 				event.preventDefault();
