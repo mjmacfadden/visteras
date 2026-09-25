@@ -527,6 +527,12 @@ const menuDefinition = [
 			{
 				name: 'Subject',
 				target: 'tools/bg_auto.select_subject'
+			},
+			{
+				name: 'Select and Mask',
+				shortcut: 'Ctrl + Alt + R',
+				ellipsis: true,
+				target: 'tools/refine_edge.open'
 			}
 		]
 	},
