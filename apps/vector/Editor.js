@@ -70061,7 +70061,7 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 		t ? (t.x += h.x, t.y += h.y) : t = {
 			x: m + (l.x - f) * g,
 			y: p + (l.y - d) * g
-		}, e ? this.svgCanvas.contentW > parseFloat(getComputedStyle(r, null).width.replace("px", "")) ? (r.scrollLeft = h.x - 10, r.scrollTop = h.y - 10) : (r.scrollLeft = _, r.scrollTop = v) : (r.scrollLeft = t.x - s / 2, r.scrollTop = t.y - c / 2), this.configObj.curConfig.showRulers && (this.rulers.updateRulers(i, n), r.scroll()), this.configObj.urldata.storagePrompt !== !0 && this.storagePromptState === "ignore" && Uz("dialog_box") != null && (Uz("dialog_box").style.display = "none");
+		}, e ? (r.scrollLeft = Math.max(0, Math.round(_)), r.scrollTop = Math.max(0, Math.round(v))) : (r.scrollLeft = Math.round(t.x - s / 2), r.scrollTop = Math.round(t.y - c / 2)), this.configObj.curConfig.showRulers && (this.rulers.updateRulers(i, n), r.scroll()), this.configObj.urldata.storagePrompt !== !0 && this.storagePromptState === "ignore" && Uz("dialog_box") != null && (Uz("dialog_box").style.display = "none");
 	}
 	updateWireFrame() {
 		let e = `

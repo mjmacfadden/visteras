@@ -170,7 +170,7 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=shape-transform-controls-3';
+    import Editor from './Editor.js?v=center-artboard-1';
     import { mountPenTools } from './js/visteras-pen-tools.js';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountSelectionTools } from './js/visteras-selection.js?v=smoke-stroke-align-5';
@@ -685,6 +685,25 @@
       });
 
       // Zoom & Fit actions
+      function centerArtboardInWorkspace() {
+        const workarea = document.getElementById('workarea') || svgEditor?.workarea;
+        const svgcanvas = document.getElementById('svgcanvas');
+        if (!workarea || !svgcanvas) return;
+        const canvasW = parseFloat(svgcanvas.style.width) || svgcanvas.clientWidth || 0;
+        const canvasH = parseFloat(svgcanvas.style.height) || svgcanvas.clientHeight || 0;
+        const areaW = workarea.clientWidth || 0;
+        const areaH = workarea.clientHeight || 0;
+        if (canvasW > 0 && areaW > 0) {
+          workarea.scrollLeft = Math.max(0, Math.round((canvasW - areaW) / 2));
+        }
+        if (canvasH > 0 && areaH > 0) {
+          workarea.scrollTop = Math.max(0, Math.round((canvasH - areaH) / 2));
+        }
+        if (svgEditor?.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
+          svgEditor.rulers.updateRulers();
+        }
+      }
+
       function fitArtboardToWorkspace() {
         if (!svgEditor) return;
         if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
@@ -693,9 +712,10 @@
           svgEditor.zoomChanged(window, 'canvas');
         }
         svgEditor.updateCanvas(!0);
-        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
-          svgEditor.rulers.updateRulers();
-        }
+        centerArtboardInWorkspace();
+        requestAnimationFrame(() => {
+          centerArtboardInWorkspace();
+        });
       }
 
       function zoomTo100Percent() {
@@ -706,9 +726,17 @@
           svgEditor.zoomImage();
         }
         svgEditor.updateCanvas(!0);
-        if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
-          svgEditor.rulers.updateRulers();
-        }
+        centerArtboardInWorkspace();
+        requestAnimationFrame(() => {
+          centerArtboardInWorkspace();
+        });
+      }
+
+      window.centerArtboardInWorkspace = centerArtboardInWorkspace;
+      window.fitArtboardToWorkspace = fitArtboardToWorkspace;
+      if (svgEditor) {
+        svgEditor.centerCanvas = centerArtboardInWorkspace;
+        svgEditor.fitArtboardToWorkspace = fitArtboardToWorkspace;
       }
 
       function zoomIn() {
