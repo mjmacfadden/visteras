@@ -3,7 +3,6 @@ import config from './../config.js';
 import Layer_raster_class from './../modules/layer/raster.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 
-const Layer_raster = new Layer_raster_class();
 
 /**
  * Create a blank full-document image layer above the current selection.
@@ -131,7 +130,7 @@ export function ensure_paint_layer(options = {}) {
 	}
 
 	if (config.layer.type !== 'image') {
-		Layer_raster.raster();
+		new Layer_raster_class().raster();
 	} else {
 		normalize_raster_layer_to_document(config.layer);
 	}
