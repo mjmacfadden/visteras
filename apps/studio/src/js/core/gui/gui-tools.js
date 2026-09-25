@@ -108,6 +108,9 @@ class GUI_tools_class {
 			//bringing this back by default gives bad UX
 			saved_tool = null
 		}
+		if (saved_tool === 'magic_erase') {
+			saved_tool = 'magic_wand';
+		}
 		if (saved_tool != null) {
 			this.active_tool = saved_tool;
 		}
@@ -291,6 +294,9 @@ class GUI_tools_class {
 	 * owner button (e.g. 'pencil' is shown/highlighted via the 'brush' button).
 	 */
 	get_button_id_for_tool(name) {
+		if (name === 'magic_erase') {
+			name = 'magic_wand';
+		}
 		for (var i in config.TOOLS) {
 			var item = config.TOOLS[i];
 			if (item.name == name)
@@ -480,6 +486,9 @@ class GUI_tools_class {
 	}
 
 	async activate_tool(key, options = {}) {
+		if (key === 'magic_erase') {
+			key = 'magic_wand';
+		}
 		return app.State.do_action(
 			new app.Actions.Activate_tool_action(key, false, options),
 			options

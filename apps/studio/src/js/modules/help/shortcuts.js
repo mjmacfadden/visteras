@@ -29,6 +29,7 @@ class Help_shortcuts_class {
 				{title: "L", value: 'Lasso Tool'},
 				{title: "N", value: 'Pencil Tool'},
 				{title: "M", value: 'Selection Tool'},
+				{title: "W", value: 'Magic Wand Tool'},
 				{title: "U", value: 'Rectangle / Shape Tool'},
 				{title: "J", value: 'Desaturate Tool'},
 				{title: "O", value: 'Bulge/Pinch Tool'},

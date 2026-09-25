@@ -39,7 +39,7 @@
     "Box blur": "Doos vervagen",
     "Brightness": "Helderheid",
     "Brightness:": "Helderheid:",
-    "Bulge\/Pinch Tool": "Uitzetten\/knijpen gereedschap",
+    "Bulge/Pinch Tool": "Uitzetten/knijpen gereedschap",
     "Burn": "Branden",
     "Can not animate 1 layer.": "Kan geen 1 laag animeren.",
     "Can not find previous layer.": "Kan de vorige laag niet vinden.",
@@ -187,7 +187,7 @@
     "Green channel:": "Groen kanaal:",
     "Greyscale:": "Grijstinten:",
     "Grid": "Raster",
-    "Grid on\/off": "Raster aan\/uit",
+    "Grid on/off": "Raster aan/uit",
     "Guides": "Gidsen",
     "Guides enabled.": "Gidsen ingeschakeld.",
     "H Radius:": "H Radius:",
@@ -223,7 +223,7 @@
     "Instagram Filters": "Instagram Filters",
     "Invalid Hex Code": "Ongeldige Hex Code",
     "Italiano": "Italiaans",
-    "JPG\/JPEG Format": "JPG\/JPEG Formaat",
+    "JPG/JPEG Format": "JPG/JPEG Formaat",
     "Kerning:": "Kerning:",
     "Key-Points": "Belangrijke Punten",
     "KeyU": "SleutelU",
@@ -406,7 +406,7 @@
     "Shift + S": "Shift + S",
     "Shortcut Key:": "Sneltoets:",
     "Show": "Show",
-    "Show \/ Hide": "Tonen \/ Verbergen",
+    "Show / Hide": "Tonen / Verbergen",
     "Show file size:": "Toon bestandsgrootte:",
     "Simple": "Eenvoudig",
     "Size is too big, max": "Grootte is te groot, maximaal",
@@ -510,5 +510,6 @@
     "Zoom blur": "Zoomvervaging",
     "Zoom in": "Inzoomen",
     "Zoom out": "Uitzoomen",
-    "Zoom:": "Zoom:"
+    "Zoom:": "Zoom:",
+    "Magic Wand Tool": "Toverstaf"
 }

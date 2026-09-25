@@ -144,6 +144,33 @@ config.TOOLS = [
 		},
 	},
 	{
+		name: 'magic_wand',
+		title: 'Magic Wand Tool',
+		on_update: 'on_params_update',
+		attributes: {
+			mode: {
+				title: 'Mode',
+				value: 'New',
+				values: ['New', 'Add', 'Subtract', 'Intersect'],
+			},
+			tolerance: {
+				title: 'Tolerance',
+				value: 32,
+				min: 0,
+				max: 255,
+				step: 1,
+				slider: true,
+			},
+			contiguous: true,
+			anti_aliasing: true,
+			all_layers: false,
+			select_subject: {
+				title: 'Select Subject',
+				value: true,
+			},
+		},
+	},
+	{
 		name: 'brush',
 		on_leave: 'on_leave',
 		attributes: {
@@ -239,15 +266,6 @@ config.TOOLS = [
 				values: ['Auto', 'Transparent', 'Background Color'],
 			},
 			pressure: false,
-		},
-	},
-	{
-		name: 'magic_erase',
-		title: 'Magic Eraser Tool',
-		attributes: {
-			power: 15,
-			anti_aliasing: true,
-			contiguous: false,
 		},
 	},
 	{

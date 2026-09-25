@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Magic Wand Cursor: hotspot at (3, 3) -->
+  <!-- Wand outline for contrast on dark backgrounds -->
+  <path d="M4 2 L2 4 L19 21 L21 19 Z" fill="#000000" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M20 20 L27 27 L25 29 L18 22 Z" fill="#000000" stroke="#000000" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Wand tip (light / metallic) -->
+  <path d="M4 2 L2 4 L12 14 L14 12 Z" fill="#ffffff" stroke="#ffffff" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M12 14 L14 12 L19 21 L21 19 Z" fill="#d0d0d0"/>
+  <!-- Wand handle (dark) -->
+  <path d="M18 22 L20 20 L27 27 L25 29 Z" fill="#202020" stroke="#ffffff" stroke-width="0.8"/>
+  <!-- Sparkles around tip -->
+  <!-- Top sparkle -->
+  <path d="M8 1 L9 3 L11 4 L9 5 L8 7 L7 5 L5 4 L7 3 Z" fill="#ffffff" stroke="#000000" stroke-width="0.75"/>
+  <!-- Left sparkle -->
+  <path d="M1 8 L2 9.5 L3.5 10 L2 10.5 L1 12 L0.5 10.5 L-1 10 L0.5 9.5 Z" fill="#ffffff" stroke="#000000" stroke-width="0.75"/>
+  <!-- Center star near tip -->
+  <path d="M13 5 L14 6.5 L16 7 L14 7.5 L13 9 L12 7.5 L10 7 L12 6.5 Z" fill="#ffffff" stroke="#000000" stroke-width="0.75"/>
+</svg>

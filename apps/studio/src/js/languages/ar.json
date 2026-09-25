@@ -39,7 +39,7 @@
     "Box blur": "مربع طمس",
     "Brightness": "سطوع",
     "Brightness:": "سطوع:",
-    "Bulge\/Pinch Tool": "أداة انتفاخ \/ قرصة",
+    "Bulge/Pinch Tool": "أداة انتفاخ / قرصة",
     "Burn": "حرق",
     "Can not animate 1 layer.": "لا يمكن تحريك طبقة واحدة.",
     "Can not find previous layer.": "لا يمكن العثور على الطبقة السابقة.",
@@ -186,7 +186,7 @@
     "Green channel:": "القناة الخضراء:",
     "Greyscale:": "الرمادي:",
     "Grid": "شبكة",
-    "Grid on\/off": "الشبكة على \/ قبالة",
+    "Grid on/off": "الشبكة على / قبالة",
     "Guides": "خطوط إرشاد",
     "Guides enabled.": "تم تمكين الأدلة.",
     "H Radius:": "نصف قطر H:",
@@ -222,7 +222,7 @@
     "Instagram Filters": "مرشحات Instagram",
     "Invalid Hex Code": "رمز سداسي عشري غير صالح",
     "Italiano": "ايطالي",
-    "JPG\/JPEG Format": "تنسيق JPG \/ JPEG",
+    "JPG/JPEG Format": "تنسيق JPG / JPEG",
     "Kerning:": "تقنين الأحرف:",
     "Key-Points": "النقاط الرئيسية",
     "KeyU": "KeyU",
@@ -405,7 +405,7 @@
     "Shift + S": "التحول + س",
     "Shortcut Key:": "مفتاح الاختصار:",
     "Show": "يعرض",
-    "Show \/ Hide": "اظهر المخفي",
+    "Show / Hide": "اظهر المخفي",
     "Show file size:": "إظهار حجم الملف:",
     "Simple": "بسيط",
     "Size is too big, max": "الحجم كبير جدًا ، الحد الأقصى",
@@ -509,5 +509,6 @@
     "Zoom blur": "زووم طمس",
     "Zoom in": "تكبير",
     "Zoom out": "تصغير",
-    "Zoom:": "تكبير:"
+    "Zoom:": "تكبير:",
+    "Magic Wand Tool": "أداة العصا السحرية"
 }

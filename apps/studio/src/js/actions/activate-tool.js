@@ -11,6 +11,9 @@ export class Activate_tool_action extends Base_action {
 	constructor(key, ignore_same_tool, options = {}) {
 		super('activate_tool', 'Activate Tool');
 		this.ignore_same_tool = !!ignore_same_tool;
+		if (key === 'magic_erase') {
+			key = 'magic_wand';
+		}
 		this.key = key;
 		this.old_key = null;
 		this.tool_leave_actions = null;
@@ -82,13 +85,15 @@ export class Activate_tool_action extends Base_action {
 			const mainWrapper = document.getElementById('main_wrapper');
 			const middleArea = document.querySelector('.middle_area');
 			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
-			const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
+			const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 			let defaultCursor = 'default';
 			if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 				defaultCursor = 'none';
 			} else if (config.TOOL && config.TOOL.name === 'text') {
 				defaultCursor = 'text';
+			} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
+				defaultCursor = "url('images/icons/cursor-magic-wand.svg') 3 3, crosshair";
 			} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 				defaultCursor = 'crosshair';
 			} else if (config.TOOL && config.TOOL.name === 'pick_color') {
@@ -264,13 +269,15 @@ export class Activate_tool_action extends Base_action {
 		const mainWrapper = document.getElementById('main_wrapper');
 		const middleArea = document.querySelector('.middle_area');
 		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
-		const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
+		const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';
 		if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 			defaultCursor = 'none';
 		} else if (config.TOOL && config.TOOL.name === 'text') {
 			defaultCursor = 'text';
+		} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
+			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 3 3, crosshair";
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
 		} else if (config.TOOL && config.TOOL.name === 'pick_color') {
