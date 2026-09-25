@@ -1403,16 +1403,29 @@ class Tools_refineEdge_class {
 					actions.push(new app.Actions.Update_layer_image_action(finalImgCanvas, this._layerId));
 				}
 				if (targetLayer.mask) {
-					actions.push(new app.Actions.Update_layer_mask_image_action(finalMask, this._layerId));
+					actions.push(new app.Actions.Update_layer_mask_image_action(finalMask, this._layerId, this._origMaskCanvas));
 				} else {
 					actions.push(new app.Actions.Add_layer_mask_action(this._layerId, true, false));
 					actions.push(new app.Actions.Update_layer_mask_image_action(finalMask, this._layerId));
 				}
-				await app.State.do_action(
+				if (app.Layers.Base_selection && app.Layers.Base_selection.has_selection && app.Actions.Reset_selection_action) {
+					actions.push(new app.Actions.Reset_selection_action());
+				}
+				const result = await app.State.do_action(
 					new app.Actions.Bundle_action('refine_edge_mask', 'Refine Edge Mask', actions)
 				);
+				if (result && result.status === 'aborted') {
+					console.error('Refine edge action aborted:', result.reason);
+					alertify.error('Error applying refine edge: ' + (result.reason?.message || result.reason));
+					return;
+				}
 			} else if (this._outputTo === 'new_layer_mask') {
-				// Duplicate layer and apply mask
+				// Duplicate layer and apply mask in a clean, single-action bundle
+				const maskCopy = document.createElement('canvas');
+				maskCopy.width = finalMask.width;
+				maskCopy.height = finalMask.height;
+				maskCopy.getContext('2d').drawImage(finalMask, 0, 0);
+
 				const newName = `${targetLayer.name} (Refined)`;
 				const newLayerAction = new app.Actions.Insert_layer_action({
 					name: newName,
@@ -1422,16 +1435,27 @@ class Tools_refineEdge_class {
 					y: targetLayer.y,
 					width: targetLayer.width,
 					height: targetLayer.height,
+					mask: {
+						link: maskCopy,
+						x: targetLayer.x || 0,
+						y: targetLayer.y || 0,
+						width: maskCopy.width,
+						height: maskCopy.height,
+						enabled: true,
+						linked: true,
+					},
 				});
-				await app.State.do_action(newLayerAction);
-				const createdLayer = config.layer;
-				if (createdLayer) {
-					await app.State.do_action(
-						new app.Actions.Bundle_action('refine_edge_new_mask', 'Refine Edge (New Layer with Mask)', [
-							new app.Actions.Add_layer_mask_action(createdLayer.id, true, false),
-							new app.Actions.Update_layer_mask_image_action(finalMask, createdLayer.id),
-						])
-					);
+				const actions = [newLayerAction];
+				if (app.Layers.Base_selection && app.Layers.Base_selection.has_selection && app.Actions.Reset_selection_action) {
+					actions.push(new app.Actions.Reset_selection_action());
+				}
+				const result = await app.State.do_action(
+					new app.Actions.Bundle_action('refine_edge_new_mask', 'Refine Edge (New Layer with Mask)', actions)
+				);
+				if (result && result.status === 'aborted') {
+					console.error('Refine edge action aborted:', result.reason);
+					alertify.error('Error applying refine edge: ' + (result.reason?.message || result.reason));
+					return;
 				}
 			}
 
