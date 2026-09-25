@@ -82,10 +82,15 @@ class Tools_refineEdge_class {
 		this._isDrawing = false;
 		this._strokePoints = [];
 		this._debounceFilterTimer = null;
+		this._undoStack = [];
+		this._redoStack = [];
+		this._activeStrokeMaskSnapshot = null;
+		this._activeStrokeSubtract = false;
 
 		// Bound event listeners for cleanup
 		this._onKeyDown = this._handle_keydown.bind(this);
 		this._onKeyUp = this._handle_keyup.bind(this);
+		this._onBlur = this._handle_blur.bind(this);
 		this._onWheel = this._handle_wheel.bind(this);
 		this._onResize = this._handle_resize.bind(this);
 		this._onPointerMove = this._handle_pointer_move.bind(this);
@@ -171,6 +176,10 @@ class Tools_refineEdge_class {
 		this._decontaminate = false;
 		this._decontaminateAmount = 100;
 		this._outputTo = 'mask';
+		this._undoStack = [];
+		this._redoStack = [];
+		this._activeStrokeMaskSnapshot = null;
+		this._activeStrokeSubtract = false;
 
 		this._recalculate_working_mask();
 
@@ -210,6 +219,14 @@ class Tools_refineEdge_class {
 						<span class="refine-edge__subtitle">${escapeHtml(label)} \u00b7 ${dims}</span>
 					</div>
 					<div class="refine-edge__header-actions">
+						<button type="button" class="refine-edge__btn refine-edge__btn--ghost" id="refine_undo_btn" data-action="undo" title="Undo (Cmd/Ctrl + Z)" disabled>
+							<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px; margin-right: 4px; fill: currentColor;"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C20.88 11.02 17.06 8 12.5 8z"/></svg>
+							Undo
+						</button>
+						<button type="button" class="refine-edge__btn refine-edge__btn--ghost" id="refine_redo_btn" data-action="redo" title="Redo (Cmd/Ctrl + Shift + Z)" disabled>
+							<svg viewBox="0 0 24 24" width="14" height="14" style="vertical-align: -2px; margin-right: 4px; fill: currentColor;"><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.56 0-8.38 3.02-9.57 7.22l2.37.78c1.05-3.19 4.06-5.5 7.6-5.5 1.96 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+							Redo
+						</button>
 						<button type="button" class="refine-edge__btn refine-edge__btn--ghost" data-action="reset">Reset</button>
 						<button type="button" class="refine-edge__btn" data-action="cancel">Cancel</button>
 						<button type="button" class="refine-edge__btn refine-edge__btn--primary" data-action="apply">OK</button>
@@ -230,8 +247,13 @@ class Tools_refineEdge_class {
 						<input type="range" class="refine-edge__range-input" id="refine_brush_size_range" min="1" max="250" value="${this._brushSize}">
 						<input type="number" class="refine-edge__num-input" id="refine_brush_size_num" min="1" max="500" value="${this._brushSize}"> px
 					</div>
+					<div class="refine-edge__opt-group" id="refine_brush_hardness_group" style="${this._activeTool === 'brush' ? '' : 'display: none;'}">
+						<span class="refine-edge__opt-label">Hardness:</span>
+						<input type="range" class="refine-edge__range-input" id="refine_brush_hardness_range" min="0" max="100" value="${this._brushHardness}">
+						<input type="number" class="refine-edge__num-input" id="refine_brush_hardness_num" min="0" max="100" value="${this._brushHardness}"> %
+					</div>
 					<div class="refine-edge__opt-hint">
-						<span>Brush over hair/fur edges \u00b7 <b>[</b> <b>]</b> to resize \u00b7 <b>X</b> to swap +/−</span>
+						<span>Hold <b>Option/Alt</b> to invert mode \u00b7 <b>[ ]</b> size \u00b7 <b>Shift [ ]</b> hardness \u00b7 <b>X</b> swap +/−</span>
 					</div>
 				</div>
 
@@ -240,22 +262,31 @@ class Tools_refineEdge_class {
 					<!-- Left Toolbar -->
 					<div class="refine-edge__toolbar" id="refine_toolbar">
 						<button type="button" class="refine-edge__tool-btn active" data-tool="refine_edge" title="Refine Edge Brush Tool (R)">
-							<svg viewBox="0 0 24 24" width="20" height="20">
-								<!-- Photoshop Refine Edge Brush Icon -->
-								<path d="M20.2 3.8a1.6 1.6 0 0 0-2.3 0l-4.7 4.7 2.3 2.3 4.7-4.7a1.6 1.6 0 0 0 0-2.3z" fill="currentColor"/>
-								<path d="M12.4 9.3l2.3 2.3c-.6 1.4-1.5 2.5-2.7 3.3-1.3.9-2.7 1.3-4.2 1.4l-.2-.2c.1-1.5.5-2.9 1.4-4.2.8-1.2 1.9-2.1 3.4-2.6z" fill="currentColor"/>
-								<path d="M7.1 6.8c-.8.8-1.4 1.8-1.8 2.8.6-.2 1.3-.3 1.9-.3-.5.7-.9 1.6-1.1 2.5.6-.2 1.3-.3 1.9-.2-.7.8-1.2 1.8-1.4 2.8.6-.2 1.3-.2 1.9 0-.9 1.2-1.3 2.6-1.1 4 .8-.3 1.5-.7 2.1-1.3 1.2-.9 2.2-2.1 2.8-3.4l-1.1-.7c-.5 1-1.3 1.9-2.3 2.6-.1-.7.1-1.4.5-2 .5-.8 1.3-1.5 2.2-2l-1-.9c-.7.5-1.3 1.1-1.8 1.8 0-.7.2-1.3.6-1.9.5-.7 1.2-1.3 2-1.7l-.9-1c-.8.5-1.5 1.1-2 1.8 0-.7.3-1.4.7-2 .4-.6 1-1.1 1.7-1.5l-.8-1.3z" fill="currentColor"/>
+							<svg viewBox="0 0 24 24" width="24" height="24">
+								<!-- Angled Brush Handle -->
+								<path d="M15.5 9.5l4.8-4.8a1.6 1.6 0 0 0-2.3-2.3l-4.8 4.8 2.3 2.3z" fill="currentColor"/>
+								<!-- Brush Bristle Tip -->
+								<path d="M14.2 10.8c-.6 1.8-1.7 3.3-3.1 4.5-1.7 1.4-3.8 2-6 1.8.4-2.1 1.3-4.1 2.8-5.6 1.4-1.3 3.1-2.2 4.9-2.4l1.4 1.7z" fill="currentColor"/>
+								<!-- 3 Whisker Strands Sweeping Arc -->
+								<path d="M9.8 6.8c-.9 1-1.7 2.2-2.2 3.5l1.4 1.4c.4-.9.9-1.8 1.7-2.5l-.9-2.4zm-2.7 2.3c-.8 1.1-1.4 2.3-1.8 3.7l1.4 1.3c.3-1 .8-2 1.5-2.9l-1.1-2.1zm-2.3 3.1c-.5 1.2-.8 2.5-.9 3.9l1.4 1.1c.1-1.1.4-2.1.9-3.1l-1.4-1.9zm-1.1 4.3c-.2 1.7.2 3.5 1.1 4.9 1.4 1.9 3.6 3.1 6 3.1 1.7 0 3.5-.6 4.8-1.7l-.9-1.3c-1.1.9-2.5 1.4-3.9 1.4-1.9 0-3.6-.9-4.7-2.4-.7-1.1-.9-2.4-.8-3.7l-1.6-.3z" fill="currentColor"/>
 							</svg>
 						</button>
 						<button type="button" class="refine-edge__tool-btn" data-tool="brush" title="Brush Tool (B) - Touch up mask">
-							<svg viewBox="0 0 24 24"><path d="M20.7 5.7c.4-.4.4-1 0-1.4l-2-2c-.4-.4-1-.4-1.4 0l-9.1 9.1L6 14.8V21h6.2l3.4-2.2 5.1-13.1zM11.5 19H8v-3.5l1.6-1.6 3.5 3.5-1.6 1.6z"/></svg>
+							<svg viewBox="0 0 24 24" width="24" height="24">
+								<path d="M19.7 4.3a2 2 0 0 0-2.8 0l-7.2 7.2 2.8 2.8 7.2-7.2a2 2 0 0 0 0-2.8z" fill="currentColor"/>
+								<path d="M8.6 13.6l2.8 2.8c-.8.8-1.8 1.5-2.8 2-1.3.6-2.7.8-4 .6-.2-1.3 0-2.7.6-4 .5-1.1 1.2-2.1 2-2.8l1.4 1.4z" fill="currentColor"/>
+							</svg>
 						</button>
 						<div class="refine-edge__tool-sep"></div>
 						<button type="button" class="refine-edge__tool-btn" data-tool="hand" title="Hand Tool (H / Space)">
-							<svg viewBox="0 0 24 24"><path d="M18 9V4a2 2 0 0 0-4 0v5h-1V2a2 2 0 0 0-4 0v7H8V5a2 2 0 0 0-4 0v10a7 7 0 0 0 14 0V9z"/></svg>
+							<svg viewBox="0 0 24 24" width="24" height="24">
+								<path d="M18 10V5a2 2 0 0 0-4 0v5h-1V2a2 2 0 0 0-4 0v8H8V4a2 2 0 0 0-4 0v11a7 7 0 0 0 14 0v-5z" fill="currentColor"/>
+							</svg>
 						</button>
 						<button type="button" class="refine-edge__tool-btn" data-tool="zoom" title="Zoom Tool (Z / Alt-click to zoom out)">
-							<svg viewBox="0 0 24 24"><path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm1-7H9v2h2v2h1v-2h2V9h-2V7z"/></svg>
+							<svg viewBox="0 0 24 24" width="24" height="24">
+								<path d="M15.5 14h-.8l-.3-.3a6.5 6.5 0 1 0-.7.7l.3.3v.8l5 5 1.5-1.5-5-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9zm1-7H9v2h2v2h1v-2h2V9h-2V7z" fill="currentColor"/>
+							</svg>
 						</button>
 					</div>
 
@@ -409,6 +440,12 @@ class Tools_refineEdge_class {
 		root.querySelectorAll('[data-action="reset"]').forEach(btn => {
 			btn.addEventListener('click', () => this.reset());
 		});
+		root.querySelectorAll('[data-action="undo"]').forEach(btn => {
+			btn.addEventListener('click', () => this.undo());
+		});
+		root.querySelectorAll('[data-action="redo"]').forEach(btn => {
+			btn.addEventListener('click', () => this.redo());
+		});
 
 		// 3. Toolbar tool selection
 		root.querySelectorAll('#refine_toolbar [data-tool]').forEach(btn => {
@@ -425,6 +462,7 @@ class Tools_refineEdge_class {
 				root.querySelectorAll('#refine_tool_mode_seg button').forEach(b => b.classList.remove('active'));
 				btn.classList.add('active');
 				this._toolMode = btn.dataset.mode;
+				this._update_cursor_ring();
 			});
 		});
 
@@ -446,6 +484,10 @@ class Tools_refineEdge_class {
 		linkDual('refine_brush_size_range', 'refine_brush_size_num', val => {
 			this._brushSize = Math.max(1, Math.min(500, val));
 			this._update_cursor_ring();
+		});
+
+		linkDual('refine_brush_hardness_range', 'refine_brush_hardness_num', val => {
+			this._brushHardness = Math.max(0, Math.min(100, val));
 		});
 
 		linkDual('refine_view_opacity_range', 'refine_view_opacity_num', val => {
@@ -517,12 +559,14 @@ class Tools_refineEdge_class {
 		window.addEventListener('mouseup', this._onPointerUp);
 		this._viewport.addEventListener('wheel', this._onWheel, { passive: false });
 
-		// 9. Global Keyboard Listeners
+		// 9. Global Keyboard & Window Listeners
 		window.addEventListener('keydown', this._onKeyDown, true);
 		window.addEventListener('keyup', this._onKeyUp, true);
+		window.addEventListener('blur', this._onBlur);
 		window.addEventListener('resize', this._onResize);
 
 		this._update_cursor_ring();
+		this._update_undo_redo_ui();
 	}
 
 	_update_ui_slider_values() {
@@ -545,6 +589,10 @@ class Tools_refineEdge_class {
 	_set_active_tool(tool) {
 		this._activeTool = tool;
 		this._update_viewport_cursor();
+		const hardGroup = document.getElementById('refine_brush_hardness_group');
+		if (hardGroup) {
+			hardGroup.style.display = (tool === 'brush') ? 'flex' : 'none';
+		}
 	}
 
 	_update_viewport_cursor() {
@@ -571,10 +619,27 @@ class Tools_refineEdge_class {
 		this._cursorRing.style.width = diameter + 'px';
 		this._cursorRing.style.height = diameter + 'px';
 
+		if (this._is_subtract_mode()) {
+			this._cursorRing.classList.add('is-subtract');
+		} else {
+			this._cursorRing.classList.remove('is-subtract');
+		}
+
 		if (e) {
 			const rect = this._viewport.getBoundingClientRect();
 			this._cursorRing.style.left = (e.clientX - rect.left) + 'px';
 			this._cursorRing.style.top = (e.clientY - rect.top) + 'px';
+		}
+	}
+
+	_update_undo_redo_ui() {
+		const uBtn = document.getElementById('refine_undo_btn');
+		const rBtn = document.getElementById('refine_redo_btn');
+		if (uBtn) {
+			uBtn.disabled = this._undoStack.length === 0;
+		}
+		if (rBtn) {
+			rBtn.disabled = this._redoStack.length === 0;
 		}
 	}
 
@@ -671,6 +736,15 @@ class Tools_refineEdge_class {
 		const pt = this._get_canvas_coords(e);
 		this._isDrawing = true;
 
+		const isSubtract = (e.altKey || this._altHeld) ? (this._toolMode !== 'subtract') : (this._toolMode === 'subtract');
+		this._activeStrokeSubtract = isSubtract;
+
+		// Snapshot base mask for undo
+		this._activeStrokeMaskSnapshot = document.createElement('canvas');
+		this._activeStrokeMaskSnapshot.width = this._width;
+		this._activeStrokeMaskSnapshot.height = this._height;
+		this._activeStrokeMaskSnapshot.getContext('2d').drawImage(this._baseMaskCanvas, 0, 0);
+
 		if (this._activeTool === 'refine_edge') {
 			this._strokePoints = [pt];
 			this._apply_refine_brush_dab(pt, null);
@@ -718,6 +792,17 @@ class Tools_refineEdge_class {
 			this._finish_refine_brush_stroke();
 		}
 
+		// Commit stroke snapshot to undo stack
+		if (this._activeStrokeMaskSnapshot) {
+			this._undoStack.push(this._activeStrokeMaskSnapshot);
+			if (this._undoStack.length > 30) {
+				this._undoStack.shift();
+			}
+			this._redoStack = [];
+			this._activeStrokeMaskSnapshot = null;
+			this._update_undo_redo_ui();
+		}
+
 		this._strokePoints = [];
 		this._recalculate_working_mask();
 		this._render_preview();
@@ -728,7 +813,36 @@ class Tools_refineEdge_class {
 	// -------------------------------------------------------------------------
 
 	_is_subtract_mode() {
+		if (this._isDrawing) {
+			return this._activeStrokeSubtract;
+		}
 		return (this._toolMode === 'subtract') !== (this._altHeld);
+	}
+
+	_get_brush_dab(size, hardness, isSub) {
+		const rad = size / 2;
+		const d = Math.max(2, Math.ceil(size));
+		const canvas = document.createElement('canvas');
+		canvas.width = d;
+		canvas.height = d;
+		const ctx = canvas.getContext('2d');
+		const cx = d / 2;
+		const cy = d / 2;
+
+		const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+		const innerStop = Math.max(0, Math.min(0.99, hardness / 100));
+		const rgb = isSub ? '0, 0, 0' : '255, 255, 255';
+
+		grad.addColorStop(0, `rgba(${rgb}, 1)`);
+		grad.addColorStop(innerStop, `rgba(${rgb}, 1)`);
+		grad.addColorStop(1, `rgba(${rgb}, 0)`);
+
+		ctx.fillStyle = grad;
+		ctx.beginPath();
+		ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+		ctx.fill();
+
+		return canvas;
 	}
 
 	_apply_standard_brush_dab(pt, prevPt) {
@@ -737,25 +851,51 @@ class Tools_refineEdge_class {
 		const isSub = this._is_subtract_mode();
 		const color = isSub ? '#000000' : '#ffffff';
 
-		ctx.save();
-		ctx.globalCompositeOperation = 'source-over';
-		ctx.fillStyle = color;
-		ctx.strokeStyle = color;
-		ctx.lineWidth = rad * 2;
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
+		if (this._brushHardness >= 98) {
+			ctx.save();
+			ctx.globalCompositeOperation = 'source-over';
+			ctx.fillStyle = color;
+			ctx.strokeStyle = color;
+			ctx.lineWidth = rad * 2;
+			ctx.lineCap = 'round';
+			ctx.lineJoin = 'round';
 
-		if (prevPt) {
-			ctx.beginPath();
-			ctx.moveTo(prevPt.x, prevPt.y);
-			ctx.lineTo(pt.x, pt.y);
-			ctx.stroke();
+			if (prevPt) {
+				ctx.beginPath();
+				ctx.moveTo(prevPt.x, prevPt.y);
+				ctx.lineTo(pt.x, pt.y);
+				ctx.stroke();
+			} else {
+				ctx.beginPath();
+				ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.restore();
 		} else {
-			ctx.beginPath();
-			ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
-			ctx.fill();
+			const dab = this._get_brush_dab(this._brushSize, this._brushHardness, isSub);
+			const d = dab.width;
+			const r = d / 2;
+
+			ctx.save();
+			ctx.globalCompositeOperation = 'source-over';
+
+			if (!prevPt) {
+				ctx.drawImage(dab, pt.x - r, pt.y - r);
+			} else {
+				const dx = pt.x - prevPt.x;
+				const dy = pt.y - prevPt.y;
+				const dist = Math.hypot(dx, dy);
+				const step = Math.max(1, rad * 0.25);
+				const steps = Math.ceil(dist / step);
+				for (let s = 1; s <= steps; s++) {
+					const t = s / steps;
+					const ix = prevPt.x + dx * t;
+					const iy = prevPt.y + dy * t;
+					ctx.drawImage(dab, ix - r, iy - r);
+				}
+			}
+			ctx.restore();
 		}
-		ctx.restore();
 
 		this._recalculate_working_mask();
 		this._render_preview();
@@ -1008,18 +1148,58 @@ class Tools_refineEdge_class {
 			return;
 		}
 
+		const isMac = (navigator.platform && navigator.platform.toUpperCase().indexOf('MAC') >= 0) ||
+			(navigator.userAgent && navigator.userAgent.toUpperCase().indexOf('MAC') >= 0);
+		const cmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+		// 1. Undo / Redo shortcuts
+		if (cmdOrCtrl && !e.altKey && e.code === 'KeyZ') {
+			e.preventDefault();
+			e.stopPropagation();
+			if (e.shiftKey) {
+				this.redo();
+			} else {
+				this.undo();
+			}
+			return;
+		} else if (cmdOrCtrl && !e.altKey && e.code === 'KeyY') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.redo();
+			return;
+		}
+
+		// 2. Brush size ([ / ]) & Hardness (Shift + [ / ])
 		if (e.code === 'BracketLeft') {
 			e.preventDefault();
-			this._brushSize = Math.max(1, this._brushSize - (e.shiftKey ? 10 : 5));
-			this._update_ui_brush_values();
+			if (e.shiftKey) {
+				this._brushHardness = Math.max(0, this._brushHardness - 25);
+				this._update_ui_brush_values();
+			} else {
+				this._brushSize = Math.max(1, this._brushSize - 5);
+				this._update_ui_brush_values();
+			}
 		} else if (e.code === 'BracketRight') {
 			e.preventDefault();
-			this._brushSize = Math.min(500, this._brushSize + (e.shiftKey ? 10 : 5));
-			this._update_ui_brush_values();
+			if (e.shiftKey) {
+				this._brushHardness = Math.min(100, this._brushHardness + 25);
+				this._update_ui_brush_values();
+			} else {
+				this._brushSize = Math.min(500, this._brushSize + 5);
+				this._update_ui_brush_values();
+			}
 		} else if (e.code === 'KeyX') {
 			e.preventDefault();
 			this._toolMode = this._toolMode === 'add' ? 'subtract' : 'add';
 			this._update_tool_mode_ui();
+			this._update_cursor_ring();
+		} else if (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight') {
+			if (!this._altHeld) {
+				this._altHeld = true;
+				this._update_tool_mode_ui();
+				this._update_viewport_cursor();
+				this._update_cursor_ring();
+			}
 		} else if (e.code === 'KeyP') {
 			e.preventDefault();
 			this._showOriginal = !this._showOriginal;
@@ -1032,14 +1212,11 @@ class Tools_refineEdge_class {
 			this._activate_tool_by_id('brush');
 		} else if (e.code === 'KeyH') {
 			this._activate_tool_by_id('hand');
-		} else if (e.code === 'KeyZ') {
+		} else if (e.code === 'KeyZ' && !cmdOrCtrl) {
 			this._activate_tool_by_id('zoom');
 		} else if (e.code === 'Space') {
 			e.preventDefault();
 			this._spaceHeld = true;
-			this._update_viewport_cursor();
-		} else if (e.key === 'Alt') {
-			this._altHeld = true;
 			this._update_viewport_cursor();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
@@ -1054,10 +1231,20 @@ class Tools_refineEdge_class {
 		if (e.code === 'Space') {
 			this._spaceHeld = false;
 			this._update_viewport_cursor();
-		} else if (e.key === 'Alt') {
+		} else if (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight') {
 			this._altHeld = false;
+			this._update_tool_mode_ui();
 			this._update_viewport_cursor();
+			this._update_cursor_ring();
 		}
+	}
+
+	_handle_blur() {
+		this._altHeld = false;
+		this._spaceHeld = false;
+		this._update_tool_mode_ui();
+		this._update_viewport_cursor();
+		this._update_cursor_ring();
 	}
 
 	_update_ui_brush_values() {
@@ -1065,14 +1252,20 @@ class Tools_refineEdge_class {
 		const n = document.getElementById('refine_brush_size_num');
 		if (r) r.value = this._brushSize;
 		if (n) n.value = this._brushSize;
+		const hr = document.getElementById('refine_brush_hardness_range');
+		const hn = document.getElementById('refine_brush_hardness_num');
+		if (hr) hr.value = this._brushHardness;
+		if (hn) hn.value = this._brushHardness;
 		this._update_cursor_ring();
 	}
 
 	_update_tool_mode_ui() {
 		const root = document.getElementById('refine_tool_mode_seg');
 		if (!root) return;
+		const isSub = this._is_subtract_mode();
 		root.querySelectorAll('button').forEach(b => {
-			b.classList.toggle('active', b.dataset.mode === this._toolMode);
+			const mode = b.getAttribute('data-mode');
+			b.classList.toggle('active', isSub ? mode === 'subtract' : mode === 'add');
 		});
 	}
 
@@ -1082,10 +1275,61 @@ class Tools_refineEdge_class {
 	}
 
 	// -------------------------------------------------------------------------
+	// Undo / Redo
+	// -------------------------------------------------------------------------
+
+	undo() {
+		if (this._undoStack.length === 0) return;
+
+		const currentSnapshot = document.createElement('canvas');
+		currentSnapshot.width = this._width;
+		currentSnapshot.height = this._height;
+		currentSnapshot.getContext('2d').drawImage(this._baseMaskCanvas, 0, 0);
+		this._redoStack.push(currentSnapshot);
+
+		const prevSnapshot = this._undoStack.pop();
+		const ctx = this._baseMaskCanvas.getContext('2d');
+		ctx.clearRect(0, 0, this._width, this._height);
+		ctx.drawImage(prevSnapshot, 0, 0);
+
+		this._recalculate_working_mask();
+		this._render_preview();
+		this._update_undo_redo_ui();
+	}
+
+	redo() {
+		if (this._redoStack.length === 0) return;
+
+		const currentSnapshot = document.createElement('canvas');
+		currentSnapshot.width = this._width;
+		currentSnapshot.height = this._height;
+		currentSnapshot.getContext('2d').drawImage(this._baseMaskCanvas, 0, 0);
+		this._undoStack.push(currentSnapshot);
+
+		const nextSnapshot = this._redoStack.pop();
+		const ctx = this._baseMaskCanvas.getContext('2d');
+		ctx.clearRect(0, 0, this._width, this._height);
+		ctx.drawImage(nextSnapshot, 0, 0);
+
+		this._recalculate_working_mask();
+		this._render_preview();
+		this._update_undo_redo_ui();
+	}
+
+	// -------------------------------------------------------------------------
 	// Teardown & Reset
 	// -------------------------------------------------------------------------
 
 	reset() {
+		// Snapshot before reset so user can undo accidental reset
+		const snapshot = document.createElement('canvas');
+		snapshot.width = this._width;
+		snapshot.height = this._height;
+		snapshot.getContext('2d').drawImage(this._baseMaskCanvas, 0, 0);
+		this._undoStack.push(snapshot);
+		this._redoStack = [];
+		this._update_undo_redo_ui();
+
 		this._feather = 0;
 		this._shiftEdge = 0;
 		this._contrast = 0;
@@ -1111,6 +1355,7 @@ class Tools_refineEdge_class {
 		window.removeEventListener('mouseup', this._onPointerUp);
 		window.removeEventListener('keydown', this._onKeyDown, true);
 		window.removeEventListener('keyup', this._onKeyUp, true);
+		window.removeEventListener('blur', this._onBlur);
 		window.removeEventListener('resize', this._onResize);
 	}
 

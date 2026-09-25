@@ -357,52 +357,52 @@
 
 /* Left Toolbar */
 .refine-edge__toolbar {
-	width: 44px;
+	width: 52px;
 	background: #1f1f1f;
 	border-right: 1px solid #333333;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	padding: 8px 0;
-	gap: 6px;
-	flex: 0 0 auto;
+	padding: 10px 0;
+	gap: 8px;
+	flex: 0 0 52px;
 	z-index: 10;
 }
 
 .refine-edge__tool-btn {
-	width: 32px;
-	height: 32px;
+	width: 40px;
+	height: 40px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	background: transparent;
 	border: 1px solid transparent;
-	border-radius: 4px;
-	color: #9e9e9e;
+	border-radius: 6px;
+	color: #d2d2d2;
 	cursor: pointer;
 	position: relative;
-	transition: background 0.1s ease, color 0.1s ease;
+	transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .refine-edge__tool-btn:hover {
-	background: #2d2d2d;
-	color: #e0e0e0;
+	background: #2f2f2f;
+	color: #ffffff;
 }
 
 .refine-edge__tool-btn.active {
-	background: #383838;
+	background: #2b3948;
 	border-color: #1473e6;
-	color: #1473e6;
+	color: #3795ff;
 }
 
 .refine-edge__tool-btn svg {
-	width: 18px;
-	height: 18px;
+	width: 24px;
+	height: 24px;
 	fill: currentColor;
 }
 
 .refine-edge__tool-sep {
-	width: 24px;
+	width: 28px;
 	height: 1px;
 	background: #333;
 	margin: 4px 0;
@@ -464,6 +464,30 @@
 	transform: translate(-50%, -50%);
 	display: none;
 	z-index: 50;
+}
+
+.refine-edge__cursor-ring::before {
+	content: '+';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: 11px;
+	line-height: 1;
+	color: rgba(255, 255, 255, 0.95);
+	text-shadow: 0 0 2px rgba(0, 0, 0, 0.95);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-weight: 700;
+	pointer-events: none;
+}
+
+.refine-edge__cursor-ring.is-subtract {
+	border-color: rgba(255, 90, 90, 0.9);
+}
+
+.refine-edge__cursor-ring.is-subtract::before {
+	content: '−';
+	color: rgba(255, 110, 110, 0.95);
 }
 
 /* Viewport Bottom Floating Status / Zoom Bar */
