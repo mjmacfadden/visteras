@@ -1115,6 +1115,157 @@ class Base_selection_class {
 		this.update_mask_state();
 	}
 
+	/**
+	 * Expands (radius > 0) or contracts (radius < 0) an 8-bit selection mask by the specified radius.
+	 * Uses separable Euclidean distance transform (Felzenszwalb-Huttenlocher) for exact,
+	 * circular expansion/contraction in O(W * H) time with anti-aliasing.
+	 *
+	 * @param {HTMLCanvasElement} srcCanvas - Source mask canvas
+	 * @param {number} radius - Pixel radius to expand (positive) or contract (negative)
+	 * @returns {HTMLCanvasElement} New canvas containing the expanded/contracted mask
+	 */
+	expand_mask(srcCanvas, radius) {
+		const src = srcCanvas || this.mask_canvas;
+		const W = Math.max(1, src.width);
+		const H = Math.max(1, src.height);
+		const outCanvas = document.createElement('canvas');
+		outCanvas.width = W;
+		outCanvas.height = H;
+		const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+
+		const r = Math.round(Number(radius) || 0);
+		if (r === 0) {
+			outCtx.drawImage(src, 0, 0);
+			return outCanvas;
+		}
+
+		const srcCtx = (src === this.mask_canvas && this.mask_ctx)
+			? this.mask_ctx
+			: src.getContext('2d', { willReadFrequently: true });
+		const srcImg = srcCtx.getImageData(0, 0, W, H);
+		const srcData = srcImg.data;
+
+		// Extract alpha / grayscale intensity into single channel
+		const N = W * H;
+		const alpha = new Uint8Array(N);
+		let hasAny = false;
+		for (let i = 0, p = 0; i < N; i++, p += 4) {
+			const a = Math.max(srcData[p], srcData[p + 3]);
+			alpha[i] = a;
+			if (a > 0) hasAny = true;
+		}
+
+		if (!hasAny) {
+			return outCanvas;
+		}
+
+		const isContract = r < 0;
+		const absR = Math.abs(r);
+
+		// Initialize distance grid
+		const grid = new Float32Array(N);
+		const INF = 1e9;
+
+		for (let i = 0; i < N; i++) {
+			let val = alpha[i];
+			if (isContract) {
+				val = 255 - val;
+			}
+			if (val >= 128) {
+				grid[i] = 0;
+			} else if (val > 0) {
+				const frac = (128 - val) / 128;
+				grid[i] = frac * frac;
+			} else {
+				grid[i] = INF;
+			}
+		}
+
+		// 1D squared distance transform (Felzenszwalb-Huttenlocher)
+		function dt1d(f, n) {
+			const d = new Float32Array(n);
+			const v = new Int32Array(n);
+			const z = new Float32Array(n + 1);
+			let k = 0;
+			v[0] = 0;
+			z[0] = -Infinity;
+			z[1] = Infinity;
+			for (let q = 1; q < n; q++) {
+				let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+				while (s <= z[k]) {
+					k--;
+					s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+				}
+				k++;
+				v[k] = q;
+				z[k] = s;
+				z[k + 1] = Infinity;
+			}
+			k = 0;
+			for (let q = 0; q < n; q++) {
+				while (z[k + 1] < q) k++;
+				const dx = q - v[k];
+				d[q] = dx * dx + f[v[k]];
+			}
+			return d;
+		}
+
+		// Column pass
+		const col = new Float32Array(H);
+		for (let x = 0; x < W; x++) {
+			for (let y = 0; y < H; y++) {
+				col[y] = grid[y * W + x];
+			}
+			const d = dt1d(col, H);
+			for (let y = 0; y < H; y++) {
+				grid[y * W + x] = d[y];
+			}
+		}
+
+		// Row pass
+		const row = new Float32Array(W);
+		for (let y = 0; y < H; y++) {
+			for (let x = 0; x < W; x++) {
+				row[x] = grid[y * W + x];
+			}
+			const d = dt1d(row, W);
+			for (let x = 0; x < W; x++) {
+				grid[y * W + x] = d[x];
+			}
+		}
+
+		// Output image data
+		const outImg = outCtx.createImageData(W, H);
+		const outData = outImg.data;
+
+		for (let i = 0, p = 0; i < N; i++, p += 4) {
+			const dist = Math.sqrt(grid[i]);
+			let cov = 0;
+			if (dist <= absR - 0.5) {
+				cov = 255;
+			} else if (dist < absR + 0.5) {
+				cov = Math.min(255, Math.max(0, Math.round(255 * (absR + 0.5 - dist))));
+			}
+
+			const orig = alpha[i];
+			let finalVal;
+			if (isContract) {
+				const res = 255 - cov;
+				finalVal = Math.min(orig, res);
+			} else {
+				finalVal = Math.max(orig, cov);
+			}
+
+			outData[p] = finalVal;
+			outData[p + 1] = finalVal;
+			outData[p + 2] = finalVal;
+			outData[p + 3] = finalVal;
+		}
+
+		outCtx.putImageData(outImg, 0, 0);
+		return outCanvas;
+	}
+
 	draw_marching_ants(target_ctx = null) {
 		var ctx = target_ctx || this.ctx;
 		var Z = config.ZOOM || 1;
