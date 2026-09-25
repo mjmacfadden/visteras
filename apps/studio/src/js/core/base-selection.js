@@ -1672,7 +1672,7 @@ class Base_selection_class {
 		} else if (config.TOOL && config.TOOL.name === 'pick_color') {
 			defaultCursor = "url('images/icons/cursor-eyedropper.svg') 2 22, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'pen') {
-			defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
+			defaultCursor = "url('images/icons/cursor-pen.svg') 4 4, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 			defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
 		}

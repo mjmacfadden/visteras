@@ -1715,7 +1715,7 @@ crop handles) win over the default crosshair - not !important so inline styles a
 }
 .middle_area.tool-pen #main_wrapper,
 .middle_area.tool-pen #main_wrapper * {
-	cursor: url('../images/icons/cursor-pen.svg') 1 1, crosshair !important;
+	cursor: url('../images/icons/cursor-pen.svg') 4 4, crosshair !important;
 }
 .middle_area.tool-fill #main_wrapper,
 .middle_area.tool-fill #main_wrapper * {
