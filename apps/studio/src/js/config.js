@@ -249,6 +249,73 @@ config.TOOLS = [
 		},
 	},
 	{
+		name: 'crop',
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
+		on_leave: 'on_leave',
+		attributes: {
+			aspect: {
+				value: 'Free',
+				values: ['Free', 'Original', '1:1', '4:5', '5:4', '16:9', '9:16', '3:2', '2:3', 'Custom'],
+			},
+			ratio_w: {
+				title: 'W',
+				value: 1,
+				min: 1,
+				visible: false,
+			},
+			ratio_h: {
+				title: 'H',
+				value: 1,
+				min: 1,
+				visible: false,
+			},
+			guides: {
+				value: 'Rule of Thirds',
+				values: ['Rule of Thirds', 'Grid', 'Diagonal', 'None'],
+			},
+			straighten: {
+				value: false,
+				icon: 'rotate.svg',
+			},
+			angle: {
+				value: 0,
+				min: -45,
+				max: 45,
+				step: 0.1,
+			},
+			commit_crop: true,
+		},
+	},
+	{
+		name: 'pick_color',
+		attributes: {
+			global: false,
+		},
+	},
+	{
+		name: 'spot_heal',
+		title: 'Spot Healing Brush',
+		on_leave: 'on_leave',
+		attributes: {
+			size: 30,
+			hardness: {
+				value: 50,
+				min: 0,
+				max: 100,
+				step: 1,
+				slider: true,
+			},
+			strength: {
+				value: 100,
+				min: 1,
+				max: 100,
+				step: 1,
+				slider: true,
+			},
+		},
+	},
+	{
 		name: 'brush',
 		on_leave: 'on_leave',
 		attributes: {
@@ -316,9 +383,15 @@ config.TOOLS = [
 		},
 	},
 	{
-		name: 'pick_color',
+		name: 'clone',
+		on_leave: 'on_leave',
 		attributes: {
-			global: false,
+			size: 30,
+			anti_aliasing: true,
+			source_layer: {
+				value: 'All Layers',
+				values: ['All Layers', 'Current', 'Previous'],
+			},
 		},
 	},
 	{
@@ -345,6 +418,261 @@ config.TOOLS = [
 			},
 			pressure: false,
 		},
+	},
+	{
+		name: 'gradient',
+		title: 'Gradient Tool',
+		on_activate: 'on_activate',
+		on_update: 'on_params_update',
+		attributes: {
+			style: {
+				title: 'Style',
+				value: 'Linear',
+				values: ['Linear', 'Radial'],
+			},
+			color_1: '#000000',
+			color_2: 'none',
+			alpha_1: {
+				title: 'Opacity 1',
+				value: 100,
+				min: 0,
+				max: 100,
+				step: 1,
+				slider: true,
+			},
+			alpha_2: {
+				title: 'Opacity 2',
+				value: 100,
+				min: 0,
+				max: 100,
+				step: 1,
+				slider: true,
+			},
+			reverse: false,
+			radial_power: {
+				title: 'Radius',
+				value: 50,
+				min: 0,
+				max: 99,
+				step: 1,
+				slider: true,
+			},
+		},
+		// Paint Bucket nested under Gradient (Photoshop-style). Gradient is the
+		// default face of the slot; Shift+G cycles. fill stays registered but hidden.
+		tool_group: {
+			label: 'Fill Tools',
+			hidden: false,
+			items: [
+				{
+					shape: 'gradient',
+					title: 'Gradient Tool',
+					icon: 'gradient',
+				},
+				{
+					shape: 'fill',
+					title: 'Paint Bucket Tool',
+					icon: 'fill',
+					tool: 'fill',
+				},
+			],
+		},
+	},
+	{
+		name: 'fill',
+		title: 'Paint Bucket Tool',
+		visible: false,
+		attributes: {
+			power: 5,
+			anti_aliasing: false,
+			contiguous: false,
+		},
+	},
+	{
+		name: 'blur',
+		attributes: {
+			size: 30,
+			strength: 1,
+		},
+	},
+	{
+		name: 'sharpen',
+		attributes: {
+			size: 30,
+		},
+	},
+	{
+		name: 'desaturate',
+		attributes: {
+			size: 50,
+			anti_aliasing: true,
+		},
+	},
+	{
+		name: 'bulge_pinch',
+		title: 'Bulge/Pinch Tool',
+		attributes: {
+			radius: 80,
+			power: 50,
+			bulge: true,
+		},
+	},
+	{
+		name: 'pen',
+		title: 'Pen Tool (P)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		on_update: 'on_params_update',
+		attributes: {
+			mode: {
+				title: 'Mode',
+				value: 'Shape',
+				values: ['Shape', 'Path'],
+			},
+			fill: '#cccccc',
+			stroke: '#000000',
+			stroke_width: {
+				title: 'Stroke Width',
+				value: 2,
+				min: 1,
+				max: 100,
+				step: 1,
+			},
+			stroke_align: {
+				title: 'Align',
+				value: 'Center',
+				values: ['Center', 'Inside', 'Outside'],
+			},
+			stroke_corners: {
+				title: 'Corners',
+				value: 'Right Angle',
+				values: ['Right Angle', 'Rounded', 'Capped'],
+			},
+			rubber_band: true,
+			auto_add_delete: true,
+		},
+	},
+	{
+		name: 'text',
+		on_update: 'on_params_update',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		attributes: {
+			font: {
+				value: 'Roboto',
+				values() {
+					const user_font_names = Object.keys(config.user_fonts);
+					const systemFonts = (typeof window !== 'undefined' && window.FontManager
+						&& typeof window.FontManager.getCachedSystemFonts === 'function')
+						? window.FontManager.getCachedSystemFonts()
+						: [];
+					return ['[Add Font...]', ...Array.from(new Set([...config.FONTS, ...user_font_names, ...systemFonts].sort()))];
+				}
+			},
+			size: {
+				value: 38,
+				min: 1,
+				max: 999,
+				step: 1,
+					inputStep: 0.01,
+					inputType: 'text'
+			},
+			weight: {
+				title: 'Weight',
+				value: 'Regular (400)',
+				values() {
+					const textTool = (config.TOOLS || []).find((t) => t.name === 'text');
+					const family = textTool && textTool.attributes && textTool.attributes.font
+						? (textTool.attributes.font.value || 'Roboto')
+						: 'Roboto';
+					if (typeof window !== 'undefined' && window.FontManager
+						&& typeof window.FontManager.getFontWeightList === 'function') {
+						return window.FontManager.getFontWeightList(family, googleFontsCache);
+					}
+					// Fallback before FontManager init: Google cache + defaults
+					const variants = [];
+					const userFont = config.user_fonts && config.user_fonts[family];
+					if (userFont && Array.isArray(userFont.variants)) {
+						for (const v of userFont.variants) {
+							if (v && !variants.includes(v)) variants.push(v);
+						}
+					}
+					if (Array.isArray(googleFontsCache)) {
+						const entry = googleFontsCache.find((f) => f && f.family === family);
+						if (entry && Array.isArray(entry.variants)) {
+							for (const v of entry.variants) {
+								if (!v || /italic/i.test(String(v))) continue;
+								const map = {
+									'regular': 'Regular (400)', '400': 'Regular (400)',
+									'100': 'Thin (100)', '200': 'ExtraLight (200)', '300': 'Light (300)',
+									'500': 'Medium (500)', '600': 'SemiBold (600)',
+									'700': 'Bold (700)', '800': 'ExtraBold (800)', '900': 'Black (900)',
+									'thin': 'Thin (100)', 'light': 'Light (300)', 'medium': 'Medium (500)',
+									'semibold': 'SemiBold (600)', 'bold': 'Bold (700)', 'black': 'Black (900)',
+								};
+								const key = String(v).toLowerCase();
+								const label = map[key] || String(v);
+								if (!variants.includes(label)) variants.push(label);
+							}
+						}
+					}
+					if (variants.length === 0) return ['Regular (400)', 'Bold (700)'];
+					return variants;
+				}
+			},
+			bold: {
+				value: false,
+				icon: `bold.svg`
+			},
+			italic: {
+				value: false,
+				icon: `italic.svg`
+			},
+			underline: {
+				value: false,
+				icon: `underline.svg`
+			},
+			strikethrough: {
+				value: false,
+				icon: `strikethrough.svg`
+			},
+			fill: '#000000',
+			halign: {
+				type: 'button_group',
+				value: 'Left',
+				values: ['Left', 'Center', 'Right', 'Justify'],
+				icons: {
+					Left: 'align-left.svg',
+					Center: 'align-center.svg',
+					Right: 'align-right.svg',
+					Justify: 'align-justify.svg',
+				}
+			},
+			kerning: {
+				value: 0,
+				min: -999,
+				max: 999,
+				step: 1
+			},
+			leading: {
+				value: 0,
+				min: -999,
+				max: 999,
+				step: 1
+			},
+			boundary: {
+				title: 'Mode',
+				value: 'Point',
+				values: ['Point', 'Paragraph'],
+			}
+		},
+	},
+	{
+		name: 'direct_select',
+		title: 'Direct Selection Tool (A)',
+		on_activate: 'on_activate',
+		on_leave: 'on_leave',
+		attributes: {},
 	},
 	{
 		name: 'rectangle',
@@ -595,62 +923,6 @@ config.TOOLS = [
 		},
 	},
 	{
-		name: 'pen',
-		title: 'Pen Tool (P)',
-		on_activate: 'on_activate',
-		on_leave: 'on_leave',
-		on_update: 'on_params_update',
-		attributes: {
-			mode: {
-				title: 'Mode',
-				value: 'Shape',
-				values: ['Shape', 'Path'],
-			},
-			fill: '#cccccc',
-			stroke: '#000000',
-			stroke_width: {
-				title: 'Stroke Width',
-				value: 2,
-				min: 1,
-				max: 100,
-				step: 1,
-			},
-			stroke_align: {
-				title: 'Align',
-				value: 'Center',
-				values: ['Center', 'Inside', 'Outside'],
-			},
-			stroke_corners: {
-				title: 'Corners',
-				value: 'Right Angle',
-				values: ['Right Angle', 'Rounded', 'Capped'],
-			},
-			rubber_band: true,
-			auto_add_delete: true,
-		},
-	},
-	{
-		name: 'direct_select',
-		title: 'Direct Selection Tool (A)',
-		on_activate: 'on_activate',
-		on_leave: 'on_leave',
-		attributes: {},
-	},
-	{
-		name: 'media',
-		title: 'Search Images',
-		on_activate: 'on_activate',
-		attributes: {
-			size: 30,
-		},
-	},
-	{
-		name: 'camera',
-		title: 'Camera',
-		on_activate: 'on_activate',
-		attributes: {},
-	},
-	{
 		name: 'triangle',
 		visible: false,
 		attributes: {
@@ -831,290 +1103,18 @@ config.TOOLS = [
 		},
 	},
 	{
-		name: 'text',
-		on_update: 'on_params_update',
+		name: 'media',
+		title: 'Search Images',
 		on_activate: 'on_activate',
-		on_leave: 'on_leave',
 		attributes: {
-			font: {
-				value: 'Roboto',
-				values() {
-					const user_font_names = Object.keys(config.user_fonts);
-					const systemFonts = (typeof window !== 'undefined' && window.FontManager
-						&& typeof window.FontManager.getCachedSystemFonts === 'function')
-						? window.FontManager.getCachedSystemFonts()
-						: [];
-					return ['[Add Font...]', ...Array.from(new Set([...config.FONTS, ...user_font_names, ...systemFonts].sort()))];
-				}
-			},
-			size: {
-				value: 38,
-				min: 1,
-				max: 999,
-				step: 1,
-					inputStep: 0.01,
-					inputType: 'text'
-			},
-			weight: {
-				title: 'Weight',
-				value: 'Regular (400)',
-				values() {
-					const textTool = (config.TOOLS || []).find((t) => t.name === 'text');
-					const family = textTool && textTool.attributes && textTool.attributes.font
-						? (textTool.attributes.font.value || 'Roboto')
-						: 'Roboto';
-					if (typeof window !== 'undefined' && window.FontManager
-						&& typeof window.FontManager.getFontWeightList === 'function') {
-						return window.FontManager.getFontWeightList(family, googleFontsCache);
-					}
-					// Fallback before FontManager init: Google cache + defaults
-					const variants = [];
-					const userFont = config.user_fonts && config.user_fonts[family];
-					if (userFont && Array.isArray(userFont.variants)) {
-						for (const v of userFont.variants) {
-							if (v && !variants.includes(v)) variants.push(v);
-						}
-					}
-					if (Array.isArray(googleFontsCache)) {
-						const entry = googleFontsCache.find((f) => f && f.family === family);
-						if (entry && Array.isArray(entry.variants)) {
-							for (const v of entry.variants) {
-								if (!v || /italic/i.test(String(v))) continue;
-								const map = {
-									'regular': 'Regular (400)', '400': 'Regular (400)',
-									'100': 'Thin (100)', '200': 'ExtraLight (200)', '300': 'Light (300)',
-									'500': 'Medium (500)', '600': 'SemiBold (600)',
-									'700': 'Bold (700)', '800': 'ExtraBold (800)', '900': 'Black (900)',
-									'thin': 'Thin (100)', 'light': 'Light (300)', 'medium': 'Medium (500)',
-									'semibold': 'SemiBold (600)', 'bold': 'Bold (700)', 'black': 'Black (900)',
-								};
-								const key = String(v).toLowerCase();
-								const label = map[key] || String(v);
-								if (!variants.includes(label)) variants.push(label);
-							}
-						}
-					}
-					if (variants.length === 0) return ['Regular (400)', 'Bold (700)'];
-					return variants;
-				}
-			},
-			bold: {
-				value: false,
-				icon: `bold.svg`
-			},
-			italic: {
-				value: false,
-				icon: `italic.svg`
-			},
-			underline: {
-				value: false,
-				icon: `underline.svg`
-			},
-			strikethrough: {
-				value: false,
-				icon: `strikethrough.svg`
-			},
-			fill: '#000000',
-			halign: {
-				type: 'button_group',
-				value: 'Left',
-				values: ['Left', 'Center', 'Right', 'Justify'],
-				icons: {
-					Left: 'align-left.svg',
-					Center: 'align-center.svg',
-					Right: 'align-right.svg',
-					Justify: 'align-justify.svg',
-				}
-			},
-			kerning: {
-				value: 0,
-				min: -999,
-				max: 999,
-				step: 1
-			},
-			leading: {
-				value: 0,
-				min: -999,
-				max: 999,
-				step: 1
-			},
-			boundary: {
-				title: 'Mode',
-				value: 'Point',
-				values: ['Point', 'Paragraph'],
-			}
+			size: 30,
 		},
 	},
 	{
-		name: 'gradient',
-		title: 'Gradient Tool',
+		name: 'camera',
+		title: 'Camera',
 		on_activate: 'on_activate',
-		on_update: 'on_params_update',
-		attributes: {
-			style: {
-				title: 'Style',
-				value: 'Linear',
-				values: ['Linear', 'Radial'],
-			},
-			color_1: '#000000',
-			color_2: 'none',
-			alpha_1: {
-				title: 'Opacity 1',
-				value: 100,
-				min: 0,
-				max: 100,
-				step: 1,
-				slider: true,
-			},
-			alpha_2: {
-				title: 'Opacity 2',
-				value: 100,
-				min: 0,
-				max: 100,
-				step: 1,
-				slider: true,
-			},
-			reverse: false,
-			radial_power: {
-				title: 'Radius',
-				value: 50,
-				min: 0,
-				max: 99,
-				step: 1,
-				slider: true,
-			},
-		},
-		// Paint Bucket nested under Gradient (Photoshop-style). Gradient is the
-		// default face of the slot; Shift+G cycles. fill stays registered but hidden.
-		tool_group: {
-			label: 'Fill Tools',
-			hidden: false,
-			items: [
-				{
-					shape: 'gradient',
-					title: 'Gradient Tool',
-					icon: 'gradient',
-				},
-				{
-					shape: 'fill',
-					title: 'Paint Bucket Tool',
-					icon: 'fill',
-					tool: 'fill',
-				},
-			],
-		},
-	},
-	{
-		name: 'fill',
-		title: 'Paint Bucket Tool',
-		visible: false,
-		attributes: {
-			power: 5,
-			anti_aliasing: false,
-			contiguous: false,
-		},
-	},
-	{
-		name: 'clone',
-		on_leave: 'on_leave',
-		attributes: {
-			size: 30,
-			anti_aliasing: true,
-			source_layer: {
-				value: 'All Layers',
-				values: ['All Layers', 'Current', 'Previous'],
-			},
-		},
-	},
-	{
-		name: 'spot_heal',
-		title: 'Spot Healing Brush',
-		on_leave: 'on_leave',
-		attributes: {
-			size: 30,
-			hardness: {
-				value: 50,
-				min: 0,
-				max: 100,
-				step: 1,
-				slider: true,
-			},
-			strength: {
-				value: 100,
-				min: 1,
-				max: 100,
-				step: 1,
-				slider: true,
-			},
-		},
-	},
-	{
-		name: 'crop',
-		on_activate: 'on_activate',
-		on_update: 'on_params_update',
-		on_leave: 'on_leave',
-		attributes: {
-			aspect: {
-				value: 'Free',
-				values: ['Free', 'Original', '1:1', '4:5', '5:4', '16:9', '9:16', '3:2', '2:3', 'Custom'],
-			},
-			ratio_w: {
-				title: 'W',
-				value: 1,
-				min: 1,
-				visible: false,
-			},
-			ratio_h: {
-				title: 'H',
-				value: 1,
-				min: 1,
-				visible: false,
-			},
-			guides: {
-				value: 'Rule of Thirds',
-				values: ['Rule of Thirds', 'Grid', 'Diagonal', 'None'],
-			},
-			straighten: {
-				value: false,
-				icon: 'rotate.svg',
-			},
-			angle: {
-				value: 0,
-				min: -45,
-				max: 45,
-				step: 0.1,
-			},
-			commit_crop: true,
-		},
-	},
-	{
-		name: 'blur',
-		attributes: {
-			size: 30,
-			strength: 1,
-		},
-	},
-	{
-		name: 'sharpen',
-		attributes: {
-			size: 30,
-		},
-	},
-	{
-		name: 'desaturate',
-		attributes: {
-			size: 50,
-			anti_aliasing: true,
-		},
-	},
-	{
-		name: 'bulge_pinch',
-		title: 'Bulge/Pinch Tool',
-		attributes: {
-			radius: 80,
-			power: 50,
-			bulge: true,
-		},
+		attributes: {},
 	},
 	{
 		name: 'animation',
@@ -1133,7 +1133,7 @@ config.TOOLS = [
 	},
 ];
 
-//link to active tool
-config.TOOL = config.TOOLS[2];
+// Default active tool (Move Tool 'select')
+config.TOOL = (config.TOOLS || []).find((t) => t && t.name === 'select') || config.TOOLS[0];
 	
 export default config;
