@@ -13,6 +13,7 @@ import './../css/print.css';
 import './../../node_modules/alertifyjs/build/css/alertify.min.css';
 import './../css/new-document-modal.css';
 import './../css/raw-develop-modal.css';
+import './../css/refine-edge-modal.css';
 //js
 import app from './app.js';
 import config from './config.js';

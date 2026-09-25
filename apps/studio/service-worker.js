@@ -1,5 +1,5 @@
-var CACHE_NAME = 'visteras-studio-shell-v91';
-var CDN_ML_CACHE = 'visteras-studio-cdn-ml-v91';
+var CACHE_NAME = 'visteras-studio-shell-v92';
+var CDN_ML_CACHE = 'visteras-studio-cdn-ml-v92';
 var APP_SHELL = [
 	'./',
 	'./index.html',

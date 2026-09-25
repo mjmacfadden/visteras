@@ -855,11 +855,23 @@ class GUI_layers_class {
 
 		// 3. Mask operations
 		if (layer.mask == null) {
+			button('Select and Mask...', () => {
+				if (app.GUI && app.GUI.modules && app.GUI.modules['tools/refine_edge']) {
+					app.GUI.modules['tools/refine_edge'].open(layer_id);
+				}
+			});
+			separator();
 			button('Add Layer Mask (Reveal All)', () => { _this.Mask.add_mask(layer_id, true, false); });
 			button('Add Layer Mask (Hide All)', () => { _this.Mask.add_mask(layer_id, false, false); });
 			button('Mask from Selection', () => { _this.Mask.add_mask(layer_id, true, true); });
 		}
 		else {
+			button('Select and Mask...', () => {
+				if (app.GUI && app.GUI.modules && app.GUI.modules['tools/refine_edge']) {
+					app.GUI.modules['tools/refine_edge'].open(layer_id);
+				}
+			});
+			separator();
 			button(layer.mask.enabled === false ? 'Enable Layer Mask' : 'Disable Layer Mask',
 				() => { _this.Mask.toggle_enabled(layer_id); });
 			button(layer.mask.linked === false ? 'Link Layer Mask' : 'Unlink Layer Mask',

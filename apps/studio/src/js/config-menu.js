@@ -448,10 +448,6 @@ const menuDefinition = [
 				target: 'layer/raster.raster'
 			},
 			{
-				name: 'Remove Background',
-				target: 'tools/bg_auto.remove_background'
-			},
-			{
 				divider: true
 			},
 			{
@@ -533,8 +529,18 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Subject',
+				name: 'Select Subject',
 				target: 'tools/bg_auto.select_subject'
+			},
+			{
+				name: 'Remove Background',
+				target: 'tools/bg_auto.remove_background'
+			},
+			{
+				name: 'Select and Mask',
+				shortcut: 'Ctrl + Alt + R',
+				ellipsis: true,
+				target: 'tools/refine_edge.open'
 			}
 		]
 	},

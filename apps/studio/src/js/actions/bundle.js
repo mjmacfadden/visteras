@@ -1,3 +1,4 @@
+import app from '../app.js';
 import config from '../config.js';
 import { Base_action } from './base.js';
 
@@ -34,6 +35,9 @@ export class Bundle_action extends Base_action {
 			throw error;
 		}
 		config.need_render = true;
+		if (app.Layers && typeof app.Layers.render === 'function') {
+			app.Layers.render();
+		}
 	}
 
 	async undo() {
@@ -46,6 +50,9 @@ export class Bundle_action extends Base_action {
 			this.database_estimate += this.actions_to_do[i].database_estimate;
 		}
 		config.need_render = true;
+		if (app.Layers && typeof app.Layers.render === 'function') {
+			app.Layers.render();
+		}
 	}
 
 	free() {

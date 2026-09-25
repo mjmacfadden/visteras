@@ -68,7 +68,10 @@ class Base_state_class {
 	 */
 	_action_needs_image_serialize(action) {
 		if (!action) return false;
-		if (action.action_id === 'update_layer_image') return true;
+		if (action.action_id === 'update_layer_image'
+			|| action.action_id === 'update_layer_mask_image'
+			|| action.action_id === 'refine_edge_mask'
+			|| action.action_id === 'refine_edge_new_mask') return true;
 		if (Array.isArray(action.actions_to_do)) {
 			for (let i = 0; i < action.actions_to_do.length; i++) {
 				if (this._action_needs_image_serialize(action.actions_to_do[i])) {
