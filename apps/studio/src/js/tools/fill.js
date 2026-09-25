@@ -44,6 +44,10 @@ class Fill_class extends Base_tools_class {
 			return;
 		}
 
+		if (this.Base_layers?.Base_selection?.has_selection && !this.Base_layers.Base_selection.point_inside_selection(mouse.x, mouse.y)) {
+			return;
+		}
+
 		this.fill(mouse);
 	}
 

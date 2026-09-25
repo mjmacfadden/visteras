@@ -39,7 +39,7 @@
     "Box blur": "Langelis blur",
     "Brightness": "Ryškumas",
     "Brightness:": "Ryškumas:",
-    "Bulge\/Pinch Tool": "Išsipūtimo \/ prispaudimo įrankis",
+    "Bulge/Pinch Tool": "Išsipūtimo / prispaudimo įrankis",
     "Burn": "Deginti",
     "Can not animate 1 layer.": "Negalima animuoti 1 sluoksniu.",
     "Can not find previous layer.": "Negaliu rasti ankstesnio sluoksnio.",
@@ -186,7 +186,7 @@
     "Green channel:": "Žalias kanalas:",
     "Greyscale:": "Pilkieji pustoniai:",
     "Grid": "Tinklelis",
-    "Grid on\/off": "Tinklelis",
+    "Grid on/off": "Tinklelis",
     "Guides": "Vadovai",
     "Guides enabled.": "Vadovai įjungti.",
     "H Radius:": "H spindulys:",
@@ -222,7 +222,7 @@
     "Instagram Filters": "„Instagram“ filtrai",
     "Invalid Hex Code": "Netinkamas šešiakampis kodas",
     "Italiano": "Italų kalba",
-    "JPG\/JPEG Format": "JPG \/ JPEG formatas",
+    "JPG/JPEG Format": "JPG / JPEG formatas",
     "Kerning:": "Kerningas:",
     "Key-Points": "Pagrindiniai klausimai",
     "KeyU": "KeyU",
@@ -405,7 +405,7 @@
     "Shift + S": "Shift + S",
     "Shortcut Key:": "Spartusis klavišas:",
     "Show": "Rodyti",
-    "Show \/ Hide": "Rodyti \/ Slėpti",
+    "Show / Hide": "Rodyti / Slėpti",
     "Show file size:": "Rodyti failo dydį:",
     "Simple": "Paprastas",
     "Size is too big, max": "Dydis yra per didelis, maks",
@@ -509,5 +509,6 @@
     "Zoom blur": "Padidinti blur",
     "Zoom in": "Priartinti",
     "Zoom out": "Nutolinti",
-    "Zoom:": "Priartinimas:"
+    "Zoom:": "Priartinimas:",
+    "Magic Wand Tool": "Burtų lazdelės įrankis"
 }

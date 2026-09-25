@@ -39,7 +39,7 @@
     "Box blur": "",
     "Brightness": "",
     "Brightness:": "",
-    "Bulge\/Pinch Tool": "",
+    "Bulge/Pinch Tool": "",
     "Burn": "",
     "Can not animate 1 layer.": "",
     "Can not find previous layer.": "",
@@ -186,7 +186,7 @@
     "Green channel:": "",
     "Greyscale:": "",
     "Grid": "",
-    "Grid on\/off": "",
+    "Grid on/off": "",
     "Guides": "",
     "Guides enabled.": "",
     "H Radius:": "",
@@ -222,7 +222,7 @@
     "Instagram Filters": "",
     "Invalid Hex Code": "",
     "Italiano": "",
-    "JPG\/JPEG Format": "",
+    "JPG/JPEG Format": "",
     "Kerning:": "",
     "Key-Points": "",
     "KeyU": "",
@@ -405,7 +405,7 @@
     "Shift + S": "",
     "Shortcut Key:": "",
     "Show": "",
-    "Show \/ Hide": "",
+    "Show / Hide": "",
     "Show file size:": "",
     "Simple": "",
     "Size is too big, max": "",
@@ -509,5 +509,6 @@
     "Zoom blur": "",
     "Zoom in": "",
     "Zoom out": "",
-    "Zoom:": ""
+    "Zoom:": "",
+    "Magic Wand Tool": ""
 }

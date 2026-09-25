@@ -39,7 +39,7 @@
     "Box blur": "Размытие по рамке",
     "Brightness": "Яркость",
     "Brightness:": "Яркость:",
-    "Bulge\/Pinch Tool": "Вдавливание\/вытяжение",
+    "Bulge/Pinch Tool": "Вдавливание/вытяжение",
     "Burn": "Выжигание",
     "Can not animate 1 layer.": "Невозможно анимировать 1 слой.",
     "Can not find previous layer.": "Не удается найти предыдущий слой.",
@@ -186,7 +186,7 @@
     "Green channel:": "Зеленый канал:",
     "Greyscale:": "Оттенки серого:",
     "Grid": "Сетка",
-    "Grid on\/off": "Сетка вкл\/выкл",
+    "Grid on/off": "Сетка вкл/выкл",
     "Guides": "Гайдлайны",
     "Guides enabled.": "Гайдлайны включены",
     "H Radius:": "H Радиус:",
@@ -222,7 +222,7 @@
     "Instagram Filters": "Фильтры Instagram",
     "Invalid Hex Code": "Неверный HEX код",
     "Italiano": "Italiano",
-    "JPG\/JPEG Format": "JPG\/JPEG Формат",
+    "JPG/JPEG Format": "JPG/JPEG Формат",
     "Kerning:": "Интервал:",
     "Key-Points": "Ключевые точки",
     "KeyU": "КлючU",
@@ -405,7 +405,7 @@
     "Shift + S": "Шифт + С",
     "Shortcut Key:": "Быстрая клавиша:",
     "Show": "Показывать",
-    "Show \/ Hide": "Показать \/ Спрятать",
+    "Show / Hide": "Показать / Спрятать",
     "Show file size:": "Считать размер:",
     "Simple": "Простой",
     "Size is too big, max": "Размер слишком большой, максимум",
@@ -509,5 +509,6 @@
     "Zoom blur": "Масштабирование",
     "Zoom in": "Приблизить",
     "Zoom out": "Отдалить",
-    "Zoom:": "Приблизить:"
+    "Zoom:": "Приблизить:",
+    "Magic Wand Tool": "Волшебная палочка"
 }

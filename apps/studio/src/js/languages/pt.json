@@ -39,7 +39,7 @@
     "Box blur": "Desfoque de caixa",
     "Brightness": "Brilho",
     "Brightness:": "Brilho:",
-    "Bulge\/Pinch Tool": "Ferramenta Bulge \/ Pinch",
+    "Bulge/Pinch Tool": "Ferramenta Bulge / Pinch",
     "Burn": "Queimar",
     "Can not animate 1 layer.": "Não é possível animar 1 camada.",
     "Can not find previous layer.": "Não é possível encontrar a camada anterior.",
@@ -186,7 +186,7 @@
     "Green channel:": "Canal verde:",
     "Greyscale:": "Escala de cinza:",
     "Grid": "Grade",
-    "Grid on\/off": "Grades Ligado \/ Desligado",
+    "Grid on/off": "Grades Ligado / Desligado",
     "Guides": "Guias",
     "Guides enabled.": "Guias ativados.",
     "H Radius:": "Raio H.",
@@ -222,7 +222,7 @@
     "Instagram Filters": "Filtros de Instagram",
     "Invalid Hex Code": "Código Hex inválido",
     "Italiano": "Italiano",
-    "JPG\/JPEG Format": "Formato JPG \/ JPEG",
+    "JPG/JPEG Format": "Formato JPG / JPEG",
     "Kerning:": "Kerning:",
     "Key-Points": "Pontos-chave",
     "KeyU": "KeyU",
@@ -405,7 +405,7 @@
     "Shift + S": "Shift + S",
     "Shortcut Key:": "Tecla de atalho:",
     "Show": "Mostrar",
-    "Show \/ Hide": "Mostrar \/ Ocultar",
+    "Show / Hide": "Mostrar / Ocultar",
     "Show file size:": "Mostrar tamanho do arquivo:",
     "Simple": "Simples",
     "Size is too big, max": "O tamanho é muito grande, máximo",
@@ -509,5 +509,6 @@
     "Zoom blur": "Desfoque de zoom",
     "Zoom in": "Mais Zoom",
     "Zoom out": "Menos zoom",
-    "Zoom:": "Zoom:"
+    "Zoom:": "Zoom:",
+    "Magic Wand Tool": "Ferramenta Varinha Mágica"
 }

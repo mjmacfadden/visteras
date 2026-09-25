@@ -270,8 +270,10 @@ class Selection_class extends Base_tools_class {
 					w = w < 0 ? -size : size;
 					h = h < 0 ? -size : size;
 				}
+				var params = this.getParams();
+				var anti_alias = (params.anti_aliasing?.value ?? params.anti_aliasing) !== false;
 				this.Base_selection.compute_preview_contours(
-					shape, start_x, start_y, w, h, null, active_mode
+					shape, start_x, start_y, w, h, null, active_mode, anti_alias
 				);
 			}
 		}
@@ -347,7 +349,9 @@ class Selection_class extends Base_tools_class {
 			this.Base_selection._preview_lasso_path = null;
 
 			if (valid) {
-				this.Base_selection.apply_shape_to_mask(shape, x, y, width, height, path, mode);
+				var params = this.getParams();
+				var anti_alias = (params.anti_aliasing?.value ?? params.anti_aliasing) !== false;
+				this.Base_selection.apply_shape_to_mask(shape, x, y, width, height, path, mode, this.Base_selection.mask_ctx, anti_alias);
 				this.Base_selection.update_mask_state();
 				app.State.do_action(
 					new app.Actions.Set_selection_action(
@@ -464,17 +468,28 @@ class Selection_class extends Base_tools_class {
 		var is_locked = (layer.locked === true);
 		var bgColor = config.COLOR_BG || '#ffffff';
 
-		this.tmpCanvasCtx.save();
 		if (is_locked) {
-			this.tmpCanvasCtx.drawImage(mask, 0, 0);
-			this.tmpCanvasCtx.globalCompositeOperation = 'source-in';
-			this.tmpCanvasCtx.fillStyle = bgColor;
-			this.tmpCanvasCtx.fillRect(0, 0, ow, oh);
+			var originalSnapshot = document.createElement('canvas');
+			originalSnapshot.width = ow;
+			originalSnapshot.height = oh;
+			originalSnapshot.getContext('2d').drawImage(this.tmpCanvas, 0, 0);
+
+			var editedCanvas = document.createElement('canvas');
+			editedCanvas.width = ow;
+			editedCanvas.height = oh;
+			var ectx = editedCanvas.getContext('2d');
+			ectx.fillStyle = bgColor;
+			ectx.fillRect(0, 0, ow, oh);
+
+			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
+			this.tmpCanvasCtx.clearRect(0, 0, ow, oh);
+			this.tmpCanvasCtx.drawImage(editedCanvas, 0, 0);
 		} else {
+			this.tmpCanvasCtx.save();
 			this.tmpCanvasCtx.globalCompositeOperation = 'destination-out';
 			this.tmpCanvasCtx.drawImage(mask, 0, 0);
+			this.tmpCanvasCtx.restore();
 		}
-		this.tmpCanvasCtx.restore();
 
 		app.State.do_action(
 			new app.Actions.Bundle_action('delete_selection', 'Delete Selection', [
@@ -534,13 +549,22 @@ class Selection_class extends Base_tools_class {
 		var oh = layer.height_original || layer.height || config.HEIGHT;
 
 		if (this.Base_selection.has_selection) {
-			var mask = this.Base_selection.create_layer_selection_alpha(layer);
-			this.tmpCanvasCtx.save();
-			this.tmpCanvasCtx.drawImage(mask, 0, 0);
-			this.tmpCanvasCtx.globalCompositeOperation = 'source-in';
-			this.tmpCanvasCtx.fillStyle = color;
-			this.tmpCanvasCtx.fillRect(0, 0, ow, oh);
-			this.tmpCanvasCtx.restore();
+			var originalSnapshot = document.createElement('canvas');
+			originalSnapshot.width = ow;
+			originalSnapshot.height = oh;
+			originalSnapshot.getContext('2d').drawImage(this.tmpCanvas, 0, 0);
+
+			var editedCanvas = document.createElement('canvas');
+			editedCanvas.width = ow;
+			editedCanvas.height = oh;
+			var ectx = editedCanvas.getContext('2d');
+			ectx.drawImage(this.tmpCanvas, 0, 0);
+			ectx.fillStyle = color;
+			ectx.fillRect(0, 0, ow, oh);
+
+			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
+			this.tmpCanvasCtx.clearRect(0, 0, ow, oh);
+			this.tmpCanvasCtx.drawImage(editedCanvas, 0, 0);
 		} else {
 			this.tmpCanvasCtx.fillStyle = color;
 			this.tmpCanvasCtx.fillRect(0, 0, ow, oh);

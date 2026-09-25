@@ -424,7 +424,7 @@
     "Shift + S": "Shift + S",
     "Shortcut Key:": "快捷键：",
     "Show": "显示",
-    "Show \/ Hide": "显示 \/ 隐藏",
+    "Show / Hide": "显示 / 隐藏",
     "Show file size:": "显示文件大小：",
     "Simple": "简单",
     "Size is too big, max": "尺寸太大，最大值为",
@@ -531,5 +531,6 @@
     "Zoom blur": "缩放模糊",
     "Zoom in": "放大",
     "Zoom out": "缩小",
-    "Zoom:": "缩放："
+    "Zoom:": "缩放：",
+    "Magic Wand Tool": "魔棒工具"
 }

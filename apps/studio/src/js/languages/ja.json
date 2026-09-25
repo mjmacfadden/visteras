@@ -39,7 +39,7 @@
     "Box blur": "ボックスボケ",
     "Brightness": "輝度",
     "Brightness:": "輝度：",
-    "Bulge\/Pinch Tool": "バルジ\/ピンチツール",
+    "Bulge/Pinch Tool": "バルジ/ピンチツール",
     "Burn": "燃やす",
     "Can not animate 1 layer.": "1つのレイヤーをアニメートできません。",
     "Can not find previous layer.": "以前のレイヤーが見つかりません。",
@@ -186,7 +186,7 @@
     "Green channel:": "グリーンチャネル：",
     "Greyscale:": "グレースケール：",
     "Grid": "グリッド",
-    "Grid on\/off": "グリッドのオン\/オフ",
+    "Grid on/off": "グリッドのオン/オフ",
     "Guides": "ガイド",
     "Guides enabled.": "ガイドが有効になりました。",
     "H Radius:": "H半径：",
@@ -222,7 +222,7 @@
     "Instagram Filters": "Instagramフィルター",
     "Invalid Hex Code": "無効な16進コード",
     "Italiano": "イタリア語",
-    "JPG\/JPEG Format": "JPG \/ JPEG形式",
+    "JPG/JPEG Format": "JPG / JPEG形式",
     "Kerning:": "字詰め：",
     "Key-Points": "キーポイント",
     "KeyU": "キーユー",
@@ -405,7 +405,7 @@
     "Shift + S": "Shift + S",
     "Shortcut Key:": "ショートカットキー：",
     "Show": "見せる",
-    "Show \/ Hide": "表示\/非表示",
+    "Show / Hide": "表示/非表示",
     "Show file size:": "ファイルサイズを表示：",
     "Simple": "シンプル",
     "Size is too big, max": "サイズが大きすぎます",
@@ -509,5 +509,6 @@
     "Zoom blur": "ズームブラー",
     "Zoom in": "ズームイン",
     "Zoom out": "ズームアウトする",
-    "Zoom:": "ズーム："
+    "Zoom:": "ズーム：",
+    "Magic Wand Tool": "自動選択ツール"
 }

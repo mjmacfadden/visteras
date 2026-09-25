@@ -233,7 +233,9 @@ var Helper = new Helper_class();
     };
 
     const set_value = ($el, value) => {
-        const { min, max, input } = $el.data();
+        const data = ($el && typeof $el.data === 'function') ? $el.data() : null;
+        if (!data || !data.input) return;
+        const { min, max, input } = data;
         if (typeof value === 'string') {
             value = parseFloat(value);
         }
@@ -256,7 +258,9 @@ var Helper = new Helper_class();
     };
 
     const set_disabled = ($el, disabled) => {
-        const { input } = $el.data();
+        const data = ($el && typeof $el.data === 'function') ? $el.data() : null;
+        if (!data || !data.input) return;
+        const { input } = data;
         if (disabled) {
             input.setAttribute('disabled', 'disabled');
         } else {
@@ -396,7 +400,7 @@ var Helper = new Helper_class();
             else if (behavior === 'set_value') {
                 const newValue = parseFloat(args[0]);
                 const $el = $(el);
-                if ($el.data('value') !== newValue) {
+                if ($el.data('input') && $el.data('value') !== newValue) {
                     set_value($(el), newValue);
                 }
             }

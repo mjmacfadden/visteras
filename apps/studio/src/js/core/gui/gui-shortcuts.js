@@ -37,6 +37,7 @@ class GUI_shortcuts_class {
 			'l': 'lasso',
 			'n': 'pencil',
 			'm': 'selection',
+			'w': 'magic_wand',
 			'u': 'rectangle',
 			'j': 'desaturate',
 			'o': 'bulge_pinch',
@@ -425,17 +426,14 @@ class GUI_shortcuts_class {
 			}
 
 			// Delete/Backspace = delete selected layer(s)
-			// (Skip when marquee/lasso has an active selection — that clears pixels instead.)
+			// (Skip when marquee/lasso/magic wand has an active selection — that clears pixels instead.)
 			if (!event.ctrlKey && !event.metaKey && !event.altKey
 				&& (event.code === 'Delete' || event.code === 'Backspace'
 					|| event.key === 'Delete' || event.key === 'Backspace'
 					|| event.keyCode === 46 || event.keyCode === 8)) {
-				const selMod = app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules
-					&& app.GUI.GUI_tools.tools_modules['selection'];
-				const selTool = selMod && selMod.object;
-				const hasMarquee = config.TOOL && config.TOOL.name === 'selection'
-					&& selTool && selTool.Base_selection && selTool.Base_selection.has_selection;
-				if (!hasMarquee) {
+				const hasSelection = (config.TOOL && (config.TOOL.name === 'selection' || config.TOOL.name === 'lasso' || config.TOOL.name === 'magic_wand'))
+					&& app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection;
+				if (!hasSelection) {
 					event.preventDefault();
 					event.stopImmediatePropagation();
 					if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
@@ -491,20 +489,16 @@ class GUI_shortcuts_class {
 				var targetTool = this.keymap[key];
 				if (targetTool === 'lasso') {
 					if (app.GUI && app.GUI.GUI_tools) {
-						app.GUI.GUI_tools.update_tool_shape('selection', 'lasso');
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('lasso');
+						} else {
+							app.GUI.GUI_tools.activate_tool('lasso');
+						}
 					}
 				} else if (targetTool === 'selection') {
 					if (app.GUI && app.GUI.GUI_tools) {
-						var selDef = null;
-						for (var si in config.TOOLS) {
-							if (config.TOOLS[si].name === 'selection') {
-								selDef = config.TOOLS[si];
-								break;
-							}
-						}
-						var activeShape = (selDef && selDef.tool_group) ? selDef.tool_group.active_shape : 'rect';
-						if (activeShape === 'lasso') {
-							app.GUI.GUI_tools.update_tool_shape('selection', 'rect');
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('selection');
 						} else {
 							app.GUI.GUI_tools.activate_tool('selection');
 						}
@@ -523,6 +517,17 @@ class GUI_shortcuts_class {
 								? app.GUI.GUI_tools.get_active_tool_for_group('gradient')
 								: 'gradient';
 							app.GUI.GUI_tools.activate_tool(gResolved);
+						}
+					}
+				} else if (targetTool === 'magic_wand') {
+					if (app.GUI && app.GUI.GUI_tools) {
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('magic_wand');
+						} else {
+							var wResolved = (typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
+								? app.GUI.GUI_tools.get_active_tool_for_group('magic_wand')
+								: 'magic_wand';
+							app.GUI.GUI_tools.activate_tool(wResolved);
 						}
 					}
 				} else {
@@ -697,24 +702,54 @@ class GUI_shortcuts_class {
 		if (!config.TOOL || !config.TOOL.attributes) return;
 		if (config.TOOL.attributes.size == null) return;
 
-		const oldSize = config.TOOL.attributes.size;
+		const attr = config.TOOL.attributes.size;
+		const oldSize = (typeof attr === 'object' && attr != null) ? (attr.value ?? 30) : attr;
 		const newSize = Math.max(1, Math.min(999, oldSize + delta));
 		if (newSize === oldSize) return;
 
-		config.TOOL.attributes.size = newSize;
+		if (typeof attr === 'object' && attr != null) {
+			attr.value = newSize;
+		} else {
+			config.TOOL.attributes.size = newSize;
+		}
 
-		// Update the UI input if it exists
-		const sizeInput = document.querySelector('#size');
-		if (sizeInput && sizeInput.closest) {
-			const $input = $(sizeInput);
-			if ($input.uiNumberInput) {
-				$input.uiNumberInput('set_value', newSize);
+		// Update UI elements in options bar if present
+		const sizeItem = document.querySelector('.attributes .item.size') || document.querySelector('.attributes');
+		if (sizeItem) {
+			const numberInput = sizeItem.querySelector('.ui_number_input');
+			if (numberInput && typeof $(numberInput).uiNumberInput === 'function') {
+				try {
+					$(numberInput).uiNumberInput('set_value', newSize);
+				} catch (e) { /* ignore */ }
+			}
+			const slider = sizeItem.querySelector('.ui_range');
+			if (slider && typeof $(slider).uiRange === 'function') {
+				try {
+					$(slider).uiRange('set_value', newSize);
+				} catch (e) { /* ignore */ }
+			}
+			const valueLabel = sizeItem.querySelector('.slider_value, #attribute_value_size');
+			if (valueLabel) {
+				valueLabel.value = String(newSize);
+				valueLabel.innerHTML = String(newSize);
+			}
+		}
+
+		// Notify active tool if it listens for param updates
+		if (app.GUI && app.GUI.GUI_tools && config.TOOL) {
+			const mod = app.GUI.GUI_tools.tools_modules[config.TOOL.name];
+			if (mod && mod.object) {
+				if (typeof mod.object.on_params_update === 'function') {
+					mod.object.on_params_update({ key: 'size', value: newSize });
+				} else if (typeof mod.object.on_update === 'function') {
+					mod.object.on_update({ key: 'size', value: newSize });
+				}
 			}
 		}
 
 		// Immediately update the brush cursor on screen
 		var mouseEl = document.getElementById('mouse');
-		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect'))) {
+		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect') || mouseEl.classList.contains('quick_selection_add') || mouseEl.classList.contains('quick_selection_subtract'))) {
 			var curW = parseFloat(mouseEl.style.width) || 0;
 			var zoomedSize = newSize * config.ZOOM;
 			var left = parseFloat(mouseEl.style.left) || 0;

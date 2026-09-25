@@ -521,6 +521,14 @@ const menuDefinition = [
 				divider: true
 			},
 			{
+				name: 'Expand',
+				ellipsis: true,
+				target: 'edit/selection.expand'
+			},
+			{
+				divider: true
+			},
+			{
 				name: 'Select Subject',
 				target: 'tools/bg_auto.select_subject'
 			},

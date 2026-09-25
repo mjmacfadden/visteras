@@ -41,7 +41,7 @@
     "Box blur": "",
     "Brightness": "",
     "Brightness:": "",
-    "Bulge\/Pinch Tool": "",
+    "Bulge/Pinch Tool": "",
     "Burn": "",
     "Can not animate 1 layer.": "Sorry, you can not animate just 1 layer, you need at least 2 layers.",
     "Can not find previous layer.": "Sorry, I can not find the previous layer.",
@@ -184,7 +184,7 @@
     "Green channel:": "",
     "Greyscale:": "",
     "Grid": "",
-    "Grid on\/off": "",
+    "Grid on/off": "",
     "Guides": "",
     "Guides enabled.": "",
     "H Radius:": "",
@@ -218,7 +218,7 @@
     "Instagram Filters": "",
     "Invalid Hex Code": "",
     "Italiano": "",
-    "JPG\/JPEG Format": "",
+    "JPG/JPEG Format": "",
     "Kerning:": "",
     "Key-Points": "",
     "KeyU": "",
@@ -395,7 +395,7 @@
     "Sharpen Tool": "",
     "Sharpen:": "",
     "Shortcut Key:": "",
-    "Show \/ Hide": "",
+    "Show / Hide": "",
     "Show file size:": "",
     "Simple": "",
     "Size is too big, max": "",
@@ -503,5 +503,6 @@
     "Zoom blur": "",
     "Zoom in": "",
     "Zoom out": "",
-    "Zoom:": ""
+    "Zoom:": "",
+    "Magic Wand Tool": "Чарівна паличка"
 }

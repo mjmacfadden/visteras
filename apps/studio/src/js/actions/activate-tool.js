@@ -11,6 +11,9 @@ export class Activate_tool_action extends Base_action {
 	constructor(key, ignore_same_tool, options = {}) {
 		super('activate_tool', 'Activate Tool');
 		this.ignore_same_tool = !!ignore_same_tool;
+		if (key === 'magic_erase') {
+			key = 'magic_wand';
+		}
 		this.key = key;
 		this.old_key = null;
 		this.tool_leave_actions = null;
@@ -81,20 +84,22 @@ export class Activate_tool_action extends Base_action {
 			//set default cursor
 			const mainWrapper = document.getElementById('main_wrapper');
 			const middleArea = document.querySelector('.middle_area');
-			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
-			const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
+			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
+			const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 			let defaultCursor = 'default';
 			if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 				defaultCursor = 'none';
 			} else if (config.TOOL && config.TOOL.name === 'text') {
 				defaultCursor = 'text';
+			} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
+				defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
 			} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 				defaultCursor = 'crosshair';
 			} else if (config.TOOL && config.TOOL.name === 'pick_color') {
 				defaultCursor = "url('images/icons/cursor-eyedropper.svg') 2 22, crosshair";
 			} else if (config.TOOL && config.TOOL.name === 'pen') {
-				defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
+				defaultCursor = "url('images/icons/cursor-pen.svg') 4 4, crosshair";
 			} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 				defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
 			} else if (config.TOOL && config.TOOL.name === 'fill') {
@@ -263,20 +268,22 @@ export class Activate_tool_action extends Base_action {
 		//set default cursor
 		const mainWrapper = document.getElementById('main_wrapper');
 		const middleArea = document.querySelector('.middle_area');
-		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
-		const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
+		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
+		const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';
 		if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 			defaultCursor = 'none';
 		} else if (config.TOOL && config.TOOL.name === 'text') {
 			defaultCursor = 'text';
+		} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
+			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
 		} else if (config.TOOL && config.TOOL.name === 'pick_color') {
 			defaultCursor = "url('images/icons/cursor-eyedropper.svg') 2 22, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'pen') {
-			defaultCursor = "url('images/icons/cursor-pen.svg') 1 1, crosshair";
+			defaultCursor = "url('images/icons/cursor-pen.svg') 4 4, crosshair";
 		} else if (config.TOOL && config.TOOL.name === 'direct_select') {
 			defaultCursor = "url('images/icons/cursor-direct-select.svg') 1 1, default";
 		} else if (config.TOOL && config.TOOL.name === 'fill') {
@@ -339,14 +346,21 @@ export class Activate_tool_action extends Base_action {
 		const element = document.getElementById('mouse');
 		const wrapper = document.getElementById('canvas_wrapper');
 		if (!element || !wrapper || !size) return;
+		const rawSize = (typeof size === 'object' && size != null) ? (size.value ?? 30) : size;
 		const zoom = config.ZOOM || 1;
-		const px = Math.max(size * zoom, 5);
+		const px = Math.max(rawSize * zoom, 5);
 		const wRect = wrapper.getBoundingClientRect();
 		element.style.width = px + 'px';
 		element.style.height = px + 'px';
 		element.style.left = (wRect.width / 2 - px / 2) + 'px';
 		element.style.top = (wRect.height / 2 - px / 2) + 'px';
-		element.className = (config.TOOL && config.TOOL.name === 'pencil') ? 'rect' : 'circle';
+		let cursorClass = 'circle';
+		if (config.TOOL && config.TOOL.name === 'pencil') {
+			cursorClass = 'rect';
+		} else if (config.TOOL && config.TOOL.name === 'quick_selection') {
+			cursorClass = 'quick_selection_add';
+		}
+		element.className = cursorClass;
 	}
 
 	hide_brush_cursor() {
