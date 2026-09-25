@@ -7,6 +7,7 @@ import GUI_tools_class from './../core/gui/gui-tools.js';
 import Layer_raster_class from './../modules/layer/raster.js';
 import Helper_class from './../libs/helpers.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
+import { normalize_raster_layer_to_document } from './../libs/paint-target.js';
 
 var instance = null;
 
@@ -449,6 +450,16 @@ class Selection_class extends Base_tools_class {
 		}
 		this.Base_selection.bake_selection_clips();
 
+		if (config.mask_active === true && config.layer.mask != null) {
+			this.fill('#000000');
+			return;
+		}
+
+		if (config.layer.type === 'adjustment') {
+			alertify.error('Cannot delete pixels on an adjustment layer.');
+			return;
+		}
+
 		if (config.layer.type !== 'image') {
 			this.Layer_raster.raster();
 		}
@@ -459,7 +470,7 @@ class Selection_class extends Base_tools_class {
 			return;
 		}
 
-		this.init_tmp_canvas();
+		normalize_raster_layer_to_document(layer);
 
 		var ow = layer.width_original || layer.width || config.WIDTH;
 		var oh = layer.height_original || layer.height || config.HEIGHT;
@@ -468,47 +479,57 @@ class Selection_class extends Base_tools_class {
 		var is_locked = (layer.locked === true);
 		var bgColor = config.COLOR_BG || '#ffffff';
 
+		var delCanvas = document.createElement('canvas');
+		delCanvas.width = ow;
+		delCanvas.height = oh;
+		var delCtx = delCanvas.getContext('2d');
+		var src = layer.link_canvas || layer.link;
+		if (src) {
+			delCtx.drawImage(src, 0, 0, ow, oh);
+		}
+
 		if (is_locked) {
 			var originalSnapshot = document.createElement('canvas');
 			originalSnapshot.width = ow;
 			originalSnapshot.height = oh;
-			originalSnapshot.getContext('2d').drawImage(this.tmpCanvas, 0, 0);
+			originalSnapshot.getContext('2d').drawImage(delCanvas, 0, 0);
 
 			var editedCanvas = document.createElement('canvas');
 			editedCanvas.width = ow;
 			editedCanvas.height = oh;
 			var ectx = editedCanvas.getContext('2d');
+			ectx.drawImage(delCanvas, 0, 0);
 			ectx.fillStyle = bgColor;
 			ectx.fillRect(0, 0, ow, oh);
 
 			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
-			this.tmpCanvasCtx.clearRect(0, 0, ow, oh);
-			this.tmpCanvasCtx.drawImage(editedCanvas, 0, 0);
+			delCtx.clearRect(0, 0, ow, oh);
+			delCtx.drawImage(editedCanvas, 0, 0);
 		} else {
-			this.tmpCanvasCtx.save();
-			this.tmpCanvasCtx.globalCompositeOperation = 'destination-out';
-			this.tmpCanvasCtx.drawImage(mask, 0, 0);
-			this.tmpCanvasCtx.restore();
+			delCtx.save();
+			delCtx.globalCompositeOperation = 'destination-out';
+			delCtx.drawImage(mask, 0, 0);
+			delCtx.restore();
 		}
 
 		app.State.do_action(
 			new app.Actions.Bundle_action('delete_selection', 'Delete Selection', [
-				new app.Actions.Update_layer_image_action(this.tmpCanvas, layer.id)
+				new app.Actions.Update_layer_image_action(delCanvas, layer.id)
 			])
 		);
 
-		this.reset_tmp_canvas();
 		config.need_render = true;
 	}
 
 	init_tmp_canvas() {
 		var layer = config.layer;
+		if (!layer) return;
 		var lw = layer.width_original || layer.width || config.WIDTH;
 		var lh = layer.height_original || layer.height || config.HEIGHT;
 		this.tmpCanvas = document.createElement('canvas');
 		this.tmpCanvas.width = lw;
 		this.tmpCanvas.height = lh;
-		this.tmpCanvasCtx = this.tmpCanvas.getContext("2d");
+		this.tmpCanvasCtx = this.tmpCanvas.getContext('2d');
 		var src = layer.link_canvas || layer.link;
 		if (src) {
 			this.tmpCanvasCtx.drawImage(src, 0, 0, lw, lh);
@@ -516,6 +537,64 @@ class Selection_class extends Base_tools_class {
 	}
 
 	fill(color) {
+		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+			const layer = config.layer;
+			const source = layer.mask.link_canvas || layer.mask.link;
+			if (source) {
+				const maskCanvas = document.createElement('canvas');
+				maskCanvas.width = source.width;
+				maskCanvas.height = source.height;
+				const mctx = maskCanvas.getContext('2d');
+				mctx.drawImage(source, 0, 0);
+
+				let fillStyle = color;
+				try {
+					const rgb = this.Helper.hexToRgb(color);
+					if (rgb && typeof rgb.r === 'number') {
+						const gray = Math.round(0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b);
+						fillStyle = 'rgb(' + gray + ', ' + gray + ', ' + gray + ')';
+					}
+				} catch (e) {}
+
+				if (this.Base_selection.has_selection) {
+					const originalMask = document.createElement('canvas');
+					originalMask.width = source.width;
+					originalMask.height = source.height;
+					originalMask.getContext('2d').drawImage(source, 0, 0);
+
+					const editedMask = document.createElement('canvas');
+					editedMask.width = source.width;
+					editedMask.height = source.height;
+					const emctx = editedMask.getContext('2d');
+					emctx.drawImage(source, 0, 0);
+					emctx.fillStyle = fillStyle;
+					emctx.fillRect(0, 0, source.width, source.height);
+
+					this.Base_selection.restore_outside_selection(editedMask, originalMask, {
+						x: layer.mask.x || 0,
+						y: layer.mask.y || 0,
+						width: source.width,
+						height: source.height,
+						width_original: source.width,
+						height_original: source.height,
+					});
+					mctx.clearRect(0, 0, source.width, source.height);
+					mctx.drawImage(editedMask, 0, 0);
+				} else {
+					mctx.fillStyle = fillStyle;
+					mctx.fillRect(0, 0, source.width, source.height);
+				}
+
+				app.State.do_action(
+					new app.Actions.Bundle_action('fill_mask', 'Fill Mask', [
+						new app.Actions.Update_layer_mask_image_action(maskCanvas, layer.id)
+					])
+				);
+				config.need_render = true;
+				return;
+			}
+		}
+
 		if (!config.layer) {
 			var new_layer = {
 				name: 'Layer 1',
@@ -533,6 +612,11 @@ class Selection_class extends Base_tools_class {
 			app.State.do_action(new app.Actions.Insert_layer_action(new_layer, false));
 		}
 
+		if (config.layer.type === 'adjustment') {
+			alertify.error('Cannot fill an adjustment layer. Create a new layer or edit the layer mask.');
+			return;
+		}
+
 		if (config.layer.type !== 'image') {
 			this.Layer_raster.raster();
 		}
@@ -543,40 +627,48 @@ class Selection_class extends Base_tools_class {
 			return;
 		}
 
-		this.init_tmp_canvas();
+		normalize_raster_layer_to_document(layer);
 
 		var ow = layer.width_original || layer.width || config.WIDTH;
 		var oh = layer.height_original || layer.height || config.HEIGHT;
+
+		var fillCanvas = document.createElement('canvas');
+		fillCanvas.width = ow;
+		fillCanvas.height = oh;
+		var fillCtx = fillCanvas.getContext('2d');
+		var src = layer.link_canvas || layer.link;
+		if (src) {
+			fillCtx.drawImage(src, 0, 0, ow, oh);
+		}
 
 		if (this.Base_selection.has_selection) {
 			var originalSnapshot = document.createElement('canvas');
 			originalSnapshot.width = ow;
 			originalSnapshot.height = oh;
-			originalSnapshot.getContext('2d').drawImage(this.tmpCanvas, 0, 0);
+			originalSnapshot.getContext('2d').drawImage(fillCanvas, 0, 0);
 
 			var editedCanvas = document.createElement('canvas');
 			editedCanvas.width = ow;
 			editedCanvas.height = oh;
 			var ectx = editedCanvas.getContext('2d');
-			ectx.drawImage(this.tmpCanvas, 0, 0);
+			ectx.drawImage(fillCanvas, 0, 0);
 			ectx.fillStyle = color;
 			ectx.fillRect(0, 0, ow, oh);
 
 			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
-			this.tmpCanvasCtx.clearRect(0, 0, ow, oh);
-			this.tmpCanvasCtx.drawImage(editedCanvas, 0, 0);
+			fillCtx.clearRect(0, 0, ow, oh);
+			fillCtx.drawImage(editedCanvas, 0, 0);
 		} else {
-			this.tmpCanvasCtx.fillStyle = color;
-			this.tmpCanvasCtx.fillRect(0, 0, ow, oh);
+			fillCtx.fillStyle = color;
+			fillCtx.fillRect(0, 0, ow, oh);
 		}
 
 		app.State.do_action(
 			new app.Actions.Bundle_action('fill_layer', 'Fill', [
-				new app.Actions.Update_layer_image_action(this.tmpCanvas, layer.id)
+				new app.Actions.Update_layer_image_action(fillCanvas, layer.id)
 			])
 		);
 
-		this.reset_tmp_canvas();
 		config.need_render = true;
 	}
 
@@ -635,10 +727,6 @@ class Selection_class extends Base_tools_class {
 	}
 
 	reset_tmp_canvas() {
-		if (this.tmpCanvas == null)
-			return;
-		this.tmpCanvas.width = 1;
-		this.tmpCanvas.height = 1;
 		this.tmpCanvas = null;
 		this.tmpCanvasCtx = null;
 	}

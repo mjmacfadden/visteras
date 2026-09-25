@@ -95,7 +95,7 @@ class Pen_tool_class extends Base_tools_class {
 		}
 
 		// Delete / Backspace: delete selected anchor
-		if ((e.key === 'Delete' || e.key === 'Backspace') && Vector_manager.active_anchor_index !== null) {
+		if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && Vector_manager.active_anchor_index !== null) {
 			this._delete_active_anchor();
 			e.preventDefault();
 			return;

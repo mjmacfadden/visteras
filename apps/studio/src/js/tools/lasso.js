@@ -96,7 +96,7 @@ class Lasso_tool_class extends Base_tools_class {
 
 			// Backspace / Delete
 			if (code === 46 || code === 8 || key === 'Delete' || key === 'Backspace') {
-				if (this.poly_path != null) {
+				if (!e.altKey && !e.ctrlKey && !e.metaKey && this.poly_path != null) {
 					e.preventDefault();
 					this.undo_poly_vertex();
 					return;

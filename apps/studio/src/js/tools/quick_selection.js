@@ -59,19 +59,15 @@ class Quick_selection_class extends Base_tools_class {
 
 			// Alt/Option + Delete/Backspace - fill foreground
 			if (e.altKey && !e.ctrlKey && !e.metaKey && (code === 46 || code === 8 || key === 'Delete' || key === 'Backspace')) {
-				if (app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection) {
-					e.preventDefault();
-					this.fill(config.COLOR || '#000000');
-				}
+				e.preventDefault();
+				this.fill(config.COLOR || '#000000');
 				return;
 			}
 
 			// Ctrl/Cmd + Delete/Backspace - fill background
 			if ((e.ctrlKey || e.metaKey) && !e.altKey && (code === 46 || code === 8 || key === 'Delete' || key === 'Backspace')) {
-				if (app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection) {
-					e.preventDefault();
-					this.fill(config.COLOR_BG || '#ffffff');
-				}
+				e.preventDefault();
+				this.fill(config.COLOR_BG || '#ffffff');
 				return;
 			}
 

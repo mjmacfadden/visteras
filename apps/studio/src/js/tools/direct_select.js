@@ -86,7 +86,7 @@ class Direct_select_tool_class extends Base_tools_class {
 		if (!vec) return;
 
 		// Delete / Backspace: delete selected anchors
-		if (e.key === 'Delete' || e.key === 'Backspace') {
+		if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace')) {
 			if (Vector_manager.selected_anchors.length > 0 || Vector_manager.active_anchor_index !== null) {
 				this._delete_selected_anchors();
 				e.preventDefault();

@@ -386,8 +386,11 @@ class GUI_shortcuts_class {
 				&& (event.code === 'Delete' || event.code === 'Backspace' || event.key === 'Delete' || event.key === 'Backspace' || event.keyCode === 46 || event.keyCode === 8)) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
-				if (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['selection']) {
-					app.GUI.GUI_tools.tools_modules['selection'].object.fill(config.COLOR || '#000000');
+				const selModule = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['selection'])
+					? app.GUI.GUI_tools.tools_modules['selection'].object
+					: (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection'] ? app.GUI.modules['edit/selection'].Selection : null);
+				if (selModule) {
+					selModule.fill(config.COLOR || '#000000');
 				}
 				return;
 			}
@@ -419,28 +422,42 @@ class GUI_shortcuts_class {
 				&& (event.code === 'Delete' || event.code === 'Backspace' || event.key === 'Delete' || event.key === 'Backspace' || event.keyCode === 46 || event.keyCode === 8)) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
-				if (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['selection']) {
-					app.GUI.GUI_tools.tools_modules['selection'].object.fill(config.COLOR_BG || '#ffffff');
+				const selModule = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['selection'])
+					? app.GUI.GUI_tools.tools_modules['selection'].object
+					: (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection'] ? app.GUI.modules['edit/selection'].Selection : null);
+				if (selModule) {
+					selModule.fill(config.COLOR_BG || '#ffffff');
 				}
 				return;
 			}
 
 			// Delete/Backspace = delete selected layer(s)
-			// (Skip when marquee/lasso/magic wand has an active selection — that clears pixels instead.)
+			// (If there is an active selection anywhere, clear pixels within selection instead.)
 			if (!event.ctrlKey && !event.metaKey && !event.altKey
 				&& (event.code === 'Delete' || event.code === 'Backspace'
 					|| event.key === 'Delete' || event.key === 'Backspace'
 					|| event.keyCode === 46 || event.keyCode === 8)) {
-				const hasSelection = (config.TOOL && (config.TOOL.name === 'selection' || config.TOOL.name === 'lasso' || config.TOOL.name === 'magic_wand'))
-					&& app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection;
-				if (!hasSelection) {
+				const hasSelection = app.Layers && app.Layers.Base_selection && app.Layers.Base_selection.has_selection;
+				if (hasSelection) {
 					event.preventDefault();
 					event.stopImmediatePropagation();
-					if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
-						app.GUI.modules['layer/delete'].delete();
+					const selModule = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['selection'])
+						? app.GUI.GUI_tools.tools_modules['selection'].object
+						: (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection'] ? app.GUI.modules['edit/selection'].Selection : null);
+					if (selModule) {
+						selModule.delete_selection();
 					}
 					return;
 				}
+				if (config.TOOL && (config.TOOL.name === 'pen' || config.TOOL.name === 'direct_select')) {
+					return;
+				}
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['layer/delete']) {
+					app.GUI.modules['layer/delete'].delete();
+				}
+				return;
 			}
 
 			// Ctrl/Cmd + G = Group Layers; Ctrl/Cmd + Shift + G = Ungroup

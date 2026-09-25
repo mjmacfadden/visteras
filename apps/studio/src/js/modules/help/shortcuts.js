@@ -38,6 +38,8 @@ class Help_shortcuts_class {
 				{title: "---", value: "Colors"},
 				{title: "X", value: 'Swap Foreground/Background'},
 				{title: "D", value: 'Default Colors (Black/White)'},
+				{title: "Alt / Option + Delete", value: 'Fill with Foreground Color'},
+				{title: `${mod} + Delete`, value: 'Fill with Background Color'},
 				{title: "---", value: "Brush Size / Hardness"},
 				{title: "[ / ]", value: 'Decrease / Increase Brush Size'},
 				{title: "Shift + [ / ]", value: 'Decrease / Increase Brush Hardness'},
