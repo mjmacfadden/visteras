@@ -702,12 +702,37 @@ class GUI_shortcuts_class {
 			config.TOOL.attributes.size = newSize;
 		}
 
-		// Update the UI input if it exists
-		const sizeInput = document.querySelector('#size');
-		if (sizeInput && sizeInput.closest) {
-			const $input = $(sizeInput);
-			if ($input.uiNumberInput) {
-				$input.uiNumberInput('set_value', newSize);
+		// Update UI elements in options bar if present
+		const sizeItem = document.querySelector('.attributes .item.size') || document.querySelector('.attributes');
+		if (sizeItem) {
+			const numberInput = sizeItem.querySelector('.ui_number_input');
+			if (numberInput && typeof $(numberInput).uiNumberInput === 'function') {
+				try {
+					$(numberInput).uiNumberInput('set_value', newSize);
+				} catch (e) { /* ignore */ }
+			}
+			const slider = sizeItem.querySelector('.ui_range');
+			if (slider && typeof $(slider).uiRange === 'function') {
+				try {
+					$(slider).uiRange('set_value', newSize);
+				} catch (e) { /* ignore */ }
+			}
+			const valueLabel = sizeItem.querySelector('.slider_value, #attribute_value_size');
+			if (valueLabel) {
+				valueLabel.value = String(newSize);
+				valueLabel.innerHTML = String(newSize);
+			}
+		}
+
+		// Notify active tool if it listens for param updates
+		if (app.GUI && app.GUI.GUI_tools && config.TOOL) {
+			const mod = app.GUI.GUI_tools.tools_modules[config.TOOL.name];
+			if (mod && mod.object) {
+				if (typeof mod.object.on_params_update === 'function') {
+					mod.object.on_params_update({ key: 'size', value: newSize });
+				} else if (typeof mod.object.on_update === 'function') {
+					mod.object.on_update({ key: 'size', value: newSize });
+				}
 			}
 		}
 
