@@ -419,7 +419,7 @@ class GUI_tools_class {
 			return;
 		var shape = null;
 		for (var k in itemDef.tool_group.items) {
-			if ((itemDef.tool_group.items[k].tool || itemDef.name) == key) {
+			if ((itemDef.tool_group.items[k].tool || itemDef.tool_group.items[k].shape || itemDef.name) == key) {
 				shape = itemDef.tool_group.items[k].shape;
 				break;
 			}

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Brush Handle & Ferrule -->
+  <path d="M472 40c-24-24-64-24-88 0L248 176l88 88L472 128c24-24 24-64 0-88z" fill="#000000"/>
+  <path d="M224 200l-48 48 88 88 48-48-88-88z" fill="#000000"/>
+  <!-- Bristles -->
+  <path d="M160 264c-32 32-56 72-72 112-8 20 8 40 28 32 40-16 80-40 112-72l-68-72z" fill="#000000"/>
+  <!-- Dashed Selection Arc Around Tip -->
+  <path d="M48 352a160 160 0 0 0 40 88" fill="none" stroke="#000000" stroke-width="28" stroke-linecap="round" stroke-dasharray="24 20"/>
+  <path d="M136 480a160 160 0 0 0 88 16" fill="none" stroke="#000000" stroke-width="28" stroke-linecap="round" stroke-dasharray="24 20"/>
+  <path d="M280 472a160 160 0 0 0 88-64" fill="none" stroke="#000000" stroke-width="28" stroke-linecap="round" stroke-dasharray="24 20"/>
+  <path d="M40 264a160 160 0 0 0 0 48" fill="none" stroke="#000000" stroke-width="28" stroke-linecap="round" stroke-dasharray="24 20"/>
+</svg>

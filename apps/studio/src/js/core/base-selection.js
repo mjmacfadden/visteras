@@ -966,6 +966,21 @@ class Base_selection_class {
 		config.need_render = true;
 	}
 
+	set_preview_mask(canvas) {
+		if (!canvas) {
+			this._preview_contours = null;
+		} else {
+			this._preview_contours = this._trace_mask_contours(canvas);
+		}
+		config.need_render = true;
+	}
+
+	clear_preview_mask() {
+		this._preview_contours = null;
+		this._preview_lasso_path = null;
+		config.need_render = true;
+	}
+
 	update_mask_state() {
 		var contours = this._trace_mask_contours(this.mask_canvas);
 		if (!contours || contours.length === 0) {
@@ -1657,7 +1672,7 @@ class Base_selection_class {
 			return;
 
 		const mainWrapper = document.getElementById('main_wrapper');
-		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
+		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
 		const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';

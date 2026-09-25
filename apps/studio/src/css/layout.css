@@ -489,6 +489,7 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .erase:after{ background-image: url('../images/icons/erase.svg'); }
 .sidebar_left .magic_wand:after,
 .sidebar_left .magic_erase:after{ background-image: url('../images/icons/magic_wand.svg'); }
+.sidebar_left .quick_selection:after{ background-image: url('../images/icons/quick_selection.svg'); }
 .sidebar_left .fill:after{ background-image: url('../images/icons/fill.svg'); }
 .sidebar_left .media:after{ background-image: url('../images/icons/media.svg'); }
 .sidebar_left .camera:after{ background-image: url('../images/icons/camera.svg'); }
@@ -542,6 +543,8 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .sidebar_left .item.selection.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .item.lasso.marquee_lasso:after{ background-image: url('../images/icons/lasso.svg'); }
 .sidebar_left .item.lasso.marquee_polygonal_lasso:after{ background-image: url('../images/icons/polygonal_lasso.svg'); }
+.sidebar_left .item.magic_wand.marquee_magic_wand:after{ background-image: url('../images/icons/magic_wand.svg'); }
+.sidebar_left .item.magic_wand.marquee_quick_selection:after{ background-image: url('../images/icons/quick_selection.svg'); }
 .sidebar_left .item.brush.marquee_pencil:after{ background-image: url('../images/icons/pencil.svg'); }
 .sidebar_left .item.gradient.marquee_fill:after{
 	background-image: url('../images/icons/fill.svg');
@@ -612,6 +615,8 @@ body.tool-pan.pan-dragging #canvas_minipaint{
 .tg_icon.selection_ellipse{ background-image: url('../images/icons/selection_ellipse.svg'); }
 .tg_icon.lasso{ background-image: url('../images/icons/lasso.svg'); }
 .tg_icon.polygonal_lasso{ background-image: url('../images/icons/polygonal_lasso.svg'); }
+.tg_icon.magic_wand{ background-image: url('../images/icons/magic_wand.svg'); }
+.tg_icon.quick_selection{ background-image: url('../images/icons/quick_selection.svg'); }
 .tg_icon.brush{ background-image: url('../images/icons/brush.svg'); }
 .tg_icon.pencil{ background-image: url('../images/icons/pencil.svg'); }
 .tg_icon.rectangle{ background-image: url('../images/icons/rectangle.svg'); }
@@ -1918,6 +1923,36 @@ visible around/outside the canvas edge; never blocks pointer events */
 	top: 50%;
 	left: -4px;
 	right: -4px;
+	height: 1px;
+	transform: translateY(-50%);
+}
+#mouse.quick_selection_add,
+#mouse.quick_selection_subtract{
+	border: 1px solid rgba(0, 0, 0, 0.85);
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.75);
+	border-radius: 50%;
+}
+#mouse.quick_selection_add::before,
+#mouse.quick_selection_add::after,
+#mouse.quick_selection_subtract::after{
+	content: '';
+	position: absolute;
+	background: rgba(0, 0, 0, 0.85);
+	box-shadow: 0 0 1px rgba(255, 255, 255, 0.9);
+	pointer-events: none;
+}
+#mouse.quick_selection_add::before{
+	left: 50%;
+	top: calc(50% - 4px);
+	height: 8px;
+	width: 1px;
+	transform: translateX(-50%);
+}
+#mouse.quick_selection_add::after,
+#mouse.quick_selection_subtract::after{
+	top: 50%;
+	left: calc(50% - 4px);
+	width: 8px;
 	height: 1px;
 	transform: translateY(-50%);
 }

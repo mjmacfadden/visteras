@@ -508,6 +508,17 @@ class GUI_shortcuts_class {
 							app.GUI.GUI_tools.activate_tool(gResolved);
 						}
 					}
+				} else if (targetTool === 'magic_wand') {
+					if (app.GUI && app.GUI.GUI_tools) {
+						if (event.shiftKey) {
+							app.GUI.GUI_tools.cycle_tool_group('magic_wand');
+						} else {
+							var wResolved = (typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
+								? app.GUI.GUI_tools.get_active_tool_for_group('magic_wand')
+								: 'magic_wand';
+							app.GUI.GUI_tools.activate_tool(wResolved);
+						}
+					}
 				} else {
 					var resolved = (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.get_active_tool_for_group === 'function')
 						? app.GUI.GUI_tools.get_active_tool_for_group(targetTool)
@@ -680,11 +691,16 @@ class GUI_shortcuts_class {
 		if (!config.TOOL || !config.TOOL.attributes) return;
 		if (config.TOOL.attributes.size == null) return;
 
-		const oldSize = config.TOOL.attributes.size;
+		const attr = config.TOOL.attributes.size;
+		const oldSize = (typeof attr === 'object' && attr != null) ? (attr.value ?? 30) : attr;
 		const newSize = Math.max(1, Math.min(999, oldSize + delta));
 		if (newSize === oldSize) return;
 
-		config.TOOL.attributes.size = newSize;
+		if (typeof attr === 'object' && attr != null) {
+			attr.value = newSize;
+		} else {
+			config.TOOL.attributes.size = newSize;
+		}
 
 		// Update the UI input if it exists
 		const sizeInput = document.querySelector('#size');
@@ -697,7 +713,7 @@ class GUI_shortcuts_class {
 
 		// Immediately update the brush cursor on screen
 		var mouseEl = document.getElementById('mouse');
-		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect'))) {
+		if (mouseEl && (mouseEl.classList.contains('circle') || mouseEl.classList.contains('rect') || mouseEl.classList.contains('quick_selection_add') || mouseEl.classList.contains('quick_selection_subtract'))) {
 			var curW = parseFloat(mouseEl.style.width) || 0;
 			var zoomedSize = newSize * config.ZOOM;
 			var left = parseFloat(mouseEl.style.left) || 0;

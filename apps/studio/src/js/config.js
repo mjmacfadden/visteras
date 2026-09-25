@@ -194,6 +194,59 @@ config.TOOLS = [
 				value: true,
 			},
 		},
+		tool_group: {
+			label: 'Wand & Quick Selection Tools',
+			hidden: false,
+			items: [
+				{
+					shape: 'magic_wand',
+					title: 'Magic Wand Tool',
+					icon: 'magic_wand',
+				},
+				{
+					shape: 'quick_selection',
+					title: 'Quick Selection Tool',
+					icon: 'quick_selection',
+					tool: 'quick_selection',
+				},
+			],
+		},
+	},
+	{
+		name: 'quick_selection',
+		title: 'Quick Selection Tool',
+		visible: false,
+		on_update: 'on_params_update',
+		on_leave: 'on_leave',
+		attributes: {
+			mode: {
+				title: 'Mode',
+				value: 'Add',
+				values: ['New', 'Add', 'Subtract'],
+			},
+			size: {
+				title: 'Size',
+				value: 30,
+				min: 1,
+				max: 300,
+				step: 1,
+				slider: true,
+			},
+			tolerance: {
+				title: 'Tolerance',
+				value: 32,
+				min: 1,
+				max: 100,
+				step: 1,
+				slider: true,
+			},
+			all_layers: false,
+			anti_aliasing: true,
+			select_subject: {
+				title: 'Select Subject',
+				value: true,
+			},
+		},
 	},
 	{
 		name: 'brush',

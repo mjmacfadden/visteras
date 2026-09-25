@@ -84,7 +84,7 @@ export class Activate_tool_action extends Base_action {
 			//set default cursor
 			const mainWrapper = document.getElementById('main_wrapper');
 			const middleArea = document.querySelector('.middle_area');
-			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
+			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
 			const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 			let defaultCursor = 'default';
@@ -268,7 +268,7 @@ export class Activate_tool_action extends Base_action {
 		//set default cursor
 		const mainWrapper = document.getElementById('main_wrapper');
 		const middleArea = document.querySelector('.middle_area');
-		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
+		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
 		const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';
@@ -346,14 +346,21 @@ export class Activate_tool_action extends Base_action {
 		const element = document.getElementById('mouse');
 		const wrapper = document.getElementById('canvas_wrapper');
 		if (!element || !wrapper || !size) return;
+		const rawSize = (typeof size === 'object' && size != null) ? (size.value ?? 30) : size;
 		const zoom = config.ZOOM || 1;
-		const px = Math.max(size * zoom, 5);
+		const px = Math.max(rawSize * zoom, 5);
 		const wRect = wrapper.getBoundingClientRect();
 		element.style.width = px + 'px';
 		element.style.height = px + 'px';
 		element.style.left = (wRect.width / 2 - px / 2) + 'px';
 		element.style.top = (wRect.height / 2 - px / 2) + 'px';
-		element.className = (config.TOOL && config.TOOL.name === 'pencil') ? 'rect' : 'circle';
+		let cursorClass = 'circle';
+		if (config.TOOL && config.TOOL.name === 'pencil') {
+			cursorClass = 'rect';
+		} else if (config.TOOL && config.TOOL.name === 'quick_selection') {
+			cursorClass = 'quick_selection_add';
+		}
+		element.className = cursorClass;
 	}
 
 	hide_brush_cursor() {

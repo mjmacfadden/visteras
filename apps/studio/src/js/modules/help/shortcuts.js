@@ -28,7 +28,7 @@ class Help_shortcuts_class {
 				{title: "Alt / Option + Click", value: 'Sample Clone Source'},
 				{title: "M", value: 'Marquee Selection Tool (Shift+M to cycle)'},
 				{title: "L", value: 'Lasso Tool (Shift+L to cycle)'},
-				{title: "W", value: 'Magic Wand Tool'},
+				{title: "W", value: 'Magic Wand / Quick Selection Tool (Shift+W to cycle)'},
 				{title: "N", value: 'Pencil Tool'},
 				{title: "U", value: 'Rectangle / Shape Tool'},
 				{title: "J", value: 'Desaturate Tool'},

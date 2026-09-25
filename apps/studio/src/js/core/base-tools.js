@@ -90,7 +90,7 @@ class Base_tools_class {
 			}
 
 			// Custom brush cursor outline
-			var brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch'];
+			var brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
 			if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 				var params = activeTool.getParams ? activeTool.getParams() : (config.TOOL.attributes || {});
 				var size = params.size?.value ?? params.size ?? 10;
@@ -99,6 +99,10 @@ class Base_tools_class {
 					cursorType = 'rect';
 				} else if (config.TOOL.name === 'clone' && (event.altKey || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down))) {
 					cursorType = 'crosshair';
+				} else if (config.TOOL.name === 'quick_selection') {
+					var isSubtract = (event.altKey || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down)) ||
+						String(params.mode?.value ?? params.mode ?? 'Add').toLowerCase().includes('sub');
+					cursorType = isSubtract ? 'quick_selection_subtract' : 'quick_selection_add';
 				}
 				_this.show_mouse_cursor(config.mouse.x, config.mouse.y, size, cursorType);
 			}
