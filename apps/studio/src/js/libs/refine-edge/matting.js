@@ -249,7 +249,25 @@ export function refineStrokeMatting(
 		}
 	}
 
-	// Fallback samples if ROI doesn't have enough confidence
+	// If ROI lacks samples, search full mask for confident samples
+	if (fgSamples.length < 5 || bgSamples.length < 5) {
+		const step = Math.max(1, Math.floor(Math.sqrt((width * height) / 2000)));
+		for (let y = 0; y < height; y += step) {
+			const row = y * width;
+			for (let x = 0; x < width; x += step) {
+				const idx = row + x;
+				const mVal = maskPixels[idx];
+				const pIdx = idx * 4;
+				if (mVal >= 200 && fgSamples.length < fgSampleLimit) {
+					fgSamples.push([imgPixels[pIdx], imgPixels[pIdx + 1], imgPixels[pIdx + 2]]);
+				} else if (mVal <= 50 && bgSamples.length < bgSampleLimit) {
+					bgSamples.push([imgPixels[pIdx], imgPixels[pIdx + 1], imgPixels[pIdx + 2]]);
+				}
+			}
+		}
+	}
+
+	// Fallback samples if ROI and mask still don't have enough confidence
 	if (fgSamples.length === 0) fgSamples.push([200, 200, 200]);
 	if (bgSamples.length === 0) bgSamples.push([50, 50, 50]);
 

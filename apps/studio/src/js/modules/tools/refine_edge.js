@@ -26,11 +26,11 @@ import {
 } from './../../libs/refine-edge/matting.js';
 
 const VIEW_MODES = [
+	{ id: 'on_black', name: 'On Black (B)' },
+	{ id: 'on_white', name: 'On White (W)' },
 	{ id: 'overlay', name: 'Overlay (V)' },
 	{ id: 'onion_skin', name: 'Onion Skin (O)' },
 	{ id: 'marching_ants', name: 'Marching Ants (M)' },
-	{ id: 'on_black', name: 'On Black (B)' },
-	{ id: 'on_white', name: 'On White (W)' },
 	{ id: 'black_and_white', name: 'Black & White (K)' },
 	{ id: 'on_layers', name: 'On Layers (Y)' },
 ];
@@ -150,38 +150,51 @@ class Tools_refineEdge_class {
 		this._layerId = layer.id;
 		this._sourceLayer = layer;
 
-		// 1. Prepare original RGB image canvas
-		this._imgCanvas = this.Base_layers.convert_layer_to_canvas(this._layerId, true);
-		if (!this._imgCanvas || this._imgCanvas.width === 0 || this._imgCanvas.height === 0) {
-			alertify.error('Unable to read layer image content.');
-			return;
+		// 1. Determine target canvas dimensions from mask (if present) or layer
+		const maskSource = layer.mask ? (layer.mask.link_canvas || layer.mask.link) : null;
+		if (maskSource && maskSource.width > 0 && maskSource.height > 0) {
+			this._width = maskSource.width;
+			this._height = maskSource.height;
+		} else {
+			this._width = Math.max(1, Math.round(layer.width || config.WIDTH));
+			this._height = Math.max(1, Math.round(layer.height || config.HEIGHT));
 		}
-		this._width = this._imgCanvas.width;
-		this._height = this._imgCanvas.height;
 
-		// 2. Prepare initial mask canvas
+		// 2. Prepare original RGB image canvas
+		this._imgCanvas = document.createElement('canvas');
+		this._imgCanvas.width = this._width;
+		this._imgCanvas.height = this._height;
+		const imgCtx = this._imgCanvas.getContext('2d');
+
+		const layerSrc = layer.link_canvas || layer.link;
+		if (layer.type === 'image' && layerSrc) {
+			imgCtx.drawImage(layerSrc, 0, 0, this._width, this._height);
+		} else {
+			const savedMask = layer.mask;
+			layer.mask = null;
+			this.Base_layers.render_object(imgCtx, layer);
+			layer.mask = savedMask;
+		}
+
+		// 3. Prepare initial mask canvas
 		this._origMaskCanvas = document.createElement('canvas');
 		this._origMaskCanvas.width = this._width;
 		this._origMaskCanvas.height = this._height;
 		const origCtx = this._origMaskCanvas.getContext('2d');
 
-		if (layer.mask && (layer.mask.link_canvas || layer.mask.link)) {
-			// Layer already has a mask: draw into native layer coordinates
-			const srcMask = layer.mask.link_canvas || layer.mask.link;
-			origCtx.drawImage(srcMask, 0, 0, this._width, this._height);
+		if (maskSource) {
+			origCtx.drawImage(maskSource, 0, 0, this._width, this._height);
 		} else if (app.Layers.Base_selection && app.Layers.Base_selection.has_selection) {
-			// Initialize from document selection
 			const selMask = app.Layers.Base_selection.mask_canvas;
 			const layerX = layer.x || 0;
 			const layerY = layer.y || 0;
 			origCtx.drawImage(selMask, -layerX, -layerY);
 		} else {
-			// Fallback: full reveal (white) mask
 			origCtx.fillStyle = '#ffffff';
 			origCtx.fillRect(0, 0, this._width, this._height);
 		}
 
-		// 3. Clone for base editable mask and working filtered mask
+		// 4. Clone for base editable mask and working filtered mask
 		this._baseMaskCanvas = document.createElement('canvas');
 		this._baseMaskCanvas.width = this._width;
 		this._baseMaskCanvas.height = this._height;
@@ -191,16 +204,16 @@ class Tools_refineEdge_class {
 		this._workingMaskCanvas.width = this._width;
 		this._workingMaskCanvas.height = this._height;
 
-		// 4. Capture composite of layers underneath (for "On Layers" view mode)
+		// 5. Capture composite of layers underneath (for "On Layers" view mode)
 		this._build_under_layers_canvas();
 
-		// 5. Reset tools & sliders to clean initial defaults
+		// 6. Reset tools & sliders to clean initial defaults
 		this._activeTool = 'refine_edge';
 		this._toolMode = 'add';
 		this._brushSize = 35;
 		this._brushHardness = 100;
-		this._viewMode = 'overlay';
-		this._viewOpacity = 50;
+		this._viewMode = 'on_black';
+		this._viewOpacity = 100;
 		this._showEdge = false;
 		this._showOriginal = false;
 		this._refineMode = 'color';
@@ -311,7 +324,11 @@ class Tools_refineEdge_class {
 							<svg viewBox="0 0 24 24"><path d="M7 2v2H5v2H3v2H1v2h2v2h2v2h2v2h2v-2h2v-2h2v-2h2V8h-2V6h-2V4h-2V2H7zm11 11l-1.4 1.4 3 3L18.2 19l-3-3-1.4 1.4 3 3 1.4-1.4 3-3-1.4-1.4-1.8-1.6z"/></svg>
 						</button>
 						<button type="button" class="refine-edge__tool-btn active" data-tool="refine_edge" title="Refine Edge Brush Tool (R)">
-							<svg viewBox="0 0 24 24"><path d="M20.7 7.7a2.5 2.5 0 0 0-3.5-3.5L14.4 7l3.5 3.5 2.8-2.8zM3 17.2V21h3.8l9.6-9.6-3.8-3.8L3 17.2zM21 2h-2v3h-3v2h3v3h2V7h3V5h-3V2z"/></svg>
+							<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+								<path d="M15.4 3.6c-.4-.4-1.1-.4-1.5 0l-2.6 2.6 4.1 4.1 2.6-2.6c.4-.4.4-1.1 0-1.5l-2.6-2.6z"/>
+								<path d="M10.5 7.5l4.3 4.3c-.8 1.6-2 2.8-3.6 3.7-1.3.7-2.8 1.1-4.3 1.2l-.2-.2c.1-1.5.5-3 1.2-4.3.9-1.6 2.1-2.8 3.7-3.6z"/>
+								<path d="M12.2 18c-3.2.2-6.2-.9-8.2-3.2-1.9-2.2-2.6-5.2-1.8-8 .3-1.2.9-2.3 1.7-3.2l.6 1.4c-.6.8-1.1 1.7-1.3 2.7-.6 2.3-.1 4.8 1.4 6.6 1.6 1.9 4 2.8 6.4 2.6l-1.9-2.7 2.6 1.4-1.4-2.8 2.6 1.4-1.3-2.6c1.1 1.1 2.1 2.4 2.8 3.9l-2.1.5z"/>
+							</svg>
 						</button>
 						<button type="button" class="refine-edge__tool-btn" data-tool="brush" title="Brush Tool (B)">
 							<svg viewBox="0 0 24 24"><path d="M20.7 5.7c.4-.4.4-1 0-1.4l-2-2c-.4-.4-1-.4-1.4 0l-9.1 9.1L6 14.8V21h6.2l3.4-2.2 5.1-13.1zM11.5 19H8v-3.5l1.6-1.6 3.5 3.5-1.6 1.6z"/></svg>
@@ -895,10 +912,10 @@ class Tools_refineEdge_class {
 
 		if (this._activeTool === 'refine_edge') {
 			this._strokePoints = [pt];
-			this._apply_refine_brush_dab(pt);
+			this._apply_refine_brush_dab(pt, null);
 		} else if (this._activeTool === 'brush') {
 			this._strokePoints = [pt];
-			this._apply_standard_brush_dab(pt);
+			this._apply_standard_brush_dab(pt, null);
 		} else if (this._activeTool === 'lasso') {
 			this._lassoPath = [pt];
 		} else if (this._activeTool === 'quick_select') {
@@ -919,13 +936,14 @@ class Tools_refineEdge_class {
 		if (!this._isDrawing) return;
 
 		const pt = this._get_canvas_coords(e);
+		const prevPt = this._strokePoints.length > 0 ? this._strokePoints[this._strokePoints.length - 1] : null;
 
 		if (this._activeTool === 'refine_edge') {
 			this._strokePoints.push(pt);
-			this._apply_refine_brush_dab(pt);
+			this._apply_refine_brush_dab(pt, prevPt);
 		} else if (this._activeTool === 'brush') {
 			this._strokePoints.push(pt);
-			this._apply_standard_brush_dab(pt);
+			this._apply_standard_brush_dab(pt, prevPt);
 		} else if (this._activeTool === 'lasso') {
 			this._lassoPath.push(pt);
 			this._render_lasso_preview();
@@ -963,46 +981,58 @@ class Tools_refineEdge_class {
 		return (this._toolMode === 'subtract') !== (this._altHeld);
 	}
 
-	_apply_standard_brush_dab(pt) {
+	_apply_standard_brush_dab(pt, prevPt) {
 		const ctx = this._baseMaskCanvas.getContext('2d');
 		const rad = this._brushSize / 2;
 		const isSub = this._is_subtract_mode();
+		const color = isSub ? '#000000' : '#ffffff';
 
 		ctx.save();
-		const grad = ctx.createRadialGradient(pt.x, pt.y, Math.max(0, rad * (this._brushHardness / 100)), pt.x, pt.y, rad);
-		if (isSub) {
-			grad.addColorStop(0, 'rgba(0,0,0,1)');
-			grad.addColorStop(1, 'rgba(0,0,0,0)');
-			ctx.globalCompositeOperation = 'destination-out';
+		ctx.globalCompositeOperation = 'source-over';
+		ctx.fillStyle = color;
+		ctx.strokeStyle = color;
+		ctx.lineWidth = rad * 2;
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+
+		if (prevPt) {
+			ctx.beginPath();
+			ctx.moveTo(prevPt.x, prevPt.y);
+			ctx.lineTo(pt.x, pt.y);
+			ctx.stroke();
 		} else {
-			grad.addColorStop(0, 'rgba(255,255,255,1)');
-			grad.addColorStop(1, 'rgba(255,255,255,0)');
-			ctx.globalCompositeOperation = 'source-over';
+			ctx.beginPath();
+			ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
+			ctx.fill();
 		}
-		ctx.fillStyle = grad;
-		ctx.beginPath();
-		ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
-		ctx.fill();
 		ctx.restore();
 
 		this._recalculate_working_mask();
 		this._render_preview();
 	}
 
-	_apply_refine_brush_dab(pt) {
-		// Live visual feedback dab while painting
-		const ctx = this._workingMaskCanvas.getContext('2d');
-		const rad = this._brushSize / 2;
-		ctx.save();
-		ctx.strokeStyle = this._is_subtract_mode() ? 'rgba(220, 50, 50, 0.4)' : 'rgba(50, 150, 255, 0.4)';
-		ctx.lineWidth = rad * 1.5;
-		ctx.lineCap = 'round';
-		ctx.beginPath();
-		ctx.arc(pt.x, pt.y, 1, 0, Math.PI * 2);
-		ctx.stroke();
-		ctx.restore();
+	_apply_refine_brush_dab(pt, prevPt) {
+		// Live visual feedback dab while painting on preview
+		if (!this._displayCtx) return;
+		this._displayCtx.save();
+		const color = this._is_subtract_mode() ? 'rgba(255, 60, 60, 0.45)' : 'rgba(0, 180, 255, 0.45)';
+		this._displayCtx.strokeStyle = color;
+		this._displayCtx.fillStyle = color;
+		this._displayCtx.lineWidth = this._brushSize;
+		this._displayCtx.lineCap = 'round';
+		this._displayCtx.lineJoin = 'round';
 
-		this._render_preview();
+		if (prevPt) {
+			this._displayCtx.beginPath();
+			this._displayCtx.moveTo(prevPt.x, prevPt.y);
+			this._displayCtx.lineTo(pt.x, pt.y);
+			this._displayCtx.stroke();
+		} else {
+			this._displayCtx.beginPath();
+			this._displayCtx.arc(pt.x, pt.y, this._brushSize / 2, 0, Math.PI * 2);
+			this._displayCtx.fill();
+		}
+		this._displayCtx.restore();
 	}
 
 	_finish_refine_brush_stroke() {
@@ -1255,27 +1285,18 @@ class Tools_refineEdge_class {
 			case 'overlay': {
 				// Photoshop Rubylith: image drawn normally, unselected area tinted red
 				this._displayCtx.drawImage(effectiveImgCanvas, 0, 0);
-
-				// Red overlay where mask is 0
-				const temp = document.createElement('canvas');
-				temp.width = W;
-				temp.height = H;
-				const tCtx = temp.getContext('2d');
-				tCtx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
-				tCtx.fillRect(0, 0, W, H);
-				tCtx.globalCompositeOperation = 'destination-out';
-				tCtx.drawImage(activeMask, 0, 0);
-
-				this._displayCtx.drawImage(temp, 0, 0);
+				const rubylith = this._create_rubylith_overlay(activeMask, opacity);
+				this._displayCtx.drawImage(rubylith, 0, 0);
 				break;
 			}
 			case 'onion_skin': {
-				// Draw semi-transparent background behind matted layer
-				this._displayCtx.save();
-				this._displayCtx.globalAlpha = 1 - opacity;
-				this._displayCtx.drawImage(effectiveImgCanvas, 0, 0);
-				this._displayCtx.restore();
-
+				// Draw faint unmasked image if opacity < 1, then masked subject on top
+				if (opacity < 1) {
+					this._displayCtx.save();
+					this._displayCtx.globalAlpha = 1 - opacity;
+					this._displayCtx.drawImage(effectiveImgCanvas, 0, 0);
+					this._displayCtx.restore();
+				}
 				const matted = this._create_matted_canvas(effectiveImgCanvas, activeMask);
 				this._displayCtx.drawImage(matted, 0, 0);
 				break;
@@ -1308,7 +1329,8 @@ class Tools_refineEdge_class {
 				break;
 			}
 			case 'marching_ants': {
-				this._displayCtx.drawImage(effectiveImgCanvas, 0, 0);
+				const matted = this._create_matted_canvas(effectiveImgCanvas, activeMask);
+				this._displayCtx.drawImage(matted, 0, 0);
 				this._draw_marching_ants(activeMask);
 				break;
 			}
@@ -1325,9 +1347,47 @@ class Tools_refineEdge_class {
 		c.width = this._width;
 		c.height = this._height;
 		const ctx = c.getContext('2d');
-		ctx.drawImage(imgCanvas, 0, 0);
-		ctx.globalCompositeOperation = 'destination-in';
-		ctx.drawImage(maskCanvas, 0, 0);
+		
+		const imgData = imgCanvas.getContext('2d').getImageData(0, 0, this._width, this._height);
+		const maskData = maskCanvas.getContext('2d').getImageData(0, 0, this._width, this._height);
+		const imgP = imgData.data;
+		const maskP = maskData.data;
+		const totalPixels = this._width * this._height;
+
+		for (let i = 0; i < totalPixels; i++) {
+			const p = i * 4;
+			const mVal = maskP[p] / 255;
+			imgP[p + 3] = Math.round(imgP[p + 3] * mVal);
+		}
+
+		ctx.putImageData(imgData, 0, 0);
+		return c;
+	}
+
+	_create_rubylith_overlay(maskCanvas, opacity) {
+		const c = document.createElement('canvas');
+		c.width = this._width;
+		c.height = this._height;
+		const ctx = c.getContext('2d');
+		const imgData = ctx.createImageData(this._width, this._height);
+		const data = imgData.data;
+
+		const maskData = maskCanvas.getContext('2d').getImageData(0, 0, this._width, this._height).data;
+		const total = this._width * this._height;
+
+		for (let i = 0; i < total; i++) {
+			const p = i * 4;
+			const mVal = maskData[p]; // 0 = hidden, 255 = revealed
+			const hiddenAmount = (255 - mVal) / 255;
+			if (hiddenAmount > 0) {
+				data[p] = 255;
+				data[p + 1] = 0;
+				data[p + 2] = 0;
+				data[p + 3] = Math.round(hiddenAmount * opacity * 255);
+			}
+		}
+
+		ctx.putImageData(imgData, 0, 0);
 		return c;
 	}
 
