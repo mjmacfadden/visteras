@@ -180,12 +180,39 @@
 	display: flex;
 	align-items: center;
 	gap: 16px;
-	padding: 4px 12px;
+	padding: 0 12px;
+	height: 36px;
+	min-height: 36px;
+	max-height: 36px;
 	background: #282828;
 	border-bottom: 1px solid #333;
-	flex: 0 0 auto;
+	flex: 0 0 36px;
+	box-sizing: border-box;
 	font-size: 11px;
 	color: #bbb;
+	overflow-x: auto;
+	overflow-y: hidden;
+	white-space: nowrap;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.refine-edge__options-bar::-webkit-scrollbar {
+	height: 3px;
+}
+
+.refine-edge__options-bar::-webkit-scrollbar-track,
+.refine-edge__options-bar::-webkit-scrollbar-track-piece {
+	background: transparent;
+}
+
+.refine-edge__options-bar::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.25);
+	border-radius: 3px;
+}
+
+.refine-edge__options-bar::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.5);
 }
 
 .refine-edge__opt-group {
