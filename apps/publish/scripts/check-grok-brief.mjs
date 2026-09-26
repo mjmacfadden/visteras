@@ -146,6 +146,33 @@ assert(
   'converted html source extracted',
 );
 
+// Substack @ mentions tests
+const substackMentionHtml = `<span style="min-width:0;" data-state="closed"><a href="https://open.substack.com/users/116315392-abra-mcandrew?utm_source=mentions" target="_blank" rel="noopener" data-attrs="{&quot;name&quot;:&quot;Abra McAndrew&quot;,&quot;id&quot;:116315392,&quot;type&quot;:&quot;user&quot;,&quot;url&quot;:null,&quot;photo_url&quot;:&quot;https://substack-post-media.s3.amazonaws.com/public/images/087f4640-21fc-4c05-929e-5e7bef7d43ac_3062x4587.jpeg&quot;,&quot;uuid&quot;:&quot;0e8fb5a2-2824-4ad4-8fde-bda861a7f531&quot;}" data-component-name="MentionUser" class="mention-pnpTE1">Abra McAndrew</a></span>`;
+
+const convertedMention = htmlToMarkdown(substackMentionHtml);
+assert(convertedMention === 'Abra McAndrew', `htmlToMarkdown extracts Substack mention name (got "${convertedMention}")`);
+
+const sentenceMentionHtml = `<p>According to ${substackMentionHtml}, the initiative has seen immense success.</p>`;
+const convertedSentence = htmlToMarkdown(sentenceMentionHtml);
+assert(
+  convertedSentence.includes('According to Abra McAndrew, the initiative has seen immense success.'),
+  `htmlToMarkdown sentence with Substack mention preserved (got "${convertedSentence}")`,
+);
+
+const briefWithMention = `## National News
+**Leadership Announcement**
+*Named source: Substack*
+Today ${substackMentionHtml} spoke at the annual conference.
+`;
+const parsedMentionBrief = parseGrokBrief(briefWithMention);
+const mentionItem = parsedMentionBrief.sections[0]?.items[0];
+assert(!!mentionItem, 'parsed brief with Substack mention has item');
+assert(
+  mentionItem?.body.includes('Today Abra McAndrew spoke at the annual conference.'),
+  `brief body displays Substack mention name cleanly without raw HTML tags (got "${mentionItem?.body}")`,
+);
+assert(!mentionItem?.body.includes('data-component-name'), 'brief body does not contain raw data-component-name');
+
 console.log('\n--- summary ---');
 for (const s of parsed.sections) {
   console.log(

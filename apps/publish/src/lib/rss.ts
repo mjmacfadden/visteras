@@ -7,6 +7,7 @@ import type { RssStory, StoryCategory } from '../data/types';
 import { NEWS_FEEDS, type FeedConfig, type FeedSection } from '../data/feeds';
 import { isSameChicagoDay } from './dateFilter';
 import { fetchWithCorsFallback } from './corsFetch';
+import { cleanSubstackMentions } from './htmlToMarkdown';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -70,10 +71,11 @@ function decodeHtmlEntities(s: string): string {
 }
 
 function stripHtml(html: string): string {
-  const cleaned = html
+  const cleaned = cleanSubstackMentions(html)
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<div class="subscription-widget[\s\S]*?<\/div>\s*<\/div>/gi, '')
+    .replace(/<div[^>]*data-component-name="(?:SubscribeWidget|SubscribeButton|SubscriptionWidget|PostFooter|RestackButton|LikeButton|ShareButton)"[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/<figure[\s\S]*?<\/figure>/gi, '')
     .replace(/<figcaption[\s\S]*?<\/figcaption>/gi, '')
     .replace(/<[^>]+>/g, ' ')
@@ -83,10 +85,11 @@ function stripHtml(html: string): string {
 }
 
 function cleanParagraphHtml(html: string): string {
-  const cleaned = html
+  const cleaned = cleanSubstackMentions(html)
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<div class="subscription-widget[\s\S]*?<\/div>\s*<\/div>/gi, '')
+    .replace(/<div[^>]*data-component-name="(?:SubscribeWidget|SubscribeButton|SubscriptionWidget|PostFooter|RestackButton|LikeButton|ShareButton)"[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/<figure[\s\S]*?<\/figure>/gi, '')
     .replace(/<figcaption[\s\S]*?<\/figcaption>/gi, '')
     .replace(/<a class="footnote-anchor"[\s\S]*?<\/a>/gi, '')
@@ -104,9 +107,9 @@ export function extractStoryBlocks(descRaw: string, contentRaw: string): {
   const subtitle = cleanParagraphHtml(descRaw || '');
   const html = (contentRaw || '').trim() || (descRaw || '').trim();
 
-  const cleanHtml = html
+  const cleanHtml = cleanSubstackMentions(html)
     .replace(/<div class="subscription-widget[\s\S]*?<\/div>\s*<\/div>/gi, '')
-    .replace(/<div class="pencraft[\s\S]*?<\/div>\s*<\/div>/gi, '')
+    .replace(/<div[^>]*data-component-name="(?:SubscribeWidget|SubscribeButton|SubscriptionWidget|PostFooter|RestackButton|LikeButton|ShareButton)"[\s\S]*?<\/div>\s*<\/div>/gi, '')
     .replace(/<a class="footnote-anchor"[\s\S]*?<\/a>/gi, '');
 
   const tokens = cleanHtml.split(/(<img[^>]+src=["'][^"']+["'][^>]*>)/gi);
@@ -136,7 +139,7 @@ export function extractStoryBlocks(descRaw: string, contentRaw: string): {
         .filter((p) => {
           if (!p || p.length < 2) return false;
           if (/^(?:subscribe|restack|share this post|leave a comment)\b/i.test(p)) return false;
-          if (p.includes('pencraft') || p.includes('data-component-name')) return false;
+          if (/data-component-name="(?:Subscribe|PostFooter|Restack|LikeButton|ShareButton)/i.test(p)) return false;
           return true;
         });
       for (const p of paras) {

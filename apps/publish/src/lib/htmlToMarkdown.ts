@@ -7,6 +7,59 @@ function cleanWhitespace(s: string): string {
   return s.replace(/[\t ]+/g, ' ');
 }
 
+/**
+ * Extracts and displays user names from Substack mention markup:
+ * <span style="min-width:0;" data-state="closed"><a href="https://open.substack.com/users/..." data-attrs='{"name":"Abra McAndrew",...}' data-component-name="MentionUser" class="mention-pnpTE1">Abra McAndrew</a></span>
+ */
+export function cleanSubstackMentions(html: string): string {
+  if (!html) return '';
+
+  let s = html;
+  // If HTML entities are escaped (&lt;span...&gt;), decode them so regex matches
+  if (/&lt;span\b|&lt;a\b/i.test(s)) {
+    s = s
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
+  // Handle span wrapper around Substack mention
+  s = s.replace(
+    /<span\b[^>]*?(?:data-state=["']closed["']|min-width:\s*0)[^>]*?>\s*<a\b([^>]*?)>([\s\S]*?)<\/a>\s*<\/span>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+
+  // Handle anchor with MentionUser or mention class
+  s = s.replace(
+    /<a\b([^>]*?(?:data-component-name=["']MentionUser["']|class=["'][^"']*mention-[^"']*["'])[^>]*?)>([\s\S]*?)<\/a>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+
+  // Handle standalone span with MentionUser
+  s = s.replace(
+    /<span\b([^>]*?(?:data-component-name=["']MentionUser["']|class=["'][^"']*mention-[^"']*["'])[^>]*?)>([\s\S]*?)<\/span>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+
+  return s;
+}
+
 function extractImageSrc(el: HTMLElement): string {
   const src =
     el.getAttribute('src') ||
@@ -46,6 +99,33 @@ function elementToMarkdown(el: HTMLElement): string {
     tag === 'link'
   ) {
     return '';
+  }
+
+  // Substack User Mentions
+  const isSubstackMention =
+    el.getAttribute('data-component-name') === 'MentionUser' ||
+    (typeof el.className === 'string' && el.className.includes('mention-')) ||
+    (tag === 'span' && (el.getAttribute('data-state') === 'closed' || el.getAttribute('style')?.includes('min-width')) && Boolean(el.querySelector?.('[data-component-name="MentionUser"], a[class*="mention-"]')));
+
+  if (isSubstackMention) {
+    let name = el.textContent?.trim() || '';
+    if (!name) {
+      const dataAttrs =
+        el.getAttribute('data-attrs') ||
+        el.querySelector?.('[data-attrs]')?.getAttribute('data-attrs');
+      if (dataAttrs) {
+        try {
+          const parsed = JSON.parse(dataAttrs);
+          if (parsed.name) name = parsed.name;
+        } catch {
+          const m = dataAttrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+          if (m) name = m[1];
+        }
+      }
+    }
+    if (name) {
+      return name;
+    }
   }
 
   // Images
@@ -187,7 +267,8 @@ function childrenToMarkdown(parent: Node): string {
  * Fallback regex-based converter for environments where DOMParser is unavailable (e.g. minimal test runners).
  */
 export function fallbackHtmlToMarkdown(html: string): string {
-  return html
+  const cleaned = cleanSubstackMentions(html);
+  return cleaned
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
     .replace(/<img[^>]+src=["']([^"']+)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi, '\n\n![$2]($1)\n\n')

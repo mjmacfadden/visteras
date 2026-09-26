@@ -77,9 +77,50 @@ function stripBoldMarkers(s: string): string {
   return s.replace(/\*\*/g, '').trim();
 }
 
+/** Extracts user name from Substack mention markup */
+function cleanSubstackMentions(html: string): string {
+  if (!html) return '';
+  let s = html;
+  if (/&lt;span\b|&lt;a\b/i.test(s)) {
+    s = s
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+  s = s.replace(
+    /<span\b[^>]*?(?:data-state=["']closed["']|min-width:\s*0)[^>]*?>\s*<a\b([^>]*?)>([\s\S]*?)<\/a>\s*<\/span>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+  s = s.replace(
+    /<a\b([^>]*?(?:data-component-name=["']MentionUser["']|class=["'][^"']*mention-[^"']*["'])[^>]*?)>([\s\S]*?)<\/a>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+  s = s.replace(
+    /<span\b([^>]*?(?:data-component-name=["']MentionUser["']|class=["'][^"']*mention-[^"']*["'])[^>]*?)>([\s\S]*?)<\/span>/gi,
+    (_full, attrs, inner) => {
+      const text = inner.replace(/<[^>]+>/g, '').trim();
+      if (text) return text;
+      const m = attrs.match(/(?:&quot;|["'])name(?:&quot;|["'])\s*:\s*(?:&quot;|["'])([^"&']+)(?:&quot;|["'])/i);
+      return m ? m[1].trim() : '';
+    },
+  );
+  return s;
+}
+
 /** Normalize smart quotes, NBSP, Windows newlines before parse. */
 export function normalizeBriefText(raw: string): string {
-  return (raw || '')
+  return cleanSubstackMentions(raw || '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/\u00a0/g, ' ')
