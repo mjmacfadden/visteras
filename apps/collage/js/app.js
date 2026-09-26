@@ -224,95 +224,7 @@ import {
     downloadBlob(blob, filename);
   }
 
-  // --- PNG Chunk & Metadata Handling (Smart Images) ---
-  function makeCrcTable() {
-    const table = new Uint32Array(256);
-    for (let n = 0; n < 256; n++) {
-      let c = n;
-      for (let k = 0; k < 8; k++) {
-        if (c & 1) c = 0xedb88320 ^ (c >>> 1);
-        else c = c >>> 1;
-      }
-      table[n] = c;
-    }
-    return table;
-  }
-  const crcTable = makeCrcTable();
-
-  function crc32(buf, offset, len) {
-    let c = 0xffffffff;
-    for (let i = 0; i < len; i++) {
-      c = crcTable[(c ^ buf[offset + i]) & 0xff] ^ (c >>> 8);
-    }
-    return (c ^ 0xffffffff) >>> 0;
-  }
-
-  function embedJsonInPng(pngBytes, keyword, jsonString) {
-    let iendOffset = -1;
-    for (let i = 0; i <= pngBytes.length - 4; i++) {
-      if (pngBytes[i] === 73 && pngBytes[i + 1] === 69 && pngBytes[i + 2] === 78 && pngBytes[i + 3] === 68) {
-        iendOffset = i - 4; // Length field starts 4 bytes before 'IEND'
-        break;
-      }
-    }
-    if (iendOffset === -1) throw new Error('Invalid PNG: IEND chunk not found');
-
-    const keyBytes = new TextEncoder().encode(keyword);
-    const valBytes = new TextEncoder().encode(jsonString);
-    const dataLen = keyBytes.length + 1 + valBytes.length; // keyword + null byte + val
-    const chunkLen = 4 + 4 + dataLen + 4; // length(4) + type(4) + data + crc(4)
-
-    const newBytes = new Uint8Array(pngBytes.length + chunkLen);
-    newBytes.set(pngBytes.subarray(0, iendOffset), 0);
-
-    const view = new DataView(newBytes.buffer);
-    let pos = iendOffset;
-    view.setUint32(pos, dataLen); pos += 4;
-    // 'tEXt' = 116, 69, 88, 116
-    newBytes[pos] = 116; newBytes[pos + 1] = 69; newBytes[pos + 2] = 88; newBytes[pos + 3] = 116; pos += 4;
-    newBytes.set(keyBytes, pos); pos += keyBytes.length;
-    newBytes[pos] = 0; pos += 1;
-    newBytes.set(valBytes, pos); pos += valBytes.length;
-
-    const crcVal = crc32(newBytes, iendOffset + 4, 4 + dataLen);
-    view.setUint32(pos, crcVal); pos += 4;
-
-    newBytes.set(pngBytes.subarray(iendOffset), pos);
-    return newBytes;
-  }
-
-  function extractJsonFromPng(pngBytes) {
-    if (pngBytes[0] !== 0x89 || pngBytes[1] !== 0x50 || pngBytes[2] !== 0x4e || pngBytes[3] !== 0x47) {
-      return null;
-    }
-    let pos = 8;
-    const view = new DataView(pngBytes.buffer, pngBytes.byteOffset, pngBytes.byteLength);
-    while (pos < pngBytes.length - 8) {
-      const len = view.getUint32(pos); pos += 4;
-      const type = String.fromCharCode(pngBytes[pos], pngBytes[pos + 1], pngBytes[pos + 2], pngBytes[pos + 3]); pos += 4;
-      if (type === 'tEXt') {
-        let nullIdx = -1;
-        for (let i = 0; i < len; i++) {
-          if (pngBytes[pos + i] === 0) { nullIdx = pos + i; break; }
-        }
-        if (nullIdx !== -1) {
-          const key = new TextDecoder().decode(pngBytes.subarray(pos, nullIdx));
-          if (key === 'vcd' || key === 'visteras_project') {
-            const text = new TextDecoder('utf-8').decode(pngBytes.subarray(nullIdx + 1, pos + len));
-            try {
-              return JSON.parse(text);
-            } catch (e) {
-              console.error('Failed to parse embedded project JSON:', e);
-            }
-          }
-        }
-      }
-      pos += len + 4;
-    }
-    return null;
-  }
-
-  // --- Thumbnail & Smart Image Generation ---
+  // --- Thumbnail Capture for .vcd Metadata ---
   async function captureCollageThumbnail(scale = 0.25) {
     if (!el.letterPage || !el.viewport || typeof html2canvas === 'undefined') return null;
     const doc = docManager ? docManager.getActiveDocument() : null;
@@ -335,35 +247,6 @@ import {
       console.warn('Could not generate collage thumbnail:', err);
       return null;
     }
-  }
-
-  async function createSmartPngBlob(projectData) {
-    if (!el.letterPage || !el.viewport || typeof html2canvas === 'undefined') {
-      throw new Error('Canvas not ready for Smart Image generation');
-    }
-    const savedTransform = el.viewport.style.transform;
-    el.viewport.style.transform = 'none';
-
-    const canvas = await html2canvas(el.letterPage, {
-      scale: 1.0, // 850 x 1100 px sharp letter page preview for OS QuickLook & Explorer
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: state.backgroundColorEnabled ? state.backgroundColor : '#ffffff'
-    });
-
-    el.viewport.style.transform = savedTransform;
-
-    const dataUrl = canvas.toDataURL('image/png');
-    const base64 = dataUrl.split(',')[1];
-    const binaryStr = atob(base64);
-    const len = binaryStr.length;
-    const rawBytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      rawBytes[i] = binaryStr.charCodeAt(i);
-    }
-
-    const embeddedBytes = embedJsonInPng(rawBytes, 'vcd', JSON.stringify(projectData, null, 2));
-    return new Blob([embeddedBytes], { type: 'image/png' });
   }
 
   function saveToLibrary(doc) {
@@ -722,50 +605,18 @@ import {
         if (thumb) targetDoc.thumbnail = thumb;
       }
 
-      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|vcd\.png|collage|json|png)$/i, '');
+      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
       const fileName = targetDoc.file_name || `${slugify(baseName)}.vcd`;
       targetDoc.file_name = fileName;
       targetDoc.title = baseName;
       targetDoc.is_dirty = false;
 
       const projectData = this.serializeDoc(targetDoc);
-      const isPng = fileName.toLowerCase().endsWith('.png');
-
-      if (isPng) {
-        const smartBlob = await createSmartPngBlob(projectData);
-        downloadBlob(smartBlob, fileName);
-      } else {
-        downloadJson(projectData, fileName);
-      }
+      downloadJson(projectData, fileName);
       saveToLibrary(targetDoc);
 
       this.renderTabs();
       showToast(`Saved "${targetDoc.title}"`);
-    },
-
-    async saveSmartImageDocument(doc = null) {
-      const targetDoc = doc || this.getActiveDocument();
-      if (!targetDoc) return;
-      this.saveCurrentDocState();
-
-      if (targetDoc === this.getActiveDocument()) {
-        const thumb = await captureCollageThumbnail(0.25);
-        if (thumb) targetDoc.thumbnail = thumb;
-      }
-
-      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|vcd\.png|collage|json|png)$/i, '');
-      const fileName = `${slugify(baseName)}.vcd.png`;
-      targetDoc.file_name = fileName;
-      targetDoc.title = baseName;
-      targetDoc.is_dirty = false;
-
-      const projectData = this.serializeDoc(targetDoc);
-      const smartBlob = await createSmartPngBlob(projectData);
-      downloadBlob(smartBlob, fileName);
-      saveToLibrary(targetDoc);
-
-      this.renderTabs();
-      showToast(`Saved Smart Image "${fileName}"`);
     },
 
     async saveAsDocument(doc = null) {
@@ -778,7 +629,7 @@ import {
         if (thumb) targetDoc.thumbnail = thumb;
       }
 
-      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|vcd\.png|collage|json|png)$/i, '');
+      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
       const defaultFileName = `${slugify(baseName)}.vcd`;
       const projectData = this.serializeDoc(targetDoc);
 
@@ -790,26 +641,16 @@ import {
               {
                 description: 'Visteras Collage Document (.vcd)',
                 accept: { 'application/json': ['.vcd'] }
-              },
-              {
-                description: 'Smart Collage Image with Preview (.vcd.png)',
-                accept: { 'image/png': ['.vcd.png', '.png'] }
               }
             ]
           });
-          const isPng = handle.name.toLowerCase().endsWith('.png');
-          const savedName = handle.name.replace(/\.(vcd|vcd\.png|collage|json|png)$/i, '');
+          const savedName = handle.name.replace(/\.(vcd|collage|json)$/i, '');
           targetDoc.file_name = handle.name;
           targetDoc.title = savedName;
           targetDoc.is_dirty = false;
 
           const writable = await handle.createWritable();
-          if (isPng) {
-            const smartBlob = await createSmartPngBlob(projectData);
-            await writable.write(smartBlob);
-          } else {
-            await writable.write(JSON.stringify(projectData, null, 2));
-          }
+          await writable.write(JSON.stringify(projectData, null, 2));
           await writable.close();
 
           saveToLibrary(targetDoc);
@@ -877,7 +718,7 @@ import {
 
     openDocumentFromData(data, fileName = '') {
       if (!data) return;
-      const defaultTitle = fileName ? fileName.replace(/\.(vcd|vcd\.png|collage|json|png)$/i, '') : `Untitled-${this.autoTitleCount++}`;
+      const defaultTitle = fileName ? fileName.replace(/\.(vcd|collage|json)$/i, '') : `Untitled-${this.autoTitleCount++}`;
       const title = data.title || data.name || defaultTitle;
       const newDoc = new CollageDocument({
         title: title,
@@ -2434,24 +2275,7 @@ import {
     async function handleProjectFile(file) {
       if (!file) return;
       try {
-        const buffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-
-        // Check if it's a PNG file (magic header: 0x89 0x50 0x4e 0x47)
-        if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
-          const projectData = extractJsonFromPng(bytes);
-          if (projectData) {
-            docManager.openDocumentFromData(projectData, file.name);
-            showToast(`Opened Smart Image "${projectData.title || file.name}"`);
-            return;
-          } else {
-            alert('This PNG does not contain embedded Visteras Collage project data.');
-            return;
-          }
-        }
-
-        // Standard JSON-based document (.vcd, .collage, .json)
-        const text = new TextDecoder('utf-8').decode(bytes);
+        const text = await file.text();
         const data = JSON.parse(text);
         docManager.openDocumentFromData(data, file.name);
         showToast(`Opened "${data.title || file.name}"`);
@@ -2477,7 +2301,7 @@ import {
       });
     }
 
-    // Drag and Drop to open project or smart image
+    // Drag and Drop to open .vcd project
     window.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
@@ -2486,7 +2310,7 @@ import {
     window.addEventListener('drop', async (e) => {
       e.preventDefault();
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (file && file.name.match(/\.(vcd|vcd\.png|collage|json|png)$/i)) {
+      if (file && file.name.match(/\.(vcd|collage|json)$/i)) {
         await handleProjectFile(file);
       }
     });
@@ -2495,13 +2319,6 @@ import {
     if (saveCollageBtn) {
       saveCollageBtn.addEventListener('click', () => {
         docManager.saveDocument();
-      });
-    }
-
-    const saveSmartPngBtn = document.getElementById('action_save_smart_png');
-    if (saveSmartPngBtn) {
-      saveSmartPngBtn.addEventListener('click', () => {
-        docManager.saveSmartImageDocument();
       });
     }
 
