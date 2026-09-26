@@ -188,6 +188,575 @@ import {
     { id: 'grid-6-strip', name: '2 × 3 Magazine Sheet', count: 6, cols: 'repeat(2, 1fr)', rows: 'repeat(3, 1fr)', spans: Array(6).fill({c: 1, r: 1}) }
   ];
 
+  // --- String & File Utilities ---
+  function escapeHtml(str) {
+    return (str || '').replace(/[&<>"']/g, m => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[m]));
+  }
+
+  function slugify(text) {
+    return (text || '').toString().toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^\w\-]+/g, '')
+      .replace(/\-\-+/g, '-')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '') || 'collage';
+  }
+
+  function downloadJson(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function saveToLibrary(doc) {
+    const saveObj = {
+      id: doc.id,
+      name: doc.title,
+      layoutId: doc.activeLayoutId,
+      query: doc.searchQuery,
+      colors: doc.selectedColors,
+      style: doc.selectedStyle,
+      overlay: doc.selectedOverlay,
+      overlayOpacity: doc.overlayOpacity,
+      paintEnabled: doc.paintEnabled,
+      paintColor: doc.paintColor,
+      backgroundColorEnabled: doc.backgroundColorEnabled,
+      backgroundColor: doc.backgroundColor,
+      textOverlay: doc.textOverlay,
+      items: doc.items.map(it => ({
+        imagePath: it.image?.path || '',
+        largePath: it.image?.largePath || it.image?.path || '',
+        attribution: it.image?.attribution || '',
+        zoom: it.zoom || 1.0,
+        panX: it.panX || 0,
+        panY: it.panY || 0,
+        span: it.span || { c: 1, r: 1 },
+        locked: !!it.locked
+      }))
+    };
+
+    const existingIdx = state.savedCollages.findIndex(s => s.id === doc.id || s.name === doc.title);
+    if (existingIdx !== -1) {
+      state.savedCollages[existingIdx] = saveObj;
+    } else {
+      state.savedCollages.push(saveObj);
+    }
+    localStorage.setItem('visteras_collage_saves', JSON.stringify(state.savedCollages));
+    renderSavedList();
+  }
+
+  // --- Document Model & Tabs Manager ---
+  class CollageDocument {
+    constructor(options = {}) {
+      this.id = options.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+      this.title = options.title || 'Untitled-1';
+      this.is_dirty = !!options.is_dirty;
+      this.file_name = options.file_name || null;
+      this.activeLayoutId = options.activeLayoutId || 'grid-2x2';
+      this.items = options.items ? JSON.parse(JSON.stringify(options.items)) : [];
+      this.onlinePool = options.onlinePool ? [...options.onlinePool] : [];
+      this.assetsGenerated = options.assetsGenerated != null ? options.assetsGenerated : (this.items.length > 0);
+      this.searchQuery = options.searchQuery || 'vintage';
+      this.imageSource = options.imageSource || 'both';
+      this.selectedColors = options.selectedColors ? [...options.selectedColors] : ['red', 'orange', 'yellow', 'brown'];
+      this.selectedStyle = options.selectedStyle || 'all';
+      this.selectedCategory = options.selectedCategory || '';
+      this.editorsChoice = !!options.editorsChoice;
+      this.customImageUrl = options.customImageUrl || '';
+      this.selectedOverlay = options.selectedOverlay || '';
+      this.overlayOpacity = options.overlayOpacity != null ? options.overlayOpacity : 100;
+      this.overlayBlendMode = options.overlayBlendMode || 'normal';
+      this.paintEnabled = !!options.paintEnabled;
+      this.paintColor = options.paintColor || '#F2B041';
+      this.paintOpacity = options.paintOpacity != null ? options.paintOpacity : 50;
+      this.backgroundColorEnabled = !!options.backgroundColorEnabled;
+      this.backgroundColor = options.backgroundColor || '#E8D4B9';
+      this.textOverlay = options.textOverlay ? JSON.parse(JSON.stringify(options.textOverlay)) : {
+        content: '',
+        fontFamily: DEFAULT_FONT_FAMILY,
+        fontWeight: '400',
+        fontSize: 28,
+        fontColor: '#212529',
+        bold: false,
+        italic: false,
+        underline: false,
+        zIndex: 110,
+        x: 0,
+        y: 0
+      };
+      this.selectedEffects = options.selectedEffects ? [...options.selectedEffects] : [];
+      this.zoom = options.zoom || 1.0;
+      this.panX = options.panX || 0;
+      this.panY = options.panY || 0;
+    }
+  }
+
+  const docManager = {
+    documents: [],
+    activeId: null,
+    autoTitleCount: 1,
+    isRestoring: false,
+
+    getActiveDocument() {
+      return this.documents.find(d => d.id === this.activeId) || this.documents[0] || null;
+    },
+
+    saveCurrentDocState() {
+      const doc = this.getActiveDocument();
+      if (!doc) return;
+      doc.activeLayoutId = state.activeLayoutId;
+      doc.searchQuery = state.searchQuery;
+      doc.imageSource = state.imageSource;
+      doc.selectedColors = [...state.selectedColors];
+      doc.selectedStyle = state.selectedStyle;
+      doc.selectedCategory = state.selectedCategory;
+      doc.editorsChoice = state.editorsChoice;
+      doc.customImageUrl = state.customImageUrl;
+      doc.zoom = state.zoom;
+      doc.panX = state.panX;
+      doc.panY = state.panY;
+      doc.textOverlay = JSON.parse(JSON.stringify(state.textOverlay));
+      doc.selectedEffects = [...state.selectedEffects];
+      doc.selectedOverlay = state.selectedOverlay;
+      doc.overlayOpacity = state.overlayOpacity;
+      doc.overlayBlendMode = state.overlayBlendMode;
+      doc.paintEnabled = state.paintEnabled;
+      doc.paintColor = state.paintColor;
+      doc.paintOpacity = state.paintOpacity;
+      doc.backgroundColorEnabled = state.backgroundColorEnabled;
+      doc.backgroundColor = state.backgroundColor;
+      doc.items = JSON.parse(JSON.stringify(state.items));
+      doc.onlinePool = [...state.onlinePool];
+      doc.assetsGenerated = state.assetsGenerated;
+    },
+
+    applyDocState(doc) {
+      if (!doc) return;
+      this.isRestoring = true;
+      try {
+        state.activeLayoutId = doc.activeLayoutId || 'grid-2x2';
+        state.searchQuery = doc.searchQuery || 'vintage';
+        state.imageSource = doc.imageSource || 'both';
+        state.selectedColors = doc.selectedColors ? [...doc.selectedColors] : ['red', 'orange', 'yellow', 'brown'];
+        state.selectedStyle = doc.selectedStyle || 'all';
+        state.selectedCategory = doc.selectedCategory || '';
+        state.editorsChoice = !!doc.editorsChoice;
+        state.customImageUrl = doc.customImageUrl || '';
+        state.zoom = doc.zoom || 1.0;
+        state.panX = doc.panX || 0;
+        state.panY = doc.panY || 0;
+        state.textOverlay = doc.textOverlay ? JSON.parse(JSON.stringify(doc.textOverlay)) : {
+          content: '',
+          fontFamily: DEFAULT_FONT_FAMILY,
+          fontWeight: '400',
+          fontSize: 28,
+          fontColor: '#212529',
+          bold: false,
+          italic: false,
+          underline: false,
+          zIndex: 110,
+          x: 0,
+          y: 0
+        };
+        state.selectedEffects = doc.selectedEffects ? [...doc.selectedEffects] : [];
+        state.selectedOverlay = doc.selectedOverlay || '';
+        state.overlayOpacity = doc.overlayOpacity != null ? doc.overlayOpacity : 100;
+        state.overlayBlendMode = doc.overlayBlendMode || 'normal';
+        state.paintEnabled = !!doc.paintEnabled;
+        state.paintColor = doc.paintColor || '#F2B041';
+        state.paintOpacity = doc.paintOpacity != null ? doc.paintOpacity : 50;
+        state.backgroundColorEnabled = !!doc.backgroundColorEnabled;
+        state.backgroundColor = doc.backgroundColor || '#E8D4B9';
+        state.items = doc.items ? JSON.parse(JSON.stringify(doc.items)) : [];
+        state.onlinePool = doc.onlinePool ? [...doc.onlinePool] : [];
+        state.assetsGenerated = !!doc.assetsGenerated;
+
+        // Update UI form controls
+        this.syncUIControls();
+
+        // Render Canvas Content
+        if (state.assetsGenerated && state.items.length > 0) {
+          if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
+          renderTilesFromItems(state.items);
+        } else {
+          if (el.generateOverlay) el.generateOverlay.classList.remove('hidden');
+          if (el.container) el.container.innerHTML = '';
+        }
+
+        applyTextureOverlay();
+        applyPaintOverlay();
+        applyBackgroundColor();
+        updateTextOverlay();
+        applyViewportTransform();
+
+        if (el.statusBarStatus) {
+          el.statusBarStatus.textContent = state.assetsGenerated
+            ? `Ready (${state.items.length} tiles)`
+            : 'Ready • Click Generate to create collage fodder';
+        }
+      } finally {
+        this.isRestoring = false;
+      }
+    },
+
+    syncUIControls() {
+      // 1. Quick layout dropdown & Layout list
+      const quickSelect = document.getElementById('quick-layout-select');
+      if (quickSelect) quickSelect.value = state.activeLayoutId;
+      if (el.statusLayout) {
+        const layoutObj = layouts.find(l => l.id === state.activeLayoutId);
+        el.statusLayout.textContent = layoutObj ? layoutObj.name : state.activeLayoutId;
+      }
+      renderLayoutList();
+
+      // 2. Theme / Search
+      if (el.queryInput) el.queryInput.value = state.searchQuery;
+      if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
+      if (el.imageSourceSelect) el.imageSourceSelect.value = state.imageSource;
+      if (el.editorsChoiceToggle) el.editorsChoiceToggle.checked = state.editorsChoice;
+      renderColorChips();
+      renderThemePresets();
+
+      // 3. Overlays
+      renderOverlayList();
+      const opSlider = document.getElementById('overlayOpacity');
+      if (opSlider) opSlider.value = state.overlayOpacity;
+      const opVal = document.getElementById('opacityValue');
+      if (opVal) opVal.textContent = `${state.overlayOpacity}%`;
+
+      // 4. Paint
+      const paintToggle = document.getElementById('paintToggle');
+      if (paintToggle) paintToggle.checked = state.paintEnabled;
+      const paintColor = document.getElementById('paintColor');
+      if (paintColor) paintColor.value = state.paintColor;
+      const paintColorVal = document.getElementById('paintColorValue');
+      if (paintColorVal) paintColorVal.textContent = state.paintColor;
+      const paintOpacity = document.getElementById('paintOpacity');
+      if (paintOpacity) paintOpacity.value = state.paintOpacity;
+      const paintOpacityVal = document.getElementById('paintOpacityValue');
+      if (paintOpacityVal) paintOpacityVal.textContent = `${state.paintOpacity}%`;
+
+      // 5. Background Color
+      const bgToggle = document.getElementById('backgroundColorToggle');
+      if (bgToggle) bgToggle.checked = state.backgroundColorEnabled;
+      const bgColor = document.getElementById('backgroundColor');
+      if (bgColor) bgColor.value = state.backgroundColor;
+      const bgColorVal = document.getElementById('backgroundColorValue');
+      if (bgColorVal) bgColorVal.textContent = state.backgroundColor;
+
+      // 6. Text Overlay
+      const textInput = document.getElementById('textInput');
+      if (textInput) textInput.value = state.textOverlay.content || '';
+      const fontSize = document.getElementById('fontSize');
+      if (fontSize) fontSize.value = state.textOverlay.fontSize || 28;
+      const fontColor = document.getElementById('fontColor');
+      if (fontColor) fontColor.value = state.textOverlay.fontColor || '#212529';
+      const fontColorVal = document.getElementById('fontColorValue');
+      if (fontColorVal) fontColorVal.textContent = state.textOverlay.fontColor || '#212529';
+      const fontBold = document.getElementById('fontBold');
+      if (fontBold) fontBold.classList.toggle('active', !!state.textOverlay.bold);
+      const fontItalic = document.getElementById('fontItalic');
+      if (fontItalic) fontItalic.classList.toggle('active', !!state.textOverlay.italic);
+      const fontUnderline = document.getElementById('fontUnderline');
+      if (fontUnderline) fontUnderline.classList.toggle('active', !!state.textOverlay.underline);
+
+      if (fontPickerInstance && state.textOverlay.fontFamily) {
+        fontPickerInstance.selectFamily(state.textOverlay.fontFamily, state.textOverlay.fontWeight || '400');
+      }
+
+      // 7. Custom Image URL
+      const customImgInput = document.getElementById('imageUrlInput');
+      if (customImgInput) customImgInput.value = state.customImageUrl || '';
+    },
+
+    createDocument(options = {}) {
+      this.saveCurrentDocState();
+      let title = options.title;
+      if (!title) {
+        title = `Untitled-${this.autoTitleCount++}`;
+      } else if (title === `Untitled-${this.autoTitleCount}`) {
+        this.autoTitleCount++;
+      }
+      const doc = new CollageDocument({
+        ...options,
+        title: title
+      });
+      this.documents.push(doc);
+      this.activeId = doc.id;
+      this.applyDocState(doc);
+      this.renderTabs();
+      setTimeout(() => fitToWorkspace(), 30);
+      return doc;
+    },
+
+    activateDocument(id) {
+      if (this.activeId === id) return;
+      this.saveCurrentDocState();
+      const target = this.documents.find(d => d.id === id);
+      if (!target) return;
+      this.activeId = id;
+      this.applyDocState(target);
+      this.renderTabs();
+    },
+
+    closeDocument(id) {
+      const idx = this.documents.findIndex(d => d.id === id);
+      if (idx === -1) return;
+      const doc = this.documents[idx];
+      if (doc.is_dirty) {
+        const confirmClose = confirm(`"${doc.title}" has unsaved changes. Close anyway?`);
+        if (!confirmClose) return;
+      }
+
+      this.documents.splice(idx, 1);
+
+      if (this.documents.length === 0) {
+        this.createDocument({ title: `Untitled-${this.autoTitleCount++}` });
+      } else if (this.activeId === id) {
+        const newIdx = Math.max(0, idx - 1);
+        this.activeId = this.documents[newIdx].id;
+        this.applyDocState(this.documents[newIdx]);
+        this.renderTabs();
+      } else {
+        this.renderTabs();
+      }
+    },
+
+    cycleTab(direction = 1) {
+      if (this.documents.length <= 1) return;
+      const currentIdx = this.documents.findIndex(d => d.id === this.activeId);
+      let nextIdx = currentIdx + direction;
+      if (nextIdx >= this.documents.length) nextIdx = 0;
+      if (nextIdx < 0) nextIdx = this.documents.length - 1;
+      this.activateDocument(this.documents[nextIdx].id);
+    },
+
+    markDirty() {
+      if (this.isRestoring) return;
+      const doc = this.getActiveDocument();
+      if (!doc) return;
+      if (!doc.is_dirty) {
+        doc.is_dirty = true;
+        this.renderTabs();
+      }
+    },
+
+    saveDocument(doc = null) {
+      const targetDoc = doc || this.getActiveDocument();
+      if (!targetDoc) return;
+      this.saveCurrentDocState();
+
+      if (!targetDoc.file_name && targetDoc.title.startsWith('Untitled-')) {
+        const name = prompt('Name your collage fodder sheet:', targetDoc.title);
+        if (!name) return;
+        targetDoc.title = name.trim();
+      }
+
+      const baseName = targetDoc.title.replace(/\.collage$/i, '');
+      const fileName = targetDoc.file_name || `${slugify(baseName)}.collage`;
+      targetDoc.file_name = fileName;
+      targetDoc.title = baseName;
+      targetDoc.is_dirty = false;
+
+      const projectData = this.serializeDoc(targetDoc);
+      downloadJson(projectData, fileName);
+      saveToLibrary(targetDoc);
+
+      this.renderTabs();
+      showToast(`Saved "${targetDoc.title}"`);
+    },
+
+    saveAsDocument(doc = null) {
+      const targetDoc = doc || this.getActiveDocument();
+      if (!targetDoc) return;
+      this.saveCurrentDocState();
+
+      const name = prompt('Save Collage As:', targetDoc.title);
+      if (!name) return;
+
+      const baseName = name.trim().replace(/\.collage$/i, '');
+      targetDoc.title = baseName;
+      const fileName = `${slugify(baseName)}.collage`;
+      targetDoc.file_name = fileName;
+      targetDoc.is_dirty = false;
+
+      const projectData = this.serializeDoc(targetDoc);
+      downloadJson(projectData, fileName);
+      saveToLibrary(targetDoc);
+
+      this.renderTabs();
+      showToast(`Saved As "${targetDoc.title}"`);
+    },
+
+    serializeDoc(doc) {
+      return {
+        version: '1.0',
+        app: 'visteras-collage',
+        id: doc.id,
+        title: doc.title,
+        activeLayoutId: doc.activeLayoutId,
+        searchQuery: doc.searchQuery,
+        imageSource: doc.imageSource,
+        selectedColors: doc.selectedColors,
+        selectedStyle: doc.selectedStyle,
+        selectedCategory: doc.selectedCategory,
+        editorsChoice: doc.editorsChoice,
+        customImageUrl: doc.customImageUrl,
+        selectedOverlay: doc.selectedOverlay,
+        overlayOpacity: doc.overlayOpacity,
+        overlayBlendMode: doc.overlayBlendMode,
+        paintEnabled: doc.paintEnabled,
+        paintColor: doc.paintColor,
+        paintOpacity: doc.paintOpacity,
+        backgroundColorEnabled: doc.backgroundColorEnabled,
+        backgroundColor: doc.backgroundColor,
+        textOverlay: doc.textOverlay,
+        selectedEffects: doc.selectedEffects,
+        zoom: doc.zoom,
+        panX: doc.panX,
+        panY: doc.panY,
+        assetsGenerated: doc.assetsGenerated,
+        items: doc.items.map(it => ({
+          imagePath: it.image?.path || '',
+          largePath: it.image?.largePath || it.image?.path || '',
+          attribution: it.image?.attribution || '',
+          zoom: it.zoom || 1.0,
+          panX: it.panX || 0,
+          panY: it.panY || 0,
+          span: it.span || { c: 1, r: 1 },
+          locked: !!it.locked
+        }))
+      };
+    },
+
+    openDocumentFromData(data, fileName = '') {
+      if (!data) return;
+      const defaultTitle = fileName ? fileName.replace(/\.(collage|json)$/i, '') : `Untitled-${this.autoTitleCount++}`;
+      const title = data.title || data.name || defaultTitle;
+      const newDoc = new CollageDocument({
+        title: title,
+        file_name: fileName || null,
+        is_dirty: false,
+        activeLayoutId: data.activeLayoutId || data.layoutId || 'grid-2x2',
+        searchQuery: data.searchQuery || data.query || 'vintage',
+        imageSource: data.imageSource || data.source || 'both',
+        selectedColors: data.selectedColors || data.colors || [],
+        selectedStyle: data.selectedStyle || data.style || 'all',
+        selectedCategory: data.selectedCategory || data.category || '',
+        editorsChoice: !!data.editorsChoice,
+        customImageUrl: data.customImageUrl || '',
+        selectedOverlay: data.selectedOverlay || data.overlay || '',
+        overlayOpacity: data.overlayOpacity != null ? data.overlayOpacity : 100,
+        overlayBlendMode: data.overlayBlendMode || 'normal',
+        paintEnabled: !!data.paintEnabled,
+        paintColor: data.paintColor || '#F2B041',
+        paintOpacity: data.paintOpacity != null ? data.paintOpacity : 50,
+        backgroundColorEnabled: !!data.backgroundColorEnabled,
+        backgroundColor: data.backgroundColor || '#E8D4B9',
+        textOverlay: data.textOverlay,
+        selectedEffects: data.selectedEffects || [],
+        zoom: data.zoom || 1.0,
+        panX: data.panX || 0,
+        panY: data.panY || 0,
+        assetsGenerated: true,
+        items: (data.items || []).map((it, idx) => ({
+          index: idx,
+          image: {
+            path: it.imagePath || (it.image && it.image.path) || '',
+            largePath: it.largePath || (it.image && (it.image.largePath || it.image.path)) || it.imagePath || '',
+            attribution: it.attribution || (it.image && it.image.attribution) || ''
+          },
+          zoom: it.zoom || 1.0,
+          panX: it.panX || 0,
+          panY: it.panY || 0,
+          span: it.span || { c: 1, r: 1 },
+          locked: !!it.locked
+        }))
+      });
+
+      const current = this.getActiveDocument();
+      if (current && !current.is_dirty && !current.assetsGenerated && current.items.length === 0) {
+        const curIdx = this.documents.indexOf(current);
+        if (curIdx !== -1) {
+          this.documents[curIdx] = newDoc;
+          this.activeId = newDoc.id;
+          this.applyDocState(newDoc);
+          this.renderTabs();
+          showToast(`Opened "${newDoc.title}"`);
+          return;
+        }
+      }
+
+      this.saveCurrentDocState();
+      this.documents.push(newDoc);
+      this.activeId = newDoc.id;
+      this.applyDocState(newDoc);
+      this.renderTabs();
+      showToast(`Opened "${newDoc.title}"`);
+    },
+
+    renderTabs() {
+      const container = document.getElementById('document_tabs');
+      if (!container) return;
+
+      let html = '';
+      for (let i = 0; i < this.documents.length; i++) {
+        const doc = this.documents[i];
+        const isActive = doc.id === this.activeId;
+        const zoomPercent = Math.round((isActive ? (state.zoom || 1) : (doc.zoom || 1)) * 100);
+        const titleSafe = escapeHtml(doc.title);
+        const dirtyMark = doc.is_dirty ? '<span class="tab_dirty">•</span>' : '';
+        html += `
+          <div class="document_tab ${isActive ? 'active' : ''}${doc.is_dirty ? ' dirty' : ''}" data-id="${doc.id}" title="${titleSafe}${doc.is_dirty ? ' — unsaved changes' : ''}">
+            <span class="tab_title">${titleSafe}${dirtyMark}</span>
+            <span class="tab_zoom">@ ${zoomPercent}%</span>
+            <span class="tab_close" data-id="${doc.id}" title="Close Tab (⌘W)">✕</span>
+          </div>
+        `;
+      }
+
+      html += `<button type="button" class="new_tab_btn" id="new_tab_btn" title="New Collage Tab (⌘N)">+</button>`;
+      container.innerHTML = html;
+
+      container.querySelectorAll('.document_tab').forEach(tabEl => {
+        const docId = tabEl.getAttribute('data-id');
+        tabEl.addEventListener('click', (e) => {
+          if (e.target.classList.contains('tab_close')) {
+            e.stopPropagation();
+            this.closeDocument(docId);
+          } else {
+            this.activateDocument(docId);
+          }
+        });
+        tabEl.addEventListener('auxclick', (e) => {
+          if (e.button === 1) {
+            e.preventDefault();
+            this.closeDocument(docId);
+          }
+        });
+      });
+
+      const newBtn = container.querySelector('#new_tab_btn');
+      if (newBtn) {
+        newBtn.addEventListener('click', () => {
+          this.createDocument();
+        });
+      }
+    }
+  };
+
   // --- DOM Elements ---
   const el = {};
 
@@ -237,16 +806,20 @@ import {
   // --- Viewport Zoom & Pan System ---
   function applyViewportTransform() {
     if (!el.viewport) return;
-    el.viewport.style.transform = `translate(calc(-50% + ${state.panX}px), calc(-50% + ${state.panY}px)) scale(${state.zoom})`;
+    el.viewport.style.transform = `translate(calc(-50% + ${state.panX}px), calc(-50% + 14px + ${state.panY}px)) scale(${state.zoom})`;
     if (el.statusZoomBtn) {
       el.statusZoomBtn.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+    const activeTabZoom = document.querySelector('.document_tab.active .tab_zoom');
+    if (activeTabZoom) {
+      activeTabZoom.textContent = `@ ${Math.round(state.zoom * 100)}%`;
     }
   }
 
   function fitToWorkspace() {
     if (!el.workarea) return;
     const availW = el.workarea.clientWidth - 48;
-    const availH = el.workarea.clientHeight - 48;
+    const availH = el.workarea.clientHeight - 48 - 28;
     const scale = Math.min(availW / 816, availH / 1056);
     state.zoom = Math.max(0.15, Math.min(2.5, Math.round(scale * 100) / 100));
     state.panX = 0;
@@ -291,6 +864,7 @@ import {
           state.selectedColors.push(col.id);
         }
         renderColorChips();
+        docManager.markDirty();
       });
       container.appendChild(chip);
     });
@@ -336,6 +910,7 @@ import {
     renderThemePresets();
     renderColorChips();
     generateFodder();
+    docManager.markDirty();
   }
 
   // --- Layout Rendering in Panel ---
@@ -343,6 +918,7 @@ import {
     state.activeLayoutId = layoutId;
     const layout = layouts.find(l => l.id === layoutId) || layouts[0];
     renderLayoutList();
+    docManager.markDirty();
 
     if (!state.assetsGenerated || !state.items || state.items.length === 0) {
       generateFodder();
@@ -449,6 +1025,7 @@ import {
       row.querySelector('input').addEventListener('change', (e) => {
         state.selectedOverlay = e.target.value;
         applyTextureOverlay();
+        docManager.markDirty();
       });
       list.appendChild(row);
     });
@@ -466,6 +1043,12 @@ import {
     }
   }
 
+  function applyBackgroundColor() {
+    if (el.letterPage) {
+      el.letterPage.style.backgroundColor = state.backgroundColorEnabled ? state.backgroundColor : '#ffffff';
+    }
+  }
+
   function applyPaintOverlay() {
     if (!el.paintLayer) return;
     if (state.paintEnabled) {
@@ -477,9 +1060,7 @@ import {
       el.paintLayer.style.display = 'none';
     }
 
-    if (el.letterPage) {
-      el.letterPage.style.backgroundColor = state.backgroundColorEnabled ? state.backgroundColor : '#ffffff';
-    }
+    applyBackgroundColor();
   }
 
   // --- SVG Filter Effects ---
@@ -507,6 +1088,7 @@ import {
           state.textOverlay.fontFamily = family;
           state.textOverlay.fontWeight = weight;
           updateTextOverlay();
+          docManager.markDirty();
         }
       });
     }
@@ -514,7 +1096,7 @@ import {
 
   function updateTextOverlay() {
     if (!el.textOverlay || !el.textContent) return;
-    const txt = state.textOverlay.content.trim();
+    const txt = (state.textOverlay.content || '').trim();
     if (!txt) {
       el.textOverlay.style.display = 'none';
       return;
@@ -522,13 +1104,16 @@ import {
 
     el.textOverlay.style.display = 'inline-block';
     el.textContent.textContent = txt;
-    el.textOverlay.style.fontFamily = `"${state.textOverlay.fontFamily}", sans-serif`;
-    el.textOverlay.style.fontSize = `${state.textOverlay.fontSize}px`;
-    el.textOverlay.style.color = state.textOverlay.fontColor;
+    el.textOverlay.style.fontFamily = `"${state.textOverlay.fontFamily || DEFAULT_FONT_FAMILY}", sans-serif`;
+    el.textOverlay.style.fontSize = `${state.textOverlay.fontSize || 28}px`;
+    el.textOverlay.style.color = state.textOverlay.fontColor || '#212529';
     el.textOverlay.style.fontWeight = state.textOverlay.fontWeight || (state.textOverlay.bold ? '700' : '400');
     el.textOverlay.style.fontStyle = state.textOverlay.italic ? 'italic' : 'normal';
     el.textOverlay.style.textDecoration = state.textOverlay.underline ? 'underline' : 'none';
-    el.textOverlay.style.zIndex = state.textOverlay.zIndex;
+    el.textOverlay.style.zIndex = state.textOverlay.zIndex || 110;
+    const tx = state.textOverlay.x || 0;
+    const ty = state.textOverlay.y || 0;
+    el.textOverlay.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
 
     const fontBoldBtn = document.getElementById('fontBold');
     if (fontBoldBtn) {
@@ -553,6 +1138,9 @@ import {
           state.textOverlay.x += event.dx;
           state.textOverlay.y += event.dy;
           event.target.style.transform = `translate(calc(-50% + ${state.textOverlay.x}px), calc(-50% + ${state.textOverlay.y}px))`;
+        },
+        end() {
+          docManager.markDirty();
         }
       }
     });
@@ -847,6 +1435,7 @@ import {
           img.dataset.largeSrc = next.largePath || next.path;
           img.alt = next.attribution || `Collage tile ${i + 1}`;
           bindTileImageEvents(img, spinner);
+          docManager.markDirty();
         }
       }
     });
@@ -874,6 +1463,7 @@ import {
       itemData.zoom = parseFloat(e.target.value);
       zoomValText.textContent = `${Math.round(itemData.zoom * 100)}%`;
       updateTileTransform(img, itemData, tile);
+      docManager.markDirty();
     });
     zoomSlider.addEventListener('click', (e) => e.stopPropagation());
     zoomSlider.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -923,6 +1513,7 @@ import {
       try {
         tile.releasePointerCapture(e.pointerId);
       } catch (_) {}
+      docManager.markDirty();
     }
 
     tile.addEventListener('pointerup', endDrag);
@@ -1028,6 +1619,48 @@ import {
     applySvgEffectsToItems();
     applyTextureOverlay();
     applyPaintOverlay();
+    updateTextOverlay();
+
+    if (el.statusLayout) el.statusLayout.textContent = layout.name;
+    docManager.markDirty();
+  }
+
+  // --- Render Fixed/Saved Items into Tiles ---
+  function renderTilesFromItems(items) {
+    const layout = layouts.find(l => l.id === state.activeLayoutId) || layouts[0];
+    if (!el.container) return;
+
+    el.container.innerHTML = '';
+    el.container.style.gridTemplateColumns = layout.cols;
+    el.container.style.gridTemplateRows = layout.rows;
+    state.items = [];
+
+    const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : [];
+
+    items.forEach((item, i) => {
+      const span = item.span || (layout.spans && layout.spans[i]) || { c: 1, r: 1 };
+      const itemData = {
+        index: i,
+        image: item.image || {
+          path: item.imagePath || '',
+          largePath: item.largePath || item.imagePath || '',
+          attribution: item.attribution || ''
+        },
+        zoom: item.zoom || 1.0,
+        panX: item.panX || 0,
+        panY: item.panY || 0,
+        span: span,
+        locked: !!item.locked
+      };
+      state.items.push(itemData);
+      const tile = createTileElement(itemData, i, pool);
+      el.container.appendChild(tile);
+    });
+
+    applySvgEffectsToItems();
+    applyTextureOverlay();
+    applyPaintOverlay();
+    applyBackgroundColor();
     updateTextOverlay();
 
     if (el.statusLayout) el.statusLayout.textContent = layout.name;
@@ -1170,55 +1803,14 @@ import {
 
   // --- Saved Collages Manager ---
   function saveCurrentCollage(name) {
-    const saveObj = {
-      id: Date.now(),
-      name: name || `Collage ${new Date().toLocaleDateString()}`,
-      layoutId: state.activeLayoutId,
-      query: state.searchQuery,
-      colors: state.selectedColors,
-      style: state.selectedStyle,
-      overlay: state.selectedOverlay,
-      overlayOpacity: state.overlayOpacity,
-      paintEnabled: state.paintEnabled,
-      paintColor: state.paintColor,
-      textOverlay: state.textOverlay,
-      items: state.items.map(it => ({
-        imagePath: it.image?.path,
-        largePath: it.image?.largePath,
-        zoom: it.zoom || 1.0,
-        panX: it.panX || 0,
-        panY: it.panY || 0
-      }))
-    };
-
-    state.savedCollages.push(saveObj);
-    localStorage.setItem('visteras_collage_saves', JSON.stringify(state.savedCollages));
-    renderSavedList();
-    showToast(`Saved "${saveObj.name}"`);
+    const doc = docManager.getActiveDocument();
+    if (!doc) return;
+    if (name) doc.title = name;
+    docManager.saveDocument(doc);
   }
 
   function loadSavedCollage(saveObj) {
-    state.activeLayoutId = saveObj.layoutId || 'grid-2x2';
-    state.searchQuery = saveObj.query || 'vintage';
-    state.selectedColors = saveObj.colors || [];
-    state.selectedStyle = saveObj.style || 'all';
-    state.selectedOverlay = saveObj.overlay || '';
-    state.overlayOpacity = saveObj.overlayOpacity || 100;
-    state.paintEnabled = saveObj.paintEnabled || false;
-    state.paintColor = saveObj.paintColor || '#F2B041';
-    if (saveObj.textOverlay) {
-      state.textOverlay = saveObj.textOverlay;
-      if (fontPickerInstance && state.textOverlay.fontFamily) {
-        fontPickerInstance.selectFamily(state.textOverlay.fontFamily, state.textOverlay.fontWeight || '400');
-      }
-    }
-
-    renderLayoutList();
-    renderThemePresets();
-    renderColorChips();
-    renderOverlayList();
-    generateFodder();
-    showToast(`Loaded "${saveObj.name}"`);
+    docManager.openDocumentFromData(saveObj);
   }
 
   function renderSavedList() {
@@ -1234,13 +1826,28 @@ import {
     state.savedCollages.forEach(save => {
       const row = document.createElement('div');
       row.className = 'layout-card';
+      row.style.display = 'flex';
+      row.style.alignItems = 'center';
+      row.style.justifyContent = 'space-between';
       row.innerHTML = `
-        <span style="font-weight: 600;">${save.name}</span>
-        <button class="btn_visteras_secondary" style="padding: 2px 6px; font-size: 10px;">Load</button>
+        <span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px;">${escapeHtml(save.name || 'Untitled')}</span>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" class="btn_visteras_secondary btn_open_save" style="padding: 2px 6px; font-size: 10px;">Open</button>
+          <button type="button" class="btn_visteras_secondary btn_delete_save" style="padding: 2px 6px; font-size: 10px; color: #ef4444;" title="Delete">✕</button>
+        </div>
       `;
-      row.querySelector('button').addEventListener('click', (e) => {
+      row.querySelector('.btn_open_save').addEventListener('click', (e) => {
         e.stopPropagation();
         loadSavedCollage(save);
+      });
+      row.querySelector('.btn_delete_save').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const delIdx = state.savedCollages.indexOf(save);
+        if (delIdx !== -1) {
+          state.savedCollages.splice(delIdx, 1);
+          localStorage.setItem('visteras_collage_saves', JSON.stringify(state.savedCollages));
+          renderSavedList();
+        }
       });
       list.appendChild(row);
     });
@@ -1374,6 +1981,7 @@ import {
       clearColorsBtn.addEventListener('click', () => {
         state.selectedColors = [];
         renderColorChips();
+        docManager.markDirty();
       });
     }
 
@@ -1417,6 +2025,7 @@ import {
         state.overlayOpacity = parseInt(e.target.value, 10);
         document.getElementById('opacityValue').textContent = `${state.overlayOpacity}%`;
         applyTextureOverlay();
+        docManager.markDirty();
       });
     }
 
@@ -1426,6 +2035,7 @@ import {
       paintToggle.addEventListener('change', (e) => {
         state.paintEnabled = e.target.checked;
         applyPaintOverlay();
+        docManager.markDirty();
       });
     }
     const paintColorInput = document.getElementById('paintColor');
@@ -1434,6 +2044,7 @@ import {
         state.paintColor = e.target.value;
         document.getElementById('paintColorValue').textContent = e.target.value;
         applyPaintOverlay();
+        docManager.markDirty();
       });
     }
     const paintOpacitySlider = document.getElementById('paintOpacity');
@@ -1442,6 +2053,7 @@ import {
         state.paintOpacity = parseInt(e.target.value, 10);
         document.getElementById('paintOpacityValue').textContent = `${state.paintOpacity}%`;
         applyPaintOverlay();
+        docManager.markDirty();
       });
     }
 
@@ -1451,6 +2063,7 @@ import {
       bgToggle.addEventListener('change', (e) => {
         state.backgroundColorEnabled = e.target.checked;
         applyPaintOverlay();
+        docManager.markDirty();
       });
     }
     const bgColorInput = document.getElementById('backgroundColor');
@@ -1459,6 +2072,7 @@ import {
         state.backgroundColor = e.target.value;
         document.getElementById('backgroundColorValue').textContent = e.target.value;
         applyPaintOverlay();
+        docManager.markDirty();
       });
     }
 
@@ -1468,6 +2082,7 @@ import {
       textInput.addEventListener('input', (e) => {
         state.textOverlay.content = e.target.value;
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontFamilySel = document.getElementById('fontFamily');
@@ -1475,6 +2090,7 @@ import {
       fontFamilySel.addEventListener('change', (e) => {
         state.textOverlay.fontFamily = e.target.value;
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontSizeInput = document.getElementById('fontSize');
@@ -1482,6 +2098,7 @@ import {
       fontSizeInput.addEventListener('input', (e) => {
         state.textOverlay.fontSize = parseInt(e.target.value, 10) || 24;
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontColorInput = document.getElementById('fontColor');
@@ -1490,6 +2107,7 @@ import {
         state.textOverlay.fontColor = e.target.value;
         document.getElementById('fontColorValue').textContent = e.target.value;
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontBoldBtn = document.getElementById('fontBold');
@@ -1503,6 +2121,7 @@ import {
           fontPickerInstance.setWeight(newWeight);
         }
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontItalicBtn = document.getElementById('fontItalic');
@@ -1511,6 +2130,7 @@ import {
         state.textOverlay.italic = !state.textOverlay.italic;
         fontItalicBtn.classList.toggle('active', state.textOverlay.italic);
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
     const fontUnderlineBtn = document.getElementById('fontUnderline');
@@ -1519,6 +2139,7 @@ import {
         state.textOverlay.underline = !state.textOverlay.underline;
         fontUnderlineBtn.classList.toggle('active', state.textOverlay.underline);
         updateTextOverlay();
+        docManager.markDirty();
       });
     }
 
@@ -1529,18 +2150,88 @@ import {
         const urlInput = document.getElementById('imageUrlInput');
         state.customImageUrl = urlInput ? urlInput.value.trim() : '';
         generateFodder();
+        docManager.markDirty();
         showToast('Applied custom image URL to hero tile.');
       });
     }
 
-    // Save collage button
+    // File Menu Actions
+    const newTabMenuBtn = document.getElementById('action_menu_new_tab');
+    if (newTabMenuBtn) {
+      newTabMenuBtn.addEventListener('click', () => {
+        docManager.createDocument();
+      });
+    }
+
+    const openMenuBtn = document.getElementById('action_menu_open');
+    const openFileInput = document.getElementById('file_open_collage');
+    if (openMenuBtn && openFileInput) {
+      openMenuBtn.addEventListener('click', () => {
+        openFileInput.click();
+      });
+    }
+    if (openFileInput) {
+      openFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const data = JSON.parse(evt.target.result);
+            docManager.openDocumentFromData(data, file.name);
+          } catch (err) {
+            alert('Failed to parse collage file: ' + err.message);
+          }
+          openFileInput.value = '';
+        };
+        reader.readAsText(file);
+      });
+    }
+
     const saveCollageBtn = document.getElementById('action_save_set');
     if (saveCollageBtn) {
       saveCollageBtn.addEventListener('click', () => {
-        const name = prompt('Name your collage fodder sheet:', `Collage ${state.savedCollages.length + 1}`);
-        if (name) saveCurrentCollage(name);
+        docManager.saveDocument();
       });
     }
+
+    const saveAsBtn = document.getElementById('action_save_as');
+    if (saveAsBtn) {
+      saveAsBtn.addEventListener('click', () => {
+        docManager.saveAsDocument();
+      });
+    }
+
+    const genMenuBtn = document.getElementById('action_generate_menu');
+    if (genMenuBtn) {
+      genMenuBtn.addEventListener('click', () => {
+        generateFodder();
+      });
+    }
+
+    const closeTabMenuBtn = document.getElementById('action_menu_close_tab');
+    if (closeTabMenuBtn) {
+      closeTabMenuBtn.addEventListener('click', () => {
+        docManager.closeDocument(docManager.activeId);
+      });
+    }
+
+    // View Menu Actions
+    const fitViewBtn = document.getElementById('action_menu_fit');
+    if (fitViewBtn) fitViewBtn.addEventListener('click', fitToWorkspace);
+    const actualViewBtn = document.getElementById('action_menu_100');
+    if (actualViewBtn) {
+      actualViewBtn.addEventListener('click', () => {
+        state.zoom = 1.0;
+        state.panX = 0;
+        state.panY = 0;
+        applyViewportTransform();
+      });
+    }
+    const zoomInViewBtn = document.getElementById('action_menu_zoomin');
+    if (zoomInViewBtn) zoomInViewBtn.addEventListener('click', () => setZoom(state.zoom * 1.15));
+    const zoomOutViewBtn = document.getElementById('action_menu_zoomout');
+    if (zoomOutViewBtn) zoomOutViewBtn.addEventListener('click', () => setZoom(state.zoom / 1.15));
 
     // Export saves JSON
     const exportBtn = document.getElementById('exportSavesBtn');
@@ -1571,29 +2262,60 @@ import {
       }
     });
 
+    // Unsaved changes beforeunload warning
+    window.addEventListener('beforeunload', (e) => {
+      const hasDirty = docManager.documents.some(d => d.is_dirty);
+      if (hasDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+      if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault();
-        printCollage();
-      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
-        e.preventDefault();
-        saveCurrentCollage();
-      } else if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-        e.preventDefault();
-        fitToWorkspace();
-      } else if ((e.metaKey || e.ctrlKey) && e.key === '1') {
-        e.preventDefault();
-        state.zoom = 1.0;
-        state.panX = 0;
-        state.panY = 0;
-        applyViewportTransform();
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === '=' || e.key === '+')) {
-        e.preventDefault();
-        setZoom(state.zoom * 1.15);
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === '-' || e.key === '_')) {
-        e.preventDefault();
-        setZoom(state.zoom / 1.15);
+        docManager.cycleTab(e.shiftKey ? -1 : 1);
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey) {
+        const k = e.key.toLowerCase();
+        if (k === 'n') {
+          e.preventDefault();
+          docManager.createDocument();
+        } else if (k === 'o') {
+          e.preventDefault();
+          document.getElementById('file_open_collage')?.click();
+        } else if (k === 's') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            docManager.saveAsDocument();
+          } else {
+            docManager.saveDocument();
+          }
+        } else if (k === 'w') {
+          e.preventDefault();
+          docManager.closeDocument(docManager.activeId);
+        } else if (k === 'p') {
+          e.preventDefault();
+          printCollage();
+        } else if (e.key === '0') {
+          e.preventDefault();
+          fitToWorkspace();
+        } else if (e.key === '1') {
+          e.preventDefault();
+          state.zoom = 1.0;
+          state.panX = 0;
+          state.panY = 0;
+          applyViewportTransform();
+        } else if (e.key === '=' || e.key === '+') {
+          e.preventDefault();
+          setZoom(state.zoom * 1.15);
+        } else if (e.key === '-' || e.key === '_') {
+          e.preventDefault();
+          setZoom(state.zoom / 1.15);
+        }
       }
     });
   }
@@ -1615,6 +2337,9 @@ import {
     initTextInteract();
     setupEvents();
     selectTool('layout');
+
+    // Initialize document tabs
+    docManager.createDocument({ title: 'Untitled-1' });
 
     if (el.queryInput) el.queryInput.value = state.searchQuery;
     if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
