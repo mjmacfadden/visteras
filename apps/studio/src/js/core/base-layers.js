@@ -2045,6 +2045,10 @@ class Base_layers_class {
 	 * @param {number} layerId
 	 */
 	notify_layer_data_changed(layerId) {
+		var layer = layerId != null ? this.get_layer(layerId, true) : config.layer;
+		if (layer) {
+			delete layer._content_bounds_local;
+		}
 		this.invalidate({ document: true, preview: true, details: true });
 		var renderer = get_renderer();
 		if (renderer && renderer.on_layer_data_changed) {
@@ -2057,6 +2061,11 @@ class Base_layers_class {
 	 * Invalidates all 2D composite caches and WebGL texture caches.
 	 */
 	notify_all_layers_changed() {
+		if (config.layers) {
+			for (const l of config.layers) {
+				delete l._content_bounds_local;
+			}
+		}
 		if (this.Composite_cache) {
 			this.Composite_cache.pendingInteractiveLayerId = null;
 			this.Composite_cache.invalidate_document();
@@ -2083,6 +2092,9 @@ class Base_layers_class {
 	 */
 	notify_mask_changed(layerId) {
 		var layer = layerId != null ? this.get_layer(layerId, true) : config.layer;
+		if (layer) {
+			delete layer._content_bounds_local;
+		}
 		if (layer && layer.mask) {
 			delete layer.mask._alpha_canvas;
 			delete layer.mask._alpha_source;

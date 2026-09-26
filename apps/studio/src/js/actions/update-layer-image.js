@@ -115,6 +115,8 @@ export class Update_layer_image_action extends Base_action {
 		const apply_gen = layer._link_apply_gen;
 		this._link_apply_gen = apply_gen;
 
+		delete layer._content_bounds_local;
+
 		// Never stomp a newer stroke's live bridge canvas with this older commit.
 		if (committed_canvas) {
 			if (layer.link_canvas == null || layer.link_canvas === committed_canvas) {

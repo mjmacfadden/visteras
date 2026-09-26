@@ -193,13 +193,15 @@ class File_open_class {
 			FR.file = files[i];
 
 			FR.onload = function (event) {
-				var order = auto_increment + order_map[this.file.name];
+				const isOpaque = (this.file && (this.file.type === 'image/jpeg' || this.file.type === 'image/jpg' || this.file.type === 'image/heic' || this.file.type === 'image/heif')) ||
+					/\.(jpe?g|heic|heif|bmp)$/i.test((this.file && this.file.name) || '');
 				var new_layer = {
 					name: this.file.name,
 					type: 'image',
 					data: event.target.result,
 					order: order,
 					_exif: _this.extract_exif(this.file),
+					_is_opaque: isOpaque,
 				};
 				// Fit the placed image to the first canvas boundary without
 				// resizing its source bitmap or the document.

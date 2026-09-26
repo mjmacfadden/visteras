@@ -35,6 +35,7 @@ class Select_tool_class extends Base_tools_class {
 		this.rotate_initial = null;
 		this.selection_transform_box = null;
 		this.last_selection_signature = null;
+		this.cached_snap_positions = null;
 
 		var sel_config = {
 			enable_background: false,
@@ -445,6 +446,11 @@ class Select_tool_class extends Base_tools_class {
 			height: config.layer.mask.height,
 			linked: config.layer.mask.linked !== false,
 		} : null;
+
+		// Cache snap target positions for all other layers once at the start of drag
+		this.cached_snap_positions = (config.SNAP !== false)
+			? this.get_snap_positions(config.layer ? config.layer.id : null)
+			: null;
 
 		// Snapshot fonts after dimensions are frozen for this drag
 		if (this._resizing_point_text && config.layer && config.layer.type === 'text') {
@@ -1055,6 +1061,7 @@ class Select_tool_class extends Base_tools_class {
 		this.mousedown_transform_box = null;
 		this.mousedown_group_center = null;
 		this.rotate_initial_bounds = null;
+		this.cached_snap_positions = null;
 
 		if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_transform_indicators === 'function') {
 			app.GUI.GUI_tools.update_transform_indicators();
@@ -1128,7 +1135,7 @@ class Select_tool_class extends Base_tools_class {
 		var max_distance = (config.WIDTH + config.HEIGHT) / 2 * sensitivity / config.ZOOM;
 
 		//collect snap positions
-		var snap_positions = this.get_snap_positions(config.layer ? config.layer.id : null);
+		var snap_positions = this.cached_snap_positions || this.get_snap_positions(config.layer ? config.layer.id : null);
 
 		//find closest snap positions
 		var min_group = {

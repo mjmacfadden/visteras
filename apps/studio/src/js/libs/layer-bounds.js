@@ -143,46 +143,120 @@ export function get_layer_content_bounds(layer) {
 		return null;
 	}
 
-	// Raster / Image layers: scan pixel data for non-transparent pixels
+	// Raster / Image layers: check cache or scan pixel data for non-transparent pixels
 	const canvas = layer.link_canvas || layer.link;
 	if (!canvas) {
 		return null;
 	}
 
 	let w = 0, h = 0;
-	let imgData = null;
-
 	if (canvas instanceof HTMLCanvasElement) {
 		w = canvas.width;
 		h = canvas.height;
-		if (w === 0 || h === 0) return null;
-		const ctx = canvas.getContext('2d', { willReadFrequently: true });
-		imgData = ctx.getImageData(0, 0, w, h).data;
 	} else if (canvas instanceof HTMLImageElement) {
 		w = canvas.naturalWidth || canvas.width;
 		h = canvas.naturalHeight || canvas.height;
-		if (w === 0 || h === 0) return null;
 		if (typeof canvas.complete === 'boolean' && !canvas.complete) return null;
-		const tmp = document.createElement('canvas');
-		tmp.width = w;
-		tmp.height = h;
-		const tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
-		tmpCtx.drawImage(canvas, 0, 0);
-		imgData = tmpCtx.getImageData(0, 0, w, h).data;
 	} else {
 		return null;
 	}
+	if (w === 0 || h === 0) return null;
 
-	let minX = w, minY = h, maxX = -1, maxY = -1;
-	for (let y = 0; y < h; y++) {
-		const rowOffset = y * w * 4;
-		for (let x = 0; x < w; x++) {
-			if (imgData[rowOffset + x * 4 + 3] > 0) {
-				if (x < minX) minX = x;
-				if (x > maxX) maxX = x;
-				if (y < minY) minY = y;
-				if (y > maxY) maxY = y;
+	let minX = 0, minY = 0, maxX = -1, maxY = -1;
+
+	// 1. Check if we have a valid cached local bounding box
+	const cachedLocal = layer._content_bounds_local;
+	if (cachedLocal && cachedLocal.canvasRef === canvas && cachedLocal.w === w && cachedLocal.h === h) {
+		minX = cachedLocal.minX;
+		minY = cachedLocal.minY;
+		maxX = cachedLocal.maxX;
+		maxY = cachedLocal.maxY;
+	} else if (
+		layer._is_opaque === true ||
+		(layer.type === 'image' && !layer.mask_canvas && !layer.link_canvas &&
+			(layer.data && typeof layer.data === 'string' && (layer.data.startsWith('data:image/jpeg') || layer.data.startsWith('data:image/jpg'))))
+	) {
+		// 2. Guaranteed 100% opaque image - spans entire layer without pixel inspection
+		minX = 0;
+		minY = 0;
+		maxX = w - 1;
+		maxY = h - 1;
+		layer._content_bounds_local = { minX, minY, maxX, maxY, w, h, canvasRef: canvas };
+	} else {
+		// 3. Scan pixel data for non-transparent pixels
+		let imgData = null;
+		if (canvas instanceof HTMLCanvasElement) {
+			const ctx = canvas.getContext('2d', { willReadFrequently: true });
+			imgData = ctx.getImageData(0, 0, w, h).data;
+		} else if (canvas instanceof HTMLImageElement) {
+			const tmp = document.createElement('canvas');
+			tmp.width = w;
+			tmp.height = h;
+			const tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
+			tmpCtx.drawImage(canvas, 0, 0);
+			imgData = tmpCtx.getImageData(0, 0, w, h).data;
+		}
+
+		if (!imgData) return null;
+
+		// Fast border check: if all four outer edges contain non-transparent pixels,
+		// the image fills its bounding box (e.g. solid photos, full rectangular backgrounds).
+		// We can detect this in O(w + h) time instead of O(w * h).
+		const step = (w * h > 1000000) ? 4 : 1;
+		let topHit = false, bottomHit = false, leftHit = false, rightHit = false;
+
+		// Top row (y = 0)
+		for (let x = 0; x < w; x += step) {
+			if (imgData[x * 4 + 3] > 0) { topHit = true; break; }
+		}
+		// Bottom row (y = h - 1)
+		const bottomRowOffset = (h - 1) * w * 4;
+		for (let x = 0; x < w; x += step) {
+			if (imgData[bottomRowOffset + x * 4 + 3] > 0) { bottomHit = true; break; }
+		}
+		// Left column (x = 0)
+		for (let y = 0; y < h; y += step) {
+			if (imgData[y * w * 4 + 3] > 0) { leftHit = true; break; }
+		}
+		// Right column (x = w - 1)
+		const rightColOffset = (w - 1) * 4;
+		for (let y = 0; y < h; y += step) {
+			if (imgData[y * w * 4 + rightColOffset + 3] > 0) { rightHit = true; break; }
+		}
+
+		if (topHit && bottomHit && leftHit && rightHit) {
+			minX = 0;
+			minY = 0;
+			maxX = w - 1;
+			maxY = h - 1;
+		} else {
+			// Scan row-by-row and col-by-col inward
+			minX = w;
+			minY = h;
+			maxX = -1;
+			maxY = -1;
+			for (let y = 0; y < h; y += step) {
+				const rowOffset = y * w * 4;
+				for (let x = 0; x < w; x += step) {
+					if (imgData[rowOffset + x * 4 + 3] > 0) {
+						if (x < minX) minX = x;
+						if (x > maxX) maxX = x;
+						if (y < minY) minY = y;
+						if (y > maxY) maxY = y;
+					}
+				}
 			}
+			if (maxX >= minX && maxY >= minY && step > 1) {
+				minX = Math.max(0, minX);
+				minY = Math.max(0, minY);
+				maxX = Math.min(w - 1, maxX + step - 1);
+				maxY = Math.min(h - 1, maxY + step - 1);
+			}
+		}
+
+		// Cache local bounds on the layer
+		if (maxX >= minX && maxY >= minY) {
+			layer._content_bounds_local = { minX, minY, maxX, maxY, w, h, canvasRef: canvas };
 		}
 	}
 

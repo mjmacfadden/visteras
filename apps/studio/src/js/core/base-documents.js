@@ -477,7 +477,8 @@ class Base_documents_class {
 			img.onload = async () => {
 				const w = img.width;
 				const h = img.height;
-				const isPristine = !force_new && this.is_active_document_empty();
+				const isOpaque = (typeof data === 'string' && (data.startsWith('data:image/jpeg') || data.startsWith('data:image/jpg'))) ||
+					/\.(jpe?g|heic|heif|bmp)$/i.test(name || '');
 
 				const new_layer = {
 					id: 1,
@@ -498,6 +499,7 @@ class Base_documents_class {
 					x: 0,
 					y: 0,
 					_exif: exif,
+					_is_opaque: isOpaque,
 				};
 
 				config.TRANSPARENCY = true;
