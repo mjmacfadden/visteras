@@ -374,30 +374,32 @@ class GUI_tools_class {
 
 		var items = itemDef.tool_group.items;
 		var currentIndex = -1;
+
+		// 1. Match by explicit tool property if set on the item (e.g. pencil, fill)
 		for (var j = 0; j < items.length; j++) {
-			var toolKey = items[j].tool || items[j].shape || itemDef.name;
-			if (this.active_tool === toolKey) {
+			if (items[j].tool && this.active_tool === items[j].tool) {
 				currentIndex = j;
 				break;
 			}
 		}
 
-		var nextIndex = 0;
-		if (currentIndex !== -1) {
-			nextIndex = (currentIndex + 1) % items.length;
-		} else {
+		// 2. If not matched, match by current active shape in the group
+		if (currentIndex === -1) {
 			var activeShape = itemDef.tool_group.active_shape
-				|| this.Helper.getCookie(this.group_cookie_key(ownerName));
+				|| this.Helper.getCookie(this.group_cookie_key(ownerName))
+				|| (items[0] ? items[0].shape : null);
 			if (activeShape) {
 				for (var k = 0; k < items.length; k++) {
 					if (items[k].shape === activeShape) {
-						nextIndex = k;
+						currentIndex = k;
 						break;
 					}
 				}
 			}
 		}
 
+		// Advance to next item in group
+		var nextIndex = (currentIndex !== -1) ? (currentIndex + 1) % items.length : 0;
 		var nextItem = items[nextIndex];
 		this.update_tool_shape(ownerName, nextItem.shape);
 	}
