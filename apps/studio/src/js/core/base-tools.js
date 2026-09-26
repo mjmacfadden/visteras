@@ -93,7 +93,7 @@ class Base_tools_class {
 			var brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
 			if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 				var params = activeTool.getParams ? activeTool.getParams() : (config.TOOL.attributes || {});
-				var size = params.size?.value ?? params.size ?? 10;
+				var size = params.size?.value ?? params.size ?? (params.radius ? (params.radius.value ?? params.radius) * 2 : 10);
 				var cursorType = 'circle';
 				if (config.TOOL.name === 'pencil') {
 					cursorType = 'rect';
@@ -504,6 +504,35 @@ class Base_tools_class {
 		}
 
 		return response;
+	}
+
+	get_layer_local_coords(world_x, world_y, layer) {
+		var l = layer || config.layer || {};
+		var lx = (l.x != null) ? l.x : 0;
+		var ly = (l.y != null) ? l.y : 0;
+		var lw = (l.width != null && l.width > 0) ? l.width : (config.WIDTH || 1);
+		var lh = (l.height != null && l.height > 0) ? l.height : (config.HEIGHT || 1);
+		var lwo = l.width_original || lw;
+		var lho = l.height_original || lh;
+		var rot = l.rotate || 0;
+
+		var px = world_x;
+		var py = world_y;
+
+		if (rot !== 0) {
+			var rad = -rot * Math.PI / 180;
+			var cx = lx + lw / 2;
+			var cy = ly + lh / 2;
+			var cos = Math.cos(rad);
+			var sin = Math.sin(rad);
+			px = cx + (world_x - cx) * cos - (world_y - cy) * sin;
+			py = cy + (world_x - cx) * sin + (world_y - cy) * cos;
+		}
+
+		var local_x = (px - lx) * (lwo / lw);
+		var local_y = (py - ly) * (lho / lh);
+
+		return { x: local_x, y: local_y };
 	}
 
 	draw_shape(ctx, x, y, width, height, coords, is_demo) {

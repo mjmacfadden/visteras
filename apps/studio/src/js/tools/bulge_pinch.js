@@ -11,12 +11,13 @@ class BulgePinch_class extends Base_tools_class {
 	constructor(ctx) {
 		super();
 		this.Base_layers = new Base_layers_class();
-		this.fx_filter = false;
+		this.fx_filter = null;
 		this.Helper = new Helper_class();
 		this.ctx = ctx;
 		this.name = 'bulge_pinch';
 		this.tmpCanvas = null;
 		this.tmpCanvasCtx = null;
+		this.baseCanvas = null;
 		this.started = false;
 		this.selection_snapshot = null;
 	}
@@ -32,81 +33,146 @@ class BulgePinch_class extends Base_tools_class {
 		if (mouse.click_valid == false) {
 			return;
 		}
-		if (config.layer.type != 'image') {
+		if (!config.layer || config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
+
+		var src = config.layer.link_canvas;
+		if (!src && config.layer.link) {
+			if (typeof config.layer.link.complete === 'boolean') {
+				if (config.layer.link.complete && config.layer.link.naturalWidth > 0) {
+					src = config.layer.link;
+				}
+			} else if (config.layer.link.width > 0 && config.layer.link.height > 0) {
+				src = config.layer.link;
+			}
+		}
+		if (!src) {
+			alertify.error('Layer image is not ready.');
+			return;
+		}
+
+		var lw = (config.layer.width != null && config.layer.width > 0) ? config.layer.width : (config.WIDTH || 1);
+		var lh = (config.layer.height != null && config.layer.height > 0) ? config.layer.height : (config.HEIGHT || 1);
+		var lwo = config.layer.width_original || lw;
+		var lho = config.layer.height_original || lh;
+
 		this.started = true;
 
-		//get canvas from layer
+		// Create base snapshot to sample from during drag
+		this.baseCanvas = document.createElement('canvas');
+		this.baseCanvas.width = lwo;
+		this.baseCanvas.height = lho;
+		var baseCtx = this.baseCanvas.getContext('2d');
+		baseCtx.drawImage(src, 0, 0);
+
+		// Output canvas
 		this.tmpCanvas = document.createElement('canvas');
 		this.tmpCanvasCtx = this.tmpCanvas.getContext("2d");
-		this.tmpCanvas.width = config.layer.width_original;
-		this.tmpCanvas.height = config.layer.height_original;
-		this.tmpCanvasCtx.drawImage(config.layer.link, 0, 0);
+		this.tmpCanvas.width = lwo;
+		this.tmpCanvas.height = lho;
+		this.tmpCanvasCtx.drawImage(this.baseCanvas, 0, 0);
+
 		this.selection_snapshot = this.copy_layer_snapshot();
 
-		//apply
+		// Register tmp canvas for faster redraw
+		config.layer.link_canvas = this.tmpCanvas;
+
+		// Apply initial distortion
 		this.bulgePinch_general(mouse, params.power, params.radius, params.bulge);
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 
-		//register tmp canvas for faster redraw
-		config.layer.link_canvas = this.tmpCanvas;
 		config.need_render = true;
 	}
 
-	mouseup(e) {
+	mousemove(e) {
+		var mouse = this.get_mouse_info(e);
+		var params = this.getParams();
+		if (mouse.is_drag == false)
+			return;
+		if (mouse.click_valid == false) {
+			return;
+		}
 		if (this.started == false) {
 			return;
 		}
-		delete config.layer.link_canvas;
+
+		// Apply distortion from baseCanvas to tmpCanvas
+		this.bulgePinch_general(mouse, params.power, params.radius, params.bulge);
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 
-		app.State.do_action(
-			new app.Actions.Bundle_action('bulge_pinch_tool', 'Bulge/Pinch Tool', [
-				new app.Actions.Update_layer_image_action(this.tmpCanvas)
-			])
-		);
+		config.need_render = true;
+	}
 
-		//decrease memory
-		this.tmpCanvas.width = 1;
-		this.tmpCanvas.height = 1;
+	async mouseup(e) {
+		if (this.started == false) {
+			return;
+		}
+		var layer = config.layer;
+		var canvas = this.tmpCanvas;
+		if (!layer || !canvas) {
+			this.started = false;
+			return;
+		}
+		this.constrain_edit_to_selection(canvas, this.selection_snapshot);
+
+		this.started = false;
 		this.tmpCanvas = null;
 		this.tmpCanvasCtx = null;
+		this.baseCanvas = null;
 		this.selection_snapshot = null;
+
+		try {
+			await app.State.do_action(
+				new app.Actions.Bundle_action('bulge_pinch_tool', 'Bulge/Pinch Tool', [
+					new app.Actions.Update_layer_image_action(canvas, layer.id)
+				])
+			);
+		} catch (err) {
+			if (layer.link_canvas === canvas) {
+				delete layer.link_canvas;
+			}
+			throw err;
+		}
 	}
 
 	bulgePinch_general(mouse, power, radius, bulge) {
-		if (this.fx_filter == false) {
-			//init glfx lib
-			this.fx_filter = glfx.canvas();
+		if (!this.fx_filter) {
+			try {
+				this.fx_filter = glfx.canvas();
+			} catch (err) {
+				console.error('WebGL/glfx initialization error:', err);
+				alertify.error('WebGL is required for Bulge/Pinch tool.');
+				return;
+			}
 		}
 
-		var ctx = this.tmpCanvasCtx;
-		var mouse_x = Math.round(mouse.x) - config.layer.x;
-		var mouse_y = Math.round(mouse.y) - config.layer.y;
+		var coords = this.get_layer_local_coords(mouse.x, mouse.y, config.layer);
+		var mouse_x = Math.round(coords.x);
+		var mouse_y = Math.round(coords.y);
 
-		//adapt to origin size
-		mouse_x = this.adaptSize(mouse_x, 'width');
-		mouse_y = this.adaptSize(mouse_y, 'height');
+		var r = radius || 80;
+		var adapted_radius = Math.max(1, Math.round(this.adaptSize(r, 'width')));
 
-		//convert float coords to integers
-		mouse_x = Math.round(mouse_x);
-		mouse_y = Math.round(mouse_y);
-
-		power = power / 100;
-		if (power > 1) {
-			//max 100%
-			power = 1;
+		var p = (power == null ? 50 : power) / 100;
+		if (p > 1) {
+			p = 1;
+		}
+		if (bulge === false) {
+			p = -1 * p;
 		}
 
-		if (bulge == false)
-			power = -1 * power;
+		var source = this.baseCanvas || this.tmpCanvas;
+		var texture = this.fx_filter.texture(source);
+		this.fx_filter.draw(texture).bulgePinch(mouse_x, mouse_y, adapted_radius, p).update();
 
-		var texture = this.fx_filter.texture(this.tmpCanvas);
-		this.fx_filter.draw(texture).bulgePinch(mouse_x, mouse_y, radius, power).update();	//effect
 		this.tmpCanvasCtx.clearRect(0, 0, this.tmpCanvas.width, this.tmpCanvas.height);
 		this.tmpCanvasCtx.drawImage(this.fx_filter, 0, 0);
+
+		if (texture && typeof texture.destroy === 'function') {
+			texture.destroy();
+		}
 	}
 
 }

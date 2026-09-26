@@ -18,6 +18,8 @@ class Desaturate_class extends Base_tools_class {
 		this.tmpCanvasCtx = null;
 		this.started = false;
 		this.selection_snapshot = null;
+		this.last_mouse_x = null;
+		this.last_mouse_y = null;
 	}
 
 	load() {
@@ -31,30 +33,49 @@ class Desaturate_class extends Base_tools_class {
 		if (mouse.click_valid == false) {
 			return;
 		}
-		if (config.layer.type != 'image') {
+		if (!config.layer || config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
-		if (config.layer.rotate || 0 > 0) {
-			alertify.error('Erase on rotate object is disabled. Please rasterize first.');
+
+		var src = config.layer.link_canvas;
+		if (!src && config.layer.link) {
+			if (typeof config.layer.link.complete === 'boolean') {
+				if (config.layer.link.complete && config.layer.link.naturalWidth > 0) {
+					src = config.layer.link;
+				}
+			} else if (config.layer.link.width > 0 && config.layer.link.height > 0) {
+				src = config.layer.link;
+			}
+		}
+		if (!src) {
+			alertify.error('Layer image is not ready.');
 			return;
 		}
+
+		var lw = (config.layer.width != null && config.layer.width > 0) ? config.layer.width : (config.WIDTH || 1);
+		var lh = (config.layer.height != null && config.layer.height > 0) ? config.layer.height : (config.HEIGHT || 1);
+		var lwo = config.layer.width_original || lw;
+		var lho = config.layer.height_original || lh;
+
 		this.started = true;
 
-		//get canvas from layer
+		// get canvas from layer
 		this.tmpCanvas = document.createElement('canvas');
 		this.tmpCanvasCtx = this.tmpCanvas.getContext("2d");
-		this.tmpCanvas.width = config.layer.width_original;
-		this.tmpCanvas.height = config.layer.height_original;
-
-		this.tmpCanvasCtx.drawImage(config.layer.link, 0, 0);
+		this.tmpCanvas.width = lwo;
+		this.tmpCanvas.height = lho;
+		this.tmpCanvasCtx.drawImage(src, 0, 0);
 		this.selection_snapshot = this.copy_layer_snapshot();
 
-		//do desaturate
+		this.last_mouse_x = mouse.x;
+		this.last_mouse_y = mouse.y;
+
+		// do desaturate
 		this.desaturate_general('click', mouse, params.size, params.anti_aliasing);
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 
-		//register tmp canvas for faster redraw
+		// register tmp canvas for faster redraw
 		config.layer.link_canvas = this.tmpCanvas;
 		config.need_render = true;
 	}
@@ -71,58 +92,83 @@ class Desaturate_class extends Base_tools_class {
 			return;
 		}
 
-		//do desaturate
-		this.desaturate_general('move', mouse, params.size, params.anti_aliasing);
+		var size = Math.max(1, params.size || 50);
+		var step = Math.max(5, size / 2);
+
+		if (this.last_mouse_x != null && this.last_mouse_y != null) {
+			var dist = Math.hypot(mouse.x - this.last_mouse_x, mouse.y - this.last_mouse_y);
+			var steps = Math.min(5, Math.ceil(dist / step));
+			for (var s = 1; s <= steps; s++) {
+				var t = s / steps;
+				var inter_mouse = {
+					x: this.last_mouse_x + (mouse.x - this.last_mouse_x) * t,
+					y: this.last_mouse_y + (mouse.y - this.last_mouse_y) * t,
+					click_x: mouse.click_x,
+					click_y: mouse.click_y
+				};
+				this.desaturate_general('move', inter_mouse, params.size, params.anti_aliasing);
+			}
+		} else {
+			this.desaturate_general('move', mouse, params.size, params.anti_aliasing);
+		}
+
+		this.last_mouse_x = mouse.x;
+		this.last_mouse_y = mouse.y;
+
 		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
 
-		//draw draft preview
+		// draw draft preview
 		config.need_render = true;
 	}
 
-	mouseup(e) {
+	async mouseup(e) {
 		if (this.started == false) {
 			return;
 		}
-		delete config.layer.link_canvas;
-		this.constrain_edit_to_selection(this.tmpCanvas, this.selection_snapshot);
+		var layer = config.layer;
+		var canvas = this.tmpCanvas;
+		if (!layer || !canvas) {
+			this.started = false;
+			return;
+		}
+		this.constrain_edit_to_selection(canvas, this.selection_snapshot);
 
-		app.State.do_action(
-			new app.Actions.Bundle_action('desaturate_tool', 'Desaturate Tool', [
-				new app.Actions.Update_layer_image_action(this.tmpCanvas)
-			])
-		);
-
-		//decrease memory
-		this.tmpCanvas.width = 1;
-		this.tmpCanvas.height = 1;
+		this.started = false;
 		this.tmpCanvas = null;
 		this.tmpCanvasCtx = null;
 		this.selection_snapshot = null;
+		this.last_mouse_x = null;
+		this.last_mouse_y = null;
+
+		try {
+			await app.State.do_action(
+				new app.Actions.Bundle_action('desaturate_tool', 'Desaturate Tool', [
+					new app.Actions.Update_layer_image_action(canvas, layer.id)
+				])
+			);
+		} catch (err) {
+			if (layer.link_canvas === canvas) {
+				delete layer.link_canvas;
+			}
+			throw err;
+		}
 	}
 
 	desaturate_general(type, mouse, size, anti_aliasing) {
 		var ctx = this.tmpCanvasCtx;
-		var mouse_x = Math.round(mouse.x) - config.layer.x;
-		var mouse_y = Math.round(mouse.y) - config.layer.y;
+		var coords = this.get_layer_local_coords(mouse.x, mouse.y, config.layer);
+		var mouse_x = Math.round(coords.x);
+		var mouse_y = Math.round(coords.y);
 
-		//adapt to origin size
-		mouse_x = this.adaptSize(mouse_x, 'width');
-		mouse_y = this.adaptSize(mouse_y, 'height');
-		var size_w = this.adaptSize(size, 'width');
-		var size_h = this.adaptSize(size, 'height');
+		var size_w = Math.max(1, Math.round(this.adaptSize(size, 'width')));
+		var size_h = Math.max(1, Math.round(this.adaptSize(size, 'height')));
 
-		//find center
-		var center_x = mouse_x - Math.round(size_w / 2);
-		var center_y = mouse_y - Math.round(size_h / 2);
-
-		//convert float coords to integers
-		center_x = Math.round(center_x);
-		center_y = Math.round(center_y);
-		mouse_x = Math.round(mouse_x);
-		mouse_y = Math.round(mouse_y);
+		// find center
+		var center_x = Math.round(mouse_x - size_w / 2);
+		var center_y = Math.round(mouse_y - size_h / 2);
 
 		var imageData = ctx.getImageData(center_x, center_y, size_w, size_h);
-		var filtered = ImageFilters.GrayScale(imageData); //add effect
+		var filtered = ImageFilters.GrayScale(imageData);
 		this.Helper.image_round(this.tmpCanvasCtx, mouse_x, mouse_y, size_w, size_h, filtered, anti_aliasing);
 	}
 

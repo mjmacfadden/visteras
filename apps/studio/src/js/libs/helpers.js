@@ -537,7 +537,7 @@ class Helper_class {
 			gradient.addColorStop(0.8, '#ffffff');
 		else
 			gradient.addColorStop(0.99, '#ffffff');
-		gradient.addColorStop(1, 'rgba(255,255,255,0');
+		gradient.addColorStop(1, 'rgba(255,255,255,0)');
 		ctx.fillStyle = gradient;
 
 		ctx.beginPath();
