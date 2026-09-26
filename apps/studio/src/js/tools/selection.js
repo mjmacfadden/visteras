@@ -36,6 +36,7 @@ class Selection_class extends Base_tools_class {
 		this.move_last = null;
 		this.shift_key = false;
 		this.mode = null;
+		this._had_selection_on_mousedown = false;
 		this.lasso_path = null;
 		this.old_mask_snapshot = null;
 		this.selection = {
@@ -182,16 +183,20 @@ class Selection_class extends Base_tools_class {
 
 		var shift = (e.shiftKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_shift_down === true);
 		var alt = (e.altKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down === true);
+		var has_selection = this.Base_selection.has_selection === true;
+		this._had_selection_on_mousedown = has_selection;
 
 		var mode = null;
-		if (shift && alt) {
-			mode = 'intersect';
-		}
-		else if (shift) {
-			mode = 'add';
-		}
-		else if (alt) {
-			mode = 'subtract';
+		if (has_selection) {
+			if (shift && alt) {
+				mode = 'intersect';
+			}
+			else if (shift) {
+				mode = 'add';
+			}
+			else if (alt) {
+				mode = 'subtract';
+			}
 		}
 		this.mode = mode;
 
@@ -199,7 +204,7 @@ class Selection_class extends Base_tools_class {
 		this.Base_selection._preview_lasso_path = null;
 		this.old_mask_snapshot = this.Base_selection.clone_mask_canvas();
 
-		if (mode == null && this.Base_selection.has_selection && this.Base_selection.point_inside_selection(mouse.x, mouse.y)) {
+		if (mode == null && has_selection && this.Base_selection.point_inside_selection(mouse.x, mouse.y)) {
 			//move selection mask
 			this.type = 'move';
 			this.move_last = { x: mouse.x, y: mouse.y };
@@ -244,12 +249,13 @@ class Selection_class extends Base_tools_class {
 
 			var shift = (e.shiftKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_shift_down === true);
 			var alt = (e.altKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down === true);
+			var has_selection = (this._had_selection_on_mousedown != null) ? this._had_selection_on_mousedown : (this.Base_selection.has_selection === true);
 
 			var active_mode = this.mode;
-			if (active_mode == null) {
+			if (active_mode == null && has_selection) {
 				if (shift && alt) active_mode = 'intersect';
 				else if (alt) active_mode = 'subtract';
-				else if (shift && this.Base_selection.has_selection) active_mode = 'add';
+				else if (shift) active_mode = 'add';
 			}
 
 			if (shape === 'lasso') {
@@ -266,7 +272,8 @@ class Selection_class extends Base_tools_class {
 				this.Base_selection._preview_lasso_path = null;
 				var w = cur_x - start_x;
 				var h = cur_y - start_y;
-				if (shift && this.mode == null) {
+				// Maintain square/circle ratio only if NO selection was already made
+				if (shift && !has_selection) {
 					var size = Math.max(Math.abs(w), Math.abs(h));
 					w = w < 0 ? -size : size;
 					h = h < 0 ? -size : size;
@@ -286,10 +293,12 @@ class Selection_class extends Base_tools_class {
 		var type = this.type;
 		var mode = this.mode;
 		var start_coords = this.selection_coords_from;
+		var had_selection = (this._had_selection_on_mousedown != null) ? this._had_selection_on_mousedown : (this.Base_selection.has_selection === true);
 
 		this.type = null;
 		this.mode = null;
 		this.selection_coords_from = null;
+		this._had_selection_on_mousedown = null;
 
 		if (type == null)
 			return;
@@ -312,10 +321,10 @@ class Selection_class extends Base_tools_class {
 
 			var shift = (e.shiftKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_shift_down === true);
 			var alt = (e.altKey == true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_alt_down === true);
-			if (mode == null) {
+			if (mode == null && had_selection) {
 				if (shift && alt) mode = 'intersect';
 				else if (alt) mode = 'subtract';
-				else if (shift && this.Base_selection.has_selection) mode = 'add';
+				else if (shift) mode = 'add';
 			}
 
 			var valid = false;
@@ -332,7 +341,8 @@ class Selection_class extends Base_tools_class {
 				var cur_y = Math.round(mouse.y);
 				var w = cur_x - start_x;
 				var h = cur_y - start_y;
-				if (shift && this.mode == null) {
+				// Maintain square/circle ratio only if NO selection was already made
+				if (shift && !had_selection) {
 					var size = Math.max(Math.abs(w), Math.abs(h));
 					w = w < 0 ? -size : size;
 					h = h < 0 ? -size : size;
