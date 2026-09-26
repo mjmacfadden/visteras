@@ -1048,6 +1048,84 @@ html {
   color: #ffffff;
 }
 
+/* Saved Collage Items with Thumbnails */
+.saved-collage-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: #242424;
+  border: 1px solid #383838;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 6px;
+}
+
+.saved-collage-card:hover {
+  border-color: var(--collage-purple);
+  background: #2a2a2a;
+}
+
+.saved-collage-thumb-wrapper {
+  width: 44px;
+  height: 57px;
+  flex-shrink: 0;
+  background: #141414;
+  border: 1px solid #333333;
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saved-collage-thumb-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.saved-collage-no-thumb {
+  font-size: 8px;
+  color: #666666;
+  text-align: center;
+  line-height: 1.2;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.saved-collage-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.saved-collage-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #eeeeee;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-collage-meta {
+  font-size: 10px;
+  color: #888888;
+  display: flex;
+  gap: 6px;
+}
+
+.saved-collage-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Multi-select color chips */
 .color-chip-group {
   display: grid;
