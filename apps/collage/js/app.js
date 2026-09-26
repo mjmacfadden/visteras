@@ -226,22 +226,33 @@ import {
       name: doc.title,
       layoutId: doc.activeLayoutId,
       query: doc.searchQuery,
-      colors: doc.selectedColors,
+      source: doc.imageSource,
+      colors: doc.selectedColors ? [...doc.selectedColors] : [],
       style: doc.selectedStyle,
+      category: doc.selectedCategory,
+      editorsChoice: doc.editorsChoice,
+      customImageUrl: doc.customImageUrl,
       overlay: doc.selectedOverlay,
       overlayOpacity: doc.overlayOpacity,
+      overlayBlendMode: doc.overlayBlendMode,
       paintEnabled: doc.paintEnabled,
       paintColor: doc.paintColor,
+      paintOpacity: doc.paintOpacity,
       backgroundColorEnabled: doc.backgroundColorEnabled,
       backgroundColor: doc.backgroundColor,
       textOverlay: doc.textOverlay,
+      selectedEffects: doc.selectedEffects ? [...doc.selectedEffects] : [],
+      zoom: doc.zoom != null ? parseFloat(doc.zoom) : 1.0,
+      panX: doc.panX != null ? parseFloat(doc.panX) : 0,
+      panY: doc.panY != null ? parseFloat(doc.panY) : 0,
+      assetsGenerated: doc.assetsGenerated,
       items: doc.items.map(it => ({
-        imagePath: it.image?.path || '',
-        largePath: it.image?.largePath || it.image?.path || '',
-        attribution: it.image?.attribution || '',
-        zoom: it.zoom || 1.0,
-        panX: it.panX || 0,
-        panY: it.panY || 0,
+        imagePath: it.image?.path || it.imagePath || '',
+        largePath: it.image?.largePath || it.largePath || it.image?.path || it.imagePath || '',
+        attribution: it.image?.attribution || it.attribution || '',
+        zoom: it.zoom != null ? parseFloat(it.zoom) : 1.0,
+        panX: it.panX != null ? parseFloat(it.panX) : 0,
+        panY: it.panY != null ? parseFloat(it.panY) : 0,
         span: it.span || { c: 1, r: 1 },
         locked: !!it.locked
       }))
@@ -251,7 +262,7 @@ import {
     if (existingIdx !== -1) {
       state.savedCollages[existingIdx] = saveObj;
     } else {
-      state.savedCollages.push(saveObj);
+      state.savedCollages.unshift(saveObj);
     }
     localStorage.setItem('visteras_collage_saves', JSON.stringify(state.savedCollages));
     renderSavedList();
@@ -558,14 +569,8 @@ import {
       if (!targetDoc) return;
       this.saveCurrentDocState();
 
-      if (!targetDoc.file_name && targetDoc.title.startsWith('Untitled-')) {
-        const name = prompt('Name your collage fodder sheet:', targetDoc.title);
-        if (!name) return;
-        targetDoc.title = name.trim();
-      }
-
-      const baseName = targetDoc.title.replace(/\.collage$/i, '');
-      const fileName = targetDoc.file_name || `${slugify(baseName)}.collage`;
+      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
+      const fileName = targetDoc.file_name || `${slugify(baseName)}.vcd`;
       targetDoc.file_name = fileName;
       targetDoc.title = baseName;
       targetDoc.is_dirty = false;
@@ -578,21 +583,43 @@ import {
       showToast(`Saved "${targetDoc.title}"`);
     },
 
-    saveAsDocument(doc = null) {
+    async saveAsDocument(doc = null) {
       const targetDoc = doc || this.getActiveDocument();
       if (!targetDoc) return;
       this.saveCurrentDocState();
 
-      const name = prompt('Save Collage As:', targetDoc.title);
-      if (!name) return;
-
-      const baseName = name.trim().replace(/\.collage$/i, '');
-      targetDoc.title = baseName;
-      const fileName = `${slugify(baseName)}.collage`;
-      targetDoc.file_name = fileName;
-      targetDoc.is_dirty = false;
-
+      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
+      const fileName = `${slugify(baseName)}.vcd`;
       const projectData = this.serializeDoc(targetDoc);
+
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'Visteras Collage Document (.vcd)',
+              accept: { 'application/json': ['.vcd'] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(JSON.stringify(projectData, null, 2));
+          await writable.close();
+          const savedName = handle.name.replace(/\.(vcd|collage|json)$/i, '');
+          targetDoc.file_name = handle.name;
+          targetDoc.title = savedName;
+          targetDoc.is_dirty = false;
+          saveToLibrary(targetDoc);
+          this.renderTabs();
+          showToast(`Saved "${targetDoc.title}"`);
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+
+      targetDoc.file_name = fileName;
+      targetDoc.title = baseName;
+      targetDoc.is_dirty = false;
       downloadJson(projectData, fileName);
       saveToLibrary(targetDoc);
 
@@ -604,12 +631,13 @@ import {
       return {
         version: '1.0',
         app: 'visteras-collage',
+        format: 'vcd',
         id: doc.id,
         title: doc.title,
         activeLayoutId: doc.activeLayoutId,
         searchQuery: doc.searchQuery,
         imageSource: doc.imageSource,
-        selectedColors: doc.selectedColors,
+        selectedColors: doc.selectedColors ? [...doc.selectedColors] : [],
         selectedStyle: doc.selectedStyle,
         selectedCategory: doc.selectedCategory,
         editorsChoice: doc.editorsChoice,
@@ -623,18 +651,18 @@ import {
         backgroundColorEnabled: doc.backgroundColorEnabled,
         backgroundColor: doc.backgroundColor,
         textOverlay: doc.textOverlay,
-        selectedEffects: doc.selectedEffects,
-        zoom: doc.zoom,
-        panX: doc.panX,
-        panY: doc.panY,
+        selectedEffects: doc.selectedEffects ? [...doc.selectedEffects] : [],
+        zoom: doc.zoom != null ? parseFloat(doc.zoom) : 1.0,
+        panX: doc.panX != null ? parseFloat(doc.panX) : 0,
+        panY: doc.panY != null ? parseFloat(doc.panY) : 0,
         assetsGenerated: doc.assetsGenerated,
         items: doc.items.map(it => ({
-          imagePath: it.image?.path || '',
-          largePath: it.image?.largePath || it.image?.path || '',
-          attribution: it.image?.attribution || '',
-          zoom: it.zoom || 1.0,
-          panX: it.panX || 0,
-          panY: it.panY || 0,
+          imagePath: it.image?.path || it.imagePath || '',
+          largePath: it.image?.largePath || it.largePath || it.image?.path || it.imagePath || '',
+          attribution: it.image?.attribution || it.attribution || '',
+          zoom: it.zoom != null ? parseFloat(it.zoom) : 1.0,
+          panX: it.panX != null ? parseFloat(it.panX) : 0,
+          panY: it.panY != null ? parseFloat(it.panY) : 0,
           span: it.span || { c: 1, r: 1 },
           locked: !!it.locked
         }))
@@ -643,11 +671,11 @@ import {
 
     openDocumentFromData(data, fileName = '') {
       if (!data) return;
-      const defaultTitle = fileName ? fileName.replace(/\.(collage|json)$/i, '') : `Untitled-${this.autoTitleCount++}`;
+      const defaultTitle = fileName ? fileName.replace(/\.(vcd|collage|json)$/i, '') : `Untitled-${this.autoTitleCount++}`;
       const title = data.title || data.name || defaultTitle;
       const newDoc = new CollageDocument({
         title: title,
-        file_name: fileName || null,
+        file_name: fileName || (data.title ? `${slugify(data.title)}.vcd` : null),
         is_dirty: false,
         activeLayoutId: data.activeLayoutId || data.layoutId || 'grid-2x2',
         searchQuery: data.searchQuery || data.query || 'vintage',
@@ -667,9 +695,9 @@ import {
         backgroundColor: data.backgroundColor || '#E8D4B9',
         textOverlay: data.textOverlay,
         selectedEffects: data.selectedEffects || [],
-        zoom: data.zoom || 1.0,
-        panX: data.panX || 0,
-        panY: data.panY || 0,
+        zoom: data.zoom != null ? parseFloat(data.zoom) : 1.0,
+        panX: data.panX != null ? parseFloat(data.panX) : 0,
+        panY: data.panY != null ? parseFloat(data.panY) : 0,
         assetsGenerated: true,
         items: (data.items || []).map((it, idx) => ({
           index: idx,
@@ -678,9 +706,9 @@ import {
             largePath: it.largePath || (it.image && (it.image.largePath || it.image.path)) || it.imagePath || '',
             attribution: it.attribution || (it.image && it.image.attribution) || ''
           },
-          zoom: it.zoom || 1.0,
-          panX: it.panX || 0,
-          panY: it.panY || 0,
+          zoom: it.zoom != null ? parseFloat(it.zoom) : 1.0,
+          panX: it.panX != null ? parseFloat(it.panX) : 0,
+          panY: it.panY != null ? parseFloat(it.panY) : 0,
           span: it.span || { c: 1, r: 1 },
           locked: !!it.locked
         }))
@@ -1297,32 +1325,36 @@ import {
   }
 
   function clampTilePan(itemData, tile, img) {
-    if (!img || !tile) return;
+    if (!img || !tile || !itemData) return;
+    if (!tile.clientWidth || !tile.clientHeight) return;
     const { tw, th, baseWidth, baseHeight } = getTileDimensions(tile, img);
-    const zoom = Math.max(1.0, itemData.zoom || 1.0);
+    const zoom = Math.max(1.0, parseFloat(itemData.zoom) || 1.0);
     const renderedW = baseWidth * zoom;
     const renderedH = baseHeight * zoom;
 
     const maxPanX = Math.max(0, (renderedW - tw) / 2);
     const maxPanY = Math.max(0, (renderedH - th) / 2);
 
-    itemData.panX = Math.min(maxPanX, Math.max(-maxPanX, itemData.panX || 0));
-    itemData.panY = Math.min(maxPanY, Math.max(-maxPanY, itemData.panY || 0));
+    if (maxPanX > 0) {
+      itemData.panX = Math.min(maxPanX, Math.max(-maxPanX, parseFloat(itemData.panX) || 0));
+    } else {
+      itemData.panX = 0;
+    }
+    if (maxPanY > 0) {
+      itemData.panY = Math.min(maxPanY, Math.max(-maxPanY, parseFloat(itemData.panY) || 0));
+    } else {
+      itemData.panY = 0;
+    }
   }
 
   // --- Tile Image Load & Spinner Binding ---
-  function bindTileImageEvents(img, spinnerEl) {
+  function bindTileImageEvents(img, spinnerEl, itemData, tile) {
     function markDone() {
       img.classList.add('loaded');
       if (spinnerEl) spinnerEl.classList.add('hidden');
-      const tile = img.closest('.collage-item');
-      if (tile) {
-        const itemIdx = Array.from(tile.parentElement ? tile.parentElement.children : []).indexOf(tile);
-        const itemData = state.items[itemIdx];
-        if (itemData) {
-          updateTileTransform(img, itemData, tile);
-        }
-      }
+      requestAnimationFrame(() => {
+        updateTileTransform(img, itemData, tile);
+      });
     }
 
     if (!img.src || img.src === window.location.href) {
@@ -1345,7 +1377,7 @@ import {
 
   // --- Transform & Tile Element Helper ---
   function updateTileTransform(img, itemData, tile) {
-    if (!img) return;
+    if (!img || !itemData) return;
     const parentTile = tile || img.closest('.collage-item');
     if (parentTile && img.naturalWidth > 0 && img.naturalHeight > 0) {
       const { baseWidth, baseHeight } = getTileDimensions(parentTile, img);
@@ -1356,11 +1388,13 @@ import {
       img.style.position = 'absolute';
       img.style.top = '50%';
       img.style.left = '50%';
-      clampTilePan(itemData, parentTile, img);
+      if (parentTile.clientWidth > 0 && parentTile.clientHeight > 0) {
+        clampTilePan(itemData, parentTile, img);
+      }
     }
-    const z = Math.max(1.0, itemData.zoom || 1.0);
-    const px = itemData.panX || 0;
-    const py = itemData.panY || 0;
+    const z = Math.max(1.0, parseFloat(itemData.zoom) || 1.0);
+    const px = Math.round((parseFloat(itemData.panX) || 0) * 100) / 100;
+    const py = Math.round((parseFloat(itemData.panY) || 0) * 100) / 100;
     img.style.transform = `translate(-50%, -50%) translate(${px}px, ${py}px) scale(${z})`;
   }
 
@@ -1387,7 +1421,7 @@ import {
       img.src = itemData.image.path;
       img.dataset.largeSrc = itemData.image.largePath || itemData.image.path;
       img.alt = itemData.image.attribution || `Collage tile ${i + 1}`;
-      bindTileImageEvents(img, spinner);
+      bindTileImageEvents(img, spinner, itemData, tile);
     } else {
       img.alt = `Loading tile ${i + 1}...`;
     }
@@ -1397,12 +1431,13 @@ import {
     const zoomPopover = document.createElement('div');
     zoomPopover.className = 'tile-zoom-popover hidden';
     zoomPopover.setAttribute('data-html2canvas-ignore', 'true');
+    const initZoom = parseFloat(itemData.zoom) || 1.0;
     zoomPopover.innerHTML = `
       <div class="tile-zoom-popover-header">
         <span>ZOOM</span>
-        <span class="tile-zoom-val">${Math.round((itemData.zoom || 1) * 100)}%</span>
+        <span class="tile-zoom-val">${Math.round(initZoom * 100)}%</span>
       </div>
-      <input type="range" class="tile-zoom-slider" min="1.0" max="3.5" step="0.01" value="${itemData.zoom || 1}" />
+      <input type="range" class="tile-zoom-slider" min="1.0" max="3.5" step="0.01" value="${initZoom}" />
     `;
 
     const zoomSlider = zoomPopover.querySelector('.tile-zoom-slider');
@@ -1431,10 +1466,16 @@ import {
         if (next) {
           itemData.image = next;
           itemData.locked = true;
+          itemData.zoom = 1.0;
+          itemData.panX = 0;
+          itemData.panY = 0;
+          zoomSlider.value = 1;
+          zoomValText.textContent = '100%';
           img.src = next.path;
           img.dataset.largeSrc = next.largePath || next.path;
           img.alt = next.attribution || `Collage tile ${i + 1}`;
-          bindTileImageEvents(img, spinner);
+          bindTileImageEvents(img, spinner, itemData, tile);
+          updateTileTransform(img, itemData, tile);
           docManager.markDirty();
         }
       }
@@ -1449,8 +1490,9 @@ import {
         if (pop !== zoomPopover) pop.classList.add('hidden');
       });
       if (isHidden) {
-        zoomSlider.value = itemData.zoom || 1;
-        zoomValText.textContent = `${Math.round((itemData.zoom || 1) * 100)}%`;
+        const curZoom = parseFloat(itemData.zoom) || 1.0;
+        zoomSlider.value = curZoom;
+        zoomValText.textContent = `${Math.round(curZoom * 100)}%`;
         zoomPopover.classList.remove('hidden');
       } else {
         zoomPopover.classList.add('hidden');
@@ -1460,7 +1502,7 @@ import {
     // Slider Input Event (Granular Zooming)
     zoomSlider.addEventListener('input', (e) => {
       e.stopPropagation();
-      itemData.zoom = parseFloat(e.target.value);
+      itemData.zoom = parseFloat(e.target.value) || 1.0;
       zoomValText.textContent = `${Math.round(itemData.zoom * 100)}%`;
       updateTileTransform(img, itemData, tile);
       docManager.markDirty();
@@ -1593,8 +1635,8 @@ import {
               img.src = chosenImg.path;
               img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
               img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
-              bindTileImageEvents(img, spinnerEl);
-              updateTileTransform(img, state.items[i]);
+              bindTileImageEvents(img, spinnerEl, state.items[i], tile);
+              updateTileTransform(img, state.items[i], tile);
             }
           }
         }
@@ -1646,15 +1688,27 @@ import {
           largePath: item.largePath || item.imagePath || '',
           attribution: item.attribution || ''
         },
-        zoom: item.zoom || 1.0,
-        panX: item.panX || 0,
-        panY: item.panY || 0,
+        zoom: item.zoom != null ? parseFloat(item.zoom) : 1.0,
+        panX: item.panX != null ? parseFloat(item.panX) : 0,
+        panY: item.panY != null ? parseFloat(item.panY) : 0,
         span: span,
         locked: !!item.locked
       };
       state.items.push(itemData);
       const tile = createTileElement(itemData, i, pool);
       el.container.appendChild(tile);
+    });
+
+    // Re-verify transforms once tiles are mounted into layout
+    requestAnimationFrame(() => {
+      if (!el.container) return;
+      el.container.querySelectorAll('.collage-item').forEach((tile, i) => {
+        const it = state.items[i];
+        const img = tile.querySelector('img');
+        if (it && img && img.naturalWidth > 0) {
+          updateTileTransform(img, it, tile);
+        }
+      });
     });
 
     applySvgEffectsToItems();
