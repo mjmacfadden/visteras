@@ -529,7 +529,7 @@ class Image_rawDevelop_class {
 			if (hiAmt !== 0 || shAmt !== 0) {
 				var hiW = smoothstep(0.45, 1.0, y);
 				var shW = 1 - smoothstep(0.0, 0.55, y);
-				var tone = 1 + hiW * (-hiAmt * 0.55) + shW * (shAmt * 0.55);
+				var tone = 1 + hiW * (hiAmt * 0.55) + shW * (shAmt * 0.55);
 				r = clamp01(r * tone);
 				g = clamp01(g * tone);
 				b = clamp01(b * tone);
