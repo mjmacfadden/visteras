@@ -595,9 +595,67 @@ import {
       }
     },
 
+    promptDocumentName(defaultName = 'Collage 1') {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); display: flex; align-items: center; justify-content: center; z-index: 10000; backdrop-filter: blur(2px);';
+
+        overlay.innerHTML = `
+          <div style="background: #242424; border: 1px solid #444; border-radius: 6px; padding: 20px; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-family: 'Roboto', sans-serif;">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600; color: #eee;">Save Collage Document (.vcd)</h4>
+            <label style="display: block; font-size: 11px; color: #aaa; margin-bottom: 6px;">Document Name</label>
+            <input type="text" id="prompt_doc_name_input" value="${escapeHtml(defaultName)}" style="width: 100%; box-sizing: border-box; background: #181818; border: 1px solid #383838; border-radius: 4px; padding: 8px 10px; color: #fff; font-size: 13px; outline: none; margin-bottom: 16px;" />
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="button" id="prompt_doc_cancel" class="btn_visteras_secondary" style="padding: 6px 14px; font-size: 12px;">Cancel</button>
+              <button type="button" id="prompt_doc_save" class="btn_visteras_purple" style="padding: 6px 16px; font-size: 12px;">Save</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const input = overlay.querySelector('#prompt_doc_name_input');
+        const saveBtn = overlay.querySelector('#prompt_doc_save');
+        const cancelBtn = overlay.querySelector('#prompt_doc_cancel');
+
+        input.focus();
+        input.select();
+
+        const close = (val) => {
+          if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+          }
+          resolve(val);
+        };
+
+        saveBtn.addEventListener('click', () => {
+          close(input.value.trim() || defaultName);
+        });
+
+        cancelBtn.addEventListener('click', () => {
+          close(null);
+        });
+
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') close(input.value.trim() || defaultName);
+          if (e.key === 'Escape') close(null);
+        });
+
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) close(null);
+        });
+      });
+    },
+
     async saveDocument(doc = null) {
       const targetDoc = doc || this.getActiveDocument();
       if (!targetDoc) return;
+
+      // If document is untitled, route through saveAsDocument so user chooses name & location
+      if (!targetDoc.file_name || targetDoc.title.match(/^untitled([ -_\d]*)$/i)) {
+        return this.saveAsDocument(targetDoc);
+      }
+
       this.saveCurrentDocState();
 
       if (targetDoc === this.getActiveDocument()) {
@@ -629,9 +687,9 @@ import {
         if (thumb) targetDoc.thumbnail = thumb;
       }
 
-      const baseName = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
-      const defaultFileName = `${slugify(baseName)}.vcd`;
-      const projectData = this.serializeDoc(targetDoc);
+      const currentTitle = (targetDoc.title || 'untitled').replace(/\.(vcd|collage|json)$/i, '');
+      const isUntitled = currentTitle.match(/^untitled([ -_\d]*)$/i);
+      const defaultFileName = `${slugify(currentTitle)}.vcd`;
 
       if (window.showSaveFilePicker) {
         try {
@@ -649,6 +707,9 @@ import {
           targetDoc.title = savedName;
           targetDoc.is_dirty = false;
 
+          // Serialize AFTER updating targetDoc title & file_name so file metadata has real name!
+          const projectData = this.serializeDoc(targetDoc);
+
           const writable = await handle.createWritable();
           await writable.write(JSON.stringify(projectData, null, 2));
           await writable.close();
@@ -663,14 +724,25 @@ import {
         }
       }
 
-      targetDoc.file_name = defaultFileName;
-      targetDoc.title = baseName;
+      // If showSaveFilePicker is not available (or fallback):
+      let chosenTitle = currentTitle;
+      if (isUntitled) {
+        chosenTitle = await this.promptDocumentName(currentTitle);
+        if (!chosenTitle) return; // User cancelled
+      }
+
+      const fileName = `${slugify(chosenTitle)}.vcd`;
+      targetDoc.file_name = fileName;
+      targetDoc.title = chosenTitle;
       targetDoc.is_dirty = false;
-      downloadJson(projectData, defaultFileName);
+
+      // Serialize AFTER updating targetDoc title and file_name!
+      const projectData = this.serializeDoc(targetDoc);
+      downloadJson(projectData, fileName);
       saveToLibrary(targetDoc);
 
       this.renderTabs();
-      showToast(`Saved As "${targetDoc.title}"`);
+      showToast(`Saved "${targetDoc.title}"`);
     },
 
     serializeDoc(doc) {
@@ -718,11 +790,28 @@ import {
 
     openDocumentFromData(data, fileName = '') {
       if (!data) return;
-      const defaultTitle = fileName ? fileName.replace(/\.(vcd|collage|json)$/i, '') : `Untitled-${this.autoTitleCount++}`;
-      const title = data.title || data.name || defaultTitle;
+
+      const fileBaseTitle = fileName ? fileName.replace(/\.(vcd|collage|json)$/i, '') : '';
+      const candidateTitle = data.title || data.name || '';
+      let title = '';
+
+      if (fileBaseTitle) {
+        if (candidateTitle && !candidateTitle.match(/^untitled([ -_\d]*)$/i) && slugify(candidateTitle) === slugify(fileBaseTitle)) {
+          title = candidateTitle;
+        } else {
+          title = fileBaseTitle;
+        }
+      } else if (candidateTitle && !candidateTitle.match(/^untitled([ -_\d]*)$/i)) {
+        title = candidateTitle;
+      } else {
+        title = `Untitled-${this.autoTitleCount++}`;
+      }
+
+      const cleanFileName = fileName || `${slugify(title)}.vcd`;
+
       const newDoc = new CollageDocument({
         title: title,
-        file_name: fileName || (data.title ? `${slugify(data.title)}.vcd` : null),
+        file_name: cleanFileName,
         is_dirty: false,
         thumbnail: data.thumbnail || null,
         activeLayoutId: data.activeLayoutId || data.layoutId || 'grid-2x2',
@@ -822,6 +911,40 @@ import {
             this.closeDocument(docId);
           }
         });
+
+        const titleSpan = tabEl.querySelector('.tab_title');
+        if (titleSpan) {
+          titleSpan.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            const doc = this.documents.find(d => d.id === docId);
+            if (!doc) return;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = doc.title;
+            input.className = 'tab_rename_input';
+            input.style.cssText = 'background: #181818; color: #fff; border: 1px solid var(--collage-purple); border-radius: 2px; padding: 0 4px; font-size: 11px; width: 85px; outline: none; height: 18px; line-height: 18px;';
+            titleSpan.replaceWith(input);
+            input.focus();
+            input.select();
+
+            const finishRename = () => {
+              const val = input.value.trim();
+              if (val && val !== doc.title) {
+                doc.title = val;
+                doc.file_name = `${slugify(val)}.vcd`;
+                this.markDirty();
+              }
+              this.renderTabs();
+            };
+
+            input.addEventListener('keydown', (ev) => {
+              if (ev.key === 'Enter') finishRename();
+              if (ev.key === 'Escape') this.renderTabs();
+            });
+            input.addEventListener('blur', finishRename);
+          });
+        }
       });
 
       const newBtn = container.querySelector('#new_tab_btn');
@@ -1913,7 +2036,8 @@ import {
   }
 
   function loadSavedCollage(saveObj) {
-    docManager.openDocumentFromData(saveObj);
+    const filename = saveObj.name ? `${slugify(saveObj.name)}.vcd` : '';
+    docManager.openDocumentFromData(saveObj, filename);
   }
 
   function renderSavedList() {
