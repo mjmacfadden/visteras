@@ -439,76 +439,17 @@ class Layer_styles_class {
 			this.apply_live_canvas();
 		};
 
-		// Drag sensitivity: native <input type="range"> maps pointer X across the
-		// track width (often jumpy on short tracks). Relative drag with scale > 1
-		// means more pixels of movement per unit — finer control. Number fields
-		// stay free (step="any"); they are not snapped to the range step.
-		const LS_RANGE_DRAG_SCALE = 2.75;
-		const applyRangeValue = (range, numInput, raw) => {
-			const min = parseFloat(range.min ?? 0);
-			const max = parseFloat(range.max ?? 100);
-			const stepAttr = range.step;
-			const step = (stepAttr && stepAttr !== 'any') ? parseFloat(stepAttr) : 1;
-			let val = Math.max(min, Math.min(max, raw));
-			if (step > 0 && !isNaN(step)) {
-				val = Math.round(val / step) * step;
-				// Avoid float noise (e.g. 10.0000002)
-				const decimals = (String(step).split('.')[1] || '').length;
-				val = parseFloat(val.toFixed(Math.max(decimals, 0)));
-			}
-			if (String(range.value) === String(val)) return;
-			range.value = val;
-			if (numInput) numInput.value = val;
-			this.read_current_controls();
-			this.apply_live_canvas();
-		};
-
 		ranges.forEach(range => {
 			const key = range.id.replace('ls_', '');
 			const numInput = controls.querySelector('#ls_num_' + key);
-			let dragging = false;
-			let startX = 0;
-			let startVal = 0;
-
-			range.addEventListener('pointerdown', (e) => {
-				if (e.button != null && e.button !== 0) return;
-				dragging = true;
-				startX = e.clientX;
-				startVal = parseFloat(range.value) || 0;
-				try { range.setPointerCapture(e.pointerId); } catch (_) {}
-				// Prevent native absolute scrub (too sensitive on short tracks).
-				e.preventDefault();
-			});
-			range.addEventListener('pointermove', (e) => {
-				if (!dragging) return;
-				const min = parseFloat(range.min ?? 0);
-				const max = parseFloat(range.max ?? 100);
-				const span = Math.max(max - min, 1);
-				const trackW = Math.max(range.getBoundingClientRect().width || 160, 1);
-				const pxPerUnit = (trackW * LS_RANGE_DRAG_SCALE) / span;
-				const raw = startVal + (e.clientX - startX) / pxPerUnit;
-				applyRangeValue(range, numInput, raw);
-			});
-			const endDrag = (e) => {
-				if (!dragging) return;
-				dragging = false;
-				try { range.releasePointerCapture(e.pointerId); } catch (_) {}
+			const syncFromRange = () => {
+				if (numInput) numInput.value = range.value;
+				this.read_current_controls();
+				this.apply_live_canvas();
 			};
-			range.addEventListener('pointerup', endDrag);
-			range.addEventListener('pointercancel', endDrag);
 
-			// Keyboard / a11y still fire input/change on the range.
-			range.addEventListener('input', () => {
-				if (dragging) return; // pointer path already applied
-				if (numInput) numInput.value = range.value;
-				this.read_current_controls();
-				this.apply_live_canvas();
-			});
-			range.addEventListener('change', () => {
-				if (numInput) numInput.value = range.value;
-				this.read_current_controls();
-				this.apply_live_canvas();
-			});
+			range.addEventListener('input', syncFromRange);
+			range.addEventListener('change', syncFromRange);
 			range.addEventListener('dblclick', (e) => {
 				e.preventDefault();
 				resetRangePair(range);
