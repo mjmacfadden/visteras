@@ -5,6 +5,7 @@ import Effects_browser_class from '../browser.js';
 import Base_layers_class from './../../../core/base-layers.js';
 import alertify from './../../../../../node_modules/alertifyjs/build/alertify.min.js';
 import app from './../../../app.js';
+import Mask_class from '../../mask/mask.js';
 
 class Effects_color_overlay_class extends Effects_common_class {
 
@@ -98,7 +99,7 @@ class Effects_color_overlay_class extends Effects_common_class {
 		if (layer.type === 'image') {
 			lctx.save();
 			lctx.translate(layer.x + layer.width / 2, layer.y + layer.height / 2);
-			lctx.rotate((layer.rotate * Math.PI) / 180);
+			lctx.rotate(((layer.rotate || 0) * Math.PI) / 180);
 			lctx.drawImage(
 				layer.link_canvas != null ? layer.link_canvas : layer.link,
 				-layer.width / 2,
@@ -113,6 +114,13 @@ class Effects_color_overlay_class extends Effects_common_class {
 			if (app.GUI.GUI_tools.tools_modules[render_class]) {
 				app.GUI.GUI_tools.tools_modules[render_class].object[render_function](lctx, layer, false);
 			}
+		}
+
+		if (layer.mask != null && layer.mask.enabled !== false) {
+			if (!this.Mask) {
+				this.Mask = new Mask_class();
+			}
+			this.Mask.multiply_alpha_by_mask_world(lctx, layer);
 		}
 
 		// 2. Colorize silhouette (preserve alpha, replace RGB)

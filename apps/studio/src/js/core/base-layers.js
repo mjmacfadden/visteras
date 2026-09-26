@@ -896,11 +896,11 @@ class Base_layers_class {
 		// Remove full-strength content; leave shadow/glow that CSS filter added outside.
 		ctx.globalCompositeOperation = 'destination-out';
 		ctx.globalAlpha = 1;
-		this._draw_layer_content(ctx, object, is_preview);
+		this._render_object_body(ctx, object, is_preview);
 		// Redraw content at fill (caller already applied layer opacity via globalAlpha).
 		ctx.globalCompositeOperation = 'source-over';
 		ctx.globalAlpha = fill;
-		this._draw_layer_content(ctx, object, is_preview);
+		this._render_object_body(ctx, object, is_preview);
 		ctx.restore();
 	}
 
@@ -975,16 +975,16 @@ class Base_layers_class {
 		var masked = object.mask != null && object.mask.enabled !== false;
 
 		if (masked === true) {
-			// Render into an offscreen buffer, multiply alpha by the mask,
-			// then composite the result - so filters/opacity/composition on ctx
-			// apply to the masked pixels only.
+			// Render clean content into an offscreen buffer, multiply alpha by the mask,
+			// then composite the result onto ctx with its active filters/opacity/composition,
+			// so style FX (drop shadow, outer glow, etc.) apply to the masked shape rather
+			// than having the mask cut off the FX itself.
 			if (!this.Mask) {
 				this.Mask = new Mask_class();
 			}
 			var canvas = this.create_new_canvas(ctx);
 			var bctx = canvas.getContext("2d");
 
-			//mirror the current ctx transform and filter onto the buffer
 			var t = null;
 			if (typeof ctx.getTransform == "function")
 				t = ctx.getTransform();
@@ -996,20 +996,19 @@ class Base_layers_class {
 				t ? t.e : 0,
 				t ? t.f : 0
 			);
-			bctx.filter = ctx.filter;
+			bctx.filter = "none";
 
-			//draw the object into the buffer
+			// Draw clean content into the buffer
 			this._draw_layer_content(bctx, object, is_preview);
 
-			//apply the mask (alpha multiply) on the buffer content
-			bctx.filter = "none";
+			// Apply the mask (alpha multiply) to produce the masked layer content
 			this.Mask.multiply_alpha_by_mask_world(bctx, object);
 
-			//composite the screen-space buffer onto ctx without applying
-			//the zoom transform or the filter a second time
+			// Composite the masked buffer onto ctx, preserving ctx.filter so that
+			// drop-shadow / outer-glow / blur generate from the masked shape and
+			// radiate outwards without being clipped by the mask.
 			ctx.save();
 			ctx.setTransform(1, 0, 0, 1, 0, 0);
-			ctx.filter = "none";
 			ctx.drawImage(canvas, 0, 0);
 			ctx.restore();
 			canvas.width = 1;

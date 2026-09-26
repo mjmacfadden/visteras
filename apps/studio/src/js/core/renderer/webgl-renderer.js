@@ -631,6 +631,13 @@ class WebGL_renderer_class {
 				if (!maskSource) {
 					return false;
 				}
+				// When a layer has both an active mask and active filters/effects (e.g. outer glow,
+				// drop shadow, stroke), effects must be generated from and apply to the masked
+				// shape rather than being clipped by the GPU fragment shader mask pass.
+				// Route to Canvas2D which isolates and renders FX around the masked silhouette.
+				if (this._layer_has_active_filters(layer, disabled_filter_id)) {
+					return false;
+				}
 			}
 		}
 		return true;
@@ -678,6 +685,25 @@ class WebGL_renderer_class {
 			if (name && GPU_CLIP_BASE_UNSAFE_FILTERS[name]) {
 				return true;
 			}
+		}
+		return false;
+	}
+
+	_layer_has_active_filters(layer, disabled_filter_id) {
+		var filters = layer && layer.filters;
+		if (!filters || !filters.length) return false;
+		for (var f = 0; f < filters.length; f++) {
+			var filter = filters[f];
+			if (!filter || filter.disabled === true || filter.visible === false) continue;
+			if (Array.isArray(disabled_filter_id)) {
+				if (disabled_filter_id.includes(filter.id) || disabled_filter_id.includes(filter.name)) continue;
+				if (filter.name === 'drop-shadow' && disabled_filter_id.includes('shadow')) continue;
+			} else if (filter.id === disabled_filter_id || filter.name === disabled_filter_id) {
+				continue;
+			} else if (filter.name === 'drop-shadow' && disabled_filter_id === 'shadow') {
+				continue;
+			}
+			return true;
 		}
 		return false;
 	}
