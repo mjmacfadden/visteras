@@ -30,10 +30,10 @@ class Effects_shadow_class extends Effects_common_class {
 		var filter = this.Base_layers.find_filter_by_id(filter_id, 'shadow');
 
 		var params = [
-			{name: "x", title: "Offset X:", value: filter.x ??= 5, range: [-100, 100]},
-			{name: "y", title: "Offset Y:", value: filter.y ??= 5, range: [-100, 100]},
-			{name: "value", title: "Radius:", value: filter.value ??= 10, range: [0, 100]},
-			{name: "opacity", title: "Opacity:", value: filter.opacity ??= 25, range: [0, 100]},
+			{name: "x", title: "Offset X:", value: filter.x ??= 1, range: [-100, 100]},
+			{name: "y", title: "Offset Y:", value: filter.y ??= 1, range: [-100, 100]},
+			{name: "value", title: "Radius:", value: filter.value ??= 1, range: [0, 100]},
+			{name: "opacity", title: "Opacity:", value: filter.opacity ??= 50, range: [0, 100]},
 			{name: "color", title: "Color:", value: filter.color ??= "#000000", type: 'color'},
 		];
 		this.show_dialog('shadow', params, filter_id);
@@ -79,7 +79,7 @@ class Effects_shadow_class extends Effects_common_class {
 		var ctx = canvas.getContext("2d");
 
 		//draw
-		var size = this.convert_value(null, {x: 5, y: 5, value: 10, opacity: 25, color: '#000000'}, 'preview');
+		var size = this.convert_value(null, {x: 1, y: 1, value: 1, opacity: 50, color: '#000000'}, 'preview');
 		ctx.filter = "drop-shadow("+size+")";
 		ctx.drawImage(canvas_thumb,
 			10, 10,

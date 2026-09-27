@@ -7382,6 +7382,8 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	font-size: 11px;
 	text-align: right;
 	font-variant-numeric: tabular-nums;
+	-moz-appearance: textfield;
+	appearance: textfield;
 }
 .ls_row input[type="number"].ls_num:focus {
 	border-color: #3a88fe;
@@ -7389,12 +7391,9 @@ body.canvas-only-mode .canvas_wrapper canvas {
 }
 .ls_row input[type="number"].ls_num::-webkit-inner-spin-button,
 .ls_row input[type="number"].ls_num::-webkit-outer-spin-button {
-	opacity: 0.6;
-	cursor: pointer;
-}
-.ls_row input[type="number"].ls_num:hover::-webkit-inner-spin-button,
-.ls_row input[type="number"].ls_num:hover::-webkit-outer-spin-button {
-	opacity: 0.95;
+	-webkit-appearance: none;
+	margin: 0;
+	display: none;
 }
 .ls_row_angle {
 	min-height: 38px;

@@ -104,7 +104,7 @@ class Layer_styles_class {
 				name: 'Drop Shadow',
 				enabled: false,
 				id: null,
-				params: { angle: 135, distance: 7, x: 5, y: 5, value: 10, opacity: 25, color: '#000000' }
+				params: { angle: 135, distance: 2, x: 1, y: 1, value: 1, opacity: 50, color: '#000000' }
 			}
 		};
 
@@ -117,7 +117,7 @@ class Layer_styles_class {
 					let initialParams = { ...this.styles[filterName].params, ...f.params };
 					if (filterName === 'shadow') {
 						if (initialParams.angle == null || initialParams.distance == null) {
-							const ad = Layer_styles_class.angle_distance_from_offset(initialParams.x ?? 5, initialParams.y ?? 5);
+							const ad = Layer_styles_class.angle_distance_from_offset(initialParams.x ?? 1, initialParams.y ?? 1);
 							initialParams.angle = ad.angle;
 							initialParams.distance = ad.distance;
 						}
@@ -344,15 +344,15 @@ class Layer_styles_class {
 				</div>
 			`;
 		} else if (effectKey === 'shadow') {
-			const x = style.params.x ?? 5;
-			const y = style.params.y ?? 5;
+			const x = style.params.x ?? 1;
+			const y = style.params.y ?? 1;
 			const ad = Layer_styles_class.angle_distance_from_offset(x, y);
 			let angle = style.params.angle != null ? style.params.angle : ad.angle;
 			while (angle > 180) angle -= 360;
 			while (angle < -180) angle += 360;
 			const distance = style.params.distance != null ? style.params.distance : ad.distance;
-			const val = style.params.value ?? 10;
-			const opacity = style.params.opacity ?? 25;
+			const val = style.params.value ?? 1;
+			const opacity = style.params.opacity ?? 50;
 
 			const rad = (Number(angle) || 0) * Math.PI / 180;
 			const needleX = (18 + Math.cos(rad) * 13.5).toFixed(1);
@@ -373,20 +373,20 @@ class Layer_styles_class {
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Distance:</span>
-					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="7" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="7" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="2" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="2" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Radius:</span>
-					<input type="range" class="ls_range" id="ls_shadow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_value" min="0" max="100" value="${val}" step="1" data-default="1" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" step="1" data-default="1" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
-					<input type="range" class="ls_range" id="ls_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="25" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="25" title="Double-click to reset" />
+					<input type="range" class="ls_range" id="ls_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="50" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="50" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -734,10 +734,10 @@ class Layer_styles_class {
 				if (isNaN(angle)) angle = 135;
 				while (angle > 180) angle -= 360;
 				while (angle < -180) angle += 360;
-				const distance = parseInt((numDistEl ? numDistEl.value : distEl?.value) ?? 7, 10);
+				const distance = parseInt((numDistEl ? numDistEl.value : distEl?.value) ?? 2, 10);
 				const offset = Layer_styles_class.offset_from_angle_distance(angle, distance);
-				const value = parseInt((numValueEl ? numValueEl.value : valueEl?.value) ?? 10, 10);
-				const opacity = parseInt((numOpacityEl ? numOpacityEl.value : opacityEl?.value) ?? 25, 10);
+				const value = parseInt((numValueEl ? numValueEl.value : valueEl?.value) ?? 1, 10);
+				const opacity = parseInt((numOpacityEl ? numOpacityEl.value : opacityEl?.value) ?? 50, 10);
 				const color = colorEl?.value || '#000000';
 				style.params = { x: offset.x, y: offset.y, angle, distance, value, opacity, color };
 			}
