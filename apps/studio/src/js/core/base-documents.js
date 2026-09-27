@@ -505,6 +505,8 @@ class Base_documents_class {
 				config.TRANSPARENCY = true;
 				this.Helper.setCookie('transparency', 1);
 
+				const isPristine = this.is_active_document_empty() && !force_new;
+
 				if (isPristine) {
 					// Update existing tab in place
 					const doc = this.get_active_document();
