@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -13,10 +14,10 @@ class Effects_dotScreen_class {
 		this.fx_filter = false;
 	}
 
-	dot_screen() {
+	dot_screen(filter_id) {
 		var _this = this;
 
-		if (config.layer.type != 'image') {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
@@ -37,6 +38,7 @@ class Effects_dotScreen_class {
 				_this.save(params);
 			},
 		};
+		if (config.layer.type === 'smart') return smartDialog(this, 'effects/dot_screen', settings, filter_id);
 		this.POP.show(settings);
 	}
 
@@ -66,6 +68,7 @@ class Effects_dotScreen_class {
 
 		var texture = this.fx_filter.texture(canvas);
 		this.fx_filter.draw(texture).dotScreen(Math.round(canvas.width / 2), Math.round(canvas.height / 2), 0, size).update();
+		texture.destroy();
 
 		return this.fx_filter;
 	}

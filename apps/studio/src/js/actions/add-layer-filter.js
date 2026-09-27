@@ -27,6 +27,9 @@ export class Add_layer_filter_action extends Base_action {
 		if (!this.reference_layer) {
 			throw new Error('Aborted - layer with specified id doesn\'t exist');
 		}
+		if (this.name.startsWith('smart:') && (this.reference_layer.type !== 'smart' || this.reference_layer.locked)) {
+			throw new Error('Smart Effects require an unlocked Smart Layer.');
+		}
 		this.previous_filters = this.reference_layer.filters.slice();
 		var filter = {
 			id: this.filter_id,
@@ -37,7 +40,7 @@ export class Add_layer_filter_action extends Base_action {
 			//update
 			for(var i in this.reference_layer.filters) {
 				if(this.reference_layer.filters[i].id == this.filter_id){
-					this.reference_layer.filters[i] = filter;
+					this.reference_layer.filters[i] = {...this.reference_layer.filters[i], ...filter};
 					break;
 				}
 			}

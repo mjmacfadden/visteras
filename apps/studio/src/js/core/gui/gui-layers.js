@@ -141,6 +141,17 @@ class GUI_layers_class {
 			else if (target.id == 'layer_name') {
 				_this.select_layer_from_panel(target.dataset.id, event);
 			}
+			else if (target.dataset.effectStep) {
+				const layer = app.Layers.get_layer(Number(target.dataset.pid), true);
+				if (!layer || layer.locked) return;
+				const filters = layer.filters.slice();
+				const index = filters.findIndex(f => String(f.id) === target.dataset.id);
+				let next = index + Number(target.dataset.effectStep);
+				while (next >= 0 && next < filters.length && !filters[next].name.startsWith('smart:')) next += Number(target.dataset.effectStep);
+				if (index < 0 || next < 0 || next >= filters.length) return;
+				[filters[index], filters[next]] = [filters[next], filters[index]];
+				app.State.do_action(new app.Actions.Update_layer_action(layer.id, {filters}));
+			}
 			else if (target.id == 'filter_visibility') {
 				var layer_id = parseInt(target.dataset.pid);
 				var filter_id = target.dataset.id;
@@ -750,7 +761,7 @@ class GUI_layers_class {
 					var target_layer = app.Layers.get_layer(target_id, true);
 					if (source_layer && target_layer && source_layer.filters) {
 						var source_filter = source_layer.filters.find(f => String(f.id) === String(drag_filter_id));
-						if (source_filter) {
+						if (source_filter && (!source_filter.name.startsWith('smart:') || target_layer.type === 'smart')) {
 							var is_copy = (event.ctrlKey || event.metaKey || event.altKey || drag_is_copy || drag_filter_pid === target_id);
 							var clonedParams = JSON.parse(JSON.stringify(source_filter.params || {}));
 							if (is_copy) {
@@ -1149,6 +1160,10 @@ class GUI_layers_class {
 	 * open their own Effects dialog so they can be re-edited non-destructively.
 	 */
 	open_layer_filter(filterName, filter_id) {
+		if (filterName.startsWith('smart:')) {
+			const key = filterName.slice(6);
+			return app.GUI.modules[key][key.split('/').pop().replace(/-/g, '_')](filter_id);
+		}
 		var styleEffects = ['stroke', 'color_overlay', 'inner_glow', 'outer_glow', 'shadow', 'drop-shadow'];
 		if (styleEffects.indexOf(filterName) !== -1) {
 			if (app.GUI && app.GUI.modules && app.GUI.modules['layer/styles']) {
@@ -1273,7 +1288,7 @@ class GUI_layers_class {
 				}
 				(function (filter) {
 					var label = titleMap[filter.name]
-						|| String(filter.name).replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+						|| String(filter.name).replace(/^smart:.*\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
 					addItem(label + '...', function () {
 						_this.open_layer_filter(filter.name, filter.id);
 					}, true);
@@ -1575,7 +1590,7 @@ class GUI_layers_class {
 							'inner_glow': 'Inner Glow',
 							'outer_glow': 'Outer Glow'
 						};
-						var title = titleMap[filter.name] || filter.name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+						var title = titleMap[filter.name] || filter.name.replace(/^smart:.*\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 						html += '<div class="filter' + (is_disabled ? ' disabled' : '') + '" draggable="true" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Drag to move effect, or ' + this.Helper.format_shortcut('Ctrl + Drag to duplicate') + '">';
 						if (!is_disabled) {
@@ -1584,6 +1599,10 @@ class GUI_layers_class {
 							html += '	<button class="visibility trn" id="filter_visibility" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Show effect"></button>';
 						}
 						html += '	<span class="layer_name" id="filter_name" data-pid="' + value.id + '" data-id="' + filter.id + '" data-filter="' + filter.name + '">' + title + '</span>';
+						if (filter.name.startsWith('smart:')) {
+							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="-1" title="Apply earlier" aria-label="Apply earlier">↑</button>';
+							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="1" title="Apply later" aria-label="Apply later">↓</button>';
+						}
 						html += '	<span class="delete" id="delete_filter" data-pid="' + value.id + '" data-id="' + filter.id + '" title="delete"></span>';
 						html += '	<div class="clear"></div>';
 						html += '</div>';

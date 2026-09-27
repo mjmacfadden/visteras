@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -13,10 +14,10 @@ class Effects_vintage_class {
 		this.Vintage = new Vintage_class(config.WIDTH, config.HEIGHT);
 	}
 
-	vintage() {
+	vintage(filter_id) {
 		var _this = this;
 
-		if (config.layer.type != 'image') {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
@@ -37,6 +38,7 @@ class Effects_vintage_class {
 				_this.save(params);
 			},
 		};
+		if (config.layer.type === 'smart') return smartDialog(this, 'effects/vintage', settings, filter_id);
 		this.POP.show(settings);
 	}
 

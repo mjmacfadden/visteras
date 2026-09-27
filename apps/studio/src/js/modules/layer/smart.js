@@ -1,3 +1,4 @@
+import { renderSmart, isContentEffect } from '../../libs/smart-effects.js';
 import app from '../../app.js';
 import config from '../../config.js';
 import alertify from '../../../../node_modules/alertifyjs/build/alertify.min.js';
@@ -174,10 +175,10 @@ class Layer_smart_class {
 
 	rasterize(id) { return this.run(async () => {
 		const layer = this.smart(id); this.assert_mutable(layer);
-		const image = layer.link;
+		const image = renderSmart(layer);
 		const canvas = this.canvas(image.naturalWidth || image.width, image.naturalHeight || image.height);
 		canvas.getContext('2d').drawImage(image, 0, 0);
-		const raster = { ...layer, type: 'image', smart_source_id: null, link: canvas, data: null };
+		const raster = { ...layer, type: 'image', smart_source_id: null, link: canvas, link_canvas: null, filters: layer.filters.filter(f => !isContentEffect(f)), data: null };
 		await this.action(new Smart_layer_action('Rasterize Smart Layer', config.layers.map(l => l === layer ? raster : l), config.smart_sources, layer.id));
 	}); }
 }

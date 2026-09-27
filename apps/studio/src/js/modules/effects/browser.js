@@ -16,7 +16,7 @@ class Effects_browser_class extends Base_tools_class {
 		var _this = this;
 		var html = '';
 
-		if (config.layer.type != 'image') {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}

@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -14,10 +15,10 @@ class Effects_tiltShift_class {
 		this.fx_filter = false;
 	}
 
-	tilt_shift() {
+	tilt_shift(filter_id) {
 		var _this = this;
 
-		if (config.layer.type != 'image') {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
@@ -61,6 +62,7 @@ class Effects_tiltShift_class {
 				_this.save(params);
 			},
 		};
+		if (config.layer.type === 'smart') return smartDialog(this, 'effects/tilt_shift', settings, filter_id);
 		this.POP.show(settings);
 	}
 
@@ -106,6 +108,7 @@ class Effects_tiltShift_class {
 		//main effect
 		var texture = this.fx_filter.texture(canvas);
 		this.fx_filter.draw(texture).tiltShift(param3, param4, param5, param6, param1, param2).update();
+		texture.destroy();
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		ctx.drawImage(this.fx_filter, 0, 0);
 

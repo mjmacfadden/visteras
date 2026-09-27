@@ -31,3 +31,11 @@ test('invalid dimensions and nonembedded previews are rejected', () => {
  for(const patch of [{width:0},{height:Infinity},{preview:'https://example.com/image.png'}])
   assert.throws(()=>context.validate_sources({source:{...source(),...patch}}, [layer()]), /Invalid/);
 });
+
+test('Smart Effect recipes validate versions, processor IDs, seeds and layer type', () => {
+ const valid = {name:'smart:image/raw_develop', params:{_version:1,_seed:42,exposure:0.5}};
+ assert.doesNotThrow(()=>context.validate_sources({source:source()}, [{...layer(),filters:[valid]}]));
+ for (const f of [{...valid,name:'smart:unknown'}, {...valid,params:{_version:2,_seed:42}}, {...valid,params:{_version:1,_seed:-1}}])
+  assert.throws(()=>context.validate_sources({source:source()}, [{...layer(),filters:[f]}]), /Smart Effect/);
+ assert.throws(()=>context.validate_sources({}, [{type:'image',filters:[valid]}]), /Smart Effect/);
+});

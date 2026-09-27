@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -13,10 +14,10 @@ class Effects_grains_class {
 		this.Helper = new Helper_class();
 	}
 
-	grains() {
+	grains(filter_id) {
 		var _this = this;
 
-		if (config.layer.type != 'image') {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
 		}
@@ -37,6 +38,7 @@ class Effects_grains_class {
 				_this.save(params);
 			},
 		};
+		if (config.layer.type === 'smart') return smartDialog(this, 'effects/grains', settings, filter_id);
 		this.POP.show(settings);
 	}
 
@@ -56,7 +58,7 @@ class Effects_grains_class {
 		);
 	}
 
-	change(data, params) {
+	change(data, params, random = Math.random) {
 		if (params.level == 0)
 			return data;
 		var imgData = data.data;
@@ -70,7 +72,7 @@ class Effects_grains_class {
 				if (imgData[x + 3] == 0)
 					continue;	//transparent
 				//increase it's lightness
-				var delta = this.Helper.getRandomInt(0, params.level);
+				var delta = Math.floor(random() * (Number(params.level) + 1));
 				if (delta == 0)
 					continue;
 

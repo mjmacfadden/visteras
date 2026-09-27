@@ -1,3 +1,4 @@
+import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
  * author: Vilius L.
@@ -835,7 +836,7 @@ class Base_layers_class {
 
 		if (object.type == "image" || object.type === "smart") {
 			ctx.drawImage(
-				object.link_canvas != null ? object.link_canvas : object.link,
+				object.type === 'smart' ? renderSmart(object, null, this.disabled_filter_id) : (object.link_canvas != null ? object.link_canvas : object.link),
 				object.x || 0,
 				object.y || 0,
 				object.width,
@@ -1039,6 +1040,7 @@ class Base_layers_class {
 		for (let k = 0; k < object.filters.length; k++) {
 			let filter = object.filters[k];
 			if (!filter || filter.disabled === true || filter.visible === false) continue;
+			if (object.type === 'smart' && isContentEffect(filter)) continue;
 			if (Array.isArray(this.disabled_filter_id)) {
 				if (this.disabled_filter_id.includes(filter.id) || this.disabled_filter_id.includes(filter.name) || (filter.name === 'drop-shadow' && this.disabled_filter_id.includes('shadow'))) {
 					continue;
@@ -1080,6 +1082,7 @@ class Base_layers_class {
 		for (let k = 0; k < object.filters.length; k++) {
 			let filter = object.filters[k];
 			if (!filter || filter.disabled === true || filter.visible === false) continue;
+			if (object.type === 'smart' && isContentEffect(filter)) continue;
 			if (Array.isArray(this.disabled_filter_id)) {
 				if (this.disabled_filter_id.includes(filter.id) || this.disabled_filter_id.includes(filter.name) || (filter.name === 'drop-shadow' && this.disabled_filter_id.includes('shadow'))) {
 					continue;

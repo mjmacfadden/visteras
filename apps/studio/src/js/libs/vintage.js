@@ -288,7 +288,7 @@ class Vintage_class {
 
 	//random number generator
 	getRandomInt(min, max) {
-		return Math.floor(Math.random() * (max - min + 1)) + min;
+		return Math.floor((this.random || Math.random)() * (max - min + 1)) + min;
 	}
 }
 

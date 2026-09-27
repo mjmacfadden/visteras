@@ -20,8 +20,8 @@ storage are local to the browser. There are no external file links or uploads.
   Smart Object metadata.
 
 Direct pixel modification of Smart Layers is blocked. Paint in their contents, paint
-on an instance mask, or rasterize explicitly. Existing live filters remain editable;
-other effects are available inside the contents editor or after rasterization.
+on an instance mask, or rasterize explicitly. Raw Develop and Effects commands are
+editable Smart Effects; see the workflow below.
 
 ## Data and history
 
@@ -57,11 +57,10 @@ use Save Contents to commit them to the parent, then save the parent project.
 - Source composites are rasterized at source-document resolution. Enlarging raster
   content cannot create detail; vector/text supersampling at arbitrary instance scales
   is not implemented. Edit the source dimensions when a larger render is needed.
-- Perspective/mesh warp, an expanded Smart Filter engine, Photoshop Smart Object
+- Perspective/mesh warp, per-effect masks, Photoshop Smart Object
   interchange, worker rendering and tiled large-document rendering are future work.
 - Unfiltered Smart Layers use WebGL when available; Smart Layers with live effects
-  use the Canvas compositor to preserve effect scaling. Instances share decoded source data; no per-instance copy is generated until
-  rasterization. History memory estimates include source bitmaps and encoded previews.
+  use the Canvas compositor to preserve effect scaling. Instances share decoded source data; effect variants use cached rendered surfaces. History memory estimates include source bitmaps and encoded previews.
   Native JSON still uses data URLs and can become large for high-resolution projects.
 
 ## Validation
@@ -75,3 +74,39 @@ use Save Contents to commit them to the parent, then save the parent project.
   replacement, masks, Canvas/WebGL rendering, native roundtrip, nesting, groups and text.
 - Existing `tests/mask-selection.test.cjs` remains the mask regression suite.
 - `npm run build` builds the production editor.
+
+## Smart Effects
+
+Select a Smart Layer, then use **Image → Raw Develop** or an **Effects** command.
+Raw Develop and the 39 image-processing effects now store editable recipes instead
+of replacing pixels. Click an effect's name beneath the layer to reopen it, use its
+eye to bypass it, its delete control to remove it, or **↑ / ↓** to apply it earlier
+or later. All these changes support undo/redo. Presets have a preview/confirmation
+dialog even when they have no adjustable parameters.
+
+Recipes run in listed order on the native embedded source, before layer placement,
+mask, opacity, and existing layer styles. Shadows, color overlay, and borders keep
+their existing nondestructive layer-style behavior outside this stack. Existing
+legacy live filters retain their original rendering behavior. Selections do not
+limit Smart Effects: apply a layer mask for spatial control. Processing is bounded
+to the embedded source rectangle (including blur); use a larger source canvas when
+you need more transparent space at its edges.
+
+Copies share the source but own their effect settings. Editing/replacing source
+contents reruns their respective recipes. Rasterize bakes the Smart Effects into
+pixels and retains the outer mask/styles. Native JSON includes versioned settings
+and random seeds (grain and vintage reproduce on reopening); runtime render caches
+are omitted. PSD and image exports render the appearance, not Photoshop Smart
+Filter metadata. Photoshop interoperability remains future work.
+
+Completed effect stacks are cached (up to four variants per shared source). Moving,
+rotating, or resizing the layer reuses those pixels. Effect edits currently process
+on the main thread, including full-resolution previews for general effects; large
+images and expensive oil/denoise stacks can pause the UI. Raw Develop uses its
+existing reduced-resolution interactive preview. GPU-based effects still require
+browser WebGL support. Worker/tiled processing and per-effect masks are future work.
+
+Validation: `tests/smart-effects-browser.html` exercises all 39 processors, recipe
+editing, forced recomputation, undo/redo, Raw Develop, actual panel reorder/delete,
+native persistence, independent duplicate settings, and rasterization. Run alongside
+the original Smart Layer browser suite and source/mask Node tests.

@@ -1,3 +1,4 @@
+import { smartDialog } from '../../../libs/smart-effects.js';
 import app from './../../../app.js';
 import config from './../../../config.js';
 import Dialog_class from './../../../libs/popup.js';
@@ -46,6 +47,7 @@ class Effects_common_class {
 				_this.save(params, type, filter_id);
 			},
 		};
+		if (config.layer.type === 'smart' && type !== 'shadow') return smartDialog(this, 'effects/common/' + type, settings, filter_id);
 		this.Base_layers.disable_filter(filter_id);
 		this.POP.show(settings);
 		this.Base_layers.disable_filter(null);

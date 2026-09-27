@@ -1,3 +1,4 @@
+import { renderSmart, surface, recipe, saveEffect, seeded } from '../../libs/smart-effects.js';
 /**
  * Visteras Studio — Raw Develop (Camera Raw–style modal).
  *
@@ -134,25 +135,31 @@ class Image_rawDevelop_class {
 		this._applying = false;
 	}
 
-	async raw_develop() {
-		if (config.layer.type != 'image') {
+	async raw_develop(filter_id) {
+		if (config.layer.type != 'image' && config.layer.type !== 'smart') {
 			alertify.error('This layer must contain an image. Convert it to raster to use Raw Develop.');
 			return;
 		}
 
+		if (config.layer.locked) { alertify.error('Unlock the layer to use Raw Develop.'); return; }
 		this._layerId = config.layer.id;
+		this._smartLayer = config.layer.type === 'smart' ? config.layer : null;
+		this._documentId = app.Documents.active_id;
+		this._filterId = filter_id;
+		const old = (config.layer.filters || []).find(f => String(f.id) === String(filter_id));
 
 		try {
-			this._source = await Raw_source_registry.decode(config.layer, {
-				Base_layers: this.Base_layers,
-			});
+			if (this._smartLayer) {
+				const c = surface(renderSmart(this._smartLayer, filter_id));
+				this._source = {width:c.width, height:c.height, imageData:c.getContext('2d').getImageData(0, 0, c.width, c.height), label:config.layer.name};
+			} else this._source = await Raw_source_registry.decode(config.layer, {Base_layers:this.Base_layers});
 		}
 		catch (err) {
 			alertify.error((err && err.message) ? err.message : 'Could not load layer for Raw Develop.');
 			return;
 		}
 
-		this._params = Object.assign({}, DEFAULTS);
+		this._params = this._smartLayer ? recipe({...DEFAULTS, ...(old && old.params)}, old && old.params) : Object.assign({}, DEFAULTS);
 		this._applying = false;
 		var _this = this;
 
@@ -191,7 +198,7 @@ class Image_rawDevelop_class {
 			'  <div class="raw-develop__header">' +
 			'    <div><span class="raw-develop__title">Raw Develop</span>' +
 			'      <span class="raw-develop__subtitle">' + escapeHtml(label) +
-			(dims ? ' \u00b7 ' + dims : '') + ' \u00b7 JPEG/PNG raster</span></div>' +
+			(dims ? ' \u00b7 ' + dims : '') + (this._smartLayer ? ' \u00b7 Smart Effect' : ' \u00b7 JPEG/PNG raster') + '</span></div>' +
 			'    <div class="raw-develop__header-actions">' +
 			'      <button type="button" class="raw-develop__btn raw-develop__btn--ghost" data-raw-action="reset">Reset</button>' +
 			'      <button type="button" class="raw-develop__btn" data-raw-action="cancel">Cancel</button>' +
@@ -299,7 +306,7 @@ class Image_rawDevelop_class {
 	}
 
 	_reset_all() {
-		this._params = Object.assign({}, DEFAULTS);
+		this._params = this._smartLayer ? recipe(DEFAULTS, this._params) : Object.assign({}, DEFAULTS);
 		if (!this._root) return;
 		this._root.querySelectorAll('input[type="range"]').forEach((input) => {
 			var def = DEFAULTS[input.name];
@@ -361,7 +368,7 @@ class Image_rawDevelop_class {
 		}
 
 		var working = cloneImageData(this._previewBuffer);
-		var developed = this.develop(working, this._params);
+		var developed = this.develop(working, this._params, seeded(this._params._seed || 0));
 		if (!(developed instanceof ImageData)) {
 			console.error('Raw Develop preview: develop() must return ImageData');
 			return;
@@ -371,9 +378,18 @@ class Image_rawDevelop_class {
 
 	async _apply() {
 		if (!this._source || this._applying) return;
+		if (this._smartLayer) {
+			this._applying = true;
+			try {
+				const result = await saveEffect(this._smartLayer, 'image/raw_develop', {...this._params}, this._filterId, this._documentId);
+				if (result.status !== 'completed') throw result.reason;
+				this._teardown(); this.POP.hide(true);
+			} catch (error) { alertify.error(error.message); this._applying = false; }
+			return;
+		}
 
 		var working = cloneImageData(this._source.imageData);
-		var developed = this.develop(working, this._params);
+		var developed = this.develop(working, this._params, seeded(this._params._seed || 0));
 		if (!(developed instanceof ImageData)) {
 			alertify.error('Raw Develop failed to produce image data.');
 			return;
@@ -454,7 +470,7 @@ class Image_rawDevelop_class {
 	/**
 	 * ACR-inspired develop. Always returns ImageData.
 	 */
-	develop(imageData, params) {
+	develop(imageData, params, random = Math.random) {
 		var exposure = parseFloat(params.exposure) || 0;
 		var contrast = parseFloat(params.contrast) || 0;
 		var highlights = parseFloat(params.highlights) || 0;
@@ -612,7 +628,7 @@ class Image_rawDevelop_class {
 		}
 
 		if (grain_amount > 0) {
-			result = applyGrain(result, grain_amount, grain_size);
+			result = applyGrain(result, grain_amount, grain_size, random);
 		}
 
 		return result;
@@ -742,7 +758,7 @@ function applyVignette(imageData, amount) {
 	return out;
 }
 
-function applyGrain(imageData, amount, size) {
+function applyGrain(imageData, amount, size, random) {
 	var d = imageData.data;
 	var out = cloneImageData(imageData);
 	var dst = out.data;
@@ -758,7 +774,7 @@ function applyGrain(imageData, amount, size) {
 		var py = Math.floor((i / 4) / w);
 		var n;
 		if (cell <= 1) {
-			n = Math.random() * 2 - 1;
+			n = random() * 2 - 1;
 		}
 		else {
 			var cx = Math.floor(px / cell);

@@ -1,3 +1,5 @@
+const smartEffectTypes = new Set(["effects/zoom_blur", "effects/blueprint", "effects/night_vision", "effects/sharpen", "effects/box_blur", "effects/heatmap", "effects/pencil", "effects/solarize", "effects/enrich", "effects/edge", "effects/dither", "effects/tilt_shift", "effects/denoise", "effects/vignette", "effects/mosaic", "effects/black_and_white", "effects/grains", "effects/dot_screen", "effects/vintage", "effects/oil", "effects/emboss", "effects/vibrance", "effects/instagram/valencia", "effects/instagram/toaster", "effects/instagram/lofi", "effects/instagram/aden", "effects/instagram/inkwell", "effects/instagram/gingham", "effects/instagram/1977", "effects/instagram/clarendon", "effects/instagram/xpro2", "effects/common/blur", "effects/common/brightness", "effects/common/contrast", "effects/common/grayscale", "effects/common/hue-rotate", "effects/common/invert", "effects/common/saturate", "effects/common/sepia", "image/raw_develop"]);
+
 /** Embedded, document-owned sources. Serialized previews are never the editable source. */
 export function serialize_sources(layers, sources) {
 	const result = Object.create(null);
@@ -16,6 +18,15 @@ export function serialize_sources(layers, sources) {
 export function validate_sources(sources, layers, depth = 0, ancestors = new Set()) {
 	if (depth > 16) throw new Error('Smart Layers exceed the supported nesting depth (16).');
 	for (const layer of layers || []) {
+		for (const filter of layer.filters || []) {
+			if (!filter || typeof filter.name !== 'string' || !filter.name.startsWith('smart:')) continue;
+			if (layer.type !== 'smart' || !smartEffectTypes.has(filter.name.slice(6))
+				|| !filter.params || filter.params._version !== 1
+				|| !Number.isInteger(filter.params._seed) || filter.params._seed < 0 || filter.params._seed > 4294967295) {
+				throw new Error('Unsupported or invalid Smart Effect recipe.');
+			}
+		}
+
 		if (layer.type !== 'smart') continue;
 		const id = layer.smart_source_id;
 		const s = Object.prototype.hasOwnProperty.call(sources, id) && sources[id];
