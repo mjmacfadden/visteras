@@ -436,7 +436,7 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Ctrl/Cmd + Alt/Option + V = File > Paste as New
+			// Ctrl/Cmd + Alt/Option + V = Edit > Paste as New
 			if ((event.ctrlKey || event.metaKey) && event.altKey && !event.shiftKey
 				&& (event.code === 'KeyV' || event.keyCode === 86)) {
 				event.preventDefault();

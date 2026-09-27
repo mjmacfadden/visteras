@@ -8,11 +8,6 @@ const menuDefinition = [
 				target: 'file/new.new'
 			},
 			{
-				name: 'Paste as New',
-				shortcut: 'Ctrl + Alt + V',
-				target: 'file/new.paste_as_new'
-			},
-			{
 				divider: true
 			},
 			{
