@@ -85,7 +85,7 @@ export class Activate_tool_action extends Base_action {
 			const mainWrapper = document.getElementById('main_wrapper');
 			const middleArea = document.querySelector('.middle_area');
 			const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
-			const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
+			const crosshairTools = ['selection', 'gradient', 'crop'];
 
 			let defaultCursor = 'default';
 			if (config.TOOL && brushTools.includes(config.TOOL.name)) {
@@ -94,6 +94,14 @@ export class Activate_tool_action extends Base_action {
 				defaultCursor = 'text';
 			} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
 				defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
+			} else if (config.TOOL && config.TOOL.name === 'lasso') {
+				const itemDef = config.TOOLS ? config.TOOLS.find(t => t.name === 'lasso') : null;
+				const shape = (itemDef && itemDef.tool_group && itemDef.tool_group.active_shape) || 'lasso';
+				if (shape === 'polygonal_lasso') {
+					defaultCursor = "url('images/icons/cursor-polygonal-lasso.svg') 1 1, default";
+				} else {
+					defaultCursor = "url('images/icons/cursor-lasso.svg') 1 1, default";
+				}
 			} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 				defaultCursor = 'crosshair';
 			} else if (config.TOOL && config.TOOL.name === 'pick_color') {
@@ -113,12 +121,16 @@ export class Activate_tool_action extends Base_action {
 			if (middleArea) {
 				for (let i = middleArea.classList.length - 1; i >= 0; i--) {
 					const cls = middleArea.classList[i];
-					if (cls.startsWith('tool-')) {
+					if (cls.startsWith('tool-') || cls.startsWith('shape-')) {
 						middleArea.classList.remove(cls);
 					}
 				}
 				if (config.TOOL && config.TOOL.name) {
 					middleArea.classList.add('tool-' + config.TOOL.name);
+					const itemDef = config.TOOLS ? config.TOOLS.find(t => t.name === config.TOOL.name) : null;
+					if (itemDef && itemDef.tool_group && itemDef.tool_group.active_shape) {
+						middleArea.classList.add('shape-' + itemDef.tool_group.active_shape);
+					}
 				}
 			}
 			// Toggle pan tool class on body (grab/grabbing cursor)
@@ -269,7 +281,7 @@ export class Activate_tool_action extends Base_action {
 		const mainWrapper = document.getElementById('main_wrapper');
 		const middleArea = document.querySelector('.middle_area');
 		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'spot_heal', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
-		const crosshairTools = ['selection', 'lasso', 'gradient', 'crop'];
+		const crosshairTools = ['selection', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';
 		if (config.TOOL && brushTools.includes(config.TOOL.name)) {
@@ -278,6 +290,14 @@ export class Activate_tool_action extends Base_action {
 			defaultCursor = 'text';
 		} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
 			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
+		} else if (config.TOOL && config.TOOL.name === 'lasso') {
+			const itemDef = config.TOOLS ? config.TOOLS.find(t => t.name === 'lasso') : null;
+			const shape = (itemDef && itemDef.tool_group && itemDef.tool_group.active_shape) || 'lasso';
+			if (shape === 'polygonal_lasso') {
+				defaultCursor = "url('images/icons/cursor-polygonal-lasso.svg') 1 1, default";
+			} else {
+				defaultCursor = "url('images/icons/cursor-lasso.svg') 1 1, default";
+			}
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
 		} else if (config.TOOL && config.TOOL.name === 'pick_color') {
@@ -297,12 +317,16 @@ export class Activate_tool_action extends Base_action {
 		if (middleArea) {
 			for (let i = middleArea.classList.length - 1; i >= 0; i--) {
 				const cls = middleArea.classList[i];
-				if (cls.startsWith('tool-')) {
+				if (cls.startsWith('tool-') || cls.startsWith('shape-')) {
 					middleArea.classList.remove(cls);
 				}
 			}
 			if (config.TOOL && config.TOOL.name) {
 				middleArea.classList.add('tool-' + config.TOOL.name);
+				const itemDef = config.TOOLS ? config.TOOLS.find(t => t.name === config.TOOL.name) : null;
+				if (itemDef && itemDef.tool_group && itemDef.tool_group.active_shape) {
+					middleArea.classList.add('shape-' + itemDef.tool_group.active_shape);
+				}
 			}
 		}
 		// Toggle pan tool class on body (grab/grabbing cursor)

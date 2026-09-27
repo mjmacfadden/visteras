@@ -1794,6 +1794,14 @@ crop handles) win over the default crosshair - not !important so inline styles a
 .middle_area.tool-direct_select #main_wrapper * {
 	cursor: url('../images/icons/cursor-direct-select.svg') 1 1, default !important;
 }
+.middle_area.tool-lasso #main_wrapper,
+.middle_area.tool-lasso #main_wrapper * {
+	cursor: url('../images/icons/cursor-lasso.svg') 1 1, default !important;
+}
+.middle_area.tool-lasso.shape-polygonal_lasso #main_wrapper,
+.middle_area.tool-lasso.shape-polygonal_lasso #main_wrapper * {
+	cursor: url('../images/icons/cursor-polygonal-lasso.svg') 1 1, default !important;
+}
 .middle_area.tool-select #main_wrapper {
 	cursor: default;
 }

@@ -1824,13 +1824,23 @@ class Base_selection_class {
 
 		const mainWrapper = document.getElementById('main_wrapper');
 		const brushTools = ['brush', 'pencil', 'erase', 'clone', 'blur', 'sharpen', 'desaturate', 'bulge_pinch', 'quick_selection'];
-		const crosshairTools = ['selection', 'lasso', 'magic_wand', 'gradient', 'crop'];
+		const crosshairTools = ['selection', 'gradient', 'crop'];
 
 		let defaultCursor = 'default';
 		if (config.TOOL && brushTools.includes(config.TOOL.name)) {
 			defaultCursor = 'none';
 		} else if (config.TOOL && config.TOOL.name === 'text') {
 			defaultCursor = 'text';
+		} else if (config.TOOL && config.TOOL.name === 'magic_wand') {
+			defaultCursor = "url('images/icons/cursor-magic-wand.svg') 7 7, crosshair";
+		} else if (config.TOOL && config.TOOL.name === 'lasso') {
+			const itemDef = config.TOOLS ? config.TOOLS.find(t => t.name === 'lasso') : null;
+			const shape = (itemDef && itemDef.tool_group && itemDef.tool_group.active_shape) || 'lasso';
+			if (shape === 'polygonal_lasso') {
+				defaultCursor = "url('images/icons/cursor-polygonal-lasso.svg') 1 1, default";
+			} else {
+				defaultCursor = "url('images/icons/cursor-lasso.svg') 1 1, default";
+			}
 		} else if (config.TOOL && crosshairTools.includes(config.TOOL.name)) {
 			defaultCursor = 'crosshair';
 		} else if (config.TOOL && config.TOOL.name === 'fill') {
