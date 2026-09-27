@@ -25,6 +25,14 @@ export function validate_sources(sources, layers, depth = 0, ancestors = new Set
 				|| !Number.isInteger(filter.params._seed) || filter.params._seed < 0 || filter.params._seed > 4294967295) {
 				throw new Error('Unsupported or invalid Smart Effect recipe.');
 			}
+			const mask = filter.params._mask;
+			if (mask != null && (!Number.isInteger(mask.width) || !Number.isInteger(mask.height)
+				|| mask.width < 1 || mask.height < 1 || mask.width * mask.height > 268435456
+				|| typeof mask.data !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(mask.data)
+				|| mask.data.length !== 4 * Math.ceil(mask.width * mask.height / 3)
+				|| (mask.data.endsWith('==') ? 2 : mask.data.endsWith('=') ? 1 : 0) !== (3 - mask.width * mask.height % 3) % 3)) {
+				throw new Error('Invalid Smart Effect mask.');
+			}
 		}
 
 		if (layer.type !== 'smart') continue;

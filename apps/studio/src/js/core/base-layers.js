@@ -112,7 +112,7 @@ class Base_layers_class {
 			enable_rotation: false,
 			enable_move: false,
 			data_function: function () {
-				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
+				if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
 				}
 				return config.layer;

@@ -29,6 +29,7 @@ export class Add_layer_mask_action extends Base_action {
 		}
 		this.old_mask = this.reference_layer.mask;
 		this.old_mask_active = config.mask_active;
+		this.old_effect_mask_active = config.effect_mask_active;
 		if (this.reference_layer.mask) {
 			throw new Error('Aborted - layer already has a mask');
 		}
@@ -40,6 +41,7 @@ export class Add_layer_mask_action extends Base_action {
 		else {
 			this.reference_layer.mask = Mask.create_mask(this.reference_layer, this.reveal);
 		}
+		config.effect_mask_active = null;
 		config.mask_active = true;
 		Mask.default_mask_colors();
 
@@ -52,10 +54,11 @@ export class Add_layer_mask_action extends Base_action {
 		if (this.reference_layer) {
 			this.reference_layer.mask = this.old_mask;
 			config.mask_active = this.old_mask_active;
+			config.effect_mask_active = this.old_effect_mask_active;
 			this.old_mask = null;
 		}
 		this.reference_layer = null;
-		if (config.layer && config.layer.mask == null) {
+		if (config.layer && config.layer.mask == null && !config.effect_mask_active) {
 			config.mask_active = false;
 		}
 		app.GUI.GUI_layers.render_layers();

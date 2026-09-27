@@ -39,3 +39,10 @@ test('Smart Effect recipes validate versions, processor IDs, seeds and layer typ
   assert.throws(()=>context.validate_sources({source:source()}, [{...layer(),filters:[f]}]), /Smart Effect/);
  assert.throws(()=>context.validate_sources({}, [{type:'image',filters:[valid]}]), /Smart Effect/);
 });
+
+test('effect masks reject malformed grayscale payloads before rendering',()=>{
+ const make=mask=>({...layer(),filters:[{name:'smart:effects/common/invert',params:{_version:1,_seed:42,_mask:mask}}]});
+ assert.doesNotThrow(()=>context.validate_sources({source:source()},[make({width:1,height:1,data:'/w==',enabled:true})]));
+ for(const mask of [{width:0,height:1,data:''},{width:2,height:1,data:'/w=='},{width:1,height:1,data:'!!!!'}])
+  assert.throws(()=>context.validate_sources({source:source()},[make(mask)]),/Effect mask/);
+});

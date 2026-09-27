@@ -48,7 +48,7 @@ class Select_tool_class extends Base_tools_class {
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
-				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
+				if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
 				}
 				if (this.resizing && this.Base_selection && this.Base_selection.mouse_lock === 'selected_object_actions') {
@@ -585,7 +585,7 @@ class Select_tool_class extends Base_tools_class {
 			return;
 		}
 		else if (this.moving) {
-			if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
+			if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
 				// Move unlinked mask only
 				config.layer.mask.x = Math.round(mouse.x - mouse.click_x + this.mousedown_mask_dimensions.x);
 				config.layer.mask.y = Math.round(mouse.y - mouse.click_y + this.mousedown_mask_dimensions.y);
@@ -952,7 +952,7 @@ class Select_tool_class extends Base_tools_class {
 			this.is_rotating = false;
 		}
 		else if (this.moving) {
-			if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
+			if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
 				var new_mask_x = Math.round(mouse.x - mouse.click_x + this.mousedown_mask_dimensions.x);
 				var new_mask_y = Math.round(mouse.y - mouse.click_y + this.mousedown_mask_dimensions.y);
 				config.layer.mask.x = this.mousedown_mask_dimensions.x;

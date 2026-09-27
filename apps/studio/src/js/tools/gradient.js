@@ -172,7 +172,7 @@ class Gradient_class extends Base_tools_class {
 		if (mouse.click_valid == false)
 			return;
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.Mask.gradient_start(this, e);
 			const click = this._constrain_point(e, mouse.x, mouse.y, mouse.x, mouse.y);
 			this.mouse_click = { x: click.x, y: click.y };
@@ -239,7 +239,7 @@ class Gradient_class extends Base_tools_class {
 		if (!this.started)
 			return;
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.Mask.gradient_move(this, e);
 			this._update_preview_line(e, mouse);
 			this.Base_layers.render();
@@ -264,7 +264,7 @@ class Gradient_class extends Base_tools_class {
 			return;
 		}
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			await this.Mask.gradient_end(this, e);
 			this._clear_session({ keep_link: false });
 			return;

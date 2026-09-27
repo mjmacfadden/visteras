@@ -1,3 +1,4 @@
+import { blendEffectMask } from '../../libs/effect-masks.js';
 import { renderSmart, surface, recipe, saveEffect, seeded } from '../../libs/smart-effects.js';
 /**
  * Visteras Studio — Raw Develop (Camera Raw–style modal).
@@ -373,7 +374,14 @@ class Image_rawDevelop_class {
 			console.error('Raw Develop preview: develop() must return ImageData');
 			return;
 		}
-		this._previewCtx.putImageData(developed, 0, 0);
+		if (this._smartLayer && this._params._mask) {
+			const input = document.createElement('canvas'), output = document.createElement('canvas');
+			input.width = output.width = developed.width; input.height = output.height = developed.height;
+			input.getContext('2d').putImageData(this._previewBuffer, 0, 0);
+			output.getContext('2d').putImageData(developed, 0, 0);
+			this._previewCtx.clearRect(0, 0, developed.width, developed.height);
+			this._previewCtx.drawImage(blendEffectMask(input, output, this._params._mask), 0, 0);
+		} else this._previewCtx.putImageData(developed, 0, 0);
 	}
 
 	async _apply() {

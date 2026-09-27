@@ -57,7 +57,7 @@ use Save Contents to commit them to the parent, then save the parent project.
 - Source composites are rasterized at source-document resolution. Enlarging raster
   content cannot create detail; vector/text supersampling at arbitrary instance scales
   is not implemented. Edit the source dimensions when a larger render is needed.
-- Perspective/mesh warp, per-effect masks, Photoshop Smart Object
+- Perspective/mesh warp, Photoshop Smart Object
   interchange, worker rendering and tiled large-document rendering are future work.
 - Unfiltered Smart Layers use WebGL when available; Smart Layers with live effects
   use the Canvas compositor to preserve effect scaling. Instances share decoded source data; effect variants use cached rendered surfaces. History memory estimates include source bitmaps and encoded previews.
@@ -88,7 +88,8 @@ Recipes run in listed order on the native embedded source, before layer placemen
 mask, opacity, and existing layer styles. Shadows, color overlay, and borders keep
 their existing nondestructive layer-style behavior outside this stack. Existing
 legacy live filters retain their original rendering behavior. Selections do not
-limit Smart Effects: apply a layer mask for spatial control. Processing is bounded
+limit an unmasked Smart Effect. Add an effect mask for spatial control; an active
+selection initializes its coverage. Processing is bounded
 to the embedded source rectangle (including blur); use a larger source canvas when
 you need more transparent space at its edges.
 
@@ -104,9 +105,35 @@ rotating, or resizing the layer reuses those pixels. Effect edits currently proc
 on the main thread, including full-resolution previews for general effects; large
 images and expensive oil/denoise stacks can pause the UI. Raw Develop uses its
 existing reduced-resolution interactive preview. GPU-based effects still require
-browser WebGL support. Worker/tiled processing and per-effect masks are future work.
+browser WebGL support. Worker/tiled processing remains future work.
 
 Validation: `tests/smart-effects-browser.html` exercises all 39 processors, recipe
 editing, forced recomputation, undo/redo, Raw Develop, actual panel reorder/delete,
 native persistence, independent duplicate settings, and rasterization. Run alongside
 the original Smart Layer browser suite and source/mask Node tests.
+
+
+## Per-effect masks
+
+Each Smart Effect has a **+ Mask** button beneath its name. Click it to add a white
+mask (or initialize from the active selection), then paint directly on the document
+with Brush, Pencil, Eraser, Fill, or Gradient. The highlighted **Mask** button marks
+the current painting target. Click the layer name/thumbnail to stop editing the mask,
+or another effect's Mask button to switch targets.
+
+White applies that effect, black bypasses it, and gray blends its input and output.
+This does not hide the layer itself. A layer mask still controls the final layer
+independently. Controls alongside Mask disable/enable, invert, or remove only that
+mask. Edits are undoable; effect reordering carries the mask with the effect.
+
+Masks use native source coordinates and follow layer placement, scaling, and
+rotation. Source replacement stretches coverage to the new source frame. Copies
+have independent editable masks. Native JSON stores grayscale bytes with each
+recipe; runtime paint canvases are excluded. Raster/PSD export bakes the masked
+appearance. As with Smart Effects, large source images or costly stacks may make
+live painting slower. Independently transforming effect masks is not supported yet.
+
+`tests/effect-masks-browser.html` verifies direct brush routing, live rendering,
+gradients, transforms, parameter edits, layer-mask independence, undo/redo, native
+roundtrips, duplicates and rasterization. `tests/effect-masks.test.cjs` covers
+black/white/gray interpolation, transparency and runtime isolation.

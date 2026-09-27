@@ -1,3 +1,4 @@
+import { activeEffectTarget, effectMaskImageAction } from '../../libs/effect-masks.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Helper_class from './../../libs/helpers.js';
@@ -31,20 +32,21 @@ class Mask_class {
 		//active paint stroke (brush/pencil/erase on mask)
 		this.stroke = null;
 		//active gradient start point
-		this.gradient_start = null;
+		this.gradient_session = null;
 	}
 
 	/**
 	 * checks if current editing target is the layer mask
 	 */
 	is_active() {
-		return config.mask_active === true && config.layer != null && config.layer.mask != null;
+		return config.mask_active === true && config.layer != null && (config.effect_mask_active ? activeEffectTarget() != null : config.layer.mask != null);
 	}
 
 	/**
 	 * sets the active editing target. Returns the new state.
 	 */
 	set_active(value) {
+		config.effect_mask_active = null;
 		if (value === true && (config.layer == null || config.layer.mask == null)) {
 			config.mask_active = false;
 		}
@@ -747,7 +749,8 @@ class Mask_class {
 		if (mouse.click_valid == false)
 			return;
 
-		var layer = config.layer;
+		var layer = activeEffectTarget() || config.layer;
+		if (layer.locked) return;
 		var source = this.get_mask_source(layer);
 		if (source == null) {
 			alertify.error('This layer does not have a mask.');
@@ -765,6 +768,7 @@ class Mask_class {
 		var alpha = (options.alpha != null) ? options.alpha : 255;
 
 		this.stroke = {
+			layer,
 			canvas: canvas,
 			ctx: ctx,
 			color: color,
@@ -802,7 +806,7 @@ class Mask_class {
 		if (mouse.click_valid == false)
 			return;
 
-		var layer = config.layer;
+		var layer = this.stroke.layer;
 		var point = this.world_to_mask(layer, mouse.x, mouse.y);
 		var last = this.stroke.last_x != null;
 
@@ -860,12 +864,12 @@ class Mask_class {
 		this.stroke.last_y = point.y;
 		this.stroke.painted = true;
 		this.constrain_mask_stroke();
-		this.request_mask_render(config.layer);
+		this.request_mask_render(activeEffectTarget() || config.layer);
 	}
 
 	paint_point(tool, e, first) {
 		var mouse = tool.get_mouse_info(e);
-		var layer = config.layer;
+		var layer = this.stroke.layer;
 		var point = this.world_to_mask(layer, mouse.x, mouse.y);
 
 		this.stroke.ctx.save();
@@ -895,7 +899,7 @@ class Mask_class {
 		this.stroke.last_y = point.y;
 		this.stroke.painted = true;
 		this.constrain_mask_stroke();
-		this.request_mask_render(config.layer);
+		this.request_mask_render(activeEffectTarget() || config.layer);
 	}
 
 	/**
@@ -1003,12 +1007,12 @@ class Mask_class {
 		var stroke = this.stroke;
 		this.stroke = null;
 
-		var layer = config.layer;
+		var layer = stroke.layer;
 		try {
 			if (stroke.painted === true) {
 				await app.State.do_action(
 					new app.Actions.Bundle_action('paint_mask', 'Paint Mask', [
-						new app.Actions.Update_layer_mask_image_action(stroke.output, layer.id),
+						layer._effectOwner ? effectMaskImageAction(stroke.output, layer) : new app.Actions.Update_layer_mask_image_action(stroke.output, layer.id),
 					])
 				);
 			}
@@ -1085,7 +1089,8 @@ class Mask_class {
 		if (this.working === true)
 			return;
 
-		var layer = config.layer;
+		var layer = activeEffectTarget() || config.layer;
+		if (layer.locked) return;
 		var source = this.get_mask_source(layer);
 		if (source == null) {
 			alertify.error('This layer does not have a mask.');
@@ -1116,7 +1121,7 @@ class Mask_class {
 
 		await app.State.do_action(
 			new app.Actions.Bundle_action('fill_mask', 'Fill Mask', [
-				new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
+				layer._effectOwner ? effectMaskImageAction(canvas, layer) : new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
 			])
 		);
 
@@ -1133,7 +1138,8 @@ class Mask_class {
 		if (mouse.click_valid == false)
 			return;
 
-		var layer = config.layer;
+		var layer = activeEffectTarget() || config.layer;
+		if (layer.locked) return;
 		var source = this.get_mask_source(layer);
 		if (source == null) {
 			alertify.error('This layer does not have a mask.');
@@ -1147,7 +1153,8 @@ class Mask_class {
 
 		var base = this.copy_mask_canvas(source);
 		var preview = this.copy_mask_canvas(source);
-		this.gradient_start = {
+		this.gradient_session = {
+			layer,
 			x: click.x,
 			y: click.y,
 			base: base,
@@ -1158,28 +1165,28 @@ class Mask_class {
 	}
 
 	gradient_move(tool, e) {
-		if (this.gradient_start == null)
+		if (this.gradient_session == null)
 			return;
 		var mouse = tool.get_mouse_info(e);
 		if (mouse.is_drag == false || mouse.click_valid == false)
 			return;
 
-		var layer = config.layer;
+		var layer = activeEffectTarget() || config.layer;
 		if (layer == null || layer.mask == null)
 			return;
 
 		this._paint_mask_gradient_preview(tool, e, mouse, false);
-		layer.mask.link_canvas = this.gradient_start.preview;
+		layer.mask.link_canvas = this.gradient_session.preview;
 		this.request_mask_render(layer);
 	}
 
 	async gradient_end(tool, e) {
-		if (this.gradient_start == null)
+		if (this.gradient_session == null)
 			return;
 
 		var mouse = tool.get_mouse_info(e);
-		var session = this.gradient_start;
-		var layer = config.layer;
+		var session = this.gradient_session;
+		var layer = session.layer;
 		var width = mouse.x - session.x;
 		var height = mouse.y - session.y;
 
@@ -1199,11 +1206,11 @@ class Mask_class {
 
 			await app.State.do_action(
 				new app.Actions.Bundle_action('gradient_mask', 'Gradient Mask', [
-					new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
+					layer._effectOwner ? effectMaskImageAction(canvas, layer) : new app.Actions.Update_layer_mask_image_action(canvas, layer.id),
 				])
 			);
 		} finally {
-			this.gradient_start = null;
+			this.gradient_session = null;
 			if (layer != null && layer.mask != null) {
 				delete layer.mask.link_canvas;
 			}
@@ -1225,11 +1232,11 @@ class Mask_class {
 	 * Reverse, and FG→BG vs FG→transparent (via alpha_2).
 	 */
 	_paint_mask_gradient_preview(tool, e, mouse, commit) {
-		var session = this.gradient_start;
+		var session = this.gradient_session;
 		if (session == null)
 			return null;
 
-		var layer = config.layer;
+		var layer = session.layer;
 		var params = (tool && typeof tool._normalized_params === 'function')
 			? tool._normalized_params()
 			: (tool.getParams ? tool.getParams() : {});

@@ -35,7 +35,7 @@ class Fill_class extends Base_tools_class {
 		if (mouse.click_valid == false) {
 			return;
 		}
-		if (config.mask_active === true && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.Mask.fill(this, e);
 			return;
 		}

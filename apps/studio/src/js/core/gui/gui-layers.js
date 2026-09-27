@@ -141,6 +141,9 @@ class GUI_layers_class {
 			else if (target.id == 'layer_name') {
 				_this.select_layer_from_panel(target.dataset.id, event);
 			}
+			else if (target.dataset.effectMask) {
+				app.GUI.modules['layer/effect_mask'].command(target.dataset.pid, target.dataset.id, target.dataset.effectMask);
+			}
 			else if (target.dataset.effectStep) {
 				const layer = app.Layers.get_layer(Number(target.dataset.pid), true);
 				if (!layer || layer.locked) return;
@@ -1549,7 +1552,7 @@ class GUI_layers_class {
 						html += '</span>';
 
 						var mask_class = 'mask_thumb';
-						if (value.id == config.layer.id && config.mask_active === true) {
+						if (value.id == config.layer.id && config.mask_active === true && !config.effect_mask_active) {
 							mask_class += ' active_mask';
 						}
 						if (value.mask.enabled === false) {
@@ -1600,7 +1603,15 @@ class GUI_layers_class {
 						}
 						html += '	<span class="layer_name" id="filter_name" data-pid="' + value.id + '" data-id="' + filter.id + '" data-filter="' + filter.name + '">' + title + '</span>';
 						if (filter.name.startsWith('smart:')) {
-							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="-1" title="Apply earlier" aria-label="Apply earlier">↑</button>';
+							const active = config.mask_active && config.layer.id === value.id && String(config.effect_mask_active) === String(filter.id);
+							html += '<span class="effect-mask-controls"><button class="smart-effect-order effect-mask-target' + (active ? ' active' : '') + '" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-mask="edit" title="' + (filter.params._mask ? 'Paint effect mask (black bypasses, white applies)' : 'Add effect mask') + '">' + (filter.params._mask ? 'Mask' : '+ Mask') + '</button>';
+							if (filter.params._mask) {
+								for (const [action,label] of [['toggle',filter.params._mask.enabled === false ? 'Enable effect mask' : 'Disable effect mask'],['invert','Invert effect mask'],['delete','Remove effect mask']]) {
+									html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-mask="' + action + '" title="' + label + '">' + ({toggle:filter.params._mask.enabled === false ? '○' : '●',invert:'◐',delete:'×'})[action] + '</button>';
+								}
+							}
+
+							html += '</span><button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="-1" title="Apply earlier" aria-label="Apply earlier">↑</button>';
 							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="1" title="Apply later" aria-label="Apply later">↓</button>';
 						}
 						html += '	<span class="delete" id="delete_filter" data-pid="' + value.id + '" data-id="' + filter.id + '" title="delete"></span>';

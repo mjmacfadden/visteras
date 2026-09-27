@@ -52,6 +52,7 @@ Object.defineProperty(config, 'need_render', {
 	}
 });
 config.need_render_changed_params = false; // Set specifically when param change in layer details triggered render
+config.effect_mask_active = null; // Filter ID when painting a Smart Effect mask
 config.mask_active = false; // True when the active layer's mask is the editing target
 config._internal_clipboard = null; // {data_url, x, y, width, height} last copied selection/layer
 config._clipboard_position = null;

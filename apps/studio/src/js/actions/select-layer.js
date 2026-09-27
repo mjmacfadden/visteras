@@ -22,6 +22,7 @@ export class Select_layer_action extends Base_action {
 		this.selection = selection;
 		this.old_layer = null;
 		this.old_mask_active = config.mask_active;
+		this.old_effect_mask_active = config.effect_mask_active;
 		this.old_selected_layer_ids = null;
 		this.old_layer_select_anchor_id = null;
 	}
@@ -153,6 +154,7 @@ export class Select_layer_action extends Base_action {
 		}
 		this.old_layer = null;
 		config.mask_active = this.old_mask_active;
+			config.effect_mask_active = this.old_effect_mask_active;
 		this.old_mask_active = false;
 
 		if (this.old_selected_layer_ids != null) {

@@ -1,3 +1,4 @@
+import { blendEffectMask, effectMaskRuntime } from './effect-masks.js';
 import app from '../app.js';
 import config from '../config.js';
 import alertify from 'alertifyjs/build/alertify.min.js';
@@ -41,7 +42,7 @@ export function applyEffect(input, effect) {
  else result = module.change(c, params);
  if (result instanceof ImageData) ctx.putImageData(result, 0, 0);
  else if (result && result !== c) { ctx.clearRect(0, 0, c.width, c.height); ctx.drawImage(result, 0, 0); }
- return c;
+ return blendEffectMask(input, c, effect.params._mask);
 }
 export function renderSmart(layer, stopId = null, disabled = null) {
  const source = config.smart_sources[layer.smart_source_id];
@@ -57,10 +58,11 @@ export function renderSmart(layer, stopId = null, disabled = null) {
  const key = JSON.stringify([source && source.revision, filters]);
  let entries = cache.get(link);
  if (!entries) { entries = new Map(); cache.set(link, entries); }
- if (entries.has(key)) { const hit = entries.get(key); entries.delete(key); entries.set(key, hit); return hit; }
+ const painting=filters.some(f=>f.params._mask && effectMaskRuntime(f.params._mask).link_canvas);
+ if (!painting && entries.has(key)) { const hit = entries.get(key); entries.delete(key); entries.set(key, hit); return hit; }
  let canvas = link;
  for (const f of filters) canvas = applyEffect(canvas, f);
- entries.set(key, canvas);
+ if (!painting) entries.set(key, canvas);
  // Bound retained surfaces per shared source; undo/history never owns these buffers.
  while (entries.size > 4) entries.delete(entries.keys().next().value);
  return canvas;
@@ -72,7 +74,7 @@ export function saveEffect(layer, key, params, id, documentId) {
  return app.State.do_action(new app.Actions.Add_layer_filter_action(layer.id, 'smart:' + key, params, id));
 }
 export function recipe(params = {}, old) {
- return {...params, _version:1, _seed:old ? old._seed : Math.floor(Math.random() * 4294967296)};
+ return {...params, ...(old && old._mask ? {_mask:old._mask} : {}), _version:1, _seed:old ? old._seed : Math.floor(Math.random() * 4294967296)};
 }
 export function smartDialog(module, key, settings, id) {
  const layer = config.layer, documentId = app.Documents.active_id;
