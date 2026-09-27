@@ -833,7 +833,7 @@ class Base_layers_class {
 			ctx.translate(-cx, -cy);
 		}
 
-		if (object.type == "image") {
+		if (object.type == "image" || object.type === "smart") {
 			ctx.drawImage(
 				object.link_canvas != null ? object.link_canvas : object.link,
 				object.x || 0,

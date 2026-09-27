@@ -176,9 +176,13 @@ class Base_state_class {
 			clearTimeout(this.autosave_timer);
 		this.autosave_timer = setTimeout(() => {
 			this.autosave_timer = null;
-			var save = () => project_store.save(app.FileSave.export_as_json()).catch(function (error) {
+			var save = () => {
+				// A contents tab must not replace the parent recovery snapshot.
+				if (app.Documents?.get_active_document()?.smart_edit) return;
+				return project_store.save(app.FileSave.export_as_json()).catch(function (error) {
 				console.warn('Recovery snapshot failed:', error);
 			});
+			};
 			if (window.requestIdleCallback) {
 				window.requestIdleCallback(save, { timeout: 5000 });
 			}

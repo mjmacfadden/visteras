@@ -145,12 +145,19 @@ class GUI_information_class {
 	estimate_layer_bitmap_bytes() {
 		var layers = config.layers || [];
 		var total = 0;
+		const smartSources = new Set();
 		for (var i = 0; i < layers.length; i++) {
 			var layer = layers[i];
 			if (!layer || layer.type == null) continue;
 			var w = Math.max(0, Math.round(layer.width || 0));
 			var h = Math.max(0, Math.round(layer.height || 0));
-			if (w > 0 && h > 0) {
+			if (layer.type === 'smart') {
+				const source = config.smart_sources[layer.smart_source_id];
+				if (source && !smartSources.has(source.id)) {
+					total += source.width * source.height * 4;
+					smartSources.add(source.id);
+				}
+			} else if (w > 0 && h > 0) {
 				total += w * h * 4;
 			}
 			if (layer.mask && layer.mask.enabled !== false) {

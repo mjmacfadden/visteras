@@ -97,6 +97,11 @@ export function ensure_paint_layer(options = {}) {
 		return insert_blank_image_layer();
 	}
 
+	if (config.layer.type === 'smart') {
+		alertify.error('Use Edit Contents or Rasterize Smart Layer before painting.');
+		return null;
+	}
+
 	if (config.layer.type === 'adjustment') {
 		alertify.error(
 			'Cannot ' + verb + ' directly on an adjustment layer. Create a new layer or edit the layer mask.'

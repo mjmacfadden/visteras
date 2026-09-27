@@ -3650,6 +3650,15 @@ crop handles) win over the default crosshair - not !important so inline styles a
 	flex-shrink: 0;
 	transition: background-color 0.15s, color 0.15s;
 }
+.document_tabs .smart_contents_button {
+	width: auto;
+	padding: 0 10px;
+	font-size: 12px;
+	white-space: nowrap;
+	color: #dedede;
+	border-left: 1px solid #444;
+}
+
 .document_tabs .new_tab_btn:hover {
 	background-color: #333333;
 	color: #ffffff;

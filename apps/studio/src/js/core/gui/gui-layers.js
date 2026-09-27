@@ -504,6 +504,11 @@ class GUI_layers_class {
 			var layer_id = (target.dataset && target.dataset.id) ? parseInt(target.dataset.id) : (item && item.dataset && item.dataset.id ? parseInt(item.dataset.id) : null);
 			var dbl_layer = layer_id != null ? app.Layers.get_layer(layer_id, true) : null;
 
+			if (dbl_layer?.type === 'smart' && target.id !== 'layer_name') {
+				event.preventDefault();
+				app.GUI.modules['layer/smart'].edit_contents(dbl_layer.id);
+				return;
+			}
 			// If double-clicking a text layer thumbnail or row (not the rename label)
 			if (dbl_layer && dbl_layer.type === 'text' && target.id !== 'layer_name') {
 				const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
@@ -864,6 +869,17 @@ class GUI_layers_class {
 			hr.className = 'layer_context_menu_divider';
 			menu.appendChild(hr);
 		};
+
+		const smart = app.GUI.modules['layer/smart'];
+		if (smart) {
+			if (layer.type === 'smart') {
+				button('Edit Contents', () => smart.edit_contents(layer_id));
+				button('Replace Contents…', () => smart.replace_contents(layer_id));
+				button('Make Independent', () => smart.make_independent(layer_id));
+				button('Rasterize Smart Layer', () => smart.rasterize(layer_id));
+			} else button('Convert to Smart Layer', () => smart.convert(layer_id));
+			separator();
+		}
 
 		// 1. Clipping Mask (independent of blend mode)
 		if (is_layer_clipped(layer)) {
@@ -1403,6 +1419,7 @@ class GUI_layers_class {
 	 * returns thumbnail HTML for layer type
 	 */
 	get_layer_thumb(layer) {
+		if (layer.type === 'smart') return '<svg class="thumb_icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.5" y="1.5" width="10" height="10" rx="1"/><rect x="6.5" y="6.5" width="8" height="8" rx="1"/><path d="M8 10.5l2 2 3-4"/></svg>';
 		if (layer.type === 'group') {
 			return '<svg class="thumb_icon thumb_folder" viewBox="0 0 16 16" fill="currentColor"><path d="M1.5 3.5h5l1.2 1.5H14.5v8H1.5v-9.5z" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 6.5h13" stroke="currentColor" stroke-width="1.2"/></svg>';
 		}

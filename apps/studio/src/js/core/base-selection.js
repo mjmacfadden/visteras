@@ -1708,6 +1708,8 @@ class Base_selection_class {
 	 * bakes a single selection-clip masked layer in place (not undoable).
 	 */
 	_bake_selection_clip_layer(layer) {
+		// Smart contents are immutable; keep selection clips as editable masks.
+		if (layer.type === 'smart') return;
 		if (this.Mask == null) {
 			this.Mask = new Mask_class();
 		}

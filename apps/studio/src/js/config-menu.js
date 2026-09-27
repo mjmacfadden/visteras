@@ -439,6 +439,16 @@ const menuDefinition = [
 				target: 'layer/delete.delete'
 			},
 			{
+				name: 'Smart Layers',
+				children: [
+					{ name: 'Convert to Smart Layer', target: 'layer/smart.convert' },
+					{ name: 'Edit Contents', target: 'layer/smart.edit_contents' },
+					{ name: 'Replace Contents…', target: 'layer/smart.replace_contents' },
+					{ name: 'Make Independent', target: 'layer/smart.make_independent' },
+					{ name: 'Rasterize Smart Layer', target: 'layer/smart.rasterize' },
+				]
+			},
+			{
 				name: 'Convert to Raster',
 				target: 'layer/raster.raster'
 			},

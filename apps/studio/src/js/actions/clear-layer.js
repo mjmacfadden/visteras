@@ -21,6 +21,7 @@ export class Clear_layer_action extends Base_action {
 		if (!layer) {
 			throw new Error('Aborted - layer with specified id doesn\'t exist');
 		}
+		if (layer.type === 'smart') throw new Error('Use Edit Contents or Rasterize Smart Layer before clearing pixels.');
 		let new_settings = {
 			x: 0,
 			y: 0,

@@ -33,6 +33,7 @@ config.google_webfonts_key = (typeof window !== 'undefined' && window.__VP_KEYS_
 	|| (_vpLocalKeys && _vpLocalKeys.google_webfonts_key)
 	|| '';
 config.layers = [];
+config.smart_sources = {};
 config.layer = null;
 config.vectors = [];
 config.active_vector_id = null;

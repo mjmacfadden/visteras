@@ -32,6 +32,10 @@ export class Update_layer_image_action extends Base_action {
 		if (!this.reference_layer) {
 			throw new Error('Aborted - layer with specified id doesn\'t exist');
 		}
+		if (this.reference_layer.type === 'smart') {
+			alertify.error('Use Edit Contents or Rasterize Smart Layer before changing pixels.');
+			throw new Error('Smart Layer source pixels are protected.');
+		}
 		if (this.reference_layer.type != 'image'){
 			alertify.error('Error: layer must be image.');
 			throw new Error('Aborted - layer is not an image');

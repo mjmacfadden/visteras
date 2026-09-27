@@ -3,6 +3,7 @@
  */
 
 import app from '../app.js';
+import { hydrate_sources } from '../libs/smart-sources.js';
 import config from '../config.js';
 import Base_layers_class from './base-layers.js';
 import Base_gui_class from './base-gui.js';
@@ -118,6 +119,7 @@ class Base_documents_class {
 			title: options.title || ('Untitled-' + this.auto_title_count++),
 			width: w,
 			height: h,
+			smart_sources: options.smart_sources || {},
 			resolution: options.resolution || (this.Tools_settings ? this.Tools_settings.get_setting('resolution') : 72) || 72,
 			layers: layers,
 			layer: layer || layers[0],
@@ -181,6 +183,7 @@ class Base_documents_class {
 		doc.width = config.WIDTH;
 		doc.height = config.HEIGHT;
 		doc.layers = config.layers;
+		doc.smart_sources = config.smart_sources;
 		doc.layer = config.layer;
 		doc.selected_layer_ids = (config.selected_layer_ids || []).slice();
 		doc.zoom = config.ZOOM;
@@ -232,6 +235,7 @@ class Base_documents_class {
 		// 1. Ensure all image layers have valid link or link_canvas
 		if (doc.layers && Array.isArray(doc.layers)) {
 			for (let l of doc.layers) {
+				if (l.type === 'smart' && doc.smart_sources?.[l.smart_source_id]) l.link = doc.smart_sources[l.smart_source_id].link;
 				if (l.type === 'image' && !l.link && !l.link_canvas) {
 					if (typeof l.data === 'string') {
 						const img = new Image();
@@ -267,6 +271,8 @@ class Base_documents_class {
 		}
 
 		// 3. Set global config
+		config.smart_sources = doc.smart_sources || {};
+		config.mask_active = false;
 		config.WIDTH = doc.width;
 		config.HEIGHT = doc.height;
 		config.layers = (doc.layers && Array.isArray(doc.layers) && doc.layers.length > 0) ? doc.layers : (config.layers || []);
@@ -434,11 +440,12 @@ class Base_documents_class {
 		if (!doc) return true;
 		const historyLen = (app.State && app.State.action_history) ? app.State.action_history.length : (doc.action_history ? doc.action_history.length : 0);
 		if (historyLen > 0) return false;
-		if (doc.is_dirty === true) return false;
+		if (doc.is_dirty === true || doc.smart_edit) return false;
 		if (!config.layers || config.layers.length > 1) return false;
 		if (config.layers.length === 0) return true;
 		
 		const firstLayer = config.layers[0];
+		if (firstLayer?.type === 'smart') return false;
 		// If single layer with no edits and 0 history actions
 		if (firstLayer && !doc.is_dirty && historyLen === 0) {
 			return true;
@@ -447,6 +454,7 @@ class Base_documents_class {
 	}
 
 	async create_document(options = {}) {
+		await app.State?._action_queue;
 		if (this.is_active_document_empty() && !options.force_new) {
 			const doc = this.get_active_document();
 			if (options.title) doc.title = options.title;
@@ -555,7 +563,8 @@ class Base_documents_class {
 		});
 	}
 
-	async create_document_from_json(jsonOrString, filename) {
+	async create_document_from_json(jsonOrString, filename, options = {}) {
+		await app.State?._action_queue;
 		let json = jsonOrString;
 		if (typeof json === 'string') {
 			let raw = json.trim();
@@ -770,10 +779,12 @@ class Base_documents_class {
 
 		let activeLayer = layers.find(l => l.id == json.info.layer_active) || layers[layers.length - 1] || layers[0] || null;
 
-		const isPristine = this.is_active_document_empty();
+		const smart_sources = await hydrate_sources(json.smart_sources || {}, layers);
+		const isPristine = !options.force_new && this.is_active_document_empty();
 		if (isPristine) {
 			const doc = this.get_active_document();
 			doc.title = docTitle;
+			doc.smart_sources = smart_sources;
 			doc.width = w;
 			doc.height = h;
 			doc.layers = layers;
@@ -810,6 +821,7 @@ class Base_documents_class {
 				guides: json.info.guides || [],
 				user_fonts: json.user_fonts || {},
 			});
+			newDoc.smart_sources = smart_sources;
 			newDoc.save_format = 'JSON';
 			newDoc.source_filename = filename || (docTitle + '.json');
 			newDoc.fileHandle = null;
@@ -839,6 +851,7 @@ class Base_documents_class {
 		if (isPristine) {
 			const doc = this.get_active_document();
 			doc.title = docTitle;
+			doc.smart_sources = {};
 			doc.width = w;
 			doc.height = h;
 			doc.layers = layers;
@@ -918,6 +931,7 @@ class Base_documents_class {
 		if (isPristine) {
 			const doc = this.get_active_document();
 			doc.title = docTitle;
+			doc.smart_sources = {};
 			doc.width = w;
 			doc.height = h;
 			doc.layers = layers;
@@ -990,6 +1004,7 @@ class Base_documents_class {
 	}
 
 	async activate_document(id) {
+		await app.State?._action_queue;
 		if (id === this.active_id) return;
 		const targetDoc = this.documents.find(d => d.id === id);
 		if (!targetDoc) return;
@@ -1002,11 +1017,16 @@ class Base_documents_class {
 	}
 
 	async close_document(id) {
+		await app.State?._action_queue;
 		if (id == null) id = this.active_id;
 		const idx = this.documents.findIndex(d => d.id === id);
 		if (idx === -1) return;
 
 		const doc = this.documents[idx];
+		if (this.documents.some(d => d.smart_edit?.parent_id === id)) {
+			alertify.error('Close the Smart Layer contents tab before closing its parent.');
+			return;
+		}
 		if (doc && doc.is_dirty) {
 			const title = this.Helper.escapeHtml(doc.title || 'Untitled');
 			const ok = await new Promise((resolve) => {
@@ -1026,6 +1046,7 @@ class Base_documents_class {
 		if (this.documents.length === 1) {
 			// Reset single remaining document to blank
 			const doc = this.documents[0];
+			doc.smart_sources = {};
 			doc.title = 'Untitled-1';
 			doc.width = 800;
 			doc.height = 600;
@@ -1165,7 +1186,11 @@ class Base_documents_class {
 			<button class="new_tab_btn" id="new_tab_btn" title="New Document">+</button>
 		`;
 
+		const editing = this.get_active_document()?.smart_edit;
+		if (editing) html += '<button class="new_tab_btn smart_contents_button" id="smart_save_contents" title="Update all instances in the parent document (Ctrl+S)">Save Contents</button><button class="new_tab_btn smart_contents_button" id="smart_cancel_contents" title="Close contents without saving further changes">Close Contents</button>';
 		this.tab_container.innerHTML = html;
+		this.tab_container.querySelector('#smart_save_contents')?.addEventListener('click', () => app.GUI.modules['layer/smart'].save_contents());
+		this.tab_container.querySelector('#smart_cancel_contents')?.addEventListener('click', () => this.close_document(this.active_id));
 
 		// Bind events
 		this.tab_container.querySelectorAll('.document_tab').forEach((tabEl) => {

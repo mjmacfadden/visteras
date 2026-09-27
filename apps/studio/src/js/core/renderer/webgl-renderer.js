@@ -591,6 +591,11 @@ class WebGL_renderer_class {
 			if (layer == null || layer.type == null || is_group(layer) || !is_effectively_visible(layer))
 				continue;
 
+			// Smart source pixels can have a different scale from their instance.
+			// GPU filter padding currently assumes layer-local pixels; use the
+			// authoritative Canvas path until source-space filter scaling is supported.
+			if (layer.type === 'smart' && (this._get_effective_filters(layer) || []).length) return false;
+
 			if (layer.type === 'adjustment') {
 				if (!this._gpu_supports_adjustment(layer)) {
 					return false;
@@ -2109,7 +2114,7 @@ class WebGL_renderer_class {
 	 */
 	_get_layer_source(layer) {
 		// Image layers: use the stored canvas or image
-		if (layer.type === 'image') {
+		if (layer.type === 'image' || layer.type === 'smart') {
 			return layer.link_canvas || layer.link || null;
 		}
 

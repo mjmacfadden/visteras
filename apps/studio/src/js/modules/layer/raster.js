@@ -10,6 +10,7 @@ class Layer_raster_class {
 	}
 
 	raster() {
+		if (config.layer?.type === 'smart') return app.GUI.modules['layer/smart'].rasterize();
 		var canvas = this.Base_layers.convert_layer_to_canvas();
 		var current_layer = config.layer;
 		var current_id = current_layer.id;

@@ -990,6 +990,7 @@ export async function export_psd(layers, docWidth, docHeight, options = {}) {
 		fname += '.psd';
 	}
 
+	if (layers.some(l => l.type === 'smart')) alertify.warning('PSD exports Smart Layers as pixels. Save JSON to preserve editable Smart Layers.');
 	alertify.message('Generating Photoshop Document...');
 
 	let compositeCanvas = null;
@@ -1208,6 +1209,18 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 		}
 
 		return psdLayer;
+	}
+
+	// Native Smart Layer metadata is not PSD-compatible yet. Bake this instance
+	// in document coordinates so its scaling, rotation, mask and effects survive.
+	if (layer.type === 'smart') {
+		const canvas = document.createElement('canvas');
+		canvas.width = docWidth; canvas.height = docHeight;
+		app.Layers.render_object(canvas.getContext('2d'), {
+			...layer, parent_id: 0, visible: true, opacity: 100, composition: 'source-over',
+		});
+		return { name: layer.name || 'Smart Layer', canvas, left: 0, top: 0,
+			opacity, hidden: layer.visible === false, clipping: isClipping, blendMode };
 	}
 
 	const layerCanvas = render_layer_to_canvas(layer, docWidth, docHeight);
