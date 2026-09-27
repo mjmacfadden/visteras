@@ -49,9 +49,9 @@ class Layer_styles_class {
 		const ox = Number(x) || 0;
 		const oy = Number(y) || 0;
 		const distance = Math.round(Math.sqrt(ox * ox + oy * oy));
-		let angle = Math.atan2(oy, -ox) * 180 / Math.PI;
-		if (angle < 0) angle += 360;
-		angle = Math.round(angle) % 360;
+		let angle = Math.round(Math.atan2(oy, -ox) * 180 / Math.PI);
+		while (angle > 180) angle -= 360;
+		while (angle < -180) angle += 360;
 		return { angle, distance };
 	}
 
@@ -104,7 +104,7 @@ class Layer_styles_class {
 				name: 'Drop Shadow',
 				enabled: false,
 				id: null,
-				params: { x: 5, y: 5, value: 10, opacity: 25, color: '#000000' }
+				params: { angle: 135, distance: 7, x: 5, y: 5, value: 10, opacity: 25, color: '#000000' }
 			}
 		};
 
@@ -114,7 +114,15 @@ class Layer_styles_class {
 				if (this.styles[filterName]) {
 					this.styles[filterName].enabled = !f.disabled;
 					this.styles[filterName].id = f.id;
-					this.styles[filterName].params = { ...this.styles[filterName].params, ...f.params };
+					let initialParams = { ...this.styles[filterName].params, ...f.params };
+					if (filterName === 'shadow') {
+						if (initialParams.angle == null || initialParams.distance == null) {
+							const ad = Layer_styles_class.angle_distance_from_offset(initialParams.x ?? 5, initialParams.y ?? 5);
+							initialParams.angle = ad.angle;
+							initialParams.distance = ad.distance;
+						}
+					}
+					this.styles[filterName].params = initialParams;
 				}
 			}
 		}
@@ -219,7 +227,7 @@ class Layer_styles_class {
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
 					<input type="range" class="ls_range" id="ls_stroke_size" min="1" max="100" value="${size}" step="1" data-default="3" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_stroke_size" min="1" max="100" value="${size}" step="any" data-default="3" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_stroke_size" min="1" max="100" value="${size}" step="1" data-default="3" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
@@ -233,7 +241,7 @@ class Layer_styles_class {
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
 					<input type="range" class="ls_range" id="ls_stroke_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_stroke_opacity" min="0" max="100" value="${opacity}" step="any" data-default="100" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_stroke_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -285,7 +293,7 @@ class Layer_styles_class {
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
 					<input type="range" class="ls_range" id="ls_color_overlay_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_color_overlay_opacity" min="0" max="100" value="${opacity}" step="any" data-default="100" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_color_overlay_opacity" min="0" max="100" value="${opacity}" step="1" data-default="100" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -300,13 +308,13 @@ class Layer_styles_class {
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
 					<input type="range" class="ls_range" id="ls_inner_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_inner_glow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_inner_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
 					<input type="range" class="ls_range" id="ls_inner_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_inner_glow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="75" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_inner_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -321,13 +329,13 @@ class Layer_styles_class {
 				<div class="ls_row">
 					<span class="ls_label">Size:</span>
 					<input type="range" class="ls_range" id="ls_outer_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_outer_glow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_outer_glow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
 					<input type="range" class="ls_range" id="ls_outer_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_outer_glow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="75" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_outer_glow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="75" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -339,33 +347,46 @@ class Layer_styles_class {
 			const x = style.params.x ?? 5;
 			const y = style.params.y ?? 5;
 			const ad = Layer_styles_class.angle_distance_from_offset(x, y);
-			const angle = ad.angle;
-			const distance = ad.distance;
+			let angle = style.params.angle != null ? style.params.angle : ad.angle;
+			while (angle > 180) angle -= 360;
+			while (angle < -180) angle += 360;
+			const distance = style.params.distance != null ? style.params.distance : ad.distance;
 			const val = style.params.value ?? 10;
 			const opacity = style.params.opacity ?? 25;
+
+			const rad = (Number(angle) || 0) * Math.PI / 180;
+			const needleX = (18 + Math.cos(rad) * 13.5).toFixed(1);
+			const needleY = (18 - Math.sin(rad) * 13.5).toFixed(1);
+
 			fields = `
-				<div class="ls_row">
+				<div class="ls_row ls_row_angle">
 					<span class="ls_label">Angle:</span>
-					<input type="range" class="ls_range" id="ls_shadow_angle" min="0" max="360" value="${angle}" step="1" data-default="135" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_angle" min="0" max="360" value="${angle}" step="any" data-default="135" title="Double-click to reset" />
-					<span class="ls_unit">°</span>
+					<div class="ls_angle_control">
+						<svg class="ls_angle_dial" id="ls_shadow_angle_dial" width="36" height="36" viewBox="0 0 36 36" title="Click or drag to change angle (Shift for 15° steps), double-click to reset">
+							<circle cx="18" cy="18" r="16" class="ls_angle_circle" />
+							<line x1="18" y1="18" x2="${needleX}" y2="${needleY}" class="ls_angle_needle" />
+							<circle cx="18" cy="18" r="2.2" class="ls_angle_center" />
+						</svg>
+						<input type="number" class="ls_num" id="ls_num_shadow_angle" min="-180" max="180" value="${angle}" step="1" data-default="135" title="Double-click to reset" />
+						<span class="ls_unit">°</span>
+					</div>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Distance:</span>
 					<input type="range" class="ls_range" id="ls_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="7" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" step="any" data-default="7" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_distance" min="0" max="200" value="${distance}" step="1" data-default="7" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Radius:</span>
 					<input type="range" class="ls_range" id="ls_shadow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" step="any" data-default="10" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_value" min="0" max="100" value="${val}" step="1" data-default="10" title="Double-click to reset" />
 					<span class="ls_unit">px</span>
 				</div>
 				<div class="ls_row">
 					<span class="ls_label">Opacity:</span>
 					<input type="range" class="ls_range" id="ls_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="25" title="Double-click to reset" />
-					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" step="any" data-default="25" title="Double-click to reset" />
+					<input type="number" class="ls_num" id="ls_num_shadow_opacity" min="0" max="100" value="${opacity}" step="1" data-default="25" title="Double-click to reset" />
 					<span class="ls_unit">%</span>
 				</div>
 				<div class="ls_row">
@@ -435,6 +456,9 @@ class Layer_styles_class {
 			const numInput = controls.querySelector('#ls_num_' + key);
 			if (rangeInput) rangeInput.value = defVal;
 			if (numInput) numInput.value = defVal;
+			if (key === 'shadow_angle') {
+				this.update_angle_dial(defVal);
+			}
 			this.read_current_controls();
 			this.apply_live_canvas();
 		};
@@ -463,24 +487,131 @@ class Layer_styles_class {
 			const syncFromNumber = () => {
 				let val = parseFloat(num.value);
 				if (isNaN(val)) return;
-				// Typed values are free (step="any") — do not snap to the range step.
-				// Only clamp the paired range thumb so it stays within its track.
+
 				if (rangeInput) {
 					const min = parseFloat(rangeInput.min ?? 0);
 					const max = parseFloat(rangeInput.max ?? 100);
 					const clamped = Math.max(min, Math.min(max, val));
 					rangeInput.value = clamped;
 				}
+				if (key === 'shadow_angle') {
+					this.update_angle_dial(val);
+				}
 				this.read_current_controls();
 				this.apply_live_canvas();
 			};
+
 			num.addEventListener('input', syncFromNumber);
 			num.addEventListener('change', syncFromNumber);
+
+			num.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+					e.preventDefault();
+					const step = parseFloat(num.step) || 1;
+					const mult = e.shiftKey ? 10 : 1;
+					const inc = e.key === 'ArrowUp' ? 1 : -1;
+					const min = (num.min !== '') ? parseFloat(num.min) : -Infinity;
+					const max = (num.max !== '') ? parseFloat(num.max) : Infinity;
+
+					let cur = parseFloat(num.value);
+					if (isNaN(cur)) cur = isFinite(min) ? min : 0;
+					let nextVal = Math.round((cur + inc * step * mult) / step) * step;
+
+					if (key === 'shadow_angle') {
+						while (nextVal > 180) nextVal -= 360;
+						while (nextVal < -180) nextVal += 360;
+					} else {
+						if (isFinite(min)) nextVal = Math.max(min, nextVal);
+						if (isFinite(max)) nextVal = Math.min(max, nextVal);
+					}
+
+					num.value = nextVal;
+					syncFromNumber();
+				}
+			});
+
+			num.addEventListener('wheel', (e) => {
+				if (document.activeElement === num) {
+					e.preventDefault();
+					const step = parseFloat(num.step) || 1;
+					const mult = e.shiftKey ? 10 : 1;
+					const inc = e.deltaY < 0 ? 1 : -1;
+					const min = (num.min !== '') ? parseFloat(num.min) : -Infinity;
+					const max = (num.max !== '') ? parseFloat(num.max) : Infinity;
+
+					let cur = parseFloat(num.value);
+					if (isNaN(cur)) cur = isFinite(min) ? min : 0;
+					let nextVal = Math.round((cur + inc * step * mult) / step) * step;
+
+					if (key === 'shadow_angle') {
+						while (nextVal > 180) nextVal -= 360;
+						while (nextVal < -180) nextVal += 360;
+					} else {
+						if (isFinite(min)) nextVal = Math.max(min, nextVal);
+						if (isFinite(max)) nextVal = Math.min(max, nextVal);
+					}
+
+					num.value = nextVal;
+					syncFromNumber();
+				}
+			}, { passive: false });
+
 			num.addEventListener('dblclick', (e) => {
 				e.preventDefault();
 				resetRangePair(num);
 			});
 		});
+
+		// Interactive Angle Dial controller
+		const dial = controls.querySelector('#ls_shadow_angle_dial');
+		const numAngleInput = controls.querySelector('#ls_num_shadow_angle');
+		if (dial && numAngleInput) {
+			let isDragging = false;
+			const handlePointer = (e) => {
+				const rect = dial.getBoundingClientRect();
+				const cx = rect.left + rect.width / 2;
+				const cy = rect.top + rect.height / 2;
+				const dx = e.clientX - cx;
+				const dy = e.clientY - cy;
+				let deg = Math.round(Math.atan2(-dy, dx) * 180 / Math.PI);
+				if (e.shiftKey) {
+					deg = Math.round(deg / 15) * 15;
+				}
+				while (deg > 180) deg -= 360;
+				while (deg < -180) deg += 360;
+				numAngleInput.value = deg;
+				this.update_angle_dial(deg);
+				this.read_current_controls();
+				this.apply_live_canvas();
+			};
+
+			dial.addEventListener('pointerdown', (e) => {
+				if (e.button != null && e.button !== 0) return;
+				try { dial.setPointerCapture(e.pointerId); } catch (_) {}
+				isDragging = true;
+				handlePointer(e);
+			});
+			dial.addEventListener('pointermove', (e) => {
+				if (!isDragging) return;
+				handlePointer(e);
+			});
+			const endDrag = (e) => {
+				if (!isDragging) return;
+				isDragging = false;
+				try { dial.releasePointerCapture(e.pointerId); } catch (_) {}
+			};
+			dial.addEventListener('pointerup', endDrag);
+			dial.addEventListener('pointercancel', endDrag);
+
+			dial.addEventListener('dblclick', (e) => {
+				e.preventDefault();
+				const def = parseInt(numAngleInput.getAttribute('data-default') || '135', 10);
+				numAngleInput.value = def;
+				this.update_angle_dial(def);
+				this.read_current_controls();
+				this.apply_live_canvas();
+			});
+		}
 
 		const otherInputs = controls.querySelectorAll('input[type="color"], select');
 		otherInputs.forEach(el => {
@@ -493,6 +624,18 @@ class Layer_styles_class {
 				this.apply_live_canvas();
 			});
 		});
+	}
+
+	update_angle_dial(angleDeg) {
+		const popup = this.POP.el || document.querySelector('#popups .popup');
+		if (!popup) return;
+		const dial = popup.querySelector('#ls_shadow_angle_dial');
+		if (!dial) return;
+		const needle = dial.querySelector('.ls_angle_needle');
+		if (!needle) return;
+		const rad = (Number(angleDeg) || 0) * Math.PI / 180;
+		needle.setAttribute('x2', (18 + Math.cos(rad) * 13.5).toFixed(1));
+		needle.setAttribute('y2', (18 - Math.sin(rad) * 13.5).toFixed(1));
 	}
 
 	refresh_tabs() {
@@ -578,7 +721,6 @@ class Layer_styles_class {
 				style.params = { value, opacity, color };
 			}
 		} else if (k === 'shadow') {
-			const angleEl = popup.querySelector('#ls_shadow_angle');
 			const numAngleEl = popup.querySelector('#ls_num_shadow_angle');
 			const distEl = popup.querySelector('#ls_shadow_distance');
 			const numDistEl = popup.querySelector('#ls_num_shadow_distance');
@@ -587,14 +729,17 @@ class Layer_styles_class {
 			const opacityEl = popup.querySelector('#ls_shadow_opacity');
 			const numOpacityEl = popup.querySelector('#ls_num_shadow_opacity');
 			const colorEl = popup.querySelector('#ls_shadow_color');
-			if ((angleEl || numAngleEl) && (distEl || numDistEl) && (valueEl || numValueEl)) {
-				const angle = parseInt((numAngleEl ? numAngleEl.value : angleEl?.value) ?? 135);
-				const distance = parseInt((numDistEl ? numDistEl.value : distEl?.value) ?? 7);
+			if (numAngleEl && (distEl || numDistEl) && (valueEl || numValueEl)) {
+				let angle = parseInt(numAngleEl.value, 10);
+				if (isNaN(angle)) angle = 135;
+				while (angle > 180) angle -= 360;
+				while (angle < -180) angle += 360;
+				const distance = parseInt((numDistEl ? numDistEl.value : distEl?.value) ?? 7, 10);
 				const offset = Layer_styles_class.offset_from_angle_distance(angle, distance);
-				const value = parseInt((numValueEl ? numValueEl.value : valueEl?.value) ?? 10);
-				const opacity = parseInt((numOpacityEl ? numOpacityEl.value : opacityEl?.value) ?? 25);
+				const value = parseInt((numValueEl ? numValueEl.value : valueEl?.value) ?? 10, 10);
+				const opacity = parseInt((numOpacityEl ? numOpacityEl.value : opacityEl?.value) ?? 25, 10);
 				const color = colorEl?.value || '#000000';
-				style.params = { x: offset.x, y: offset.y, value, opacity, color };
+				style.params = { x: offset.x, y: offset.y, angle, distance, value, opacity, color };
 			}
 		}
 	}

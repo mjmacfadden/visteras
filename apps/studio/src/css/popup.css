@@ -482,15 +482,53 @@
 	font-size: 11px;
 	text-align: right;
 	font-variant-numeric: tabular-nums;
-	-moz-appearance: textfield;
 }
 .ls_row input[type="number"].ls_num:focus {
-	border-color: #555555;
-	outline: none;
+	border-color: #3a88fe;
+	outline: 1px solid #3a88fe;
 }
 .ls_row input[type="number"].ls_num::-webkit-inner-spin-button,
 .ls_row input[type="number"].ls_num::-webkit-outer-spin-button {
-	opacity: 0.5;
+	opacity: 0.6;
+	cursor: pointer;
+}
+.ls_row input[type="number"].ls_num:hover::-webkit-inner-spin-button,
+.ls_row input[type="number"].ls_num:hover::-webkit-outer-spin-button {
+	opacity: 0.95;
+}
+.ls_row_angle {
+	min-height: 38px;
+}
+.ls_angle_control {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+.ls_angle_dial {
+	width: 36px;
+	height: 36px;
+	cursor: crosshair;
+	user-select: none;
+	touch-action: none;
+	flex-shrink: 0;
+	display: block;
+}
+.ls_angle_dial .ls_angle_circle {
+	fill: #222222;
+	stroke: #777777;
+	stroke-width: 1.5;
+	transition: stroke 0.15s ease;
+}
+.ls_angle_dial:hover .ls_angle_circle {
+	stroke: #aaaaaa;
+}
+.ls_angle_dial .ls_angle_needle {
+	stroke: #cccccc;
+	stroke-width: 1.5;
+	stroke-linecap: round;
+}
+.ls_angle_dial .ls_angle_center {
+	fill: #cccccc;
 }
 .ls_unit {
 	width: 18px;
