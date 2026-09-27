@@ -1533,6 +1533,19 @@ button.ui_icon_button img[src*="align-"]{
 	margin-left: 20px;
 	padding-right: 4px;
 	opacity: 0.85;
+	cursor: grab;
+	user-select: none;
+}
+.layers_list .filter:active{
+	cursor: grabbing;
+}
+.layers_list .filter.dragging_filter{
+	opacity: 0.4;
+}
+.layers_list .item.drag_over_filter_target{
+	outline: 2px dashed #3a88fe;
+	background: rgba(58, 136, 254, 0.18) !important;
+	border-radius: 3px;
 }
 .layers_list .filter.disabled{
 	opacity: 0.35;

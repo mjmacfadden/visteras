@@ -202,6 +202,43 @@ export function resolve_insert_parent_id(active_layer, layers) {
 	return parent_live ? pid : 0;
 }
 
+/**
+ * Returns any active filters inherited from ancestor groups.
+ * Ancestor groups are scanned from outermost group down to immediate parent group.
+ */
+export function get_inherited_group_filters(layer, layers) {
+	if (!layer) return [];
+	const list = layers || config.layers || [];
+	if (is_group(layer)) return [];
+	const ancestors = get_ancestors(layer.id, list);
+	if (!ancestors || !ancestors.length) return [];
+
+	const inherited = [];
+	for (let i = ancestors.length - 1; i >= 0; i--) {
+		const group = ancestors[i];
+		if (group && group.visible !== false && group.filters && Array.isArray(group.filters)) {
+			for (let f = 0; f < group.filters.length; f++) {
+				const filter = group.filters[f];
+				if (filter && filter.disabled !== true && filter.visible !== false) {
+					inherited.push(filter);
+				}
+			}
+		}
+	}
+	return inherited;
+}
+
+/**
+ * Returns a layer's own active filters combined with all inherited group filters.
+ */
+export function get_effective_layer_filters(layer, layers) {
+	if (!layer) return [];
+	const own = (layer.filters && Array.isArray(layer.filters)) ? layer.filters : [];
+	const inherited = get_inherited_group_filters(layer, layers);
+	if (!inherited.length) return own;
+	return own.concat(inherited);
+}
+
 export default {
 	is_group,
 	get_parent_id,
@@ -218,4 +255,6 @@ export default {
 	next_order,
 	resolve_insert_order,
 	resolve_insert_parent_id,
+	get_inherited_group_filters,
+	get_effective_layer_filters,
 };

@@ -16,7 +16,7 @@ import Mask_class from "./../modules/mask/mask.js";
 import alertify from "./../../../node_modules/alertifyjs/build/alertify.min.js";
 import { create_renderer, get_renderer, switch_renderer } from "./renderer/index.js";
 import Composite_cache_class from "./renderer/composite-cache.js";
-import { is_group, is_effectively_visible, get_descendant_ids } from "./../libs/layer-tree.js";
+import { is_group, is_effectively_visible, get_descendant_ids, get_effective_layer_filters } from "./../libs/layer-tree.js";
 import { is_layer_clipped, get_render_composition } from './../libs/layer-clip.js';
 import Vector_renderer from "./vector/vector-renderer.js";
 
@@ -223,6 +223,10 @@ class Base_layers_class {
 		config.need_render = true;
 	}
 
+	get_effective_filters(layer) {
+		return get_effective_layer_filters(layer, config.layers);
+	}
+
 	can_render_interactive_layer(layer, layers) {
 		if (!layer || layer.visible === false || layer.type == null)
 			return false;
@@ -231,7 +235,8 @@ class Base_layers_class {
 		// The initial fast path intentionally handles only an independent,
 		// top-most normal layer. Masks, filters, clipping and blend modes keep
 		// using the exact legacy compositor.
-		if (is_layer_clipped(layer) || layer.composition !== 'source-over' || (layer.filters && layer.filters.length)
+		var effective_filters = this.get_effective_filters(layer);
+		if (is_layer_clipped(layer) || layer.composition !== 'source-over' || (effective_filters && effective_filters.length)
 			|| (layer.mask && layer.mask.enabled !== false))
 			return false;
 		return layers[0] && layers[0].id === layer.id
@@ -912,11 +917,16 @@ class Base_layers_class {
 			return;
 		}
 
-		var fillOpacity = (object.fillOpacity != null) ? Number(object.fillOpacity) : 100;
+		var effectiveFilters = this.get_effective_filters(object);
+		var effectiveObject = (effectiveFilters !== object.filters)
+			? Object.assign({}, object, { filters: effectiveFilters })
+			: object;
+
+		var fillOpacity = (effectiveObject.fillOpacity != null) ? Number(effectiveObject.fillOpacity) : 100;
 		if (!isFinite(fillOpacity)) fillOpacity = 100;
 		fillOpacity = Math.max(0, Math.min(100, fillOpacity));
 		var fill = fillOpacity / 100;
-		var hasStyleFx = this._layer_has_style_fx(object);
+		var hasStyleFx = this._layer_has_style_fx(effectiveObject);
 
 		// Photoshop Fill: fade pixels only. With style FX, render offscreen so we can
 		// punch content without erasing other layers, then blit under layer opacity.
@@ -938,10 +948,10 @@ class Base_layers_class {
 			bctx.globalAlpha = 1;
 			bctx.globalCompositeOperation = 'source-over';
 
-			this.pre_render_object(bctx, object);
-			this._render_object_body(bctx, object, is_preview);
-			this._apply_fill_opacity_punch(bctx, object, fill, is_preview);
-			this.after_render_object(bctx, object);
+			this.pre_render_object(bctx, effectiveObject);
+			this._render_object_body(bctx, effectiveObject, is_preview);
+			this._apply_fill_opacity_punch(bctx, effectiveObject, fill, is_preview);
+			this.after_render_object(bctx, effectiveObject);
 
 			ctx.save();
 			ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -959,9 +969,9 @@ class Base_layers_class {
 			ctx.globalAlpha = ctx.globalAlpha * fill;
 		}
 
-		this.pre_render_object(ctx, object);
-		this._render_object_body(ctx, object, is_preview);
-		this.after_render_object(ctx, object);
+		this.pre_render_object(ctx, effectiveObject);
+		this._render_object_body(ctx, effectiveObject, is_preview);
+		this.after_render_object(ctx, effectiveObject);
 
 		if (fill < 0.999 && !hasStyleFx) {
 			ctx.restore();
@@ -1291,9 +1301,10 @@ class Base_layers_class {
 		let type = layer.adjustment_type;
 		let params = layer.params || {};
 
-		if (!type && layer.filters && layer.filters.length > 0) {
+		let effectiveFilters = this.get_effective_filters(layer);
+		if (!type && effectiveFilters && effectiveFilters.length > 0) {
 			let filtersArr = [];
-			for (let f of layer.filters) {
+			for (let f of effectiveFilters) {
 				if (f && !f.disabled) {
 					let str = this.convert_filter_to_css(f.name, f.params || {});
 					if (str) filtersArr.push(str);

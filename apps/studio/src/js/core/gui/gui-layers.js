@@ -630,10 +630,27 @@ class GUI_layers_class {
 			_this.show_mask_context_menu(event.clientX, event.clientY, layer_id);
 		});
 
-		// Drag-to-reorder / reparent layers (tree-aware)
+		// Drag-to-reorder / reparent layers (tree-aware) or drag effects
 		var drag_layer_id = null;
 		var drag_drop_mode = 'above'; // above | below | into
+		var drag_filter_pid = null;
+		var drag_filter_id = null;
+		var drag_is_copy = false;
+
 		document.getElementById('layers_base').addEventListener('dragstart', function (event) {
+			// Check if dragging an effect filter first
+			var filterItem = event.target.closest('.filter');
+			if (filterItem) {
+				drag_filter_pid = parseInt(filterItem.dataset.pid, 10);
+				drag_filter_id = filterItem.dataset.id;
+				drag_is_copy = (event.ctrlKey || event.metaKey || event.altKey);
+				drag_layer_id = null;
+				filterItem.classList.add('dragging_filter');
+				event.dataTransfer.effectAllowed = 'copyMove';
+				event.dataTransfer.setData('text/plain', 'filter:' + drag_filter_pid + ':' + drag_filter_id);
+				return;
+			}
+
 			var item = event.target.closest('.item');
 			if (!item) return;
 			var layer = app.Layers.get_layer(parseInt(item.dataset.id), true);
@@ -642,6 +659,8 @@ class GUI_layers_class {
 				return;
 			}
 			drag_layer_id = parseInt(item.dataset.id);
+			drag_filter_pid = null;
+			drag_filter_id = null;
 			item.classList.add('dragging');
 			// If the drag source is part of a multi-select, mark all selected rows.
 			var selected = (config.selected_layer_ids || []).map(function (id) { return parseInt(id, 10); });
@@ -660,11 +679,29 @@ class GUI_layers_class {
 
 		document.getElementById('layers_base').addEventListener('dragover', function (event) {
 			event.preventDefault();
+			var items = document.querySelectorAll('#layers_base .item');
+
+			// If dragging an effect filter
+			if (drag_filter_id !== null) {
+				var is_copy = (event.ctrlKey || event.metaKey || event.altKey || drag_is_copy);
+				event.dataTransfer.dropEffect = is_copy ? 'copy' : 'move';
+				for (var i = 0; i < items.length; i++) {
+					items[i].classList.remove('drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into', 'drag_over_filter_target');
+				}
+				var item = event.target.closest('.item');
+				if (item) {
+					var target_layer = app.Layers.get_layer(parseInt(item.dataset.id, 10), true);
+					if (target_layer) {
+						item.classList.add('drag_over_filter_target');
+					}
+				}
+				return;
+			}
+
 			event.dataTransfer.dropEffect = 'move';
 			var item = event.target.closest('.item');
-			var items = document.querySelectorAll('#layers_base .item');
 			for (var i = 0; i < items.length; i++) {
-				items[i].classList.remove('drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into');
+				items[i].classList.remove('drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into', 'drag_over_filter_target');
 			}
 			if (!item) return;
 			var rect = item.getBoundingClientRect();
@@ -692,13 +729,50 @@ class GUI_layers_class {
 		document.getElementById('layers_base').addEventListener('dragleave', function (event) {
 			var item = event.target.closest('.item');
 			if (item) {
-				item.classList.remove('drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into');
+				item.classList.remove('drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into', 'drag_over_filter_target');
 			}
 		});
 
 		document.getElementById('layers_base').addEventListener('drop', function (event) {
 			event.preventDefault();
 			var item = event.target.closest('.item');
+
+			// If dropping an effect filter
+			if (drag_filter_id !== null) {
+				var target_id = item ? parseInt(item.dataset.id, 10) : null;
+				if (target_id != null && !isNaN(target_id)) {
+					var source_layer = app.Layers.get_layer(drag_filter_pid, true);
+					var target_layer = app.Layers.get_layer(target_id, true);
+					if (source_layer && target_layer && source_layer.filters) {
+						var source_filter = source_layer.filters.find(f => String(f.id) === String(drag_filter_id));
+						if (source_filter) {
+							var is_copy = (event.ctrlKey || event.metaKey || event.altKey || drag_is_copy || drag_filter_pid === target_id);
+							var clonedParams = JSON.parse(JSON.stringify(source_filter.params || {}));
+							if (is_copy) {
+								app.State.do_action(
+									new app.Actions.Add_layer_filter_action(target_id, source_filter.name, clonedParams, null)
+								);
+							} else {
+								app.State.do_action(
+									new app.Actions.Bundle_action('move_layer_filter', 'Move Layer Filter', [
+										new app.Actions.Delete_layer_filter_action(drag_filter_pid, source_filter.id),
+										new app.Actions.Add_layer_filter_action(target_id, source_filter.name, clonedParams, null)
+									])
+								);
+							}
+						}
+					}
+				}
+				drag_filter_pid = null;
+				drag_filter_id = null;
+				drag_is_copy = false;
+				var items = document.querySelectorAll('#layers_base .item');
+				for (var i = 0; i < items.length; i++) {
+					items[i].classList.remove('drag_over_filter_target');
+				}
+				return;
+			}
+
 			if (!item || drag_layer_id === null) return;
 
 			var target_id = parseInt(item.dataset.id);
@@ -743,9 +817,16 @@ class GUI_layers_class {
 
 		document.getElementById('layers_base').addEventListener('dragend', function (event) {
 			drag_layer_id = null;
+			drag_filter_pid = null;
+			drag_filter_id = null;
+			drag_is_copy = false;
 			var items = document.querySelectorAll('#layers_base .item');
 			for (var i = 0; i < items.length; i++) {
-				items[i].classList.remove('dragging', 'drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into');
+				items[i].classList.remove('dragging', 'drag_over', 'drag_over_above', 'drag_over_below', 'drag_over_into', 'drag_over_filter_target');
+			}
+			var draggingFilters = document.querySelectorAll('#layers_base .dragging_filter');
+			for (var i = 0; i < draggingFilters.length; i++) {
+				draggingFilters[i].classList.remove('dragging_filter');
 			}
 		});
 
@@ -1479,7 +1560,7 @@ class GUI_layers_class {
 						};
 						var title = titleMap[filter.name] || filter.name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-						html += '<div class="filter' + (is_disabled ? ' disabled' : '') + '">';
+						html += '<div class="filter' + (is_disabled ? ' disabled' : '') + '" draggable="true" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Drag to move effect, or ' + this.Helper.format_shortcut('Ctrl + Drag to duplicate') + '">';
 						if (!is_disabled) {
 							html += '	<button class="visibility visible trn" id="filter_visibility" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Hide effect"></button>';
 						} else {

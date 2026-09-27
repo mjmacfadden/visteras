@@ -40,7 +40,7 @@
  *   - Other Porter-Duff modes beyond source-over / source-atop / GPU blends
  */
 
-import { is_group, is_effectively_visible } from "./../../libs/layer-tree.js";
+import { is_group, is_effectively_visible, get_effective_layer_filters } from "./../../libs/layer-tree.js";
 import { is_layer_clipped, get_render_composition } from "./../../libs/layer-clip.js";
 
 import config from './../../config.js';
@@ -670,8 +670,12 @@ class WebGL_renderer_class {
 		return !this._layer_has_unsafe_clip_filters(base, disabled_filter_id);
 	}
 
+	_get_effective_filters(layer) {
+		return get_effective_layer_filters(layer, config.layers);
+	}
+
 	_layer_has_unsafe_clip_filters(layer, disabled_filter_id) {
-		var filters = layer.filters;
+		var filters = this._get_effective_filters(layer);
 		if (!filters || !filters.length) return false;
 		for (var f = 0; f < filters.length; f++) {
 			var filter = filters[f];
@@ -690,7 +694,7 @@ class WebGL_renderer_class {
 	}
 
 	_layer_has_active_filters(layer, disabled_filter_id) {
-		var filters = layer && layer.filters;
+		var filters = this._get_effective_filters(layer);
 		if (!filters || !filters.length) return false;
 		for (var f = 0; f < filters.length; f++) {
 			var filter = filters[f];
@@ -721,7 +725,7 @@ class WebGL_renderer_class {
 	 * @returns {boolean}
 	 */
 	_layer_filters_gpu_ok(layer, disabled_filter_id) {
-		var filters = layer.filters;
+		var filters = this._get_effective_filters(layer);
 		if (!filters || !filters.length) return true;
 		for (var f = 0; f < filters.length; f++) {
 			var filter = filters[f];
@@ -748,7 +752,7 @@ class WebGL_renderer_class {
 	 * @returns {{css: string, signature: string, pad: number}|null}
 	 */
 	_layer_filters_css(layer, disabled_filter_id, superScale = 1) {
-		var filters = layer.filters;
+		var filters = this._get_effective_filters(layer);
 		if (!filters || !filters.length) return null;
 		var parts = [];
 		var sig = [];
@@ -831,7 +835,7 @@ class WebGL_renderer_class {
 	 * @returns {{effects: Object[], signature: string, pad: number}|null}
 	 */
 	_layer_effect_filters(layer, disabled_filter_id) {
-		var filters = layer.filters;
+		var filters = this._get_effective_filters(layer);
 		if (!filters || !filters.length) return null;
 		var effects = [];
 		var sig = [];
