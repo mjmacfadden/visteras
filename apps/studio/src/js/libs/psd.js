@@ -6,6 +6,7 @@
  * and conversion of PSD text layers to editable Vantage Point text layers.
  */
 
+import { point_text_origin } from './text-geometry.js';
 import app from './../app.js';
 import config from './../config.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
@@ -723,7 +724,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		else if (sx > 0.001) scale = sx;
 
 		const angleRad = Math.atan2(xy, xx);
-		rotate = Math.round((angleRad * 180) / Math.PI);
+		rotate = (angleRad * 180) / Math.PI;
 	}
 
 	// 2. Resolve Global / Base Style from textData.style or styleRuns
@@ -758,17 +759,14 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		}
 	}
 
-	let primaryFontSize = rawFontSize ? Math.round(rawFontSize * scale) : null;
+	let primaryFontSize = rawFontSize ? rawFontSize * scale : null;
 
-	// Cross-check font size with rendered canvas height
+	// Estimate only missing sizes; wrapped or rotated raster height is not a font size.
 	const lines = rawText.split(/\r\n|\r|\n/);
 	const lineCount = Math.max(1, lines.filter(l => l.trim().length > 0).length);
 	if (psdLayer.canvas && psdLayer.canvas.height > 0) {
 		const renderedLineHeight = psdLayer.canvas.height / lineCount;
 		if (primaryFontSize == null || primaryFontSize <= 0) {
-			primaryFontSize = Math.max(10, Math.round(renderedLineHeight * 0.85));
-		} else if (primaryFontSize < renderedLineHeight * 0.35 || primaryFontSize > renderedLineHeight * 2.8) {
-			// Discrepancy between point size and canvas pixel size (e.g. high DPI or untracked transform)
 			primaryFontSize = Math.max(10, Math.round(renderedLineHeight * 0.85));
 		}
 	} else if (primaryFontSize == null || primaryFontSize <= 0) {
@@ -819,6 +817,8 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 	const defaultMeta = {
 		family: primaryFamily,
 		size: primaryFontSize,
+		postscript_font: primaryPostScriptFont,
+		tracking: Number(globalStyle.tracking || firstRunStyle.tracking) || 0,
 		bold: bold,
 		italic: italic,
 		underline: underline,
@@ -834,7 +834,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 	let height = psdLayer.canvas ? psdLayer.canvas.height : Math.max(20, (psdLayer.bottom - psdLayer.top) || 60);
 
 	const isBox = textData.shapeType === 'box';
-	// Prefer explicit boxBounds from ag-psd when available (text-local [top,left,bottom,right]).
+	// Prefer explicit boxBounds from ag-psd when available (text-local [top,left,right,bottom]).
 	if (isBox && Array.isArray(textData.boxBounds) && textData.boxBounds.length >= 4) {
 		const bbTop = textData.boxBounds[0];
 		const bbLeft = textData.boxBounds[1];
@@ -873,6 +873,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 			size: primaryFontSize,
 			font: { value: primaryFamily },
 			postscript_font: primaryPostScriptFont,
+			psd_point_origin: !isBox && textData.transform ? textData.transform.slice(4, 6) : undefined,
 			bold: { value: bold },
 			italic: { value: italic },
 			underline: { value: underline },
@@ -916,7 +917,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 
 		const fontObj = style.font || defaultMeta.font;
 		let family = fontObj && fontObj.name ? clean_psd_font_family(fontObj.name) : defaultMeta.family;
-		let size = style.fontSize ? Math.round(style.fontSize * scale) : defaultMeta.size;
+		let size = style.fontSize ? style.fontSize * scale : defaultMeta.size;
 		let fill_color = parse_psd_color(style.fillColor) || defaultMeta.fill_color;
 		const bold = Boolean(style.fauxBold || (fontObj && fontObj.name && /bold/i.test(fontObj.name)));
 		const italic = Boolean(style.fauxItalic || (fontObj && fontObj.name && /(italic|oblique)/i.test(fontObj.name)));
@@ -927,6 +928,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 			family: family,
 			postscript_font: fontObj && fontObj.name ? fontObj.name : defaultMeta.postscript_font,
 			size: size,
+			tracking: Number(style.tracking) || 0,
 			bold: bold,
 			italic: italic,
 			underline: underline,
@@ -958,6 +960,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 			const meta = charMetas[charOffset + c] || defaultMeta;
 			if (
 				meta.size === currentSpan.meta.size &&
+				meta.tracking === currentSpan.meta.tracking &&
 				meta.fill_color === currentSpan.meta.fill_color &&
 				meta.family === currentSpan.meta.family &&
 				meta.bold === currentSpan.meta.bold &&
@@ -1365,6 +1368,7 @@ function build_psd_text_from_layer(layer) {
 		const style = {
 			font: { name: m.postscript_font || m.family || 'Arial' },
 			fontSize: m.size || 32,
+			tracking: Number(m.tracking) || 0,
 			fauxBold: Boolean(m.bold),
 			fauxItalic: Boolean(m.italic),
 			underline: Boolean(m.underline),
@@ -1434,18 +1438,11 @@ function build_psd_text_from_layer(layer) {
 	// just below the box top (the small offset is Photoshop's text engine
 	// ascender adjustment).
 	const baselineOffset = isBox ? 0.8162841796875 : (Number(meta.size) || 32) * 0.75;
-	const transform = [cos, sin, -sin, cos, Number(layer.x) || 0, (Number(layer.y) || 0) + baselineOffset];
-	// The imported layer parameters retain Photoshop's authoritative point size.
-	// Prefer that value for paragraph text: rendered span metadata can be
-	// inflated by canvas measurement during import (especially for wrapped text).
-	const exportSize = isBox && Number(params.size) > 0 ? Number(params.size) : Number(meta.size) || 32;
-	if (isBox) {
-		for (const run of styleRuns) {
-			if (run.style) run.style.fontSize = exportSize;
-		}
-	}
-	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(Object.assign({}, meta, { size: exportSize }));
-	if (primaryStyle) primaryStyle.fontSize = exportSize;
+	const origin = !isBox && params.psd_text_layout
+		? point_text_origin(layer, params.psd_text_layout.baseline)
+		: [Number(layer.x) || 0, (Number(layer.y) || 0) + baselineOffset];
+	const transform = [cos, sin, -sin, cos, ...origin];
+	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(meta);
 	// The browser-facing family is normalized for canvas rendering, but preserve
 	// Photoshop's PostScript face when the imported layer carries one.
 	if (params.postscript_font) {

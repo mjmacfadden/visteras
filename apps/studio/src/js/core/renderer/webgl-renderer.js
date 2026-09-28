@@ -2187,7 +2187,12 @@ class WebGL_renderer_class {
 					if (this._gui_tools_ref.tools_modules[render_class] &&
 						typeof this._gui_tools_ref.tools_modules[render_class].object[render_function] === 'function') {
 
-						var _this = this;
+						const renderTool = this._gui_tools_ref.tools_modules[render_class].object;
+						// Resolve text geometry in document coordinates before capturing the
+						// texture translation. Layout must see the real layer rotation.
+						if (layer.type === 'text' && renderTool.resize_to_dynamic_bounds) {
+							renderTool.resize_to_dynamic_bounds(layer, renderTool.get_editor(layer));
+						}
 						var paint = function(targetCtx) {
 							targetCtx.save();
 							targetCtx.scale(SUPER, SUPER);
@@ -2197,8 +2202,12 @@ class WebGL_renderer_class {
 							// the bounded source texture (which would clip and rotate twice).
 							const rotation = layer.rotate;
 							try {
-								layer.rotate = 0;
-								_this._gui_tools_ref.tools_modules[render_class].object[render_function](targetCtx, layer, false);
+								if (layer.type === 'text') {
+									renderTool[render_function](targetCtx, layer, false, { skipLayout: true, skipRotation: true });
+								} else {
+									layer.rotate = 0;
+									renderTool[render_function](targetCtx, layer, false);
+								}
 							} finally {
 								layer.rotate = rotation;
 								targetCtx.restore();

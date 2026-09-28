@@ -824,7 +824,7 @@ class Base_layers_class {
 	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
 	 */
 	_draw_layer_content(ctx, object, is_preview) {
-		const hasRotate = object.rotate != null && object.rotate !== 0;
+		const hasRotate = object.type !== 'text' && object.rotate != null && object.rotate !== 0;
 		if (hasRotate) {
 			ctx.save();
 			const cx = (object.x || 0) + (object.width || 0) / 2;

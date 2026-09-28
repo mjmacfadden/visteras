@@ -1,3 +1,4 @@
+import { place_point_text } from './../libs/text-geometry.js';
 import app from './../app.js';
 import config from './../config.js';
 import zoomView from './../libs/zoomView.js';
@@ -1891,7 +1892,7 @@ class Text_editor_class {
 						fontKerning = isHorizontalTextDirection && nextCharacter ? fontMetrics.get_kerning_offset(character + nextCharacter) : 0;
 					}
 					const characterSize = isHorizontalTextDirection ? ctx.measureText(character).width : fontMetrics.height;
-					wrapAccumulativeSize += characterSize + fontKerning + kerning;
+					wrapAccumulativeSize += characterSize + fontKerning + kerning + (Number(span.meta.tracking) || 0) * size / 1000;
 					if (boundary !== 'dynamic' && wrapAccumulativeSize > textDirectionMaxSize && ![' ', '-'].includes(character)) {
 						// Find last span with space
 						let dividerPosition = -1;
@@ -2092,7 +2093,7 @@ class Text_editor_class {
 		this.lineRenderInfo = lineRenderInfo;
 	}
 
-	render(ctx, layer) {
+	render(ctx, layer, is_preview, options = {}) {
 		if (config.need_render_changed_params || this.hasValueChanged || layer.width != this.lastCalculatedLayerWidth || layer.height != this.lastCalculatedLayerHeight || !this.textBoundaryWidth || !this.textBoundaryHeight) {
 			this.calculate_text_placement(ctx, layer);
 		}
@@ -2120,7 +2121,7 @@ class Text_editor_class {
 			let wrapIndex = 0;
 			const cursorLine = this.selection.isActiveSideEnd ? this.selection.end.line : this.selection.start.line;
 			const cursorCharacter = this.selection.isActiveSideEnd ? this.selection.end.character : this.selection.start.character;
-			const hasRotate = !!layer.rotate;
+			const hasRotate = !!layer.rotate && !options.skipRotation;
 			if(hasRotate){
 				const alpha = (layer.rotate * Math.PI) / 180;
 				ctx.save();
@@ -5168,6 +5169,12 @@ class Text_class extends Base_tools_class {
 			const sy = (layer.params.scale_y != null) ? layer.params.scale_y : 1;
 			const new_width = Math.max(1, Math.ceil(editor.textBoundaryWidth * sx + 1));
 			const new_height = Math.max(1, Math.ceil(editor.textBoundaryHeight * sy + 1));
+			if (layer.params.psd_point_origin || layer.params.psd_text_layout) {
+				place_point_text(layer, new_width, new_height, editor.lineRenderInfo.wrapSizes[0].baseline);
+				editor.lastCalculatedLayerWidth = new_width;
+				editor.lastCalculatedLayerHeight = new_height;
+				return;
+			}
 			const halign = normalize_halign(layer.params.halign);
 			if (layer.params.anchor_x == null) {
 				if (halign === 'center') {
@@ -5207,7 +5214,7 @@ class Text_class extends Base_tools_class {
 		return;
 	}
 
-	render(ctx, layer) {
+	render(ctx, layer, is_preview, options = {}) {
 		if (!layer || layer.type !== 'text')
 			return;
 		const editor = this.get_editor(layer);
@@ -5221,7 +5228,7 @@ class Text_class extends Base_tools_class {
 		const pointTransforming = this.is_point_text_transform_active(layer);
 		const isEditing = this.focused || this.selecting || this.creating;
 
-		if (layer === config.layer && !pointTransforming && !isBoxBoundary) {
+		if (!options.skipLayout && (layer === config.layer || layer.params.psd_point_origin || layer.params.psd_text_layout) && !pointTransforming && !isBoxBoundary) {
 			this.resize_to_dynamic_bounds(layer, editor);
 		}
 
@@ -5230,12 +5237,12 @@ class Text_class extends Base_tools_class {
 		editor.selection.set_cursor_visible(isActiveLayerAndTextTool && isEditing);
 		ctx.save();
 		editor._pointTransforming = pointTransforming;
-		editor.render(ctx, layer);
+		editor.render(ctx, layer, is_preview, options);
 		editor._pointTransforming = false;
 		editor._livePointScale = null;
 		ctx.restore();
 		// Don't snap dynamic bounds while a transform drag is controlling width/height
-		if (layer === config.layer && !pointTransforming && !isBoxBoundary) {
+		if (!options.skipLayout && (layer === config.layer || layer.params.psd_point_origin || layer.params.psd_text_layout) && !pointTransforming && !isBoxBoundary) {
 			this.resize_to_dynamic_bounds(layer, editor);
 		}
 		if (isActiveLayerAndTextTool && !isBoxBoundary && isEditing) {
