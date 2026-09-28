@@ -1,6 +1,7 @@
 import app from './../app.js';
 import config from './../config.js';
 import { Base_action } from './base.js';
+import { Subpath } from './../core/vector/vector-model.js';
 
 export class Update_layer_action extends Base_action {
 	/**
@@ -51,7 +52,9 @@ export class Update_layer_action extends Base_action {
 			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 			if (vec) {
 				this.old_settings.vector_paths = JSON.parse(JSON.stringify(vec.paths || []));
-				vec.paths = JSON.parse(JSON.stringify(this.settings.vector_paths));
+				vec.paths = this.settings.vector_paths.map((path) =>
+					path && typeof path.getBounds === 'function' ? path.clone() : Subpath.fromJSON(path)
+				);
 			}
 		}
 
@@ -153,7 +156,9 @@ export class Update_layer_action extends Base_action {
 			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
 			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 			if (vec) {
-				if (this.old_settings.vector_paths) vec.paths = JSON.parse(JSON.stringify(this.old_settings.vector_paths));
+				if (this.old_settings.vector_paths) vec.paths = this.old_settings.vector_paths.map((path) =>
+					path && typeof path.getBounds === 'function' ? path.clone() : Subpath.fromJSON(path)
+				);
 				const new_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
 				const new_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
 				const dx = new_x - old_x;
