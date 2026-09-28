@@ -744,6 +744,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		}
 	}
 	let primaryFamily = (fontObj && fontObj.name) ? fontObj.name : 'Arial';
+	const primaryPostScriptFont = primaryFamily;
 	primaryFamily = clean_psd_font_family(primaryFamily);
 
 	// Find the best available font size
@@ -870,6 +871,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 			fill: primaryFillColor,
 			size: primaryFontSize,
 			font: { value: primaryFamily },
+			postscript_font: primaryPostScriptFont,
 			bold: { value: bold },
 			italic: { value: italic },
 			underline: { value: underline },
@@ -922,6 +924,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 
 		charMetas.push({
 			family: family,
+			postscript_font: fontObj && fontObj.name ? fontObj.name : defaultMeta.postscript_font,
 			size: size,
 			bold: bold,
 			italic: italic,
@@ -1359,7 +1362,7 @@ function build_psd_text_from_layer(layer) {
 		const m = meta || {};
 		const rgb = hex_to_rgb(m.fill_color || '#000000');
 		const style = {
-			font: { name: m.family || 'Arial' },
+			font: { name: m.postscript_font || m.family || 'Arial' },
 			fontSize: m.size || 32,
 			fauxBold: Boolean(m.bold),
 			fauxItalic: Boolean(m.italic),
