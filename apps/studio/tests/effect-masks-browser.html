@@ -1,0 +1,66 @@
+<!doctype html><meta charset="utf-8"><title>Effect mask tests</title>
+<style>body{font:14px system-ui;background:#20242a;color:#eee;margin:20px}pre{white-space:pre-wrap;max-height:140px;overflow:auto}iframe{width:1200px;height:800px}</style>
+<h1>Effect mask integration tests</h1><pre id="results">Running…</pre><iframe id="editor" src="../"></iframe>
+<script>
+editor.onload=async()=>{const out=document.getElementById('results'),passed=[];const check=(n,c)=>{if(!c)throw Error(n);passed.push('PASS '+n);out.textContent=passed.join('\n');};try{
+ const win=editor.contentWindow,doc=win.document;for(let i=0;i<100&&!win.app?.GUI?.modules?.['layer/effect_mask'];i++)await new Promise(r=>setTimeout(r,100));
+ const {app,AppConfig:c}=win, masks=app.GUI.modules['layer/effect_mask'], paint=app.GUI.modules['mask/mask'];
+ const perform=async a=>{const r=await app.State.do_action(a);if(r.status!=='completed')throw r.reason;};
+ const src=doc.createElement('canvas');src.width=100;src.height=80;src.getContext('2d').fillStyle='red';src.getContext('2d').fillRect(0,0,100,80);
+ await perform(new app.Actions.Insert_layer_action({name:'Masked Smart Effect',type:'image',link:src,x:20,y:20,width:100,height:80,width_original:100,height_original:80},false));await app.GUI.modules['layer/smart'].convert();
+ const id=c.layer.id;await perform(new app.Actions.Add_layer_filter_action(id,'smart:effects/common/invert',{value:100,_version:1,_seed:42}));let f=c.layer.filters[0];
+ const render=()=>{const cv=doc.createElement('canvas');cv.width=400;cv.height=300;app.Layers.render_object(cv.getContext('2d'),c.layer);return cv;};
+ const px=(cv,x=40,y=40)=>[...cv.getContext('2d').getImageData(x,y,1,1).data].join(',');
+ check('Unmasked effect is cyan',px(render())==='0,255,255,255');
+ await masks.command(id,f.id,'edit');check('Add selects a white effect mask without adding a layer mask',!!c.layer.smart_filter_mask&&c.mask_active&&!c.layer.mask&&paint.is_active());
+ const brush=app.GUI.GUI_tools.tools_modules.brush.object;
+ const oldMouse=brush.get_mouse_info,oldParams=brush.getParams;
+ let mouse={x:40,y:40,click_valid:true,is_drag:true};brush.get_mouse_info=()=>mouse;brush.getParams=()=>({size:20,circle:true,opacity:100,hardness:100});
+ c.COLOR='#000000';c.ALPHA=255;
+ const processor=app.GUI.modules['effects/common/invert'],originalPre=processor.render_pre;let effectRuns=0;
+ processor.render_pre=function(...args){effectRuns++;return originalPre.apply(this,args);};
+ render();effectRuns=0;
+ brush.mousedown({});check('Brush routes to the effect mask',!!paint.stroke);
+ check('Live black stroke bypasses only the effect',px(render())==='255,0,0,255');
+ await paint.end_paint();brush.started=false;brush.get_mouse_info=oldMouse;brush.getParams=oldParams;
+ check('Paint preserves source and rest of effect',px(render())==='255,0,0,255'&&px(render(),90,60)==='0,255,255,255'&&px(c.layer.link,20,20)==='255,0,0,255');
+ await app.State.undo();check('Stroke undo restores full effect',px(render())==='0,255,255,255');await app.State.redo();check('Stroke redo restores mask',px(render())==='255,0,0,255');
+ check('Live painting, commit, undo and redo reuse the filtered source',effectRuns===0);
+ processor.render_pre=originalPre;
+ app.GUI.GUI_layers.render_layers();
+ const normalThumb=doc.querySelector('.mask_thumb:not(.smart-filter-mask)'),filterThumb=doc.querySelector('.smart-filter-mask');
+ const normalStyle=win.getComputedStyle(normalThumb),filterStyle=win.getComputedStyle(filterThumb);
+ check('Smart Filters mask uses normal layer mask dimensions',normalStyle.width===filterStyle.width&&normalStyle.height===filterStyle.height);
+ await masks.command(id,f.id,'toggle');check('Disable mask applies effect everywhere',px(render())==='0,255,255,255');await app.State.undo();
+ await masks.command(id,f.id,'invert');check('Invert swaps applied and bypassed regions',px(render())==='0,255,255,255'&&px(render(),90,60)==='255,0,0,255');await app.State.undo();
+ await perform(new app.Actions.Update_layer_action(id,{x:40,y:20,width:200,height:160,rotate:90}));
+ // Local (20,20) rotates around (140,100) to world (180,40).
+ check('Mask follows scale and rotation',px(render(),180,40)==='255,0,0,255'&&px(render(),140,140)==='0,255,255,255');await app.State.undo();
+
+ const gradientTool={get_mouse_info:()=>mouse,getParams:()=>({color_1:'#000000',color_2:'#ffffff',alpha_1:100,alpha_2:100})};
+ mouse={x:20,y:20,click_valid:true,is_drag:true};paint.gradient_start(gradientTool,{});mouse={x:120,y:20,click_valid:true,is_drag:true};paint.gradient_move(gradientTool,{});await paint.gradient_end(gradientTool,{});
+ check('Gradient paints a partial-strength effect mask',Number(px(render(),30,40).split(',')[0])>200&&Number(px(render(),110,40).split(',')[1])>200);await app.State.undo();
+ const existingMask=c.layer.smart_filter_mask.data;
+ const invert=app.GUI.modules['effects/common/invert'],show=invert.POP.show;let settings;invert.POP.show=s=>settings=s;
+ try{invert.invert(String(c.layer.filters[0].id));}finally{invert.POP.show=show;}
+ await settings.on_finish({value:75});check('Editing effect settings preserves its mask',c.layer.smart_filter_mask.data===existingMask);await app.State.undo();
+ await perform(new app.Actions.Add_layer_mask_action(c.layer.id,false,false));
+ check('Layer mask independently hides the whole result',px(render())==='0,0,0,0'&&c.effect_mask_active==null);await app.State.undo();
+ check('Undo layer mask returns to the effect target',paint.is_active()&&c.effect_mask_active!=null);
+ const json=JSON.parse(app.FileSave.export_as_json());await app.Documents.create_document_from_json(json,'Effect masks',{force_new:true});
+ check('Save reopen retains painted mask',px(render())==='255,0,0,255'&&!!c.layer.smart_filter_mask);
+ await app.GUI.modules['layer/duplicate'].duplicate();const copy=c.layer,original=c.layers.find(l=>l.type==='smart'&&l.id!==copy.id);
+ await masks.command(copy.id,copy.filters[0].id,'invert');check('Duplicate mask editing is independent',copy.smart_filter_mask.data!==original.smart_filter_mask.data);await app.State.undo();
+ await perform(new app.Actions.Add_layer_filter_action(c.layer.id,'smart:effects/common/invert',{value:100,_version:1,_seed:43}));
+ check('Shared mask covers the entire two-effect stack',px(render())==='255,0,0,255'&&px(render(),90,60)==='255,0,0,255');
+ app.GUI.GUI_layers.render_layers();
+ check('One shared mask parent with two nested effects per layer',doc.querySelectorAll('.smart-filter-group').length===2&&doc.querySelectorAll('.smart-filter-child').length===3&&!doc.querySelector('.effect-mask-controls'));
+ await app.State.undo();
+ doc.querySelector('[data-smart-filters-toggle="'+c.layer.id+'"]').click();await app.State._action_queue;
+ check('Parent eye bypasses complete stack',c.layer.smart_filters_enabled===false&&px(render(),90,60)==='255,0,0,255');await app.State.undo();
+ const before=render().toDataURL();await app.GUI.modules['layer/smart'].rasterize();check('Rasterize bakes masked effect appearance',render().toDataURL()===before);await app.State.undo();
+ await masks.command(c.layer.id,c.layer.filters[0].id,'delete');check('Remove mask restores full effect',!c.layer.smart_filter_mask&&px(render())==='0,255,255,255');await app.State.undo();
+ await masks.command(c.layer.id,c.layer.filters[0].id,'edit');
+ out.textContent+='\n\n'+passed.length+' tests passed.';
+}catch(e){out.textContent+='\nFAIL '+e.stack;console.error(e);}};
+</script>

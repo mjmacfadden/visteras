@@ -66,6 +66,9 @@ class Layer_duplicate_class {
 				delete params[i];
 		}
 
+		if (params.type === 'smart') {
+			params.link = source.link;
+		}
 		if (params.type == 'image' && source.link) {
 			params.link = source.link.cloneNode(true);
 		}

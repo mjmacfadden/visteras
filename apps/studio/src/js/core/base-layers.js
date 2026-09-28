@@ -1,3 +1,4 @@
+import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
  * author: Vilius L.
@@ -111,7 +112,7 @@ class Base_layers_class {
 			enable_rotation: false,
 			enable_move: false,
 			data_function: function () {
-				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
+				if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
 				}
 				return config.layer;
@@ -823,7 +824,7 @@ class Base_layers_class {
 	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
 	 */
 	_draw_layer_content(ctx, object, is_preview) {
-		const hasRotate = object.rotate != null && object.rotate !== 0;
+		const hasRotate = object.type !== 'text' && object.rotate != null && object.rotate !== 0;
 		if (hasRotate) {
 			ctx.save();
 			const cx = (object.x || 0) + (object.width || 0) / 2;
@@ -833,9 +834,9 @@ class Base_layers_class {
 			ctx.translate(-cx, -cy);
 		}
 
-		if (object.type == "image") {
+		if (object.type == "image" || object.type === "smart") {
 			ctx.drawImage(
-				object.link_canvas != null ? object.link_canvas : object.link,
+				object.type === 'smart' ? renderSmart(object, null, this.disabled_filter_id) : (object.link_canvas != null ? object.link_canvas : object.link),
 				object.x || 0,
 				object.y || 0,
 				object.width,
@@ -1039,6 +1040,7 @@ class Base_layers_class {
 		for (let k = 0; k < object.filters.length; k++) {
 			let filter = object.filters[k];
 			if (!filter || filter.disabled === true || filter.visible === false) continue;
+			if (object.type === 'smart' && isContentEffect(filter)) continue;
 			if (Array.isArray(this.disabled_filter_id)) {
 				if (this.disabled_filter_id.includes(filter.id) || this.disabled_filter_id.includes(filter.name) || (filter.name === 'drop-shadow' && this.disabled_filter_id.includes('shadow'))) {
 					continue;
@@ -1080,6 +1082,7 @@ class Base_layers_class {
 		for (let k = 0; k < object.filters.length; k++) {
 			let filter = object.filters[k];
 			if (!filter || filter.disabled === true || filter.visible === false) continue;
+			if (object.type === 'smart' && isContentEffect(filter)) continue;
 			if (Array.isArray(this.disabled_filter_id)) {
 				if (this.disabled_filter_id.includes(filter.id) || this.disabled_filter_id.includes(filter.name) || (filter.name === 'drop-shadow' && this.disabled_filter_id.includes('shadow'))) {
 					continue;

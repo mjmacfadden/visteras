@@ -78,6 +78,18 @@ export class Subpath {
 		}
 	}
 
+	transform(scaleX, scaleY, originX = 0, originY = 0) {
+		for (const path of this.paths) {
+			for (const anchor of path.anchors) {
+				for (const point of [anchor.point, anchor.handle_in, anchor.handle_out]) {
+					if (!point) continue;
+					point.x = originX + (point.x - originX) * scaleX;
+					point.y = originY + (point.y - originY) * scaleY;
+				}
+			}
+		}
+	}
+
 	clone() {
 		return new Subpath({
 			closed: this.closed,

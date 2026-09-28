@@ -10,6 +10,12 @@ import Layer_duplicate_class from './../modules/layer/duplicate.js';
 import { is_box_text, is_point_text } from './text.js';
 import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tree.js';
 import { get_layer_content_bounds, get_selection_content_bounds } from './../libs/layer-bounds.js';
+import { Subpath } from './../core/vector/vector-model.js';
+
+const hydrate_vector_paths = (paths) => (paths || []).map((path) =>
+	path && typeof path.getBounds === 'function' ? path : Subpath.fromJSON(path)
+);
+const vector_id_for_layer = (layer) => layer && (layer.vector_id || (layer.params && layer.params.vector_id));
 
 class Select_tool_class extends Base_tools_class {
 
@@ -48,7 +54,7 @@ class Select_tool_class extends Base_tools_class {
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
-				if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false) {
+				if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false) {
 					return config.layer.mask;
 				}
 				if (this.resizing && this.Base_selection && this.Base_selection.mouse_lock === 'selected_object_actions') {
@@ -375,6 +381,8 @@ class Select_tool_class extends Base_tools_class {
 				rotate: l.rotate || 0,
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
+				vector_paths: l.type === 'vector' && vector_id_for_layer(l)
+					? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === vector_id_for_layer(l))?.paths || [])) : null,
 				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
 				mask: l.mask ? {
 					x: l.mask.x,
@@ -552,6 +560,20 @@ class Select_tool_class extends Base_tools_class {
 							layer.height = Math.round(init_pos.height * scale_y);
 							layer.x = Math.round(s.data.x + (init_pos.x - this.mousedown_content_bounds.x) * scale_x);
 							layer.y = Math.round(s.data.y + (init_pos.y - this.mousedown_content_bounds.y) * scale_y);
+							if (init_pos.vector_paths && vector_id_for_layer(layer)) {
+								const sx = scale_x, sy = scale_y;
+								const ox = this.mousedown_content_bounds.x, oy = this.mousedown_content_bounds.y;
+								const vec = config.vectors.find(v => v.id === vector_id_for_layer(layer));
+								if (vec) {
+									vec.paths = hydrate_vector_paths(init_pos.vector_paths);
+									for (const path of vec.paths) for (const anchor of (path.anchors || [])) {
+										for (const point of [anchor.point, anchor.handle_in, anchor.handle_out]) if (point) {
+											point.x = ox + (point.x - ox) * sx;
+											point.y = oy + (point.y - oy) * sy;
+										}
+									}
+								}
+							}
 
 							if (init_pos.text_params) {
 								layer.params.scale_x = (init_pos.text_params.scale_x ?? 1) * scale_x;
@@ -585,7 +607,7 @@ class Select_tool_class extends Base_tools_class {
 			return;
 		}
 		else if (this.moving) {
-			if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
+			if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
 				// Move unlinked mask only
 				config.layer.mask.x = Math.round(mouse.x - mouse.click_x + this.mousedown_mask_dimensions.x);
 				config.layer.mask.y = Math.round(mouse.y - mouse.click_y + this.mousedown_mask_dimensions.y);
@@ -791,7 +813,9 @@ class Select_tool_class extends Base_tools_class {
 								x: layer.x,
 								y: layer.y,
 								width: layer.width,
-								height: layer.height
+								height: layer.height,
+								vector_paths: layer.type === 'vector' && vector_id_for_layer(layer)
+									? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === vector_id_for_layer(layer))?.paths || [])) : null
 							});
 						}
 					}
@@ -807,6 +831,10 @@ class Select_tool_class extends Base_tools_class {
 							layer.width = init_pos.width;
 							layer.height = init_pos.height;
 							if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
+							if (init_pos.vector_paths && vector_id_for_layer(layer)) {
+								const vec = config.vectors.find(v => v.id === vector_id_for_layer(layer));
+								if (vec) vec.paths = hydrate_vector_paths(init_pos.vector_paths);
+							}
 							if (init_pos.mask && layer.mask) {
 								Object.assign(layer.mask, init_pos.mask);
 							}
@@ -833,6 +861,9 @@ class Select_tool_class extends Base_tools_class {
 								width: finalPos.width,
 								height: finalPos.height
 							};
+							if (finalPos.vector_paths && vector_id_for_layer(layer)) {
+								layerUpdate.vector_paths = hydrate_vector_paths(finalPos.vector_paths);
+							}
 
 							// Point text: bake font size into history
 							if (is_point_text(layer) && init_pos.width > 0) {
@@ -952,7 +983,7 @@ class Select_tool_class extends Base_tools_class {
 			this.is_rotating = false;
 		}
 		else if (this.moving) {
-			if (config.mask_active === true && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
+			if (config.mask_active === true && !config.effect_mask_active && config.layer && config.layer.mask && config.layer.mask.linked === false && this.mousedown_mask_dimensions) {
 				var new_mask_x = Math.round(mouse.x - mouse.click_x + this.mousedown_mask_dimensions.x);
 				var new_mask_y = Math.round(mouse.y - mouse.click_y + this.mousedown_mask_dimensions.y);
 				config.layer.mask.x = this.mousedown_mask_dimensions.x;

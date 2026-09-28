@@ -202,7 +202,7 @@ class Image_resize_class {
 		}
 		
 		//is vector
-		else if (layer.is_vector == true && layer.width != null && layer.height != null) {
+		else if ((layer.is_vector == true || layer.type === 'smart') && layer.width != null && layer.height != null) {
 			// Return actions
 			let actions = [
 				new app.Actions.Update_layer_action(layer.id, {

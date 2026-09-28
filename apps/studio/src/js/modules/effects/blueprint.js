@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -15,7 +16,8 @@ class Effects_blueprint_class {
 		this.fx_filter = false;
 	}
 
-	blueprint() {
+	blueprint(filter_id) {
+		if (config.layer.type === 'smart') return smartPreset(this, 'effects/blueprint', filter_id);
 		if (config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
@@ -59,6 +61,7 @@ class Effects_blueprint_class {
 		//denoise
 		var texture = this.fx_filter.texture(canvas);
 		this.fx_filter.draw(texture).denoise(20).update();	//effect
+		texture.destroy();
 		canvas = this.fx_filter;
 		
 		//Brightness

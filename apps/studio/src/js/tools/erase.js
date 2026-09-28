@@ -90,7 +90,7 @@ class Erase_class extends Base_tools_class {
 			this.pressure_supported = false;
 		}
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.started = true;
 			this.Mask.erase(this, e, 'start');
 			return;
@@ -149,7 +149,7 @@ class Erase_class extends Base_tools_class {
 		var mouse = this.get_mouse_info(e);
 		if (mouse.is_drag == false || mouse.click_valid == false) return;
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.Mask.erase(this, e, 'move');
 			return;
 		}
@@ -193,7 +193,7 @@ class Erase_class extends Base_tools_class {
 	mouseup(e) {
 		if (this.started == false) return;
 
-		if (config.mask_active === true && config.layer && config.layer.mask != null) {
+		if (this.Mask.is_active()) {
 			this.Mask.erase(this, e, 'end');
 			this.started = false;
 			return;

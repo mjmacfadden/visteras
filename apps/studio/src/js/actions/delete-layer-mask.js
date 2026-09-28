@@ -27,6 +27,7 @@ export class Delete_layer_mask_action extends Base_action {
 		}
 
 		this.old_mask_active = config.mask_active;
+		this.old_effect_mask_active = config.effect_mask_active;
 		this.old_mask = this.reference_layer.mask;
 		this.reference_layer.mask = null;
 
@@ -44,6 +45,7 @@ export class Delete_layer_mask_action extends Base_action {
 			this.reference_layer.mask = this.old_mask;
 			if (this.old_mask_active != null) {
 				config.mask_active = this.old_mask_active;
+			config.effect_mask_active = this.old_effect_mask_active;
 			}
 			this.old_mask = null;
 			this.old_mask_active = null;

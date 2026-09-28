@@ -447,6 +447,19 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Ctrl/Cmd + V = Paste from the system clipboard. Keep this explicit
+			// fallback because browser paste events are not delivered when focus is
+			// inside the canvas overlay or a menu has just closed.
+			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+				&& (event.code === 'KeyV' || event.keyCode === 86)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/paste']) {
+					app.GUI.modules['edit/paste'].paste();
+				}
+				return;
+			}
+
 			// Ctrl/Cmd + Delete/Backspace = Fill with background color
 			if ((event.ctrlKey || event.metaKey) && !event.altKey
 				&& (event.code === 'Delete' || event.code === 'Backspace' || event.key === 'Delete' || event.key === 'Backspace' || event.keyCode === 46 || event.keyCode === 8)) {

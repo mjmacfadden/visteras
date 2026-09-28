@@ -6,6 +6,7 @@
  * and conversion of PSD text layers to editable Vantage Point text layers.
  */
 
+import { point_text_origin } from './text-geometry.js';
 import app from './../app.js';
 import config from './../config.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
@@ -723,7 +724,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		else if (sx > 0.001) scale = sx;
 
 		const angleRad = Math.atan2(xy, xx);
-		rotate = Math.round((angleRad * 180) / Math.PI);
+		rotate = (angleRad * 180) / Math.PI;
 	}
 
 	// 2. Resolve Global / Base Style from textData.style or styleRuns
@@ -744,6 +745,7 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		}
 	}
 	let primaryFamily = (fontObj && fontObj.name) ? fontObj.name : 'Arial';
+	const primaryPostScriptFont = primaryFamily;
 	primaryFamily = clean_psd_font_family(primaryFamily);
 
 	// Find the best available font size
@@ -757,17 +759,14 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 		}
 	}
 
-	let primaryFontSize = rawFontSize ? Math.round(rawFontSize * scale) : null;
+	let primaryFontSize = rawFontSize ? rawFontSize * scale : null;
 
-	// Cross-check font size with rendered canvas height
+	// Estimate only missing sizes; wrapped or rotated raster height is not a font size.
 	const lines = rawText.split(/\r\n|\r|\n/);
 	const lineCount = Math.max(1, lines.filter(l => l.trim().length > 0).length);
 	if (psdLayer.canvas && psdLayer.canvas.height > 0) {
 		const renderedLineHeight = psdLayer.canvas.height / lineCount;
 		if (primaryFontSize == null || primaryFontSize <= 0) {
-			primaryFontSize = Math.max(10, Math.round(renderedLineHeight * 0.85));
-		} else if (primaryFontSize < renderedLineHeight * 0.35 || primaryFontSize > renderedLineHeight * 2.8) {
-			// Discrepancy between point size and canvas pixel size (e.g. high DPI or untracked transform)
 			primaryFontSize = Math.max(10, Math.round(renderedLineHeight * 0.85));
 		}
 	} else if (primaryFontSize == null || primaryFontSize <= 0) {
@@ -818,6 +817,8 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 	const defaultMeta = {
 		family: primaryFamily,
 		size: primaryFontSize,
+		postscript_font: primaryPostScriptFont,
+		tracking: Number(globalStyle.tracking || firstRunStyle.tracking) || 0,
 		bold: bold,
 		italic: italic,
 		underline: underline,
@@ -833,12 +834,13 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 	let height = psdLayer.canvas ? psdLayer.canvas.height : Math.max(20, (psdLayer.bottom - psdLayer.top) || 60);
 
 	const isBox = textData.shapeType === 'box';
-	// Prefer explicit boxBounds from ag-psd when available (text-local [top,left,bottom,right]).
+	// Prefer explicit boxBounds from ag-psd when available (text-local [top,left,right,bottom]).
 	if (isBox && Array.isArray(textData.boxBounds) && textData.boxBounds.length >= 4) {
 		const bbTop = textData.boxBounds[0];
 		const bbLeft = textData.boxBounds[1];
-		const bbBottom = textData.boxBounds[2];
-		const bbRight = textData.boxBounds[3];
+		// ag-psd uses Photoshop's [top, left, right, bottom] order.
+		const bbRight = textData.boxBounds[2];
+		const bbBottom = textData.boxBounds[3];
 		const bbW = Math.round(Math.abs(bbRight - bbLeft));
 		const bbH = Math.round(Math.abs(bbBottom - bbTop));
 		if (bbW > 1) width = bbW;
@@ -870,6 +872,8 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 			fill: primaryFillColor,
 			size: primaryFontSize,
 			font: { value: primaryFamily },
+			postscript_font: primaryPostScriptFont,
+			psd_point_origin: !isBox && textData.transform ? textData.transform.slice(4, 6) : undefined,
 			bold: { value: bold },
 			italic: { value: italic },
 			underline: { value: underline },
@@ -913,7 +917,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 
 		const fontObj = style.font || defaultMeta.font;
 		let family = fontObj && fontObj.name ? clean_psd_font_family(fontObj.name) : defaultMeta.family;
-		let size = style.fontSize ? Math.round(style.fontSize * scale) : defaultMeta.size;
+		let size = style.fontSize ? style.fontSize * scale : defaultMeta.size;
 		let fill_color = parse_psd_color(style.fillColor) || defaultMeta.fill_color;
 		const bold = Boolean(style.fauxBold || (fontObj && fontObj.name && /bold/i.test(fontObj.name)));
 		const italic = Boolean(style.fauxItalic || (fontObj && fontObj.name && /(italic|oblique)/i.test(fontObj.name)));
@@ -922,7 +926,9 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 
 		charMetas.push({
 			family: family,
+			postscript_font: fontObj && fontObj.name ? fontObj.name : defaultMeta.postscript_font,
 			size: size,
+			tracking: Number(style.tracking) || 0,
 			bold: bold,
 			italic: italic,
 			underline: underline,
@@ -954,6 +960,7 @@ function build_text_spans(rawText, styleRuns, globalStyle, defaultMeta, scale) {
 			const meta = charMetas[charOffset + c] || defaultMeta;
 			if (
 				meta.size === currentSpan.meta.size &&
+				meta.tracking === currentSpan.meta.tracking &&
 				meta.fill_color === currentSpan.meta.fill_color &&
 				meta.family === currentSpan.meta.family &&
 				meta.bold === currentSpan.meta.bold &&
@@ -990,6 +997,7 @@ export async function export_psd(layers, docWidth, docHeight, options = {}) {
 		fname += '.psd';
 	}
 
+	if (layers.some(l => l.type === 'smart')) alertify.warning('PSD exports Smart Layers as pixels. Save JSON to preserve editable Smart Layers.');
 	alertify.message('Generating Photoshop Document...');
 
 	let compositeCanvas = null;
@@ -1210,6 +1218,18 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 		return psdLayer;
 	}
 
+	// Native Smart Layer metadata is not PSD-compatible yet. Bake this instance
+	// in document coordinates so its scaling, rotation, mask and effects survive.
+	if (layer.type === 'smart') {
+		const canvas = document.createElement('canvas');
+		canvas.width = docWidth; canvas.height = docHeight;
+		app.Layers.render_object(canvas.getContext('2d'), {
+			...layer, parent_id: 0, visible: true, opacity: 100, composition: 'source-over',
+		});
+		return { name: layer.name || 'Smart Layer', canvas, left: 0, top: 0,
+			opacity, hidden: layer.visible === false, clipping: isClipping, blendMode };
+	}
+
 	const layerCanvas = render_layer_to_canvas(layer, docWidth, docHeight);
 	if (!layerCanvas) return null;
 
@@ -1346,8 +1366,9 @@ function build_psd_text_from_layer(layer) {
 		const m = meta || {};
 		const rgb = hex_to_rgb(m.fill_color || '#000000');
 		const style = {
-			font: { name: m.family || 'Arial' },
+			font: { name: m.postscript_font || m.family || 'Arial' },
 			fontSize: m.size || 32,
+			tracking: Number(m.tracking) || 0,
 			fauxBold: Boolean(m.bold),
 			fauxItalic: Boolean(m.italic),
 			underline: Boolean(m.underline),
@@ -1412,14 +1433,30 @@ function build_psd_text_from_layer(layer) {
 	const cos = Math.cos(rad);
 	const sin = Math.sin(rad);
 	// Affine [xx, xy, yx, yy, tx, ty]; layer left/top carry translation.
-	const transform = [cos, sin, -sin, cos, 0, 0];
+	// Photoshop stores the text transform origin separately from the layer's
+	// pixel bounds. Point text's origin is its baseline; paragraph text starts
+	// just below the box top (the small offset is Photoshop's text engine
+	// ascender adjustment).
+	const baselineOffset = isBox ? 0.8162841796875 : (Number(meta.size) || 32) * 0.75;
+	const origin = !isBox && params.psd_text_layout
+		? point_text_origin(layer, params.psd_text_layout.baseline)
+		: [Number(layer.x) || 0, (Number(layer.y) || 0) + baselineOffset];
+	const transform = [cos, sin, -sin, cos, ...origin];
 	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(meta);
+	// The browser-facing family is normalized for canvas rendering, but preserve
+	// Photoshop's PostScript face when the imported layer carries one.
+	if (params.postscript_font) {
+		for (const run of styleRuns) {
+			if (run.style && run.style.font) run.style.font.name = params.postscript_font;
+		}
+		if (primaryStyle.font) primaryStyle.font.name = params.postscript_font;
+	}
 
 	return {
 		text: textStr,
 		transform: transform,
 		shapeType: isBox ? 'box' : 'point',
-		boxBounds: isBox ? [0, 0, h, w] : undefined,
+		boxBounds: isBox ? [0, 0, w, h] : undefined,
 		pointBase: isBox ? undefined : [0, 0],
 		paragraphStyle: {
 			justification: justification,

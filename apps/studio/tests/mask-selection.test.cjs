@@ -9,7 +9,7 @@ function setup() {
 	const selection = { has_selection: true, mask_canvas: createCanvas(40, 40) };
 	const app = { Layers: { Base_selection: selection, notify_mask_changed() {} } };
 	const context = vm.createContext({
-		app, config, Helper_class: class {}, alertify: {},
+		app, config, activeEffectTarget: () => null, Helper_class: class {}, alertify: {},
 		document: { createElement: () => createCanvas(1, 1) },
 	});
 	const source = fs.readFileSync(require.resolve('../src/js/modules/mask/mask.js'), 'utf8')

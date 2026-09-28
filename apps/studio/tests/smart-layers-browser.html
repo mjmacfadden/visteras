@@ -1,0 +1,122 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Smart Layers integration tests</title>
+<style>body{font:14px system-ui;background:#20242a;color:#eee;margin:20px}pre{white-space:pre-wrap}iframe{width:1200px;height:800px;border:1px solid #555}</style>
+<h1>Smart Layers integration tests</h1>
+<p>Runs against the built editor. Serve the apps directory locally, then open /studio/tests/smart-layers-browser.html.</p>
+<pre id="results">Running…</pre><iframe id="editor" src="../"></iframe>
+<script>
+const frame = document.getElementById('editor');
+frame.onload = async () => {
+ const output=document.getElementById('results'), passed=[];
+ const check=(name,condition)=>{if(!condition)throw new Error(name);passed.push('PASS '+name);output.textContent=passed.join('\n');};
+ try {
+ const win=frame.contentWindow, doc=win.document;
+ for(let i=0;i<100&&!win.app?.GUI?.modules?.['layer/smart'];i++)await new Promise(r=>setTimeout(r,100));
+ const {app,AppConfig:c}=win, smart=app.GUI.modules['layer/smart'];
+ const canvas=(color,w=120,h=80)=>{const x=doc.createElement('canvas');x.width=w;x.height=h;x.getContext('2d').fillStyle=color;x.getContext('2d').fillRect(0,0,w,h);return x;};
+ const pixel=l=>{const x=canvas('transparent');x.getContext('2d').clearRect(0,0,120,80);x.getContext('2d').drawImage(l.link,0,0);return [...x.getContext('2d').getImageData(1,1,1,1).data].join(',');};
+ const current=id=>c.layers.find(l=>l.id===id);
+ const perform=async a=>{const r=await app.State.do_action(a);if(r.status!=='completed')throw r.reason;};
+ await perform(new app.Actions.Insert_layer_action({name:'Smart Layer test',type:'image',link:canvas('red'),x:20,y:30,width:60,height:40,width_original:120,height_original:80},false));
+ const id=c.layer.id;
+ await smart.convert();
+ check('conversion preserves intrinsic pixels and placement',c.layer.type==='smart'&&c.layer.width===60&&c.smart_sources[c.layer.smart_source_id].width===120);
+ await app.State.undo(); check('conversion undo restores image',c.layer.type==='image');
+ await app.State.redo(); check('conversion redo restores source',c.layer.type==='smart');
+ await perform(new app.Actions.Update_layer_action(id,{width:6,height:4}));
+ await perform(new app.Actions.Update_layer_action(id,{width:60,height:40}));
+ check('scale down/up does not alter source',c.layer.link.width===120&&pixel(c.layer)==='255,0,0,255');
+ await app.GUI.modules['layer/duplicate'].duplicate(); const copy=c.layer.id;
+ check('duplicate references the same source',c.layer.smart_source_id===current(id).smart_source_id&&c.layer.link===current(id).link);
+ const protectedResult=await app.State.do_action(new app.Actions.Update_layer_image_action(canvas('green'),copy));
+ check('pixel updates cannot overwrite Smart Layers',protectedResult.status==='aborted'&&pixel(current(copy))==='255,0,0,255');
+ await perform(new app.Actions.Add_layer_filter_action(copy,'blur',{value:2}));
+ const filterId=c.layer.filters[0].id;
+ await perform(new app.Actions.Add_layer_filter_action(copy,'blur',{value:4},filterId));
+ await app.State.undo();check('editable filter undo restores settings',c.layer.filters.length===1&&c.layer.filters[0].params.value===2);
+ await app.State.redo();check('editable filter redo restores settings',c.layer.filters[0].params.value===4);
+ await smart.edit_contents(); const child=app.Documents.get_active_document();
+ check('contents use isolated history and native dimensions',!!child.smart_edit&&c.WIDTH===120&&app.State.action_history.length===0);
+ await perform(new app.Actions.Update_layer_image_action(canvas('blue'),c.layer.id));
+ await smart.save_contents();
+ check('saving contents returns to parent and updates all copies',!app.Documents.get_active_document().smart_edit&&pixel(current(id))==='0,0,255,255'&&pixel(current(copy))==='0,0,255,255');
+ check('instance effects remain independent',current(copy).filters.length===1&&current(id).filters.length===0);
+ await app.State.undo();check('source undo updates all copies',pixel(current(id))==='255,0,0,255'&&pixel(current(copy))==='255,0,0,255');
+ await app.State.redo();check('source redo updates all copies',pixel(current(id))==='0,0,255,255');
+ await smart.make_independent(copy);
+ check('Make Independent detaches source ownership',current(id).smart_source_id!==current(copy).smart_source_id);
+ await smart.edit_contents(copy); await perform(new app.Actions.Update_layer_image_action(canvas('green'),c.layer.id)); await smart.save_contents();
+ check('independent source edits leave original unchanged',pixel(current(id))==='0,0,255,255'&&pixel(current(copy))==='0,128,0,255');
+ await smart.rasterize(copy);check('rasterization retains appearance and effects',current(copy).type==='image'&&pixel(current(copy))==='0,128,0,255'&&current(copy).filters.length===1);
+ await app.State.undo();check('rasterization undo restores Smart Layer',current(copy).type==='smart');
+
+ const replacement=canvas('purple',40,120);
+ const oldGeometry={x:current(copy).x,y:current(copy).y,width:current(copy).width,height:current(copy).height};
+ await smart.replace_image(current(copy),replacement,replacement.toDataURL(),'Replacement');
+ const replaced=c.smart_sources[current(copy).smart_source_id];
+ check('replacement fits source frame without changing instance placement',Object.entries(oldGeometry).every(([k,v])=>current(copy)[k]===v)&&replaced.document.layers[0].width<replaced.width&&replaced.document.layers[0].height===replaced.height);
+ await app.State.undo();check('replacement undo restores source',pixel(current(copy))==='0,128,0,255');
+ await perform(new app.Actions.Add_layer_mask_action(copy,false,false));
+ const masked=smart.canvas(c.WIDTH,c.HEIGHT);app.Layers.render_object(masked.getContext('2d'),current(copy));
+ check('instance mask can hide content without affecting shared source',masked.getContext('2d').getImageData(35,45,1,1).data[3]===0&&pixel(current(copy))==='0,128,0,255');
+ current(copy).mask._selection_clip=true;
+ app.Layers.Base_selection._bake_selection_clip_layer(current(copy));
+ check('selection clip cleanup cannot silently rasterize Smart Layers',current(copy).type==='smart');
+ await app.State.undo();
+ app.Layers.switchRenderer('canvas2d');app.Layers.render(true);
+ const cpu=smart.canvas(c.WIDTH,c.HEIGHT);app.Layers.render_object(cpu.getContext('2d'),current(id));
+ app.Layers.switchRenderer('webgl');app.Layers.render(true);
+ const gpu=app.Layers.active_renderer;
+ if(gpu.type==='webgl') {
+  check('filtered Smart Layers use the accurate Canvas fallback',!gpu.can_render_layers(app.Layers.get_sorted_layers()));
+  gpu.clear();gpu.begin_frame();gpu.render_layers([current(id)],1,{x:0,y:0},c.WIDTH,c.HEIGHT);gpu.end_frame();
+  const drawn=smart.canvas(c.WIDTH,c.HEIGHT);drawn.getContext('2d').drawImage(gpu.getCanvas(),0,0,c.WIDTH,c.HEIGHT);
+  const cpuPixel=[...cpu.getContext('2d').getImageData(25,35,1,1).data].join(',');
+  const gpuPixel=[...drawn.getContext('2d').getImageData(25,35,1,1).data].join(',');
+  check('WebGL and Canvas render the same Smart Layer interior pixel ('+cpuPixel+' vs '+gpuPixel+')',gpuPixel===cpuPixel);
+ } else passed.push('SKIP WebGL unavailable; Canvas fallback exercised');
+ const json=JSON.parse(app.FileSave.export_as_json());
+ check('native file embeds sources once and no instance rasters',Object.keys(json.smart_sources).length===2&&!json.data.some(d=>d.id===id||d.id===copy));
+ await app.Documents.create_document_from_json(json,'Roundtrip.json');
+ check('native roundtrip preserves source pixels and independent IDs',pixel(current(id))==='0,0,255,255'&&pixel(current(copy))==='0,128,0,255'&&current(id).smart_source_id!==current(copy).smart_source_id);
+ await smart.edit_contents(id);
+ await smart.convert();check('nested Smart Layer conversion works',c.layer.type==='smart');
+ await smart.save_contents();
+ await smart.edit_contents(id);
+ check('nested Smart Layer survives content reopen',c.layer.type==='smart'&&!!c.smart_sources[c.layer.smart_source_id]);
+ await app.Documents.close_document(app.Documents.active_id);
+ // A simple isolated group preserves child records and pixels.
+ await perform(new app.Actions.Insert_layer_action({name:'Group test',type:'group',composition:'pass-through',x:0,y:0,width:c.WIDTH,height:c.HEIGHT},false));
+ const group=c.layer.id;
+ await perform(new app.Actions.Insert_layer_action({name:'Group child',type:'image',parent_id:group,link:canvas('orange',30,20),x:50,y:50,width:30,height:20,width_original:30,height_original:20},false));
+ const childId=c.layer.id;
+ await smart.convert(group);
+ check('group conversion retains editable children inside source',current(group).type==='smart'&&!current(childId)&&c.smart_sources[current(group).smart_source_id].document.layers.some(l=>l.id===childId));
+ await app.State.undo();check('group undo restores hierarchy',current(group).type==='group'&&current(childId).parent_id===group);
+
+ await perform(new app.Actions.Insert_layer_action({name:'Editable title',type:'text',x:100,y:100,width:240,height:50,color:'#1e3a8a',is_vector:true,params:{boundary:'box',size:24,font:{value:'Arial'},halign:'left',valign:'top',wrap:'letter',fill:'#1e3a8a'},render_function:['text','render'],data:[[{text:'Smart Layers',meta:{size:24,font:'Arial',fill_color:'#1e3a8a'}}]]},false));
+ const textId=c.layer.id;
+ await smart.convert();
+ check('text stays editable inside Smart Layer',c.layer.type==='smart'&&c.smart_sources[c.layer.smart_source_id].document.layers[0].type==='text');
+ await smart.edit_contents();check('Edit Contents restores native text records',c.layer.type==='text');
+ await app.Documents.close_document(app.Documents.active_id);
+ const single=JSON.parse(app.FileSave.export_as_json());single.layers=single.layers.filter(l=>l.id===textId);single.info.layer_active=textId;single.layers[0].parent_id=0;single.data=[];
+ await app.Documents.create_document_from_json(single,'Single Smart Layer.json',{force_new:true});
+ const singleParent=app.Documents.active_id;
+ await smart.edit_contents();
+ check('opening contents of a clean single-layer project never replaces parent',app.Documents.active_id!==singleParent&&app.Documents.documents.find(d=>d.id===singleParent).layers[0].type==='smart');
+ await app.Documents.close_document(app.Documents.active_id);
+
+ let psdBlob;
+ await app.FileSave._write_document_to_handle({name:'smart.psd',createWritable:async()=>({write:async blob=>{psdBlob=blob;},close:async()=>{}})},'PSD');
+ check('PSD compatibility export writes a Photoshop document',await psdBlob.slice(0,4).text()==='8BPS');
+ const beforePsdImport=app.Documents.active_id;
+ await app.Documents.create_document_from_psd_data({title:'PSD import regression',width:120,height:80,layers:[{id:1,name:'PSD image',type:'image',link:canvas('orange'),width:120,height:80,x:0,y:0,order:1}]});
+ check('ordinary PSD document import remains functional',c.layer.type==='image'&&Object.keys(c.smart_sources).length===0);
+ await app.Documents.close_document(app.Documents.active_id);
+ await app.Documents.activate_document(beforePsdImport);
+ output.textContent=passed.join('\n')+'\n\n'+passed.length+' tests passed.';
+ }catch(e){output.textContent=passed.join('\n')+'\nFAIL: '+e.stack;}
+};
+</script>

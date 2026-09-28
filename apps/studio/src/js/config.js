@@ -33,6 +33,7 @@ config.google_webfonts_key = (typeof window !== 'undefined' && window.__VP_KEYS_
 	|| (_vpLocalKeys && _vpLocalKeys.google_webfonts_key)
 	|| '';
 config.layers = [];
+config.smart_sources = {};
 config.layer = null;
 config.vectors = [];
 config.active_vector_id = null;
@@ -51,6 +52,7 @@ Object.defineProperty(config, 'need_render', {
 	}
 });
 config.need_render_changed_params = false; // Set specifically when param change in layer details triggered render
+config.effect_mask_active = null; // "stack" when painting the shared Smart Filters mask
 config.mask_active = false; // True when the active layer's mask is the editing target
 config._internal_clipboard = null; // {data_url, x, y, width, height} last copied selection/layer
 config._clipboard_position = null;

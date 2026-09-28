@@ -1,4 +1,5 @@
 import app from './../../app.js';
+import { serialize_sources } from '../../libs/smart-sources.js';
 import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import Helper_class from './../../libs/helpers.js';
@@ -73,6 +74,9 @@ class File_save_class {
 	 * (and known format); otherwise fall through to Save As.
 	 */
 	async save_locally() {
+		if (app.Documents?.get_active_document()?.smart_edit) {
+			return app.GUI.modules['layer/smart'].save_contents();
+		}
 		const doc = app.Documents ? app.Documents.get_active_document() : null;
 		const format = doc && doc.save_format ? String(doc.save_format).toUpperCase() : null;
 		const handle = doc && doc.fileHandle ? doc.fileHandle : null;
@@ -785,6 +789,8 @@ class File_save_class {
 
 		//fonts
 		export_data.user_fonts = config.user_fonts;
+		export_data.smart_layers_version = 1;
+		export_data.smart_sources = serialize_sources(config.layers, config.smart_sources);
 
 		//vectors
 		export_data.vectors = [];
@@ -819,6 +825,7 @@ class File_save_class {
 		export_data.data = [];
 		for (var i in config.layers) {
 			var layerObj = config.layers[i];
+			if (layerObj.type === 'smart') continue;
 			var imgSource = layerObj.link_canvas || layerObj.link;
 			if (imgSource && (imgSource instanceof HTMLCanvasElement || imgSource instanceof HTMLImageElement || imgSource instanceof ImageBitmap)) {
 				try {

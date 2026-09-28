@@ -506,6 +506,25 @@ class Pen_tool_class extends Base_tools_class {
 		const vecId = layer.vector_id || (layer.params && layer.params.vector_id);
 		const vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
 		if (vec && vec.visible !== false) {
+			// Vector paths are stored in document coordinates, while the layer
+			// rectangle is the authoritative transform box. Apply that box to the
+			// path at paint time as a safety net for imported/serialized vectors
+			// whose anchors were not baked during a Move-tool resize.
+			const bounds = typeof vec.getBounds === 'function' ? vec.getBounds() : null;
+			if (bounds && bounds.width > 0 && bounds.height > 0 && layer.width > 0 && layer.height > 0) {
+				const sx = layer.width / bounds.width;
+				const sy = layer.height / bounds.height;
+				if (Math.abs(sx - 1) > 1e-6 || Math.abs(sy - 1) > 1e-6 ||
+					Math.abs(layer.x - bounds.minX) > 1e-6 || Math.abs(layer.y - bounds.minY) > 1e-6) {
+					ctx.save();
+					ctx.translate(layer.x, layer.y);
+					ctx.scale(sx, sy);
+					ctx.translate(-bounds.minX, -bounds.minY);
+					Vector_renderer.render_vector(ctx, vec);
+					ctx.restore();
+					return;
+				}
+			}
 			Vector_renderer.render_vector(ctx, vec);
 		}
 	}

@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../../libs/smart-effects.js';
 import app from '../../../app.js';
 import config from '../../../config.js';
 import Dialog_class from '../../../libs/popup.js';
@@ -16,7 +17,8 @@ class Effects_toaster_class {
 		this.Base_layers = new Base_layers_class();
 	}
 
-	toaster() {
+	toaster(filter_id) {
+		if (config.layer.type === 'smart') return smartPreset(this, 'effects/instagram/toaster', filter_id);
 		if (config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;

@@ -74,6 +74,9 @@ export class Frame_manager_class {
 				return value;
 			}));
 
+			// Smart instances share the current immutable source revision.
+			if (source.type === 'smart') layer.link = config.smart_sources[source.smart_source_id]?.link || source.link;
+
 			// Clone image raster canvas
 			const srcCanvas = source.link_canvas || source.link;
 			if (source.type === 'image' && srcCanvas) {

@@ -591,6 +591,11 @@ class WebGL_renderer_class {
 			if (layer == null || layer.type == null || is_group(layer) || !is_effectively_visible(layer))
 				continue;
 
+			// Smart source pixels can have a different scale from their instance.
+			// GPU filter padding currently assumes layer-local pixels; use the
+			// authoritative Canvas path until source-space filter scaling is supported.
+			if (layer.type === 'smart' && (this._get_effective_filters(layer) || []).length) return false;
+
 			if (layer.type === 'adjustment') {
 				if (!this._gpu_supports_adjustment(layer)) {
 					return false;
@@ -2109,7 +2114,7 @@ class WebGL_renderer_class {
 	 */
 	_get_layer_source(layer) {
 		// Image layers: use the stored canvas or image
-		if (layer.type === 'image') {
+		if (layer.type === 'image' || layer.type === 'smart') {
 			return layer.link_canvas || layer.link || null;
 		}
 
@@ -2132,13 +2137,10 @@ class WebGL_renderer_class {
 				var vecId = layer.vector_id || (layer.params && layer.params.vector_id);
 				var vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
 				if (vec) {
-					var b = (typeof vec.getBounds === 'function') ? vec.getBounds() : null;
-					if (b && b.width > 0 && b.height > 0) {
-						layer.x = b.minX;
-						layer.y = b.minY;
-						layer.width = b.width;
-						layer.height = b.height;
-					}
+					// Keep the layer's committed geometry authoritative. Move-tool
+					// transforms update both the layer box and vector paths; deriving
+					// the box from the path here would overwrite that resize on the
+					// next render and make the selection snap back on mouse-up.
 					var strokeWidth = Number(vec.stroke_width || (layer.params && layer.params.stroke_width) || 0);
 					var strokeColor = vec.stroke || (layer.params && layer.params.stroke);
 					if (strokeWidth > 0 && strokeColor && strokeColor !== 'none') {
@@ -2182,7 +2184,12 @@ class WebGL_renderer_class {
 					if (this._gui_tools_ref.tools_modules[render_class] &&
 						typeof this._gui_tools_ref.tools_modules[render_class].object[render_function] === 'function') {
 
-						var _this = this;
+						const renderTool = this._gui_tools_ref.tools_modules[render_class].object;
+						// Resolve text geometry in document coordinates before capturing the
+						// texture translation. Layout must see the real layer rotation.
+						if (layer.type === 'text' && renderTool.resize_to_dynamic_bounds) {
+							renderTool.resize_to_dynamic_bounds(layer, renderTool.get_editor(layer));
+						}
 						var paint = function(targetCtx) {
 							targetCtx.save();
 							targetCtx.scale(SUPER, SUPER);
@@ -2192,8 +2199,12 @@ class WebGL_renderer_class {
 							// the bounded source texture (which would clip and rotate twice).
 							const rotation = layer.rotate;
 							try {
-								layer.rotate = 0;
-								_this._gui_tools_ref.tools_modules[render_class].object[render_function](targetCtx, layer, false);
+								if (layer.type === 'text') {
+									renderTool[render_function](targetCtx, layer, false, { skipLayout: true, skipRotation: true });
+								} else {
+									layer.rotate = 0;
+									renderTool[render_function](targetCtx, layer, false);
+								}
 							} finally {
 								layer.rotate = rotation;
 								targetCtx.restore();

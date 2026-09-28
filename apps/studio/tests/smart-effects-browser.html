@@ -1,0 +1,72 @@
+<!doctype html><meta charset="utf-8"><title>Smart Effects integration tests</title>
+<style>body{font:14px system-ui;background:#20242a;color:#eee;margin:20px}pre{white-space:pre-wrap;max-height:100px;overflow:auto}iframe{width:1200px;height:800px;border:1px solid #555}</style>
+<h1>Smart Effects integration tests</h1><pre id="results">Running…</pre><iframe id="editor" src="../"></iframe>
+<script>
+const frame=document.getElementById('editor');
+frame.onload=async()=>{
+ const out=document.getElementById('results'), passed=[];
+ const check=(name,ok)=>{if(!ok)throw Error(name);passed.push('PASS '+name);out.textContent=passed.join('\n');};
+ try{
+ const win=frame.contentWindow,doc=win.document;
+ for(let i=0;i<100&&!win.app?.GUI?.modules?.['layer/smart'];i++)await new Promise(r=>setTimeout(r,100));
+ const {app,AppConfig:c}=win, modules=app.GUI.modules;
+ const perform=async a=>{const r=await app.State.do_action(a);if(r.status!=='completed')throw r.reason;};
+ const source=doc.createElement('canvas');source.width=96;source.height=64;
+ const ctx=source.getContext('2d');const g=ctx.createLinearGradient(0,0,96,64);g.addColorStop(0,'#df7130');g.addColorStop(1,'#237dbd');ctx.fillStyle=g;ctx.fillRect(0,0,96,64);ctx.fillStyle='#eeeeee';ctx.fillRect(30,20,30,20);
+ await perform(new app.Actions.Insert_layer_action({name:'Smart Effects',type:'image',link:source,x:0,y:0,width:96,height:64,width_original:96,height_original:64},false));
+ await modules['layer/smart'].convert(); const id=c.layer.id, original=c.layer.link.toDataURL();
+ const rendered=()=>{const cv=doc.createElement('canvas');cv.width=96;cv.height=64;app.Layers.render_object(cv.getContext('2d'),c.layer);return cv.toDataURL();};
+ const keys=Object.keys(modules).filter(k=>k.startsWith('effects/')&&typeof modules[k].change==='function');
+ keys.push(...['blur','brightness','contrast','grayscale','hue-rotate','invert','saturate','sepia'].map(n=>'effects/common/'+n));
+ for(const key of keys){
+  await perform(new app.Actions.Update_layer_action(id,{filters:[]}));
+  const mod=modules[key], show=mod.POP.show;let settings;
+  mod.POP.show=s=>settings=s;
+  try{mod[key.split('/').pop().replace(/-/g,'_')]();}finally{mod.POP.show=show;}
+  if(!settings)throw Error('No dialog '+key);
+  const params=Object.fromEntries((settings.params||[]).filter(p=>p.name).map(p=>[p.name,p.value]));
+  await settings.on_finish(params);
+  check(key+' stores editable recipe',c.layer.filters.length===1&&c.layer.filters[0].name==='smart:'+key);
+  const before=rendered();c.smart_sources[c.layer.smart_source_id].revision += 'test';check(key+' preserves source and renders deterministically',c.layer.link.toDataURL()===original&&rendered()===before);
+  let edited;mod.POP.show=s=>edited=s;
+  try{app.GUI.GUI_layers.open_layer_filter(c.layer.filters[0].name,String(c.layer.filters[0].id));}finally{mod.POP.show=show;}
+  check(key+' reopens saved parameters',(edited.params||[]).filter(p=>p.name).every(p=>String(p.value)===String(params[p.name])));
+  await app.State.undo();check(key+' undo removes effect',c.layer.filters.length===0);
+  await app.State.redo();check(key+' redo restores appearance',rendered()===before);
+ }
+ await perform(new app.Actions.Update_layer_action(id,{filters:[]}));
+ const raw=modules['image/raw_develop'];await raw.raw_develop();raw._params.exposure=0.75;raw._params.grain_amount=20;await raw._apply();
+ check('Raw Develop saves a recipe',c.layer.filters[0].name==='smart:image/raw_develop'&&c.layer.filters[0].params.exposure===0.75);
+ const developed=rendered();await raw.raw_develop(c.layer.filters[0].id);
+ check('Raw Develop reopens exposure and seed',raw._params.exposure===0.75&&raw._params._seed===c.layer.filters[0].params._seed);raw._cancel();
+ await perform(new app.Actions.Update_layer_action(id,{filters:c.layer.filters.map(f=>({...f,disabled:true}))}));check('Disabling restores original pixels',rendered()===original);await app.State.undo();
+ check('Raw Develop undo toggle restores appearance',rendered()===developed);
+
+ // Noncommutative stack and actual panel reorder/delete controls.
+ await perform(new app.Actions.Add_layer_filter_action(c.layer.id,'smart:effects/common/invert',{value:100,_version:1,_seed:7}));
+ const ordered=rendered(), firstId=c.layer.filters[0].id;
+ doc.querySelector('[data-effect-step="1"][data-id="'+firstId+'"]').click();await app.State._action_queue;
+ check('Panel reorder changes processing order',c.layer.filters[1].id===firstId&&rendered()!==ordered);
+ await app.State.undo();check('Reorder undo restores pixels',rendered()===ordered);
+ doc.querySelector('#delete_filter[data-id="'+c.layer.filters[1].id+'"]').click();await app.State._action_queue;
+ check('Panel delete restores preceding stack',c.layer.filters.length===1&&rendered()===developed);
+ const file=JSON.parse(app.FileSave.export_as_json());
+ await app.Documents.create_document_from_json(file,'Smart Effects roundtrip',{force_new:true});
+ check('Native roundtrip retains editable settings and appearance',c.layer.filters[0].params.exposure===0.75&&rendered()===developed);
+ await modules['layer/duplicate'].duplicate();
+ check('Duplicate retains independent effect settings',c.layer.filters[0].params.exposure===0.75);
+ const copy=c.layer;await raw.raw_develop(copy.filters[0].id);raw._params.exposure=-0.5;await raw._apply();
+ check('Editing duplicate does not change original recipe',c.layers.find(l=>l.type==='smart'&&l.id!==copy.id).filters[0].params.exposure===0.75);
+
+ const beforeSourceEdit=rendered();
+ const replacement=doc.createElement('canvas');replacement.width=96;replacement.height=64;replacement.getContext('2d').fillStyle='#399955';replacement.getContext('2d').fillRect(0,0,96,64);
+ await modules['layer/smart'].replace_image(c.layer,replacement,replacement.toDataURL(),'Replacement');
+ check('Replacing shared source recomputes existing recipes',rendered()!==beforeSourceEdit&&c.layer.filters[0].params.exposure===-0.5);
+ await app.State.undo();check('Source undo restores processed appearance',rendered()===beforeSourceEdit);
+ const rasterBefore=rendered();await modules['layer/smart'].rasterize();
+ check('Rasterize bakes Smart Effects',c.layer.type==='image'&&c.layer.filters.length===0&&rendered()===rasterBefore);
+ await app.State.undo();check('Rasterize undo restores recipes',c.layer.type==='smart'&&c.layer.filters.length===1);
+ out.textContent+='\n\n'+passed.length+' tests passed.';
+ }catch(e){out.textContent+='\nFAIL '+e.stack;console.error(e);}
+};
+</script>

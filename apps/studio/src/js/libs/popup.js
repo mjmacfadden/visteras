@@ -114,6 +114,7 @@ class Dialog_class {
 		this.onload = config.on_load || false;
 		this.className = config.className || '';
 		this.comment = config.comment || '';
+		this.preview_source = config.preview_source || null;
 
 		//reset position
 		this.el = document.createElement('div');
@@ -152,6 +153,7 @@ class Dialog_class {
 		this.title = null;
 		this.className = '';
 		this.comment = '';
+		this.preview_source = null;
 		this.onfinish = false;
 		this.oncancel = false;
 
@@ -468,7 +470,7 @@ class Dialog_class {
 		//load preview before onload so layer_active_small is ready for on_load handler
 		if (this.preview !== false) {
 			//get canvas from layer
-			var canvas = this.Base_layers.convert_layer_to_canvas();
+			var canvas = this.preview_source || this.Base_layers.convert_layer_to_canvas();
 
 			//draw original image
 			var canvas_left = this.el.querySelector('[data-id="pop_pre"]');

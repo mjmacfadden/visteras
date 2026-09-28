@@ -1,3 +1,4 @@
+import { smartDialog, smartPreset } from '../../libs/smart-effects.js';
 import app from './../../app.js';
 import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
@@ -15,7 +16,8 @@ class Effects_nightVision_class {
 		this.ImageFilters = ImageFilters_class;
 	}
 
-	night_vision() {
+	night_vision(filter_id) {
+		if (config.layer.type === 'smart') return smartPreset(this, 'effects/night_vision', filter_id);
 		if (config.layer.type != 'image') {
 			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
 			return;
@@ -60,6 +62,7 @@ class Effects_nightVision_class {
 		//vignete
 		var texture = this.fx_filter.texture(canvas2);
 		this.fx_filter.draw(texture).vignette(0.2, 0.9).update();	//effect
+		texture.destroy();
 		canvas2 = this.fx_filter;
 		
 		return canvas2;
