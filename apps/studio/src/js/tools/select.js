@@ -15,6 +15,7 @@ import { Subpath } from './../core/vector/vector-model.js';
 const hydrate_vector_paths = (paths) => (paths || []).map((path) =>
 	path && typeof path.getBounds === 'function' ? path : Subpath.fromJSON(path)
 );
+const vector_id_for_layer = (layer) => layer && (layer.vector_id || (layer.params && layer.params.vector_id));
 
 class Select_tool_class extends Base_tools_class {
 
@@ -380,8 +381,8 @@ class Select_tool_class extends Base_tools_class {
 				rotate: l.rotate || 0,
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
-				vector_paths: l.type === 'vector' && l.vector_id
-					? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === l.vector_id)?.paths || [])) : null,
+				vector_paths: l.type === 'vector' && vector_id_for_layer(l)
+					? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === vector_id_for_layer(l))?.paths || [])) : null,
 				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
 				mask: l.mask ? {
 					x: l.mask.x,
@@ -559,10 +560,10 @@ class Select_tool_class extends Base_tools_class {
 							layer.height = Math.round(init_pos.height * scale_y);
 							layer.x = Math.round(s.data.x + (init_pos.x - this.mousedown_content_bounds.x) * scale_x);
 							layer.y = Math.round(s.data.y + (init_pos.y - this.mousedown_content_bounds.y) * scale_y);
-							if (init_pos.vector_paths && layer.vector_id) {
+							if (init_pos.vector_paths && vector_id_for_layer(layer)) {
 								const sx = scale_x, sy = scale_y;
 								const ox = this.mousedown_content_bounds.x, oy = this.mousedown_content_bounds.y;
-								const vec = config.vectors.find(v => v.id === layer.vector_id);
+								const vec = config.vectors.find(v => v.id === vector_id_for_layer(layer));
 								if (vec) {
 									vec.paths = hydrate_vector_paths(init_pos.vector_paths);
 									for (const path of vec.paths) for (const anchor of (path.anchors || [])) {
@@ -813,8 +814,8 @@ class Select_tool_class extends Base_tools_class {
 								y: layer.y,
 								width: layer.width,
 								height: layer.height,
-								vector_paths: layer.type === 'vector' && layer.vector_id
-									? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === layer.vector_id)?.paths || [])) : null
+								vector_paths: layer.type === 'vector' && vector_id_for_layer(layer)
+									? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === vector_id_for_layer(layer))?.paths || [])) : null
 							});
 						}
 					}
@@ -830,8 +831,8 @@ class Select_tool_class extends Base_tools_class {
 							layer.width = init_pos.width;
 							layer.height = init_pos.height;
 							if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
-							if (init_pos.vector_paths && layer.vector_id) {
-								const vec = config.vectors.find(v => v.id === layer.vector_id);
+							if (init_pos.vector_paths && vector_id_for_layer(layer)) {
+								const vec = config.vectors.find(v => v.id === vector_id_for_layer(layer));
 								if (vec) vec.paths = hydrate_vector_paths(init_pos.vector_paths);
 							}
 							if (init_pos.mask && layer.mask) {
@@ -860,7 +861,7 @@ class Select_tool_class extends Base_tools_class {
 								width: finalPos.width,
 								height: finalPos.height
 							};
-							if (finalPos.vector_paths && layer.vector_id) {
+							if (finalPos.vector_paths && vector_id_for_layer(layer)) {
 								layerUpdate.vector_paths = hydrate_vector_paths(finalPos.vector_paths);
 							}
 
