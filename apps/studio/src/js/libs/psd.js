@@ -1435,7 +1435,17 @@ function build_psd_text_from_layer(layer) {
 	// ascender adjustment).
 	const baselineOffset = isBox ? 0.8162841796875 : (Number(meta.size) || 32) * 0.75;
 	const transform = [cos, sin, -sin, cos, Number(layer.x) || 0, (Number(layer.y) || 0) + baselineOffset];
-	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(meta);
+	// The imported layer parameters retain Photoshop's authoritative point size.
+	// Prefer that value for paragraph text: rendered span metadata can be
+	// inflated by canvas measurement during import (especially for wrapped text).
+	const exportSize = isBox && Number(params.size) > 0 ? Number(params.size) : Number(meta.size) || 32;
+	if (isBox) {
+		for (const run of styleRuns) {
+			if (run.style) run.style.fontSize = exportSize;
+		}
+	}
+	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(Object.assign({}, meta, { size: exportSize }));
+	if (primaryStyle) primaryStyle.fontSize = exportSize;
 	// The browser-facing family is normalized for canvas rendering, but preserve
 	// Photoshop's PostScript face when the imported layer carries one.
 	if (params.postscript_font) {
