@@ -2137,13 +2137,10 @@ class WebGL_renderer_class {
 				var vecId = layer.vector_id || (layer.params && layer.params.vector_id);
 				var vec = (config.vectors && config.vectors.find(v => v.id === vecId)) || layer.vector;
 				if (vec) {
-					var b = (typeof vec.getBounds === 'function') ? vec.getBounds() : null;
-					if (b && b.width > 0 && b.height > 0) {
-						layer.x = b.minX;
-						layer.y = b.minY;
-						layer.width = b.width;
-						layer.height = b.height;
-					}
+					// Keep the layer's committed geometry authoritative. Move-tool
+					// transforms update both the layer box and vector paths; deriving
+					// the box from the path here would overwrite that resize on the
+					// next render and make the selection snap back on mouse-up.
 					var strokeWidth = Number(vec.stroke_width || (layer.params && layer.params.stroke_width) || 0);
 					var strokeColor = vec.stroke || (layer.params && layer.params.stroke);
 					if (strokeWidth > 0 && strokeColor && strokeColor !== 'none') {
