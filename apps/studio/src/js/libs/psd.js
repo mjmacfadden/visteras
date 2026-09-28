@@ -838,8 +838,9 @@ function convert_psd_text(psdLayer, id, name, opacity, visible, composition, mas
 	if (isBox && Array.isArray(textData.boxBounds) && textData.boxBounds.length >= 4) {
 		const bbTop = textData.boxBounds[0];
 		const bbLeft = textData.boxBounds[1];
-		const bbBottom = textData.boxBounds[2];
-		const bbRight = textData.boxBounds[3];
+		// ag-psd uses Photoshop's [top, left, right, bottom] order.
+		const bbRight = textData.boxBounds[2];
+		const bbBottom = textData.boxBounds[3];
 		const bbW = Math.round(Math.abs(bbRight - bbLeft));
 		const bbH = Math.round(Math.abs(bbBottom - bbTop));
 		if (bbW > 1) width = bbW;
