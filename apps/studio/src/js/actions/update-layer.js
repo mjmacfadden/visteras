@@ -51,7 +51,9 @@ export class Update_layer_action extends Base_action {
 			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
 			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 			if (vec) {
-				this.old_settings.vector_paths = JSON.parse(JSON.stringify(vec.paths || []));
+				if (!this.old_settings.vector_paths) {
+					this.old_settings.vector_paths = JSON.parse(JSON.stringify(vec.paths || []));
+				}
 				vec.paths = this.settings.vector_paths.map((path) =>
 					path && typeof path.getBounds === 'function' ? path.clone() : Subpath.fromJSON(path)
 				);
@@ -156,16 +158,15 @@ export class Update_layer_action extends Base_action {
 			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
 			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 			if (vec) {
-				if (this.old_settings.vector_paths) vec.paths = this.old_settings.vector_paths.map((path) =>
-					path && typeof path.getBounds === 'function' ? path.clone() : Subpath.fromJSON(path)
-				);
-				const new_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
-				const new_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
-				const dx = new_x - old_x;
-				const dy = new_y - old_y;
-				if (dx !== 0 || dy !== 0) {
-					if (typeof vec.translate === 'function') {
-						vec.translate(dx, dy);
+				if (!('vector_paths' in this.settings)) {
+					const new_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
+					const new_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
+					const dx = new_x - old_x;
+					const dy = new_y - old_y;
+					if (dx !== 0 || dy !== 0) {
+						if (typeof vec.translate === 'function') {
+							vec.translate(dx, dy);
+						}
 					}
 				}
 				if ('name' in this.settings) vec.name = this.reference_layer.name;
@@ -256,15 +257,21 @@ export class Update_layer_action extends Base_action {
 				const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
 				const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 				if (vec) {
-					const cur_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
-					const cur_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
-					const old_x = (this.old_settings.x != null) ? this.old_settings.x : cur_x;
-					const old_y = (this.old_settings.y != null) ? this.old_settings.y : cur_y;
-					const dx = old_x - cur_x;
-					const dy = old_y - cur_y;
-					if (dx !== 0 || dy !== 0) {
-						if (typeof vec.translate === 'function') {
-							vec.translate(dx, dy);
+					if (this.old_settings.vector_paths) {
+						vec.paths = this.old_settings.vector_paths.map((path) =>
+							path && typeof path.getBounds === 'function' ? path.clone() : Subpath.fromJSON(path)
+						);
+					} else {
+						const prev_x = (this.settings.x != null) ? this.settings.x : ((this.reference_layer.x != null) ? this.reference_layer.x : 0);
+						const prev_y = (this.settings.y != null) ? this.settings.y : ((this.reference_layer.y != null) ? this.reference_layer.y : 0);
+						const target_x = (this.old_settings.x != null) ? this.old_settings.x : prev_x;
+						const target_y = (this.old_settings.y != null) ? this.old_settings.y : prev_y;
+						const dx = target_x - prev_x;
+						const dy = target_y - prev_y;
+						if (dx !== 0 || dy !== 0) {
+							if (typeof vec.translate === 'function') {
+								vec.translate(dx, dy);
+							}
 						}
 					}
 					if ('name' in this.old_settings) vec.name = this.reference_layer.name;
