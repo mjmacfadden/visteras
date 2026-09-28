@@ -1430,6 +1430,14 @@ function build_psd_text_from_layer(layer) {
 	// Affine [xx, xy, yx, yy, tx, ty]; layer left/top carry translation.
 	const transform = [cos, sin, -sin, cos, 0, 0];
 	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(meta);
+	// The browser-facing family is normalized for canvas rendering, but preserve
+	// Photoshop's PostScript face when the imported layer carries one.
+	if (params.postscript_font) {
+		for (const run of styleRuns) {
+			if (run.style && run.style.font) run.style.font.name = params.postscript_font;
+		}
+		if (primaryStyle.font) primaryStyle.font.name = params.postscript_font;
+	}
 
 	return {
 		text: textStr,
