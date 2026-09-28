@@ -46,6 +46,14 @@ export class Update_layer_action extends Base_action {
 			}
 			this.reference_layer[i] = this.settings[i];
 		}
+		if (this.reference_layer.type === 'vector' && this.settings.vector_paths) {
+			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
+			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
+			if (vec) {
+				this.old_settings.vector_paths = vec.paths.map(p => p.clone());
+				vec.paths = this.settings.vector_paths.map(p => p.clone ? p.clone() : p);
+			}
+		}
 
 		// Keep linked mask synchronized with layer transformations if not explicitly specified in settings
 		if (this.reference_layer.mask && this.reference_layer.mask.linked !== false && !('mask' in this.settings)) {
@@ -145,6 +153,7 @@ export class Update_layer_action extends Base_action {
 			const vecId = this.reference_layer.vector_id || (this.reference_layer.params && this.reference_layer.params.vector_id);
 			const vec = config.vectors && config.vectors.find(v => v.id === vecId);
 			if (vec) {
+				if (this.old_settings.vector_paths) vec.paths = this.old_settings.vector_paths.map(p => p.clone());
 				const new_x = (this.reference_layer.x != null) ? this.reference_layer.x : 0;
 				const new_y = (this.reference_layer.y != null) ? this.reference_layer.y : 0;
 				const dx = new_x - old_x;

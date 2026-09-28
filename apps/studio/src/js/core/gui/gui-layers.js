@@ -1581,7 +1581,7 @@ class GUI_layers_class {
 						html += '</span>';
 
 						var mask_class = 'mask_thumb';
-						if (value.id == config.layer.id && config.mask_active === true && !config.effect_mask_active) {
+						if (config.layer && value.id == config.layer.id && config.mask_active === true && !config.effect_mask_active) {
 							mask_class += ' active_mask';
 						}
 						if (value.mask.enabled === false) {

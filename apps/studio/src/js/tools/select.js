@@ -375,6 +375,8 @@ class Select_tool_class extends Base_tools_class {
 				rotate: l.rotate || 0,
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
+				vector_paths: l.type === 'vector' && l.vector_id
+					? (config.vectors.find(v => v.id === l.vector_id)?.paths || []).map(p => p.clone()) : null,
 				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
 				mask: l.mask ? {
 					x: l.mask.x,
@@ -552,6 +554,15 @@ class Select_tool_class extends Base_tools_class {
 							layer.height = Math.round(init_pos.height * scale_y);
 							layer.x = Math.round(s.data.x + (init_pos.x - this.mousedown_content_bounds.x) * scale_x);
 							layer.y = Math.round(s.data.y + (init_pos.y - this.mousedown_content_bounds.y) * scale_y);
+							if (init_pos.vector_paths && layer.vector_id) {
+								const sx = scale_x, sy = scale_y;
+								const ox = this.mousedown_content_bounds.x, oy = this.mousedown_content_bounds.y;
+								const vec = config.vectors.find(v => v.id === layer.vector_id);
+								if (vec) {
+									vec.paths = init_pos.vector_paths.map(p => p.clone());
+									vec.transform(sx, sy, ox, oy);
+								}
+							}
 
 							if (init_pos.text_params) {
 								layer.params.scale_x = (init_pos.text_params.scale_x ?? 1) * scale_x;
@@ -807,6 +818,10 @@ class Select_tool_class extends Base_tools_class {
 							layer.width = init_pos.width;
 							layer.height = init_pos.height;
 							if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
+							if (init_pos.vector_paths && layer.vector_id) {
+								const vec = config.vectors.find(v => v.id === layer.vector_id);
+								if (vec) vec.paths = init_pos.vector_paths.map(p => p.clone());
+							}
 							if (init_pos.mask && layer.mask) {
 								Object.assign(layer.mask, init_pos.mask);
 							}
@@ -833,6 +848,16 @@ class Select_tool_class extends Base_tools_class {
 								width: finalPos.width,
 								height: finalPos.height
 							};
+							if (init_pos.vector_paths && layer.vector_id) {
+								const vec = config.vectors.find(v => v.id === layer.vector_id);
+								if (vec) {
+									const sx = this.mousedown_content_bounds.width > 0 ? (finalPos.width / this.mousedown_content_bounds.width) : 1;
+									const sy = this.mousedown_content_bounds.height > 0 ? (finalPos.height / this.mousedown_content_bounds.height) : 1;
+									const transformed = init_pos.vector_paths.map(p => p.clone());
+									for (const p of transformed) for (const a of p.anchors) for (const q of [a.point, a.handle_in, a.handle_out]) if (q) { q.x = this.mousedown_content_bounds.x + (q.x - this.mousedown_content_bounds.x) * sx; q.y = this.mousedown_content_bounds.y + (q.y - this.mousedown_content_bounds.y) * sy; }
+									layerUpdate.vector_paths = transformed;
+								}
+							}
 
 							// Point text: bake font size into history
 							if (is_point_text(layer) && init_pos.width > 0) {
