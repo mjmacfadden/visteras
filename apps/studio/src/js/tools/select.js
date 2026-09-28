@@ -812,7 +812,9 @@ class Select_tool_class extends Base_tools_class {
 								x: layer.x,
 								y: layer.y,
 								width: layer.width,
-								height: layer.height
+								height: layer.height,
+								vector_paths: layer.type === 'vector' && layer.vector_id
+									? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === layer.vector_id)?.paths || [])) : null
 							});
 						}
 					}
@@ -858,15 +860,8 @@ class Select_tool_class extends Base_tools_class {
 								width: finalPos.width,
 								height: finalPos.height
 							};
-							if (init_pos.vector_paths && layer.vector_id) {
-								const vec = config.vectors.find(v => v.id === layer.vector_id);
-								if (vec) {
-									const sx = this.mousedown_content_bounds.width > 0 ? (finalPos.width / this.mousedown_content_bounds.width) : 1;
-									const sy = this.mousedown_content_bounds.height > 0 ? (finalPos.height / this.mousedown_content_bounds.height) : 1;
-									const transformed = hydrate_vector_paths(init_pos.vector_paths);
-									for (const p of transformed) for (const a of p.anchors) for (const q of [a.point, a.handle_in, a.handle_out]) if (q) { q.x = this.mousedown_content_bounds.x + (q.x - this.mousedown_content_bounds.x) * sx; q.y = this.mousedown_content_bounds.y + (q.y - this.mousedown_content_bounds.y) * sy; }
-									layerUpdate.vector_paths = transformed;
-								}
+							if (finalPos.vector_paths && layer.vector_id) {
+								layerUpdate.vector_paths = hydrate_vector_paths(finalPos.vector_paths);
 							}
 
 							// Point text: bake font size into history
