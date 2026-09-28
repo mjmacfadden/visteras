@@ -376,7 +376,7 @@ class Select_tool_class extends Base_tools_class {
 				anchor_x: (l.params && l.params.anchor_x != null) ? l.params.anchor_x : null,
 				anchor_y: (l.params && l.params.anchor_y != null) ? l.params.anchor_y : null,
 				vector_paths: l.type === 'vector' && l.vector_id
-					? (config.vectors.find(v => v.id === l.vector_id)?.paths || []).map(p => p.clone()) : null,
+					? JSON.parse(JSON.stringify(config.vectors.find(v => v.id === l.vector_id)?.paths || [])) : null,
 				text_params: is_point_text(l) ? JSON.parse(JSON.stringify(l.params)) : null,
 				mask: l.mask ? {
 					x: l.mask.x,
@@ -559,8 +559,13 @@ class Select_tool_class extends Base_tools_class {
 								const ox = this.mousedown_content_bounds.x, oy = this.mousedown_content_bounds.y;
 								const vec = config.vectors.find(v => v.id === layer.vector_id);
 								if (vec) {
-									vec.paths = init_pos.vector_paths.map(p => p.clone());
-									vec.transform(sx, sy, ox, oy);
+									vec.paths = JSON.parse(JSON.stringify(init_pos.vector_paths));
+									for (const path of vec.paths) for (const anchor of (path.anchors || [])) {
+										for (const point of [anchor.point, anchor.handle_in, anchor.handle_out]) if (point) {
+											point.x = ox + (point.x - ox) * sx;
+											point.y = oy + (point.y - oy) * sy;
+										}
+									}
 								}
 							}
 
@@ -820,7 +825,7 @@ class Select_tool_class extends Base_tools_class {
 							if (init_pos.text_params) layer.params = JSON.parse(JSON.stringify(init_pos.text_params));
 							if (init_pos.vector_paths && layer.vector_id) {
 								const vec = config.vectors.find(v => v.id === layer.vector_id);
-								if (vec) vec.paths = init_pos.vector_paths.map(p => p.clone());
+								if (vec) vec.paths = JSON.parse(JSON.stringify(init_pos.vector_paths));
 							}
 							if (init_pos.mask && layer.mask) {
 								Object.assign(layer.mask, init_pos.mask);
@@ -853,7 +858,7 @@ class Select_tool_class extends Base_tools_class {
 								if (vec) {
 									const sx = this.mousedown_content_bounds.width > 0 ? (finalPos.width / this.mousedown_content_bounds.width) : 1;
 									const sy = this.mousedown_content_bounds.height > 0 ? (finalPos.height / this.mousedown_content_bounds.height) : 1;
-									const transformed = init_pos.vector_paths.map(p => p.clone());
+									const transformed = JSON.parse(JSON.stringify(init_pos.vector_paths));
 									for (const p of transformed) for (const a of p.anchors) for (const q of [a.point, a.handle_in, a.handle_out]) if (q) { q.x = this.mousedown_content_bounds.x + (q.x - this.mousedown_content_bounds.x) * sx; q.y = this.mousedown_content_bounds.y + (q.y - this.mousedown_content_bounds.y) * sy; }
 									layerUpdate.vector_paths = transformed;
 								}
