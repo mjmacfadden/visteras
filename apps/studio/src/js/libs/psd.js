@@ -1428,7 +1428,12 @@ function build_psd_text_from_layer(layer) {
 	const cos = Math.cos(rad);
 	const sin = Math.sin(rad);
 	// Affine [xx, xy, yx, yy, tx, ty]; layer left/top carry translation.
-	const transform = [cos, sin, -sin, cos, 0, 0];
+	// Photoshop stores the text transform origin separately from the layer's
+	// pixel bounds. Point text's origin is its baseline; paragraph text starts
+	// just below the box top (the small offset is Photoshop's text engine
+	// ascender adjustment).
+	const baselineOffset = isBox ? 0.8162841796875 : (Number(meta.size) || 32) * 0.75;
+	const transform = [cos, sin, -sin, cos, Number(layer.x) || 0, (Number(layer.y) || 0) + baselineOffset];
 	const primaryStyle = (styleRuns[0] && styleRuns[0].style) || meta_to_style(meta);
 	// The browser-facing family is normalized for canvas rendering, but preserve
 	// Photoshop's PostScript face when the imported layer carries one.
@@ -1443,7 +1448,7 @@ function build_psd_text_from_layer(layer) {
 		text: textStr,
 		transform: transform,
 		shapeType: isBox ? 'box' : 'point',
-		boxBounds: isBox ? [0, 0, h, w] : undefined,
+		boxBounds: isBox ? [0, 0, w, h] : undefined,
 		pointBase: isBox ? undefined : [0, 0],
 		paragraphStyle: {
 			justification: justification,
