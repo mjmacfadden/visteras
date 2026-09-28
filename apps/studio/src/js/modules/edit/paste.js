@@ -20,8 +20,45 @@ class Edit_paste_class {
 			if (ok) return;
 		}
 		const ok = await this.paste_from_system_svg(null);
-		if (!ok) {
-			alertify.error('Use Ctrl+V to paste from the clipboard.');
+		if (ok) return;
+		if (await this.paste_system_image()) return;
+		alertify.error('Nothing to paste. Copy an image or vector to the clipboard first.');
+	}
+
+	/** Read the first raster image from a paste event or the system clipboard. */
+	async read_system_image(clipboardEvent = null) {
+		if (clipboardEvent && clipboardEvent.clipboardData) {
+			const items = clipboardEvent.clipboardData.items || [];
+			for (let i = 0; i < items.length; i++) {
+				if ((items[i].type || '').indexOf('image/') !== 0) continue;
+				const blob = items[i].getAsFile && items[i].getAsFile();
+				if (blob) return this.blob_to_data_url(blob);
+			}
+		}
+		if (!navigator.clipboard || !navigator.clipboard.read) return null;
+		const items = await navigator.clipboard.read();
+		for (const item of items) {
+			for (const type of (item.types || [])) {
+				if (type.indexOf('image/') !== 0) continue;
+				return this.blob_to_data_url(await item.getType(type));
+			}
+		}
+		return null;
+	}
+
+	async paste_system_image(clipboardEvent = null) {
+		try {
+			const data_url = await this.read_system_image(clipboardEvent);
+			if (!data_url) return false;
+			const dims = await this.load_image_dimensions(data_url);
+			app.State.do_action(new app.Actions.Insert_layer_action({
+				name: 'Paste', type: 'image', data: data_url,
+				x: 0, y: 0, width: dims.width, height: dims.height,
+				width_original: dims.width, height_original: dims.height,
+			}, false));
+			return true;
+		} catch (error) {
+			return false;
 		}
 	}
 
@@ -141,6 +178,7 @@ class Edit_paste_class {
 					return;
 				}
 			} catch (error) {
+				if (await this.paste_system_image()) return;
 				alertify.error('Could not read the clipboard.');
 				return;
 			}
