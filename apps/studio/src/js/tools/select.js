@@ -568,8 +568,8 @@ class Select_tool_class extends Base_tools_class {
 									vec.paths = hydrate_vector_paths(init_pos.vector_paths);
 									for (const path of vec.paths) for (const anchor of (path.anchors || [])) {
 										for (const point of [anchor.point, anchor.handle_in, anchor.handle_out]) if (point) {
-											point.x = ox + (point.x - ox) * sx;
-											point.y = oy + (point.y - oy) * sy;
+											point.x = s.data.x + (point.x - ox) * sx;
+											point.y = s.data.y + (point.y - oy) * sy;
 										}
 									}
 								}
