@@ -5,6 +5,7 @@ import alertify from 'alertifyjs/build/alertify.min.js';
 
 // Versioned, serializable recipes; runtime surfaces live only in this weak cache.
 const cache = new WeakMap();
+const maskedCache = new WeakMap();
 const pixels = new Set(['black_and_white', 'box_blur', 'dither', 'edge', 'emboss', 'enrich', 'grains', 'heatmap', 'mosaic', 'oil', 'sharpen', 'solarize']);
 export const isSmartEffect = f => f.name.startsWith('smart:');
 export const isContentEffect = isSmartEffect;
@@ -56,17 +57,32 @@ export function renderSmart(layer, stopId = null, disabled = null) {
  }
  const link = source ? source.link : layer.link;
  if (!filters.length) return link;
- const key = JSON.stringify([source && source.revision, filters, stopId == null ? layer.smart_filter_mask : null]);
+ // Mask painting does not change the filter recipe. Cache its expensive output
+ // independently, and never serialize the full shared mask into a frame cache key.
+ const key = JSON.stringify([source && source.revision, filters]);
  let entries = cache.get(link);
  if (!entries) { entries = new Map(); cache.set(link, entries); }
- const painting=(stopId == null && layer.smart_filter_mask && effectMaskRuntime(layer.smart_filter_mask).link_canvas) || filters.some(f=>f.params._mask && effectMaskRuntime(f.params._mask).link_canvas);
- if (!painting && entries.has(key)) { const hit = entries.get(key); entries.delete(key); entries.set(key, hit); return hit; }
- let canvas = link;
- for (const f of filters) canvas = applyEffect(canvas, f);
- if (stopId == null) canvas = blendEffectMask(link, canvas, layer.smart_filter_mask);
- if (!painting) entries.set(key, canvas);
+ const legacyPainting = filters.some(f => f.params._mask && effectMaskRuntime(f.params._mask).link_canvas);
+ let canvas;
+ if (!legacyPainting && entries.has(key)) {
+  canvas = entries.get(key); entries.delete(key); entries.set(key, canvas);
+ } else {
+  canvas = link;
+  for (const f of filters) canvas = applyEffect(canvas, f);
+  if (!legacyPainting) entries.set(key, canvas);
+ }
  // Bound retained surfaces per shared source; undo/history never owns these buffers.
  while (entries.size > 4) entries.delete(entries.keys().next().value);
+ const mask = stopId == null ? layer.smart_filter_mask : null;
+ if (mask && mask.enabled !== false) {
+  const painting = effectMaskRuntime(mask).link_canvas;
+  const previous = maskedCache.get(canvas);
+  if (!painting && previous?.mask === mask) return previous.result;
+  const blended = blendEffectMask(link, canvas, mask);
+  // Retain only the latest composite, not one full bitmap per undo state.
+  if (!painting) maskedCache.set(canvas, {mask, result:blended});
+  return blended;
+ }
  return canvas;
 }
 export function saveEffect(layer, key, params, id, documentId) {

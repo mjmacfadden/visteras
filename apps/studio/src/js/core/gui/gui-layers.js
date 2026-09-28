@@ -1624,7 +1624,7 @@ class GUI_layers_class {
 							if (mask) thumb = this.Mask.get_mask_thumb({mask:effectMaskRuntime(mask)});
 							html += '<div class="smart-filter-group">';
 							html += '<button class="visibility ' + (value.smart_filters_enabled === false ? '' : 'visible') + '" data-smart-filters-toggle="' + value.id + '" title="Toggle Smart Filters" aria-label="Toggle Smart Filters"></button>';
-							html += '<button class="mask_thumb smart-filter-mask' + (active ? ' active_mask' : '') + (mask?.enabled === false ? ' disabled_mask' : '') + '" data-pid="' + value.id + '" data-effect-mask="edit" title="Smart Filters mask — paint; Shift-click to disable; right-click for options" aria-label="Smart Filters mask" style="background-color:white;' + (thumb ? 'background-image:url(' + thumb + ')' : '') + '"></button>';
+							html += '<button class="mask_thumb smart-filter-mask' + (active ? ' active_mask' : '') + (mask?.enabled === false ? ' disabled_mask' : '') + '" data-pid="' + value.id + '" data-effect-mask="edit" title="Smart Filters mask — paint; Shift-click to disable; right-click for options" aria-label="Smart Filters mask" style="' + (thumb ? 'background-image:url(' + thumb + ')' : 'background-color:white') + '"></button>';
 							html += '<span class="smart-filter-label">Smart Filters</span></div>';
 						}
 

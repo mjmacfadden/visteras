@@ -134,3 +134,14 @@ new masking uses the shared stack mask. Independent mask transforms are not supp
 `tests/effect-masks-browser.html` covers painting, gradients, transforms, undo/redo,
 shared stack rendering, hierarchy, visibility, native roundtrips, duplication, and
 rasterization. Node tests cover interpolation, transparency, and payload validation.
+
+### Mask painting performance
+
+The filter recipe cache is independent of the shared mask. Brush previews, mask
+commits, and mask undo/redo reuse the processed source; source or recipe changes
+invalidate it. Mask pixels are excluded from the recipe cache key. Canvas native
+compositing blends source and filtered pixels with grayscale coverage converted to
+alpha, preserving transparency. Temporary surfaces are reused, and only the latest
+finished mask composite is retained per cached filter result. This avoids retaining
+full-size composites for every undo state. Large masks still require coverage
+updates over the source frame; actual responsiveness depends on image size and browser.

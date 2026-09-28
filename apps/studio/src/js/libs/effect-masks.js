@@ -3,6 +3,7 @@ import config from '../config.js';
 
 // Stored masks contain grayscale bytes only. Runtime paint canvases never enter JSON/history.
 const runtime = new WeakMap();
+const blendSurfaces = new WeakMap();
 export function encodeEffectMask(canvas, enabled = true) {
  const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
  let data = '';
@@ -38,16 +39,28 @@ export function effectMaskImageAction(canvas, target) {
 export function blendEffectMask(input, output, mask) {
  if (!mask || mask.enabled===false) return output;
  const state=effectMaskRuntime(mask), source=state.link_canvas||state.link;
- const c=document.createElement('canvas');c.width=output.width;c.height=output.height;
- const ctx=c.getContext('2d');ctx.drawImage(source,0,0,c.width,c.height);
- const weights=ctx.getImageData(0,0,c.width,c.height).data;
- ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(input,0,0,c.width,c.height);
- const before=ctx.getImageData(0,0,c.width,c.height), after=output.getContext('2d').getImageData(0,0,c.width,c.height);
- // Interpolate premultiplied colors so transparent pixels do not produce dark fringes.
- for(let i=0;i<before.data.length;i+=4) {
-  const t=weights[i]/255, a=before.data[i+3]*(1-t), b=after.data[i+3]*t, alpha=a+b;
-  for(let k=0;k<3;k++) before.data[i+k]=alpha?(before.data[i+k]*a+after.data[i+k]*b)/alpha:0;
-  before.data[i+3]=alpha;
+ // Convert grayscale coverage to alpha, then let Canvas composite premultiplied
+ // pixels. This avoids reading both full-color images and blending them in JS.
+ let surfaces=blendSurfaces.get(output);
+ if (!surfaces) {
+  const alpha=document.createElement('canvas'),filtered=document.createElement('canvas');
+  alpha.width=filtered.width=output.width;alpha.height=filtered.height=output.height;
+  surfaces={alpha,filtered};blendSurfaces.set(output,surfaces);
  }
- ctx.putImageData(before,0,0);return c;
+ const {alpha,filtered}=surfaces;
+ const alphaCtx=alpha.getContext('2d',{willReadFrequently:true});
+ alphaCtx.clearRect(0,0,alpha.width,alpha.height);
+ alphaCtx.drawImage(source,0,0,alpha.width,alpha.height);
+ const coverage=alphaCtx.getImageData(0,0,alpha.width,alpha.height);
+ for(let i=0;i<coverage.data.length;i+=4) coverage.data[i+3]=coverage.data[i];
+ alphaCtx.putImageData(coverage,0,0);
+ const c=document.createElement('canvas');c.width=output.width;c.height=output.height;
+ const ctx=c.getContext('2d');ctx.drawImage(input,0,0,c.width,c.height);
+ ctx.globalCompositeOperation='destination-out';ctx.drawImage(alpha,0,0);
+ const filteredCtx=filtered.getContext('2d');
+ filteredCtx.globalCompositeOperation='copy';filteredCtx.drawImage(output,0,0);
+ filteredCtx.globalCompositeOperation='destination-in';filteredCtx.drawImage(alpha,0,0);
+ ctx.globalCompositeOperation='lighter';ctx.drawImage(filtered,0,0);
+ ctx.globalCompositeOperation='source-over';
+ return c;
 }
