@@ -46,6 +46,7 @@ export function applyEffect(input, effect) {
 }
 export function renderSmart(layer, stopId = null, disabled = null) {
  const source = config.smart_sources[layer.smart_source_id];
+ if (stopId == null && layer.smart_filters_enabled === false) return source ? source.link : layer.link;
  const filters = [];
  for (const f of layer.filters || []) {
   if (stopId != null && String(f.id) === String(stopId)) break;
@@ -55,13 +56,14 @@ export function renderSmart(layer, stopId = null, disabled = null) {
  }
  const link = source ? source.link : layer.link;
  if (!filters.length) return link;
- const key = JSON.stringify([source && source.revision, filters]);
+ const key = JSON.stringify([source && source.revision, filters, stopId == null ? layer.smart_filter_mask : null]);
  let entries = cache.get(link);
  if (!entries) { entries = new Map(); cache.set(link, entries); }
- const painting=filters.some(f=>f.params._mask && effectMaskRuntime(f.params._mask).link_canvas);
+ const painting=(stopId == null && layer.smart_filter_mask && effectMaskRuntime(layer.smart_filter_mask).link_canvas) || filters.some(f=>f.params._mask && effectMaskRuntime(f.params._mask).link_canvas);
  if (!painting && entries.has(key)) { const hit = entries.get(key); entries.delete(key); entries.set(key, hit); return hit; }
  let canvas = link;
  for (const f of filters) canvas = applyEffect(canvas, f);
+ if (stopId == null) canvas = blendEffectMask(link, canvas, layer.smart_filter_mask);
  if (!painting) entries.set(key, canvas);
  // Bound retained surfaces per shared source; undo/history never owns these buffers.
  while (entries.size > 4) entries.delete(entries.keys().next().value);

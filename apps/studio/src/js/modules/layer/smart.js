@@ -178,7 +178,7 @@ class Layer_smart_class {
 		const image = renderSmart(layer);
 		const canvas = this.canvas(image.naturalWidth || image.width, image.naturalHeight || image.height);
 		canvas.getContext('2d').drawImage(image, 0, 0);
-		const raster = { ...layer, type: 'image', smart_source_id: null, link: canvas, link_canvas: null, filters: layer.filters.filter(f => !isContentEffect(f)), data: null };
+		const raster = { ...layer, type: 'image', smart_source_id: null, smart_filter_mask: null, smart_filters_enabled: true, link: canvas, link_canvas: null, filters: layer.filters.filter(f => !isContentEffect(f)), data: null };
 		await this.action(new Smart_layer_action('Rasterize Smart Layer', config.layers.map(l => l === layer ? raster : l), config.smart_sources, layer.id));
 	}); }
 }

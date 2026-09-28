@@ -88,7 +88,7 @@ Recipes run in listed order on the native embedded source, before layer placemen
 mask, opacity, and existing layer styles. Shadows, color overlay, and borders keep
 their existing nondestructive layer-style behavior outside this stack. Existing
 legacy live filters retain their original rendering behavior. Selections do not
-limit an unmasked Smart Effect. Add an effect mask for spatial control; an active
+limit an unmasked Smart Effect. Use the shared Smart Filters mask for spatial control; an active
 selection initializes its coverage. Processing is bounded
 to the embedded source rectangle (including blur); use a larger source canvas when
 you need more transparent space at its edges.
@@ -113,27 +113,24 @@ native persistence, independent duplicate settings, and rasterization. Run along
 the original Smart Layer browser suite and source/mask Node tests.
 
 
-## Per-effect masks
+## Shared Smart Filters mask
 
-Each Smart Effect has a **+ Mask** button beneath its name. Click it to add a white
-mask (or initialize from the active selection), then paint directly on the document
-with Brush, Pencil, Eraser, Fill, or Gradient. The highlighted **Mask** button marks
-the current painting target. Click the layer name/thumbnail to stop editing the mask,
-or another effect's Mask button to switch targets.
+Smart Effects are nested beneath a **Smart Filters** row. Its eye toggles the whole
+stack, while each effect retains its own eye, editable settings, and ordering controls.
+The mask thumbnail sits between the parent eye and label. Click it to paint with
+Brush, Pencil, Eraser, Fill, or Gradient. Shift-click toggles the mask; right-click
+opens Edit, Disable/Enable, Invert, and Delete controls. Clicking a layer thumbnail
+returns painting to the layer. An active selection initializes a newly created mask.
 
-White applies that effect, black bypasses it, and gray blends its input and output.
-This does not hide the layer itself. A layer mask still controls the final layer
-independently. Controls alongside Mask disable/enable, invert, or remove only that
-mask. Edits are undoable; effect reordering carries the mask with the effect.
+White applies the complete stack, black reveals the original source, and gray
+blends the two. The normal layer mask independently controls final layer visibility.
+Mask edits and stack visibility are undoable. Masks follow layer transforms and
+persist in native projects; duplicates have independent masks. Rasterization and
+raster/PSD export bake their appearance. Processing remains client-side.
 
-Masks use native source coordinates and follow layer placement, scaling, and
-rotation. Source replacement stretches coverage to the new source frame. Copies
-have independent editable masks. Native JSON stores grayscale bytes with each
-recipe; runtime paint canvases are excluded. Raster/PSD export bakes the masked
-appearance. As with Smart Effects, large source images or costly stacks may make
-live painting slower. Independently transforming effect masks is not supported yet.
+Older projects retain legacy per-effect masks internally to preserve their appearance;
+new masking uses the shared stack mask. Independent mask transforms are not supported.
 
-`tests/effect-masks-browser.html` verifies direct brush routing, live rendering,
-gradients, transforms, parameter edits, layer-mask independence, undo/redo, native
-roundtrips, duplicates and rasterization. `tests/effect-masks.test.cjs` covers
-black/white/gray interpolation, transparency and runtime isolation.
+`tests/effect-masks-browser.html` covers painting, gradients, transforms, undo/redo,
+shared stack rendering, hierarchy, visibility, native roundtrips, duplication, and
+rasterization. Node tests cover interpolation, transparency, and payload validation.

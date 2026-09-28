@@ -9,13 +9,13 @@ export default class EffectMask {
   try {
    await app.State._action_queue;
    const layer=app.Layers.get_layer(Number(layerId),true);
-   const filter=layer?.filters?.find(f=>String(f.id)===String(filterId));
-   if (!layer || layer.type!=='smart' || layer.locked || !filter?.name.startsWith('smart:')) throw new Error('Select an unlocked Smart Effect.');
-   const old=filter.params._mask;
+   const hasFilters=layer?.filters?.some(f=>f.name.startsWith('smart:'));
+   if (!layer || layer.type!=='smart' || layer.locked || !hasFilters) throw new Error('Select an unlocked Smart Layer with filters.');
+   const old=layer.smart_filter_mask;
    let mask=old;
    if (command==='edit' && old) {
     await app.Layers.select(layer.id);
-    config.mask_active=true;config.effect_mask_active=filter.id;
+    config.mask_active=true;config.effect_mask_active='stack';
     new Mask().default_mask_colors();app.GUI.GUI_layers.render_layers();return;
    }
    if (command==='add' || (command==='edit' && !old)) {
@@ -34,11 +34,11 @@ export default class EffectMask {
     const ctx=canvas.getContext('2d');ctx.drawImage(src,0,0);const p=ctx.getImageData(0,0,canvas.width,canvas.height);
     for(let i=0;i<p.data.length;i+=4)p.data[i]=p.data[i+1]=p.data[i+2]=255-p.data[i];ctx.putImageData(p,0,0);mask=encodeEffectMask(canvas,old.enabled!==false);
    } else return;
-   const params={...filter.params};if(mask)params._mask=mask;else delete params._mask;
-   const result=await app.State.do_action(new app.Actions.Update_layer_action(layer.id,{filters:layer.filters.map(f=>f===filter?{...f,params}:f)}));
+
+   const result=await app.State.do_action(new app.Actions.Update_layer_action(layer.id,{smart_filter_mask:mask}));
    if(result.status!=='completed')throw result.reason;
-   if(command==='add'||command==='edit')await this.command(layer.id,filter.id,'edit');
-   else if(command==='delete' && String(config.effect_mask_active)===String(filter.id)){config.mask_active=false;config.effect_mask_active=null;app.GUI.GUI_layers.render_layers();}
+   if(command==='add'||command==='edit')await this.command(layer.id,null,'edit');
+   else if(command==='delete' && config.layer?.id===layer.id && config.effect_mask_active==='stack'){config.mask_active=false;config.effect_mask_active=null;app.GUI.GUI_layers.render_layers();}
   } catch(error) {alertify.error(error.message);}
  }
 }

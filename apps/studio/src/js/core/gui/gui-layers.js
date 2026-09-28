@@ -1,3 +1,4 @@
+import { effectMaskRuntime } from '../../libs/effect-masks.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
  * author: Vilius L.
@@ -141,8 +142,12 @@ class GUI_layers_class {
 			else if (target.id == 'layer_name') {
 				_this.select_layer_from_panel(target.dataset.id, event);
 			}
+			else if (target.dataset.smartFiltersToggle) {
+				const layer = app.Layers.get_layer(Number(target.dataset.smartFiltersToggle), true);
+				if (layer && !layer.locked) app.State.do_action(new app.Actions.Update_layer_action(layer.id, {smart_filters_enabled:layer.smart_filters_enabled === false}));
+			}
 			else if (target.dataset.effectMask) {
-				app.GUI.modules['layer/effect_mask'].command(target.dataset.pid, target.dataset.id, target.dataset.effectMask);
+				app.GUI.modules['layer/effect_mask'].command(target.dataset.pid, null, event.shiftKey ? 'toggle' : target.dataset.effectMask);
 			}
 			else if (target.dataset.effectStep) {
 				const layer = app.Layers.get_layer(Number(target.dataset.pid), true);
@@ -617,6 +622,12 @@ class GUI_layers_class {
 		});
 
 		document.getElementById('layers_base').addEventListener('contextmenu', function (event) {
+			const stackMask = event.target.closest('[data-effect-mask]');
+			if (stackMask) {
+				event.preventDefault(); event.stopPropagation();
+				_this.show_smart_filter_mask_menu(event.clientX, event.clientY, Number(stackMask.dataset.pid));
+				return;
+			}
 			var thumb = event.target.closest('.layer_thumb');
 			var maskThumb = event.target.closest('.mask_thumb');
 			if (event.ctrlKey && !event.metaKey && (thumb || maskThumb)) {
@@ -854,6 +865,24 @@ class GUI_layers_class {
 	/**
 	 * shows mask context menu near the given coordinates
 	 */
+	show_smart_filter_mask_menu(x, y, layerId) {
+		this.hide_mask_context_menu();
+		const layer = app.Layers.get_layer(layerId, true);
+		const menu = document.createElement('div');
+		menu.id = 'mask_context_menu'; menu.className = 'mask_context_menu';
+		const actions = layer.smart_filter_mask ? [['edit','Edit Mask'],['toggle',layer.smart_filter_mask.enabled === false ? 'Enable Mask' : 'Disable Mask'],['invert','Invert Mask'],['delete','Delete Mask']] : [['edit','Add Mask']];
+		for (const [action, label] of actions) {
+			const button = document.createElement('button'); button.className = 'mask_context_menu_item'; button.textContent = label;
+			button.onclick = () => {this.hide_mask_context_menu(); app.GUI.modules['layer/effect_mask'].command(layerId, null, action);};
+			menu.appendChild(button);
+		}
+		document.body.appendChild(menu);
+		const rect = menu.getBoundingClientRect();
+		menu.style.left = Math.max(0, Math.min(x, window.innerWidth-rect.width)) + 'px';
+		menu.style.top = Math.max(0, Math.min(y, window.innerHeight-rect.height)) + 'px';
+		this.mask_context_menu=menu; this.mask_context_menu_open=true;
+	}
+
 	show_mask_context_menu(x, y, layer_id) {
 		if (this.mask_context_menu) {
 			this.mask_context_menu.remove();
@@ -1582,8 +1611,23 @@ class GUI_layers_class {
 				//show filters
 				if (value.filters && value.filters.length > 0) {
 					html += '<div class="filters" style="padding-left:' + (18 + depth * 14) + 'px">';
-					for (var j in value.filters) {
-						var filter = value.filters[j];
+					const filters = value.type === 'smart' ? [...value.filters.filter(f => !f.name.startsWith('smart:')), ...value.filters.filter(f => f.name.startsWith('smart:'))] : value.filters;
+					let smartHeader = false;
+					for (var j in filters) {
+						var filter = filters[j];
+						const smartChild = value.type === 'smart' && filter.name.startsWith('smart:');
+						if (smartChild && !smartHeader) {
+							smartHeader = true;
+							const mask = value.smart_filter_mask;
+							const active = config.mask_active && config.layer?.id === value.id && config.effect_mask_active === 'stack';
+							let thumb = '';
+							if (mask) thumb = this.Mask.get_mask_thumb({mask:effectMaskRuntime(mask)});
+							html += '<div class="smart-filter-group">';
+							html += '<button class="visibility ' + (value.smart_filters_enabled === false ? '' : 'visible') + '" data-smart-filters-toggle="' + value.id + '" title="Toggle Smart Filters" aria-label="Toggle Smart Filters"></button>';
+							html += '<button class="mask_thumb smart-filter-mask' + (active ? ' active_mask' : '') + (mask?.enabled === false ? ' disabled_mask' : '') + '" data-pid="' + value.id + '" data-effect-mask="edit" title="Smart Filters mask — paint; Shift-click to disable; right-click for options" aria-label="Smart Filters mask" style="background-color:white;' + (thumb ? 'background-image:url(' + thumb + ')' : '') + '"></button>';
+							html += '<span class="smart-filter-label">Smart Filters</span></div>';
+						}
+
 						var is_disabled = !!filter.disabled;
 						var titleMap = {
 							'shadow': 'Drop Shadow',
@@ -1595,7 +1639,7 @@ class GUI_layers_class {
 						};
 						var title = titleMap[filter.name] || filter.name.replace(/^smart:.*\//, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-						html += '<div class="filter' + (is_disabled ? ' disabled' : '') + '" draggable="true" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Drag to move effect, or ' + this.Helper.format_shortcut('Ctrl + Drag to duplicate') + '">';
+						html += '<div class="filter' + (smartChild ? ' smart-filter-child' : '') + (is_disabled ? ' disabled' : '') + '" draggable="true" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Drag to move effect, or ' + this.Helper.format_shortcut('Ctrl + Drag to duplicate') + '">';
 						if (!is_disabled) {
 							html += '	<button class="visibility visible trn" id="filter_visibility" data-pid="' + value.id + '" data-id="' + filter.id + '" title="Hide effect"></button>';
 						} else {
@@ -1603,15 +1647,7 @@ class GUI_layers_class {
 						}
 						html += '	<span class="layer_name" id="filter_name" data-pid="' + value.id + '" data-id="' + filter.id + '" data-filter="' + filter.name + '">' + title + '</span>';
 						if (filter.name.startsWith('smart:')) {
-							const active = config.mask_active && config.layer.id === value.id && String(config.effect_mask_active) === String(filter.id);
-							html += '<span class="effect-mask-controls"><button class="smart-effect-order effect-mask-target' + (active ? ' active' : '') + '" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-mask="edit" title="' + (filter.params._mask ? 'Paint effect mask (black bypasses, white applies)' : 'Add effect mask') + '">' + (filter.params._mask ? 'Mask' : '+ Mask') + '</button>';
-							if (filter.params._mask) {
-								for (const [action,label] of [['toggle',filter.params._mask.enabled === false ? 'Enable effect mask' : 'Disable effect mask'],['invert','Invert effect mask'],['delete','Remove effect mask']]) {
-									html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-mask="' + action + '" title="' + label + '">' + ({toggle:filter.params._mask.enabled === false ? '○' : '●',invert:'◐',delete:'×'})[action] + '</button>';
-								}
-							}
-
-							html += '</span><button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="-1" title="Apply earlier" aria-label="Apply earlier">↑</button>';
+							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="-1" title="Apply earlier" aria-label="Apply earlier">↑</button>';
 							html += '<button class="smart-effect-order" data-pid="' + value.id + '" data-id="' + filter.id + '" data-effect-step="1" title="Apply later" aria-label="Apply later">↓</button>';
 						}
 						html += '	<span class="delete" id="delete_filter" data-pid="' + value.id + '" data-id="' + filter.id + '" title="delete"></span>';

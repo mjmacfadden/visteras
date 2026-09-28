@@ -61,6 +61,8 @@ export class Insert_layer_action extends Base_action {
 			name: 'Layer ' + app.Layers.auto_increment,
 			type: null,
 			smart_source_id: null,
+			smart_filter_mask: null,
+			smart_filters_enabled: true,
 			link: null,
 			link_canvas: null,
 			x: 0,

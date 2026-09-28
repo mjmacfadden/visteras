@@ -3245,8 +3245,13 @@ body.canvas-only-mode .canvas_wrapper canvas {
  cursor: pointer;
 }
 .layers_list .filter .smart-effect-order:hover { color: #fff; background: #444; }
-.layers_list .filter .effect-mask-target.active { outline: 1px solid #fff; background: #3267a8; color: white; }
 .layers_list .filter { flex-wrap: wrap; }
 .layers_list .filter .layer_name { min-width: 0; flex-basis: 0; }
-.layers_list .filter .effect-mask-controls { display: flex; align-items: center; order: 2; flex-basis: 100%; padding-left: 18px; }
-.layers_list .filter .effect-mask-target { width: 44px; flex-basis: 44px; min-width: 44px; font-size: 10px; }
+
+.layers_list .smart-filter-group { display:flex; align-items:center; margin:4px 0 5px 20px; gap:4px; }
+.layers_list .smart-filter-group .visibility { flex:0 0 14px; width:14px; height:14px; opacity:.25; }
+.layers_list .smart-filter-group .visibility.visible { opacity:.8; }
+.layers_list .smart-filter-group .visibility:after { background-size:13px auto; }
+.layers_list .smart-filter-group .smart-filter-mask { padding:0; width:24px; height:20px; }
+.layers_list .smart-filter-label { font-size:12px; color:#ccc; }
+.layers_list .filter.smart-filter-child { margin-left:46px; flex-wrap:nowrap; }

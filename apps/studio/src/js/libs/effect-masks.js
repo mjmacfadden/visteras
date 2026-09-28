@@ -24,18 +24,17 @@ export function effectMaskRuntime(mask) {
 export function activeEffectTarget() {
  const layer=config.layer;
  if (!config.mask_active || !config.effect_mask_active || !layer || layer.type!=='smart') return null;
- const filter=(layer.filters||[]).find(f=>String(f.id)===String(config.effect_mask_active));
- if (!filter?.params?._mask) return null;
- const mask=effectMaskRuntime(filter.params._mask);
+ if (!layer.smart_filter_mask) return null;
+ const mask=effectMaskRuntime(layer.smart_filter_mask);
  Object.assign(mask,{x:layer.x||0,y:layer.y||0,width:layer.width,height:layer.height,linked:true,enabled:true});
- return {...layer,mask,_effectOwner:layer,_effectFilter:filter};
+ return {...layer,mask,_effectOwner:layer,_stackMask:layer.smart_filter_mask};
 }
 export function effectMaskImageAction(canvas, target) {
- const owner=target._effectOwner, filter=target._effectFilter;
- if (!config.layers.includes(owner) || owner.locked || !owner.filters.includes(filter)) throw new Error('The effect mask target changed.');
- const mask=encodeEffectMask(canvas,filter.params._mask.enabled!==false);
- return new app.Actions.Update_layer_action(owner.id,{filters:owner.filters.map(f=>f===filter?{...f,params:{...f.params,_mask:mask}}:f)});
+ const owner=target._effectOwner;
+ if (!config.layers.includes(owner) || owner.locked || owner.smart_filter_mask!==target._stackMask) throw new Error('The Smart Filters mask target changed.');
+ return new app.Actions.Update_layer_action(owner.id,{smart_filter_mask:encodeEffectMask(canvas,owner.smart_filter_mask.enabled!==false)});
 }
+
 export function blendEffectMask(input, output, mask) {
  if (!mask || mask.enabled===false) return output;
  const state=effectMaskRuntime(mask), source=state.link_canvas||state.link;

@@ -46,3 +46,8 @@ test('effect masks reject malformed grayscale payloads before rendering',()=>{
  for(const mask of [{width:0,height:1,data:''},{width:2,height:1,data:'/w=='},{width:1,height:1,data:'!!!!'}])
   assert.throws(()=>context.validate_sources({source:source()},[make(mask)]),/Effect mask/);
 });
+
+test('shared Smart Filters masks validate serialized payloads',()=>{
+ assert.doesNotThrow(()=>context.validate_sources({source:source()},[{...layer(),smart_filter_mask:{width:1,height:1,data:'/w=='}}]));
+ assert.throws(()=>context.validate_sources({source:source()},[{...layer(),smart_filter_mask:{width:2,height:1,data:'/w=='}}]),/mask/);
+});
