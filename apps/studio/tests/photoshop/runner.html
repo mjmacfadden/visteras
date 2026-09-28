@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><title>Photoshop compatibility runner</title>
+<style>body{font:15px system-ui;background:#20242a;color:#eee;margin:24px}iframe{width:1200px;height:740px}pre{white-space:pre-wrap}button{padding:10px}</style>
+<h1>Photoshop compatibility runner</h1><p>Generated fixtures only. No personal documents are used.</p><button id="run">Run Visteras round-trip</button><pre id="status">Ready</pre><iframe id="editor" src="/studio/"></iframe>
+<script>
+const statusEl=document.getElementById("status");
+run.onclick=async()=>{run.disabled=true;const results=[];const cfg=await(await fetch('/manifest')).json();const upload=async(name,body)=>{const r=await fetch('/result/'+name,{method:'POST',headers:{'X-Run-Token':cfg.token},body});if(!r.ok)throw Error('Saving '+name+' failed');};try{const win=editor.contentWindow;for(let i=0;i<200&&!win.app?.FileOpen;i++)await new Promise(r=>setTimeout(r,100));const {app,AppConfig:c}=win;
+for(const id of cfg.ids){statusEl.textContent='Round-tripping '+id;try{const blob=await(await fetch('/artifacts/reference/'+id+'.psd')).blob();await app.FileOpen.open_handler({target:{files:[new win.File([blob],id+'.psd',{type:'image/vnd.adobe.photoshop'})]}});if(!c.layers.length)throw Error('No imported layers');
+// A reversible visibility edit exercises the editor/action path without changing the baseline.
+const layer=c.layers.find(l=>!l.locked);if(layer){const r=await app.State.do_action(new app.Actions.Update_layer_action(layer.id,{visible:!layer.visible}));if(r.status!=='completed')throw Error('Edit failed');await app.State.undo();}
+await app.FileSave._write_document_to_handle({name:id+'.psd',createWritable:async()=>({write:async data=>upload(id+'.psd',data),close:async()=>{}})},'PSD');
+results.push({id,status:'ok',layers:c.layers.map(l=>({name:l.name,type:l.type,parent_id:l.parent_id,clipped:l.clipped,composition:l.composition}))});}catch(e){results.push({id,status:'error',error:String(e)});}statusEl.textContent=results.map(r=>r.id+': '+r.status+(r.error?' '+r.error:'')).join('\n');}
+await upload('browser.json',JSON.stringify({userAgent:navigator.userAgent,results}));statusEl.textContent+='\nBrowser stage complete. Run inspect.jsx in Photoshop, then generate the report.';}catch(e){statusEl.textContent+='\n'+e.stack;}finally{run.disabled=false;}};
+</script>
