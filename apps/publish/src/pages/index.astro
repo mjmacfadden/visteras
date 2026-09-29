@@ -73,8 +73,8 @@ const hasWireStories =
             <div class="menu_entry_title">File</div>
             <div class="menu_dropdown_list">
               <div class="menu_dropdown_item" id="action_new_edition">New Edition <span class="menu_dropdown_shortcut">⌘N</span></div>
-              <div class="menu_dropdown_item" id="action_open_edition">Open Edition... <span class="menu_dropdown_shortcut">⌘O</span></div>
-              <div class="menu_dropdown_item" id="action_save_edition">Save Edition As... <span class="menu_dropdown_shortcut">⌘S</span></div>
+              <div class="menu_dropdown_item" id="action_open_edition">Open Edition (.vpd)... <span class="menu_dropdown_shortcut">⌘O</span></div>
+              <div class="menu_dropdown_item" id="action_save_edition">Save Edition (.vpd) <span class="menu_dropdown_shortcut">⌘S</span></div>
               <div class="menu_dropdown_item" id="action_load_sample">Load Sample Edition</div>
               <div class="menu_dropdown_separator"></div>
               <div class="menu_dropdown_item" id="action_print">Print Edition... <span class="menu_dropdown_shortcut">⌘P</span></div>
@@ -84,7 +84,7 @@ const hasWireStories =
               <a href="../collage/" class="menu_dropdown_item">Open Visteras Collage...</a>
             </div>
           </div>
-          <input type="file" id="action_file_open_input" accept=".json,application/json" style="display: none;" />
+          <input type="file" id="action_file_open_input" accept=".vpd,.json,application/json,application/x-visteras-publish" style="display: none;" />
 
           <!-- Edit Menu -->
           <div class="menu_entry" id="menu_edit">
@@ -2623,22 +2623,37 @@ const hasWireStories =
         openFileInput?.click();
       });
 
-      openFileInput?.addEventListener('change', async (ev) => {
-        const file = (ev.target as HTMLInputElement)?.files?.[0];
+      async function handlePublishFile(file: File) {
         if (!file) return;
         try {
           const text = await file.text();
           const doc = docManager.importEditionFromText(text);
           loadDocumentIntoView(doc);
         } catch (err) {
-          alert('Failed to open edition JSON: ' + (err instanceof Error ? err.message : String(err)));
-        } finally {
-          if (openFileInput) openFileInput.value = '';
+          alert('Failed to open edition (.vpd): ' + (err instanceof Error ? err.message : String(err)));
+        }
+      }
+
+      openFileInput?.addEventListener('change', async (ev) => {
+        const file = (ev.target as HTMLInputElement)?.files?.[0];
+        if (!file) return;
+        await handlePublishFile(file);
+        if (openFileInput) openFileInput.value = '';
+      });
+
+      window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+      window.addEventListener('drop', async (e) => {
+        const file = e.dataTransfer?.files?.[0];
+        if (file && (file.name.endsWith('.vpd') || file.name.endsWith('.json') || file.type.includes('json'))) {
+          e.preventDefault();
+          await handlePublishFile(file);
         }
       });
 
       document.getElementById('action_save_edition')?.addEventListener('click', () => {
-        docManager.exportEdition();
+        void docManager.exportEdition();
       });
 
       document.getElementById('action_load_sample')?.addEventListener('click', () => {

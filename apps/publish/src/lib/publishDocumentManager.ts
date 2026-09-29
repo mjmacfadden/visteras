@@ -36,6 +36,7 @@ export interface PublishEditionBundle {
   version: number;
   app: string;
   exportedAt: string;
+  thumbnail?: string | null;
   document: {
     title: string;
     editionDate: string;
@@ -202,15 +203,29 @@ export class PublishDocumentManager {
     }
   }
 
-  public exportEdition(doc?: PublishDocument): void {
+  public async exportEdition(doc?: PublishDocument): Promise<void> {
     const target = doc || this.getActiveDocument();
     if (!target) return;
+
+    let thumbUrl: string | null = null;
+    try {
+      if (typeof document !== 'undefined') {
+        const pageEl = document.querySelector('.newspaper-page') as HTMLElement;
+        if (pageEl && (window as any).html2canvas) {
+          const canvas = await (window as any).html2canvas(pageEl, { scale: 0.25, useCORS: true, allowTaint: true });
+          thumbUrl = canvas.toDataURL('image/png');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not generate publish thumbnail:', e);
+    }
 
     const bundle: PublishEditionBundle = {
       $schema: PUBLISH_EDITION_SCHEMA,
       version: 1,
       app: PUBLISH_APP_ID,
       exportedAt: new Date().toISOString(),
+      thumbnail: thumbUrl,
       document: {
         title: target.title,
         editionDate: target.editionDate || new Date().toISOString().split('T')[0],
@@ -220,16 +235,36 @@ export class PublishDocumentManager {
     };
 
     const json = JSON.stringify(bundle, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
     const safeName = (target.settings.paperName || target.title || 'edition')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     const dateStr = target.editionDate || new Date().toISOString().split('T')[0];
-    const filename = `${safeName}-${dateStr}.publish.json`;
+    const filename = `${safeName}-${dateStr}.vpd`;
 
+    if (typeof (window as any).showSaveFilePicker === 'function') {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'Visteras Publish Document (.vpd)',
+            accept: { 'application/json': ['.vpd'], 'application/x-visteras-publish': ['.vpd'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        target.isDirty = false;
+        this.renderTabs();
+        return;
+      } catch (err: any) {
+        if (err && err.name === 'AbortError') return;
+        console.warn('showSaveFilePicker failed, falling back to download:', err);
+      }
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;

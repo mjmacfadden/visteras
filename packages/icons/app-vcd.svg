@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- App squircle drop shadow on canvas -->
+    <filter id="appShadow" x="-20%" y="-15%" width="140%" height="135%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.15"/>
+    </filter>
+    
+    <!-- Luminous ambient glow behind the logo -->
+    <filter id="logoGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="0" stdDeviation="24" flood-color="#a855f7" flood-opacity="0.42"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#a855f7" flood-opacity="0.58"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#282a30"/>
+      <stop offset="50%" stop-color="#1c1e22"/>
+      <stop offset="100%" stop-color="#121316"/>
+    </linearGradient>
+
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="50%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#7e22ce"/>
+    </linearGradient>
+
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App Squircle Base -->
+  <g filter="url(#appShadow)">
+    <rect x="36" y="36" width="440" height="440" rx="98" fill="url(#bgGrad)"/>
+    <rect x="36" y="36" width="440" height="440" rx="98" fill="none" stroke="url(#borderGrad)" stroke-width="2"/>
+  </g>
+
+  <!-- Centered App Logo Glyph with Radiant Glow -->
+  <g filter="url(#logoGlow)" transform="translate(256, 256) scale(0.63) translate(-256, -255)">
+    <path d="M 37.4,83.7 L 36.4,84.8 L 36.4,87.7 L 37.8,90.2 L 251.7,426.2 L 256.4,426.2 L 294.8,368.6 L 458.2,114.9 L 475.3,88.1 L 475.6,85.5 L 474.2,83.7 L 382.9,83.7 L 380.0,86.3 L 329.2,163.1 L 273.8,242.1 L 269.4,242.1 L 169.0,86.3 L 166.5,83.7 Z"
+          fill="url(#brandGrad)"
+          fill-rule="evenodd"/>
+  </g>
+</svg>
