@@ -72,3 +72,23 @@ test('File Types: Collage supports .vcd documents', () => {
 	assert.match(collageAppJs, /Visteras Collage Document \(\.vcd\)/);
 	assert.match(collageAppJs, /\$\{slugify\(chosenTitle\)\}\.vcd/);
 });
+
+test('File Types: All formats support embedded PNG thumbnails for previews', () => {
+	const saveJs = fs.readFileSync(path.join(rootDir, 'apps/studio/src/js/modules/file/save.js'), 'utf8');
+	const vectorHtml = fs.readFileSync(path.join(rootDir, 'apps/vector/index.html'), 'utf8');
+	const docManagerTs = fs.readFileSync(path.join(rootDir, 'apps/publish/src/lib/publishDocumentManager.ts'), 'utf8');
+	const collageAppJs = fs.readFileSync(path.join(rootDir, 'apps/collage/js/app.js'), 'utf8');
+
+	// Studio .vsd embeds thumbnail in info and root
+	assert.match(saveJs, /export_data\.info\.thumbnail\s*=\s*thumbDataUrl/);
+	assert.match(saveJs, /export_data\.thumbnail\s*=\s*thumbDataUrl/);
+
+	// Vector .vvd embeds thumbnail
+	assert.match(vectorHtml, /thumbnail:\s*thumbUrl/);
+
+	// Publish .vpd embeds thumbnail
+	assert.match(docManagerTs, /thumbnail:\s*thumbUrl/);
+
+	// Collage .vcd embeds thumbnail
+	assert.match(collageAppJs, /thumbnail:\s*doc\.thumbnail/);
+});

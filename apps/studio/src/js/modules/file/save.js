@@ -805,6 +805,33 @@ class File_save_class {
 			transparency: config.TRANSPARENCY !== false,
 		};
 
+		// Thumbnail composite preview
+		try {
+			if (typeof document !== 'undefined' && this.Base_layers && config.WIDTH && config.HEIGHT) {
+				var maxSize = 512;
+				var scale = Math.min(1, maxSize / Math.max(config.WIDTH, config.HEIGHT));
+				var thumbCanvas = document.createElement('canvas');
+				thumbCanvas.width = Math.max(1, Math.round(config.WIDTH * scale));
+				thumbCanvas.height = Math.max(1, Math.round(config.HEIGHT * scale));
+				var thumbCtx = thumbCanvas.getContext('2d');
+				if (scale < 1) {
+					var fullCanvas = document.createElement('canvas');
+					fullCanvas.width = config.WIDTH;
+					fullCanvas.height = config.HEIGHT;
+					var fullCtx = fullCanvas.getContext('2d');
+					this.Base_layers.convert_layers_to_canvas(fullCtx, null, false);
+					thumbCtx.drawImage(fullCanvas, 0, 0, thumbCanvas.width, thumbCanvas.height);
+				} else {
+					this.Base_layers.convert_layers_to_canvas(thumbCtx, null, false);
+				}
+				var thumbDataUrl = thumbCanvas.toDataURL('image/png');
+				export_data.info.thumbnail = thumbDataUrl;
+				export_data.thumbnail = thumbDataUrl;
+			}
+		} catch (e) {
+			console.warn('Could not generate vsd thumbnail:', e);
+		}
+
 		//fonts
 		export_data.user_fonts = config.user_fonts;
 		export_data.smart_layers_version = 1;

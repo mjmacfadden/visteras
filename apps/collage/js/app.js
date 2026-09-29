@@ -242,7 +242,7 @@ import {
       });
 
       el.viewport.style.transform = savedTransform;
-      return canvas.toDataURL('image/jpeg', 0.75);
+      return canvas.toDataURL('image/png');
     } catch (err) {
       console.warn('Could not generate collage thumbnail:', err);
       return null;

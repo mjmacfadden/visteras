@@ -565,6 +565,37 @@
         const unit = (svgEditor?.configObj?.curConfig?.baseUnit) || activeDoc?.unit || 'px';
         const svgStr = sc.getSvgString();
         const title = (activeDoc?.title || svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
+
+        let thumbUrl = null;
+        try {
+          const img = new Image();
+          const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+          const blobUrl = URL.createObjectURL(svgBlob);
+          await new Promise((resolve) => {
+            img.onload = () => {
+              const maxSize = 512;
+              const origW = img.naturalWidth || res.w || 512;
+              const origH = img.naturalHeight || res.h || 512;
+              const scale = Math.min(1, maxSize / Math.max(origW, origH));
+              const thumbCanvas = document.createElement('canvas');
+              thumbCanvas.width = Math.max(1, Math.round(origW * scale));
+              thumbCanvas.height = Math.max(1, Math.round(origH * scale));
+              const ctx = thumbCanvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+              thumbUrl = thumbCanvas.toDataURL('image/png');
+              URL.revokeObjectURL(blobUrl);
+              resolve();
+            };
+            img.onerror = () => {
+              URL.revokeObjectURL(blobUrl);
+              resolve();
+            };
+            img.src = blobUrl;
+          });
+        } catch (e) {
+          console.warn('Could not generate vvd thumbnail:', e);
+        }
+
         const vvdData = {
           $schema: 'visteras-vector-document-v1',
           version: 1,
@@ -574,6 +605,7 @@
           width: res.w,
           height: res.h,
           unit: unit,
+          thumbnail: thumbUrl,
           svg: svgStr,
         };
         const vvdJson = JSON.stringify(vvdData, null, 2);
