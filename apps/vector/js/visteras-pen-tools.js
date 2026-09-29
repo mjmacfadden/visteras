@@ -80,6 +80,7 @@ export function mountPenTools(editor) {
   });
   syncSnapMenu();
   const snapMarker = document.createElement('div');
+  snapMarker.className = 'visteras-snap-point-marker';
   snapMarker.style.cssText = 'position:fixed;width:8px;height:8px;border:1px solid #fa7c1b;pointer-events:none;z-index:99999;display:none;transform:translate(-50%,-50%)';
   document.body.append(snapMarker);
   function preparePointer(event) {

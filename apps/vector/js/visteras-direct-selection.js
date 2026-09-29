@@ -33,6 +33,72 @@ export function mountDirectSelection(editor) {
   status.hidden = true;
   document.getElementById('properties_panel')?.append(status);
 
+  document.getElementById('visteras-direct-snap-marker')?.remove();
+  const snapMarker = document.createElement('div');
+  snapMarker.id = 'visteras-direct-snap-marker';
+  snapMarker.className = 'visteras-snap-point-marker';
+  snapMarker.style.cssText = 'position:fixed;width:8px;height:8px;border:1px solid #fa7c1b;pointer-events:none;z-index:99999;display:none;transform:translate(-50%,-50%)';
+  document.body.append(snapMarker);
+
+  function isSnapPointEnabled() {
+    try { return localStorage.getItem('visteras_vector_snap_points') !== '0'; } catch { return true; }
+  }
+  function showSnapMarker(screenPt) {
+    snapMarker.dataset.target = `${screenPt.x},${screenPt.y}`;
+    Object.assign(snapMarker.style, {
+      display: 'block',
+      left: `${screenPt.x}px`,
+      top: `${screenPt.y}px`
+    });
+  }
+  function hideSnapMarker() {
+    snapMarker.dataset.target = 'none';
+    snapMarker.style.display = 'none';
+  }
+  let hoverSnap = null;
+
+  function findSnapTarget(sourceScreenPt, excludeAnchors = new Map()) {
+    if (!isSnapPointEnabled()) return null;
+    const content = sc.getSvgContent();
+    if (!content) return null;
+
+    let closest = null;
+    const candidateElements = leaves([...content.querySelectorAll(SHAPES)]);
+
+    for (const el of candidateElements) {
+      const elScreenMatrix = el.getScreenCTM();
+      if (!elScreenMatrix) continue;
+
+      const rec = records.find(r => r.el === el);
+      const segs = rec?.segments || readGeometry(el);
+      const excludedSet = excludeAnchors.get(el);
+
+      const anchorList = anchors(segs);
+      for (const a of anchorList) {
+        if (excludedSet && (excludedSet.has(a.index) || a.aliases.some(idx => excludedSet.has(idx)))) continue;
+        const s = segs[a.index];
+        if (!s) continue;
+
+        const screenPt = new DOMPoint(s.x, s.y).matrixTransform(elScreenMatrix);
+        const dist = Math.hypot(screenPt.x - sourceScreenPt.x, screenPt.y - sourceScreenPt.y);
+
+        if (dist <= 8 && (!closest || dist < closest.dist)) {
+          const elContentMatrix = matrix(el);
+          const contentPt = point(s.x, s.y, elContentMatrix);
+          closest = {
+            el,
+            anchorIndex: a.index,
+            screenPt,
+            contentPt,
+            dist,
+            localPt: { x: s.x, y: s.y }
+          };
+        }
+      }
+    }
+    return closest;
+  }
+
   function leaves(elements) {
     return [...new Set(elements.flatMap(el => el.matches?.(SHAPES) ? [el] : [...(el.querySelectorAll?.(SHAPES) || [])]))]
       .filter(el => el.isConnected && !el.closest('defs,clipPath,mask') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).pointerEvents !== 'none');
@@ -168,6 +234,8 @@ export function mountDirectSelection(editor) {
     }
   }
   function finish(cancel = false) {
+    hideSnapMarker();
+    hoverSnap = null;
     if (!gesture) return;
     const g = gesture;
     gesture = null;
@@ -340,6 +408,9 @@ export function mountDirectSelection(editor) {
   sc.directSelection = {
     get active() { return active; },
     getSelectedElements: () => selectedElements(),
+    findSnapTarget,
+    get snapMarker() { return snapMarker; },
+    get isSnapPointEnabled() { return isSnapPointEnabled; },
     // Paint targets: prefer elems with selected anchors; if none, all paths in the
     // current DS session (so Appearance fill/stroke still hit the edited object).
     getPaintTargets() {
@@ -388,23 +459,35 @@ export function mountDirectSelection(editor) {
       schedule();
     }
   };
-  document.addEventListener('modeChange', schedule);
+  document.addEventListener('modeChange', () => {
+    hideSnapMarker();
+    hoverSnap = null;
+    schedule();
+  });
+  document.getElementById('workarea')?.addEventListener('mouseleave', () => {
+    if (!gesture) {
+      hideSnapMarker();
+      hoverSnap = null;
+    }
+  });
   new MutationObserver(schedule).observe(sc.getSvgContent(), { subtree: true, childList: true, attributes: true });
   document.addEventListener('mousedown', e => {
     if (sc.getMode() !== 'pathedit' || e.button !== 0 || sc.spaceKey || !sc.getSvgRoot().contains(e.target)) return;
     const el = e.target.closest?.(SHAPES), artwork = el && sc.getSvgContent().contains(el) ? el : null;
     const ownGrip = e.target.hasAttribute?.('data-direct-record');
+    const snapCandidate = (hoverSnap && isSnapPointEnabled() && hoverSnap.el.isConnected) ? hoverSnap : null;
+    const targetArtwork = snapCandidate ? snapCandidate.el : artwork;
     if (!active) {
       const native = sc.getPathObj?.();
-      if (artwork && e.shiftKey && native?.elem.isConnected && native.elem !== artwork) {
+      if (targetArtwork && e.shiftKey && native?.elem.isConnected && native.elem !== targetArtwork) {
         const previous = new Set(native.selected_pts);
-        activate([native.elem, artwork], false);
+        activate([native.elem, targetArtwork], false);
         // Native SVGEdit represents the first anchor using the closing segment.
         const rec = records.find(r => r.el === native.elem);
         if (rec) rec.selected = new Set(anchors(rec.segments).filter(a => a.aliases.some(i => previous.has(i))).map(a => a.index));
-      } else if (artwork) {
-        activate([artwork], false);
-      } else if (!artwork && !e.target.closest?.('#pathpointgrip_container')) {
+      } else if (targetArtwork) {
+        activate([targetArtwork], false);
+      } else if (!targetArtwork && !e.target.closest?.('#pathpointgrip_container')) {
         const previous = native?.elem.isConnected ? { elem: native.elem, points: [...native.selected_pts] } : null;
         activate(leaves([sc.getCurrentDrawing().getCurrentLayer()]), false);
         if (e.shiftKey && previous) {
@@ -424,6 +507,16 @@ export function mountDirectSelection(editor) {
       const collapse = !control && rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
       if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
       gesture = { type: control ? 'control' : 'anchors', rec, index, control, start: position(e), before: snapshot(), collapse };
+    } else if (snapCandidate) {
+      const rec = prepare(snapCandidate.el);
+      const index = snapCandidate.anchorIndex;
+      if (e.shiftKey) {
+        rec.selected.has(index) ? rec.selected.delete(index) : rec.selected.add(index);
+        schedule(); return;
+      }
+      const collapse = rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
+      if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
+      gesture = { type: 'anchors', rec, index, control: null, start: position(e), before: snapshot(), collapse };
     } else if (artwork) {
       const rec = prepare(artwork);
       if (!rec) return;
@@ -438,14 +531,37 @@ export function mountDirectSelection(editor) {
       if (!e.shiftKey) clearPoints();
       gesture = { type: 'marquee', start: position(e), selection, additive: e.shiftKey };
     }
+    hideSnapMarker();
+    hoverSnap = null;
     schedule();
   }, true);
   document.addEventListener('mousemove', e => {
-    if (!gesture) return;
+    if (sc.getMode() !== 'pathedit') {
+      hideSnapMarker();
+      hoverSnap = null;
+      return;
+    }
+    if (!gesture) {
+      if (isSnapPointEnabled() && document.getElementById('workarea')?.contains(e.target)) {
+        const snap = findSnapTarget({ x: e.clientX, y: e.clientY });
+        if (snap) {
+          showSnapMarker(snap.screenPt);
+          hoverSnap = snap;
+        } else {
+          hideSnapMarker();
+          hoverSnap = null;
+        }
+      } else {
+        hideSnapMarker();
+        hoverSnap = null;
+      }
+      return;
+    }
     stop(e);
     const g = gesture, p = position(e);
     g.current = p;
     if (g.type === 'marquee') {
+      hideSnapMarker();
       for (const [i, rec] of records.entries()) {
         if (!rec.el.isConnected) continue;
         rec.selected = new Set(g.additive ? g.selection[i] : []);
@@ -460,6 +576,78 @@ export function mountDirectSelection(editor) {
       if (Math.hypot(dx,dy)*sc.getZoom() < 2 && !g.moved) return;
       g.moved = true;
       if (e.shiftKey) Math.abs(dx) > Math.abs(dy) ? dy = 0 : dx = 0;
+
+      if (isSnapPointEnabled()) {
+        const contentScreenCTM = sc.getSvgContent().getScreenCTM();
+        if (contentScreenCTM) {
+          if (g.type === 'anchors') {
+            const excludeAnchors = new Map();
+            for (const item of g.before) {
+              if (item.rec.selected.size) excludeAnchors.set(item.rec.el, item.rec.selected);
+            }
+            let leaderOrigContent = null;
+            if (g.rec && g.index != null) {
+              const leaderItem = g.before.find(i => i.rec === g.rec);
+              if (leaderItem && leaderItem.segments[g.index]) {
+                const s = leaderItem.segments[g.index];
+                leaderOrigContent = point(s.x, s.y, matrix(g.rec.el));
+              }
+            }
+            if (!leaderOrigContent && g.before.length) {
+              let minDist = Infinity;
+              for (const item of g.before) {
+                const m = matrix(item.rec.el);
+                for (const idx of item.rec.selected) {
+                  const s = item.segments[idx];
+                  if (!s) continue;
+                  const cp = point(s.x, s.y, m);
+                  const d = Math.hypot(cp.x - g.start.x, cp.y - g.start.y);
+                  if (d < minDist) {
+                    minDist = d;
+                    leaderOrigContent = cp;
+                  }
+                }
+              }
+            }
+            if (leaderOrigContent) {
+              const proposedContent = { x: leaderOrigContent.x + dx, y: leaderOrigContent.y + dy };
+              const proposedScreen = new DOMPoint(proposedContent.x, proposedContent.y).matrixTransform(contentScreenCTM);
+              const snap = findSnapTarget(proposedScreen, excludeAnchors);
+              if (snap) {
+                dx = snap.contentPt.x - leaderOrigContent.x;
+                dy = snap.contentPt.y - leaderOrigContent.y;
+                showSnapMarker(snap.screenPt);
+              } else {
+                hideSnapMarker();
+              }
+            } else {
+              hideSnapMarker();
+            }
+          } else if (g.type === 'control') {
+            const item = g.before.find(i => i.rec === g.rec);
+            if (item) {
+              const [index, suffix] = g.control.split(':');
+              const s = item.segments[Number(index)];
+              if (s && s['x' + suffix] !== undefined) {
+                const origHandleContent = point(s['x' + suffix], s['y' + suffix], matrix(g.rec.el));
+                const proposedContent = { x: origHandleContent.x + dx, y: origHandleContent.y + dy };
+                const proposedScreen = new DOMPoint(proposedContent.x, proposedContent.y).matrixTransform(contentScreenCTM);
+                const snap = findSnapTarget(proposedScreen);
+                if (snap) {
+                  dx = snap.contentPt.x - origHandleContent.x;
+                  dy = snap.contentPt.y - origHandleContent.y;
+                  showSnapMarker(snap.screenPt);
+                } else {
+                  hideSnapMarker();
+                }
+              }
+            }
+          }
+        }
+      } else {
+        hideSnapMarker();
+      }
+
       if (g.type === 'anchors') move(g.before, dx, dy);
       else {
         const item = g.before.find(i => i.rec === g.rec);
