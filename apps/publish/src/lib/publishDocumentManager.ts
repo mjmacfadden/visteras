@@ -202,7 +202,7 @@ export class PublishDocumentManager {
     }
   }
 
-  public exportEdition(doc?: PublishDocument): void {
+  public async exportEdition(doc?: PublishDocument): Promise<void> {
     const target = doc || this.getActiveDocument();
     if (!target) return;
 
@@ -220,16 +220,36 @@ export class PublishDocumentManager {
     };
 
     const json = JSON.stringify(bundle, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-
     const safeName = (target.settings.paperName || target.title || 'edition')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
     const dateStr = target.editionDate || new Date().toISOString().split('T')[0];
-    const filename = `${safeName}-${dateStr}.publish.json`;
+    const filename = `${safeName}-${dateStr}.vpd`;
 
+    if (typeof (window as any).showSaveFilePicker === 'function') {
+      try {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'Visteras Publish Document (.vpd)',
+            accept: { 'application/json': ['.vpd'], 'application/x-visteras-publish': ['.vpd'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        target.isDirty = false;
+        this.renderTabs();
+        return;
+      } catch (err: any) {
+        if (err && err.name === 'AbortError') return;
+        console.warn('showSaveFilePicker failed, falling back to download:', err);
+      }
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;

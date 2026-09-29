@@ -241,7 +241,7 @@ class File_open_class {
 		a.setAttribute("id", "file_open");
 		a.type = 'file';
 		a.multiple = 'multiple';
-		a.accept = 'image/*,.json,.psd,.piskel,.ttf,.otf,.woff,.woff2,application/json,image/vnd.adobe.photoshop,image/x-photoshop';
+		a.accept = '.vsd,image/*,.json,.psd,.piskel,.ttf,.otf,.woff,.woff2,application/json,application/x-visteras-studio,image/vnd.adobe.photoshop,image/x-photoshop';
 		document.getElementById("tmp").appendChild(a);
 		document.getElementById('file_open').addEventListener('change', function (e) {
 			_this.open_handler(e);
@@ -659,7 +659,8 @@ class File_open_class {
 				continue;
 			}
 			var isPiskel = (f.name && f.name.toLowerCase().endsWith('.piskel'));
-			var isJson = !isPiskel && (f.name.toLowerCase().endsWith('.json') || f.type === 'application/json' || f.type === 'text/json');
+			var isVsd = (f.name && f.name.toLowerCase().endsWith('.vsd'));
+			var isJson = !isPiskel && (isVsd || f.name.toLowerCase().endsWith('.json') || f.type === 'application/json' || f.type === 'text/json');
 			var isPsd = (f.name && f.name.toLowerCase().endsWith('.psd')) ||
 				f.type === 'image/vnd.adobe.photoshop' ||
 				f.type === 'image/x-photoshop' ||
@@ -667,9 +668,9 @@ class File_open_class {
 				f.type === 'application/photoshop' ||
 				f.type === 'application/psd';
 
-			if (!f.type.match('image.*') && !isJson && !isPsd && !isPiskel && !f.name.match(/\.(png|jpg|jpeg|webp|gif|avif|psd|piskel)/i)) {
+			if (!f.type.match('image.*') && !isJson && !isPsd && !isPiskel && !f.name.match(/\.(vsd|png|jpg|jpeg|webp|gif|avif|psd|piskel)/i)) {
 				if(dir_opened == false) {
-					alertify.error('Wrong file type, must be image, json, psd, piskel, or font.');
+					alertify.error('Wrong file type, must be vsd, image, json, psd, piskel, or font.');
 				}
 				continue;
 			}

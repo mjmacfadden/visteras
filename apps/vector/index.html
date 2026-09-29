@@ -47,10 +47,11 @@
           <div class="menu_entry_title">File</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_new">New Document <span class="menu_dropdown_shortcut">⌘N</span></div>
-            <div class="menu_dropdown_item" id="action_open">Open SVG... <span class="menu_dropdown_shortcut">⌘O</span></div>
+            <div class="menu_dropdown_item" id="action_open">Open Vector Document (.vvd, .svg)... <span class="menu_dropdown_shortcut">⌘O</span></div>
             <div class="menu_dropdown_item" id="action_place">Place... <span class="menu_dropdown_shortcut">⌘⇧P</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_save">Save SVG <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_item" id="action_save">Save Vector Document (.vvd) <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_item" id="action_export_svg">Export SVG...</div>
             <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
             <div class="menu_dropdown_item" id="action_export_pdf">Export PDF...</div>
             <a href="../studio/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Studio...</a>
@@ -486,47 +487,142 @@
         window.__visterasDocumentShell?.openNewModal?.();
       });
 
+      function openVectorFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const raw = re.target.result;
+          let svgContent = raw;
+          let base = (file.name || 'untitled').replace(/\.(vvd|svg)$/i, '');
+          let docWidth = null;
+          let docHeight = null;
+          let docUnit = null;
+
+          if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+            try {
+              const bundle = JSON.parse(raw);
+              if (bundle.svg) svgContent = bundle.svg;
+              if (bundle.title) base = bundle.title;
+              if (bundle.width) docWidth = bundle.width;
+              if (bundle.height) docHeight = bundle.height;
+              if (bundle.unit) docUnit = bundle.unit;
+            } catch (err) {
+              console.warn('VVD parse error, reading as raw text:', err);
+            }
+          }
+
+          sc.setSvgString(svgContent);
+          if (base) svgEditor.title = base;
+
+          // Opened file becomes the clean baseline (Studio parity).
+          setTimeout(() => {
+            const shell = window.__visterasDocumentShell;
+            const doc = shell?.getActiveDoc?.();
+            if (doc && base) doc.title = base;
+            if (doc && docWidth && docHeight) {
+              doc.width = docWidth;
+              doc.height = docHeight;
+              if (docUnit) doc.unit = docUnit;
+              sc.setResolution(docWidth, docHeight);
+            }
+            shell?.clearActiveDirty?.();
+            shell?.updateStatusBar?.();
+          }, 80);
+        };
+        reader.readAsText(file);
+      }
+
       document.getElementById('action_open')?.addEventListener('click', () => {
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
-        fileInput.accept = 'image/svg+xml,.svg';
+        fileInput.accept = '.vvd,image/svg+xml,.svg,application/json,application/x-visteras-vector';
         fileInput.onchange = (e) => {
           const file = e.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (re) => {
-              sc.setSvgString(re.target.result);
-              const base = (file.name || 'untitled.svg').replace(/\.svg$/i, '');
-              if (base) svgEditor.title = base;
-              // Opened file becomes the clean baseline (Studio parity).
-              setTimeout(() => {
-                const shell = window.__visterasDocumentShell;
-                const doc = shell?.getActiveDoc?.();
-                if (doc && base) doc.title = base;
-                shell?.clearActiveDirty?.();
-                shell?.updateStatusBar?.();
-              }, 80);
-            };
-            reader.readAsText(file);
-          }
+          if (file) openVectorFile(file);
         };
         fileInput.click();
+      });
+
+      window.addEventListener('dragover', (e) => {
+        e.preventDefault();
+      });
+      window.addEventListener('drop', (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file && (file.name.endsWith('.vvd') || file.name.endsWith('.svg') || file.type.includes('svg'))) {
+          e.preventDefault();
+          openVectorFile(file);
+        }
       });
 
       document.getElementById('action_place')?.addEventListener('click', () => {
         window.__visterasOpenImagePicker?.();
       });
 
-      document.getElementById('action_save')?.addEventListener('click', () => {
+      document.getElementById('action_save')?.addEventListener('click', async () => {
+        const shell = window.__visterasDocumentShell;
+        const activeDoc = shell?.getActiveDoc?.();
+        const res = (sc.getResolution && sc.getResolution()) || { w: activeDoc?.width || 800, h: activeDoc?.height || 600 };
+        const unit = (svgEditor?.configObj?.curConfig?.baseUnit) || activeDoc?.unit || 'px';
+        const svgStr = sc.getSvgString();
+        const title = (activeDoc?.title || svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
+        const vvdData = {
+          $schema: 'visteras-vector-document-v1',
+          version: 1,
+          app: 'visteras-vector',
+          exportedAt: new Date().toISOString(),
+          title: title,
+          width: res.w,
+          height: res.h,
+          unit: unit,
+          svg: svgStr,
+        };
+        const vvdJson = JSON.stringify(vvdData, null, 2);
+        const fileName = `${title}.vvd`;
+
+        if (window.showSaveFilePicker) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: fileName,
+              types: [{
+                description: 'Visteras Vector Document (.vvd)',
+                accept: { 'application/json': ['.vvd'], 'application/x-visteras-vector': ['.vvd'] },
+              }],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(vvdJson);
+            await writable.close();
+            const savedBase = handle.name.replace(/\.(vvd|svg)$/i, '');
+            if (activeDoc) activeDoc.title = savedBase;
+            svgEditor.title = savedBase;
+            shell?.clearActiveDirty?.();
+            if (svgEditor) svgEditor.showSaveWarning = false;
+            return;
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            console.warn('showSaveFilePicker failed, falling back to download:', err);
+          }
+        }
+
+        const blob = new Blob([vvdJson], { type: 'application/json;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        // Download started — clear dirty like Studio after save.
+        shell?.clearActiveDirty?.();
+        if (svgEditor) svgEditor.showSaveWarning = false;
+      });
+
+      document.getElementById('action_export_svg')?.addEventListener('click', () => {
         const svgStr = sc.getSvgString();
         const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = (svgEditor.title || 'untitled') + '.svg';
+        const title = (svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
+        a.download = `${title}.svg`;
         a.click();
-        // Download started — clear dirty like Studio after save.
-        window.__visterasDocumentShell?.clearActiveDirty?.();
-        if (svgEditor) svgEditor.showSaveWarning = false;
+        URL.revokeObjectURL(a.href);
       });
 
       document.getElementById('action_export_png')?.addEventListener('click', () => {

@@ -138,6 +138,9 @@ class Base_documents_class {
 			selection: options.selection || null,
 			selection_mask: options.selection_mask || null,
 			Composite_cache: options.Composite_cache || null,
+			save_format: options.save_format || 'VSD',
+			source_filename: options.source_filename || null,
+			fileHandle: options.fileHandle || null,
 		};
 	}
 
@@ -697,7 +700,11 @@ class Base_documents_class {
 
 		const w = parseInt(json.info.width) || config.WIDTH || 800;
 		const h = parseInt(json.info.height) || config.HEIGHT || 600;
-		const docTitle = filename ? filename.replace(/\.json$/i, '') : (json.info.name || ('Untitled-' + this.auto_title_count++));
+		const isVsd = (filename && filename.toLowerCase().endsWith('.vsd')) || (json.info && (json.info.format === 'vsd' || json.info.format === 'VSD'));
+		const isExplicitJson = filename && filename.toLowerCase().endsWith('.json');
+		const defaultFormat = isExplicitJson ? 'JSON' : 'VSD';
+		const defaultExt = isExplicitJson ? '.json' : '.vsd';
+		const docTitle = filename ? filename.replace(/\.(json|vsd)$/i, '') : (json.info.name || ('Untitled-' + this.auto_title_count++));
 		const docTransp = (json.info.transparency !== false);
 
 		let max_id_order = 0;
@@ -797,8 +804,8 @@ class Base_documents_class {
 			doc.action_history_index = 0;
 			doc.is_dirty = false;
 			doc.selection = null;
-			doc.save_format = 'JSON';
-			doc.source_filename = filename || (docTitle + '.json');
+			doc.save_format = defaultFormat;
+			doc.source_filename = filename || (docTitle + defaultExt);
 			doc.fileHandle = null;
 
 			await this.restore_state(doc);
@@ -822,8 +829,8 @@ class Base_documents_class {
 				user_fonts: json.user_fonts || {},
 			});
 			newDoc.smart_sources = smart_sources;
-			newDoc.save_format = 'JSON';
-			newDoc.source_filename = filename || (docTitle + '.json');
+			newDoc.save_format = defaultFormat;
+			newDoc.source_filename = filename || (docTitle + defaultExt);
 			newDoc.fileHandle = null;
 
 			this.documents.push(newDoc);

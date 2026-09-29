@@ -35,6 +35,7 @@ class File_save_class {
 
 		//save types config
 		this.SAVE_TYPES = {
+			VSD: "Visteras Studio Document",
 			PNG: "Portable Network Graphics",
 			JPG: "JPG/JPEG Format",
 			//AVIF: "AV1 Image File Format", //just uncomment it in future to make it work
@@ -59,7 +60,7 @@ class File_save_class {
 			if (code == "s" && (event.ctrlKey || event.metaKey)) {
 				event.preventDefault();
 				if (event.shiftKey) {
-					// Save As (JSON / PSD picker)
+					// Save As (VSD / JSON / PSD picker)
 					this.save();
 				} else {
 					// Save locally — overwrite opened file when possible
@@ -78,10 +79,10 @@ class File_save_class {
 			return app.GUI.modules['layer/smart'].save_contents();
 		}
 		const doc = app.Documents ? app.Documents.get_active_document() : null;
-		const format = doc && doc.save_format ? String(doc.save_format).toUpperCase() : null;
+		const format = doc && doc.save_format ? String(doc.save_format).toUpperCase() : 'VSD';
 		const handle = doc && doc.fileHandle ? doc.fileHandle : null;
 
-		if (handle && (format === 'PSD' || format === 'JSON')) {
+		if (handle && (format === 'VSD' || format === 'PSD' || format === 'JSON')) {
 			try {
 				await this._write_document_to_handle(handle, format);
 				if (app.Documents && typeof app.Documents.clear_active_dirty === 'function') {
@@ -99,28 +100,32 @@ class File_save_class {
 		}
 
 		// No handle yet — try File System Access picker once, then remember it
-		if (typeof window.showSaveFilePicker === 'function' && (format === 'PSD' || format === 'JSON')) {
+		if (typeof window.showSaveFilePicker === 'function' && (format === 'VSD' || format === 'PSD' || format === 'JSON')) {
 			try {
-				const ext = format.toLowerCase();
+				const effectiveFormat = (format === 'PSD' || format === 'JSON') ? format : 'VSD';
+				const ext = effectiveFormat.toLowerCase();
 				let suggested = (doc && (doc.source_filename || doc.title)) || (config.SAVE_NAME || 'image');
-				suggested = String(suggested).replace(/\.(json|psd)$/i, '');
+				suggested = String(suggested).replace(/\.(vsd|json|psd)$/i, '');
 				const newHandle = await window.showSaveFilePicker({
 					suggestedName: suggested + '.' + ext,
-					types: format === 'PSD' ? [{
+					types: effectiveFormat === 'PSD' ? [{
 						description: 'Photoshop Document',
 						accept: { 'image/vnd.adobe.photoshop': ['.psd'] },
-					}] : [{
+					}] : effectiveFormat === 'JSON' ? [{
 						description: 'Visteras Studio JSON',
 						accept: { 'application/json': ['.json'] },
+					}] : [{
+						description: 'Visteras Studio Document (.vsd)',
+						accept: { 'application/json': ['.vsd'], 'application/x-visteras-studio': ['.vsd'] },
 					}],
 				});
 				if (app.Documents && typeof app.Documents.set_active_file_meta === 'function') {
-					app.Documents.set_active_file_meta({ fileHandle: newHandle, save_format: format, source_filename: newHandle.name });
+					app.Documents.set_active_file_meta({ fileHandle: newHandle, save_format: effectiveFormat, source_filename: newHandle.name });
 				} else if (doc) {
 					doc.fileHandle = newHandle;
-					doc.save_format = format;
+					doc.save_format = effectiveFormat;
 				}
-				await this._write_document_to_handle(newHandle, format);
+				await this._write_document_to_handle(newHandle, effectiveFormat);
 				if (app.Documents && typeof app.Documents.clear_active_dirty === 'function') {
 					app.Documents.clear_active_dirty();
 				} else if (doc) {
@@ -144,7 +149,7 @@ class File_save_class {
 	async _write_document_to_handle(handle, format) {
 		const writable = await handle.createWritable();
 		try {
-			if (format === 'JSON') {
+			if (format === 'VSD' || format === 'JSON') {
 				const data_json = this.export_as_json();
 				await writable.write(new Blob([data_json], { type: 'application/json' }));
 			} else if (format === 'PSD') {
@@ -166,7 +171,7 @@ class File_save_class {
 	save(){
 		var types = JSON.parse(JSON.stringify(this.SAVE_TYPES));
 		for(var i in types){
-			if(i != 'JSON' && i != 'PSD'){
+			if(i != 'VSD' && i != 'JSON' && i != 'PSD'){
 				delete types[i];
 			}
 		}
@@ -180,6 +185,7 @@ class File_save_class {
 	 */
 	export(){
 		var types = JSON.parse(JSON.stringify(this.SAVE_TYPES));
+		delete types.VSD;
 		delete types.JSON;
 
 		this.save_general(types, 'Export');
@@ -404,7 +410,7 @@ class File_save_class {
 			return;
 		}
 
-		if (type != 'JSON') {
+		if (type != 'JSON' && type != 'VSD') {
 			//create temp canvas
 			var canvas = document.createElement('canvas');
 			var ctx = canvas.getContext("2d");
@@ -443,7 +449,7 @@ class File_save_class {
 			}
 		}
 
-		if (type != 'JSON' && (type == 'JPG' || config.TRANSPARENCY == false)) {
+		if (type != 'JSON' && type != 'VSD' && (type == 'JPG' || config.TRANSPARENCY == false)) {
 			//add white background
 			ctx.globalCompositeOperation = 'destination-over';
 			this.fillCanvasBackground(ctx, '#ffffff');
@@ -513,11 +519,11 @@ class File_save_class {
 				_this.update_file_size(blob.size);
 			}, data_header);
 		}
-		else if (type == 'JSON') {
-			//json
+		else if (type == 'VSD' || type == 'JSON') {
+			//vsd / json
 			var data_json = this.export_as_json();
 
-			var blob = new Blob([data_json], {type: "text/plain"});
+			var blob = new Blob([data_json], {type: "application/json"});
 			this.update_file_size(blob.size);
 		}
 		else if (type == 'GIF') {
@@ -564,7 +570,7 @@ class File_save_class {
 			this.Helper.setCookie('save_default', type);
 		}
 
-		if (type != 'JSON') {
+		if (type != 'JSON' && type != 'VSD') {
 			//temp canvas
 			var canvas;
 			var ctx;
@@ -585,7 +591,7 @@ class File_save_class {
 			}
 		}
 
-		if (type != 'JSON' && (type == 'JPG' || config.TRANSPARENCY == false)) {
+		if (type != 'JSON' && type != 'VSD' && (type == 'JPG' || config.TRANSPARENCY == false)) {
 			//add white background
 			ctx.globalCompositeOperation = 'destination-over';
 			this.fillCanvasBackground(ctx, '#ffffff');
@@ -676,6 +682,16 @@ class File_save_class {
 				fname = fname + ".psd";
 			var psdMod = await import(/* webpackChunkName: "psd" */ './../../libs/psd.js');
 			await psdMod.export_psd(config.layers, config.WIDTH, config.HEIGHT, { filename: fname });
+		}
+		else if (type == 'VSD') {
+			//vsd - Visteras Studio Document
+			if (this.Helper.strpos(fname, '.vsd') == false)
+				fname = fname + ".vsd";
+
+			var data_json = this.export_as_json();
+
+			var blob = new Blob([data_json], {type: "application/json"});
+			filesaver.saveAs(blob, fname);
 		}
 		else if (type == 'JSON') {
 			//json - full data with layers
@@ -780,6 +796,8 @@ class File_save_class {
 			width: config.WIDTH,
 			height: config.HEIGHT,
 			about: 'Image data with multi-layers. Can be opened using Visteras Studio',
+			format: 'vsd',
+			app: 'visteras-studio',
 			date: today,
 			version: VERSION,
 			layer_active: config.layer ? config.layer.id : 1,
