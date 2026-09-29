@@ -1,4 +1,4 @@
-import { mountDirectSelection } from './visteras-direct-selection.js';
+import { mountDirectSelection } from './visteras-direct-selection.js?v=snap-point-direct-2';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {
   mountDirectSelection(editor);

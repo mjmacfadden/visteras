@@ -42,6 +42,11 @@ copy_tree() {
   fi
 }
 
+for app in studio vector collage; do
+  cp "$ROOT/packages/tool-free.js" "$ROOT/apps/$app/tool-free.js"
+done
+cp "$ROOT/packages/tool-free.js" "$PUBLISH/public/tool-free.js"
+
 echo "==> Building shared fonts bundle for Vector & Collage"
 npm run build:vector --prefix "$ROOT/packages/fonts"
 

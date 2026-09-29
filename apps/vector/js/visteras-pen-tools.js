@@ -66,6 +66,115 @@ export function mountPenTools(editor) {
   function candidates(){
     return [...sc.getSvgContent().querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')].filter(el=>!el.closest('defs,clipPath,mask')&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).pointerEvents!=='none');
   }
+  let snapEnabled = true, autoEdit = null, snapPoint = null;
+  try { snapEnabled = localStorage.getItem('visteras_vector_snap_points') !== '0'; } catch {}
+  const snapMenu = document.getElementById('action_snap_point');
+  function syncSnapMenu() {
+    snapMenu?.setAttribute('aria-checked', String(snapEnabled));
+    if (snapMenu) snapMenu.textContent = 'Snap to Point';
+  }
+  snapMenu?.addEventListener('click', () => {
+    snapEnabled = !snapEnabled;
+    try { localStorage.setItem('visteras_vector_snap_points', snapEnabled ? '1' : '0'); } catch {}
+    syncSnapMenu();
+  });
+  syncSnapMenu();
+  const snapMarker = document.createElement('div');
+  snapMarker.className = 'visteras-snap-point-marker';
+  snapMarker.style.cssText = 'position:fixed;width:8px;height:8px;border:1px solid #fa7c1b;pointer-events:none;z-index:99999;display:none;transform:translate(-50%,-50%)';
+  document.body.append(snapMarker);
+  function preparePointer(event) {
+    autoEdit = null;
+    snapPoint = null;
+    snapMarker.style.display = 'none';
+    if (sc.getMode() !== 'path' || !document.getElementById('workarea').contains(event.target)) return;
+    const drawing = sc.getDrawnPath() || continuation;
+    const selected = sc.getSelectedElements().filter(Boolean);
+    let closest = null;
+    for (const el of [...sc.getSvgContent().querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')].filter(el => !el.closest('defs,clipPath,mask') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')) {
+      if (el === sc.getDrawnPath()) continue;
+      const matrix = el.getScreenCTM();
+      if (!matrix) continue;
+      const data = geometry(el);
+      for (const anchor of anchors(data)) {
+        const point = new DOMPoint(data[anchor.index].x, data[anchor.index].y).matrixTransform(matrix);
+        const distance = Math.hypot(point.x-event.clientX, point.y-event.clientY);
+        if (distance <= 8 && (!closest || distance < closest.distance)) closest = {point,distance,el};
+      }
+      if (!drawing && selected.includes(el)) {
+        const hit = hitSegment(data,{x:event.clientX,y:event.clientY},p=>new DOMPoint(p.x,p.y).matrixTransform(matrix));
+        if (hit) autoEdit = 'add_anchor';
+      }
+    }
+    snapMarker.dataset.target = closest ? `${closest.point.x},${closest.point.y}` : 'none';
+    if (closest && !drawing && selected.includes(closest.el)) autoEdit = 'delete_anchor';
+    // While drawing, another object's anchor is a coordinate target, never an edit command.
+    if (closest && snapEnabled) {
+      snapPoint = closest.point;
+      Object.assign(snapMarker.style,{display:'block',left:`${closest.point.x}px`,top:`${closest.point.y}px`});
+      for (const [key,value] of Object.entries({clientX:closest.point.x,clientY:closest.point.y,pageX:closest.point.x+window.scrollX,pageY:closest.point.y+window.scrollY})) {
+        Object.defineProperty(event,key,{value,configurable:true});
+      }
+    }
+    const cursor = autoEdit === 'delete_anchor' ? 'pen_delete' : autoEdit === 'add_anchor' ? 'pen_add' : 'pen';
+    style.textContent = definitions.map(([, , , mode])=>`body[data-mode="${mode}"] #svgcanvas,body[data-mode="${mode}"] #svgcanvas * {cursor:url("./images/${mode==='path'?cursor:mode==='add_anchor'?'pen_add':'pen_delete'}_cursor.svg") 4 4, crosshair !important}`).join('\n');
+  }
+  // Pass exact snapped coordinates at the drawing boundary. Native event
+  // coordinates alone can be replaced or rounded by SVG-Edit's input pipeline.
+  let pinnedAnchor = null;
+  function restorePinnedAnchor() {
+    if (!pinnedAnchor || !pinnedAnchor.path.isConnected) return;
+    const {path,index,x,y} = pinnedAnchor;
+    if (index >= path.pathSegList.numberOfItems) return;
+    const segment = path.pathSegList.getItem(index);
+    if (segment.pathSegType === 1) return;
+    segment.x = x; segment.y = y;
+  }
+  const originalMouseMove = sc.pathActions.mouseMove;
+  sc.pathActions.mouseMove = function(...args) {
+    const result = originalMouseMove.apply(this,args);
+    restorePinnedAnchor();
+    return result;
+  };
+  const originalMouseUp = sc.pathActions.mouseUp;
+  sc.pathActions.mouseUp = function(...args) {
+    restorePinnedAnchor();
+    const result = originalMouseUp.apply(this,args);
+    pinnedAnchor = null;
+    return result;
+  };
+  const originalMouseDown = sc.pathActions.mouseDown;
+  sc.pathActions.mouseDown = function(event, target, x, y) {
+    pinnedAnchor = null;
+    if (sc.getMode() !== 'path' || !snapPoint) return originalMouseDown.call(this,event,target,x,y);
+    // SVG-Edit's path tool receives coordinates in root-document space,
+    // scaled by the current zoom. Convert the screen-space target back into
+    // that same space before handing it to the native drawing routine.
+    const point = snapPoint.matrixTransform(sc.getrootSctm());
+    const zoom = sc.getZoom(), config = sc.getCurConfig();
+    const grid = config.gridSnapping, round = sc.round;
+    config.gridSnapping = false;
+    sc.round = value => value;
+    try {
+      const result = originalMouseDown.call(this,event,target,point.x*zoom,point.y*zoom);
+      const path = sc.getDrawnPath();
+      if (path) {
+        const local = snapPoint.matrixTransform(path.getScreenCTM().inverse());
+        const index = path.pathSegList.numberOfItems - 1;
+        const segment = path.pathSegList.getItem(index);
+        if (segment.pathSegType !== 1) {
+          segment.x = local.x;
+          segment.y = local.y;
+          pinnedAnchor = {path, index, x:local.x, y:local.y};
+        }
+      }
+      return result;
+    }
+    finally { config.gridSnapping = grid; sc.round = round; }
+  };
+  window.addEventListener('mousemove',preparePointer,true);
+  window.addEventListener('mousedown',preparePointer,true);
+  window.addEventListener('mouseup',preparePointer,true);
   let consumed=false, markerLayer, markerElement=null, hoverLayer, continuationHoverLayer, activeAnchorIndex=null, hoverAnchorIndex=null, hoverAnchorElement=null;
   function showContinuationPreview(el, point, event) {
     if (!continuationHoverLayer?.isConnected) {
@@ -269,7 +378,7 @@ export function mountPenTools(editor) {
     continuationHoverLayer?.replaceChildren(); continuationHoverLayer?.style.setProperty('display','none');
   },true);
   window.addEventListener('mousedown',e=>{
-    const mode=sc.getMode();
+    const mode=sc.getMode()==='path' && !sc.getDrawnPath() && !continuation ? autoEdit : sc.getMode();
     if(!['add_anchor','delete_anchor'].includes(mode)||e.button!==0||!sc.getSvgRoot().contains(e.target))return;
     e.preventDefault();e.stopImmediatePropagation();consumed=true;
     let best;

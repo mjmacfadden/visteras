@@ -16,6 +16,7 @@
 }
 
 .svg_editor.visteras-rulers-hidden {
+  grid-template-columns: 36px 0 1fr 240px !important;
   grid-template-rows: 45px 28px 0 1fr 24px !important;
 }
 
@@ -487,4 +488,14 @@
   font-weight: 700;
   color: #fa7c1b;
   flex-shrink: 0;
+}
+
+/* Checkmarks occupy the gutter, never the menu label's text flow. */
+#action_snap_point { position: relative; }
+#action_snap_point[aria-checked="true"]::before {
+  content: "✓";
+  position: absolute;
+  left: 4px;
+  width: 12px;
+  text-align: center;
 }

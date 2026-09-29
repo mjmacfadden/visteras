@@ -932,9 +932,42 @@ html, body {
   color: #ffffff !important;
 }
 
-#layerlist tr:not(.layer) {
+#layerlist tr:not(.layer):not(.vector-object-row) {
   display: none !important;
 }
+
+.vector-object-eye {
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+}
+.vector-object-eye img { width: 14px; height: 14px; }
+.vector-layer-disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 22px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.vector-layer-disclosure::before {
+  content: '';
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+.vector-layer-disclosure[aria-expanded="true"]::before { transform: rotate(90deg); }
+.vector-layer-disclosure:focus-visible { outline: 1px solid currentColor; }
+.vector-object-eye[aria-pressed="false"] { opacity: .3; }
+#layerlist tr[data-drop="above"] td { border-top: 2px solid #fa7c1b; }
+#layerlist tr[data-drop="below"] td { border-bottom: 2px solid #fa7c1b; }
 
 #layerlist td.layervis {
   width: 24px !important;
@@ -1417,3 +1450,13 @@ elix-dialog {
   user-select: none;
 }
 
+.visteras-snap-point-marker {
+  position: fixed;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--studio-orange, #fa7c1b);
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%);
+  display: none;
+}

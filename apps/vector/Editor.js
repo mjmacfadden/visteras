@@ -69811,18 +69811,6 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 				}
 			},
 			{
-				key: "tab",
-				fn: () => {
-					this.svgCanvas.cycleElement(0);
-				}
-			},
-			{
-				key: "shift+tab",
-				fn: () => {
-					this.svgCanvas.cycleElement(1);
-				}
-			},
-			{
 				key: [t + "arrowup", !0],
 				fn: () => {
 					this.zoomImage(2);

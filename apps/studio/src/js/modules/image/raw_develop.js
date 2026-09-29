@@ -41,7 +41,43 @@ var DEFAULTS = {
 	denoise_color: 0,
 	grain_amount: 0,
 	grain_size: 25,
+	mixer_enabled: true,
+	mixer_hue_red: 0,
+	mixer_hue_orange: 0,
+	mixer_hue_yellow: 0,
+	mixer_hue_green: 0,
+	mixer_hue_aqua: 0,
+	mixer_hue_blue: 0,
+	mixer_hue_purple: 0,
+	mixer_hue_magenta: 0,
+	mixer_sat_red: 0,
+	mixer_sat_orange: 0,
+	mixer_sat_yellow: 0,
+	mixer_sat_green: 0,
+	mixer_sat_aqua: 0,
+	mixer_sat_blue: 0,
+	mixer_sat_purple: 0,
+	mixer_sat_magenta: 0,
+	mixer_lum_red: 0,
+	mixer_lum_orange: 0,
+	mixer_lum_yellow: 0,
+	mixer_lum_green: 0,
+	mixer_lum_aqua: 0,
+	mixer_lum_blue: 0,
+	mixer_lum_purple: 0,
+	mixer_lum_magenta: 0,
 };
+
+var MIXER_BANDS = [
+	{ id: 'red', name: 'Reds', center: 0, maxShift: 25, color: '#e03030' },
+	{ id: 'orange', name: 'Oranges', center: 30, maxShift: 20, color: '#e27c2b' },
+	{ id: 'yellow', name: 'Yellows', center: 60, maxShift: 30, color: '#d9d22b' },
+	{ id: 'green', name: 'Greens', center: 120, maxShift: 35, color: '#3cdf3c' },
+	{ id: 'aqua', name: 'Aquas', center: 180, maxShift: 30, color: '#2bd9d9' },
+	{ id: 'blue', name: 'Blues', center: 240, maxShift: 25, color: '#3b5ce2' },
+	{ id: 'purple', name: 'Purples', center: 280, maxShift: 25, color: '#8c3be2' },
+	{ id: 'magenta', name: 'Magentas', center: 320, maxShift: 25, color: '#e23bc0' },
+];
 
 var PANELS = [
 	{
@@ -68,6 +104,11 @@ var PANELS = [
 			{ name: 'saturation', title: 'Saturation', min: -100, max: 100, step: 1 },
 			{ name: 'hue', title: 'Hue', min: -180, max: 180, step: 1 },
 		],
+	},
+	{
+		id: 'color_mixer',
+		title: 'Color Mixer',
+		open: true,
 	},
 	{
 		id: 'presence',
@@ -134,6 +175,11 @@ class Image_rawDevelop_class {
 		this._raf = 0;
 		this._root = null;
 		this._applying = false;
+		this._mixerAdjust = 'hsl';
+		this._mixerSubtab = 'saturation';
+		this._mixerColorChannel = 'red';
+		this._mixerTatActive = false;
+		this._mixerBypassed = false;
 	}
 
 	async raw_develop(filter_id) {
@@ -217,6 +263,10 @@ class Image_rawDevelop_class {
 	}
 
 	_panel_html(panel) {
+		if (panel.id === 'color_mixer') {
+			return this._panel_color_mixer_html(panel);
+		}
+
 		var body = panel.sliders.map((s) => {
 			var val = this._params[s.name];
 			return '' +
@@ -234,6 +284,118 @@ class Image_rawDevelop_class {
 			'<section class="raw-develop__panel' + collapsed + '" data-raw-panel="' + panel.id + '">' +
 			'  <button type="button" class="raw-develop__panel-toggle" data-raw-toggle="' + panel.id + '">' + panel.title + '</button>' +
 			'  <div class="raw-develop__panel-body">' + body + '</div>' +
+			'</section>';
+	}
+
+	_panel_color_mixer_html(panel) {
+		var collapsed = panel.open ? '' : ' is-collapsed';
+		var bypassed = this._mixerBypassed ? ' is-bypassed' : '';
+
+		var renderRow = (type, channel) => {
+			var paramName = 'mixer_' + type + '_' + channel.id;
+			var val = this._params[paramName] || 0;
+			return '' +
+				'<div class="raw-develop__mixer-row" data-mixer-type="' + type + '" data-mixer-channel="' + channel.id + '">' +
+				'  <div class="raw-develop__mixer-row-header">' +
+				'    <span class="raw-develop__mixer-label">' + channel.name + '</span>' +
+				'    <input type="number" class="raw-develop__mixer-num" data-raw-mixer-input="' + paramName + '"' +
+				'      min="-100" max="100" step="1" value="' + val + '" />' +
+				'  </div>' +
+				'  <div class="raw-develop__mixer-slider-wrap">' +
+				'    <input type="range" class="raw-develop__mixer-slider" name="' + paramName + '"' +
+				'      min="-100" max="100" step="1" value="' + val + '" data-default="0" />' +
+				'  </div>' +
+				'</div>';
+		};
+
+		var hueRows = MIXER_BANDS.map(b => renderRow('hue', b)).join('');
+		var satRows = MIXER_BANDS.map(b => renderRow('sat', b)).join('');
+		var lumRows = MIXER_BANDS.map(b => renderRow('lum', b)).join('');
+
+		var swatches = MIXER_BANDS.map(b => {
+			var active = b.id === this._mixerColorChannel ? ' is-active' : '';
+			return '<button type="button" class="raw-develop__mixer-swatch' + active + '" data-raw-mixer-swatch="' + b.id + '"' +
+				' style="--swatch-color:' + b.color + ';" title="' + b.name + '"></button>';
+		}).join('');
+
+		var colorSets = MIXER_BANDS.map(b => {
+			return '' +
+				'<div class="raw-develop__mixer-color-set" data-channel="' + b.id + '">' +
+				renderRow('hue', b) +
+				renderRow('sat', b) +
+				renderRow('lum', b) +
+				'</div>';
+		}).join('');
+
+		return '' +
+			'<section class="raw-develop__panel' + collapsed + bypassed + '" data-raw-panel="color_mixer">' +
+			'  <div class="raw-develop__panel-header">' +
+			'    <button type="button" class="raw-develop__panel-toggle" data-raw-toggle="color_mixer">' +
+			'      <span class="raw-develop__panel-chevron"></span>' +
+			'      Color Mixer' +
+			'    </button>' +
+			'    <button type="button" class="raw-develop__panel-eye" data-raw-panel-eye="color_mixer" title="Toggle Color Mixer">' +
+			'      <svg class="raw-develop__eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+			'      <svg class="raw-develop__eye-off-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>' +
+			'    </button>' +
+			'  </div>' +
+			'  <div class="raw-develop__panel-body">' +
+			'    <div class="raw-develop__mixer-mode-tabs">' +
+			'      <button type="button" class="raw-develop__mixer-mode-tab is-active" data-mixer-mode="mixer">Mixer</button>' +
+			'      <button type="button" class="raw-develop__mixer-mode-tab" data-mixer-mode="point_color" title="Point Color">Point Color</button>' +
+			'    </div>' +
+			'    <div class="raw-develop__mixer-mode-views" data-active-mode="mixer">' +
+			'      <div class="raw-develop__mixer-view-mixer">' +
+			'        <div class="raw-develop__mixer-adjust-row">' +
+			'          <span class="raw-develop__mixer-adjust-label">Adjust</span>' +
+			'          <div class="raw-develop__mixer-adjust-controls">' +
+			'            <select class="raw-develop__mixer-adjust-select" data-raw-mixer-adjust>' +
+			'              <option value="hsl"' + (this._mixerAdjust === 'hsl' ? ' selected' : '') + '>HSL</option>' +
+			'              <option value="color"' + (this._mixerAdjust === 'color' ? ' selected' : '') + '>Color</option>' +
+			'            </select>' +
+			'            <button type="button" class="raw-develop__mixer-tat-btn' + (this._mixerTatActive ? ' is-active' : '') + '" data-raw-mixer-tat title="Targeted Adjustment Tool">' +
+			'              <svg width="18" height="18" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="1.8"/></svg>' +
+			'            </button>' +
+			'          </div>' +
+			'        </div>' +
+			'        <div class="raw-develop__mixer-content" data-adjust="' + this._mixerAdjust + '" data-subtab="' + this._mixerSubtab + '" data-color-channel="' + this._mixerColorChannel + '">' +
+			'          <div class="raw-develop__mixer-hsl-container">' +
+			'            <div class="raw-develop__mixer-subtabs">' +
+			'              <button type="button" class="raw-develop__mixer-subtab' + (this._mixerSubtab === 'hue' ? ' is-active' : '') + '" data-raw-subtab="hue">Hue</button>' +
+			'              <button type="button" class="raw-develop__mixer-subtab' + (this._mixerSubtab === 'saturation' ? ' is-active' : '') + '" data-raw-subtab="saturation">Saturation</button>' +
+			'              <button type="button" class="raw-develop__mixer-subtab' + (this._mixerSubtab === 'luminance' ? ' is-active' : '') + '" data-raw-subtab="luminance">Luminance</button>' +
+			'              <button type="button" class="raw-develop__mixer-subtab' + (this._mixerSubtab === 'all' ? ' is-active' : '') + '" data-raw-subtab="all">All</button>' +
+			'            </div>' +
+			'            <div class="raw-develop__mixer-group" data-mixer-group="hue">' +
+			'              <div class="raw-develop__mixer-group-title">Hue</div>' +
+			hueRows +
+			'            </div>' +
+			'            <div class="raw-develop__mixer-group" data-mixer-group="saturation">' +
+			'              <div class="raw-develop__mixer-group-title">Saturation</div>' +
+			satRows +
+			'            </div>' +
+			'            <div class="raw-develop__mixer-group" data-mixer-group="luminance">' +
+			'              <div class="raw-develop__mixer-group-title">Luminance</div>' +
+			lumRows +
+			'            </div>' +
+			'          </div>' +
+			'          <div class="raw-develop__mixer-color-container">' +
+			'            <div class="raw-develop__mixer-color-swatches">' +
+			swatches +
+			'            </div>' +
+			'            <div class="raw-develop__mixer-color-sliders">' +
+			colorSets +
+			'            </div>' +
+			'          </div>' +
+			'        </div>' +
+			'      </div>' +
+			'      <div class="raw-develop__mixer-view-point-color">' +
+			'        <div class="raw-develop__point-color-notice">' +
+			'          <p>Sample a color from the image with the Targeted Adjustment Tool, or use the 8 HSL Mixer channels.</p>' +
+			'        </div>' +
+			'      </div>' +
+			'    </div>' +
+			'  </div>' +
 			'</section>';
 	}
 
@@ -264,18 +426,155 @@ class Image_rawDevelop_class {
 				this._params[name] = value;
 				var out = this._root.querySelector('[data-raw-output="' + name + '"]');
 				if (out) out.textContent = formatVal(name, value);
+				var pairedNum = this._root.querySelector('.raw-develop__mixer-num[data-raw-mixer-input="' + name + '"]');
+				if (pairedNum) pairedNum.value = String(Math.round(value));
 				this._schedule_preview();
 			});
 			input.addEventListener('dblclick', (e) => {
 				e.preventDefault();
 				var name = input.name;
-				var def = DEFAULTS[name];
+				var def = DEFAULTS[name] !== undefined ? DEFAULTS[name] : 0;
 				input.value = String(def);
 				this._params[name] = def;
 				var out = this._root.querySelector('[data-raw-output="' + name + '"]');
 				if (out) out.textContent = formatVal(name, def);
+				var pairedNum = this._root.querySelector('.raw-develop__mixer-num[data-raw-mixer-input="' + name + '"]');
+				if (pairedNum) pairedNum.value = String(Math.round(def));
 				this._schedule_preview();
 			});
+		});
+
+		this._root.querySelectorAll('.raw-develop__mixer-num').forEach((num) => {
+			num.addEventListener('input', () => {
+				var name = num.getAttribute('data-raw-mixer-input');
+				var val = Math.max(-100, Math.min(100, parseInt(num.value, 10) || 0));
+				this._params[name] = val;
+				var slider = this._root.querySelector('input[type="range"][name="' + name + '"]');
+				if (slider) slider.value = String(val);
+				this._schedule_preview();
+			});
+			num.addEventListener('dblclick', (e) => {
+				e.preventDefault();
+				var name = num.getAttribute('data-raw-mixer-input');
+				num.value = '0';
+				this._params[name] = 0;
+				var slider = this._root.querySelector('input[type="range"][name="' + name + '"]');
+				if (slider) slider.value = '0';
+				this._schedule_preview();
+			});
+		});
+
+		var eyeBtn = this._root.querySelector('[data-raw-panel-eye="color_mixer"]');
+		if (eyeBtn) {
+			eyeBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				this._mixerBypassed = !this._mixerBypassed;
+				this._params.mixer_enabled = !this._mixerBypassed;
+				var panel = eyeBtn.closest('.raw-develop__panel');
+				if (panel) panel.classList.toggle('is-bypassed', this._mixerBypassed);
+				this._schedule_preview();
+			});
+		}
+
+		this._root.querySelectorAll('[data-mixer-mode]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				var mode = btn.getAttribute('data-mixer-mode');
+				this._root.querySelectorAll('[data-mixer-mode]').forEach(b => b.classList.remove('is-active'));
+				btn.classList.add('is-active');
+				var views = this._root.querySelector('.raw-develop__mixer-mode-views');
+				if (views) views.setAttribute('data-active-mode', mode);
+			});
+		});
+
+		var adjustSelect = this._root.querySelector('[data-raw-mixer-adjust]');
+		if (adjustSelect) {
+			adjustSelect.addEventListener('change', () => {
+				this._mixerAdjust = adjustSelect.value;
+				var content = this._root.querySelector('.raw-develop__mixer-content');
+				if (content) content.setAttribute('data-adjust', this._mixerAdjust);
+			});
+		}
+
+		this._root.querySelectorAll('[data-raw-subtab]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				var subtab = btn.getAttribute('data-raw-subtab');
+				this._mixerSubtab = subtab;
+				this._root.querySelectorAll('[data-raw-subtab]').forEach(b => b.classList.remove('is-active'));
+				btn.classList.add('is-active');
+				var content = this._root.querySelector('.raw-develop__mixer-content');
+				if (content) content.setAttribute('data-subtab', subtab);
+			});
+		});
+
+		this._root.querySelectorAll('[data-raw-mixer-swatch]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				var ch = btn.getAttribute('data-raw-mixer-swatch');
+				this._mixerColorChannel = ch;
+				this._root.querySelectorAll('[data-raw-mixer-swatch]').forEach(b => b.classList.remove('is-active'));
+				btn.classList.add('is-active');
+				var content = this._root.querySelector('.raw-develop__mixer-content');
+				if (content) content.setAttribute('data-color-channel', ch);
+			});
+		});
+
+		var tatBtn = this._root.querySelector('[data-raw-mixer-tat]');
+		if (tatBtn) {
+			tatBtn.addEventListener('click', () => {
+				this._mixerTatActive = !this._mixerTatActive;
+				tatBtn.classList.toggle('is-active', this._mixerTatActive);
+				if (this._previewCanvas) {
+					this._previewCanvas.style.cursor = this._mixerTatActive ? 'crosshair' : 'default';
+				}
+			});
+		}
+
+		var isDraggingTat = false;
+		var tatStartY = 0;
+		var tatStartVal = 0;
+		var tatParamName = '';
+
+		if (this._previewCanvas) {
+			this._previewCanvas.addEventListener('mousedown', (e) => {
+				if (!this._mixerTatActive || !this._previewBuffer) return;
+				e.preventDefault();
+				var rect = this._previewCanvas.getBoundingClientRect();
+				var x = Math.floor((e.clientX - rect.left) * (this._previewCanvas.width / rect.width));
+				var y = Math.floor((e.clientY - rect.top) * (this._previewCanvas.height / rect.height));
+				x = Math.max(0, Math.min(this._previewCanvas.width - 1, x));
+				y = Math.max(0, Math.min(this._previewCanvas.height - 1, y));
+				var idx = (y * this._previewCanvas.width + x) * 4;
+				var r = this._previewBuffer.data[idx] / 255;
+				var g = this._previewBuffer.data[idx + 1] / 255;
+				var b = this._previewBuffer.data[idx + 2] / 255;
+				var max = Math.max(r, g, b), min = Math.min(r, g, b);
+				var delta = max - min;
+				if (delta >= 0.01) {
+					var h = max === r ? (g - b) / delta + (g < b ? 6 : 0) : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+					h = ((h * 60) % 360 + 360) % 360;
+					var ch = getClosestMixerChannel(h);
+					var type = (this._mixerSubtab === 'hue' || this._mixerSubtab === 'luminance') ? (this._mixerSubtab === 'hue' ? 'hue' : 'lum') : 'sat';
+					tatParamName = 'mixer_' + type + '_' + ch;
+					tatStartVal = this._params[tatParamName] || 0;
+					tatStartY = e.clientY;
+					isDraggingTat = true;
+				}
+			});
+		}
+
+		window.addEventListener('mousemove', (e) => {
+			if (!isDraggingTat || !tatParamName) return;
+			var dy = tatStartY - e.clientY;
+			var nextVal = Math.max(-100, Math.min(100, Math.round(tatStartVal + dy)));
+			this._params[tatParamName] = nextVal;
+			var slider = this._root.querySelector('input[type="range"][name="' + tatParamName + '"]');
+			if (slider) slider.value = String(nextVal);
+			var num = this._root.querySelector('input.raw-develop__mixer-num[data-raw-mixer-input="' + tatParamName + '"]');
+			if (num) num.value = String(nextVal);
+			this._schedule_preview();
+		});
+
+		window.addEventListener('mouseup', () => {
+			isDraggingTat = false;
 		});
 
 		this._root.querySelectorAll('[data-raw-toggle]').forEach((btn) => {
@@ -310,10 +609,15 @@ class Image_rawDevelop_class {
 		this._params = this._smartLayer ? recipe(DEFAULTS, this._params) : Object.assign({}, DEFAULTS);
 		if (!this._root) return;
 		this._root.querySelectorAll('input[type="range"]').forEach((input) => {
-			var def = DEFAULTS[input.name];
+			var def = DEFAULTS[input.name] !== undefined ? DEFAULTS[input.name] : 0;
 			input.value = String(def);
 			var out = this._root.querySelector('[data-raw-output="' + input.name + '"]');
 			if (out) out.textContent = formatVal(input.name, def);
+		});
+		this._root.querySelectorAll('.raw-develop__mixer-num').forEach((num) => {
+			var name = num.getAttribute('data-raw-mixer-input');
+			var def = DEFAULTS[name] !== undefined ? DEFAULTS[name] : 0;
+			num.value = String(def);
 		});
 		this._schedule_preview();
 	}
@@ -617,6 +921,10 @@ class Image_rawDevelop_class {
 			d[i + 2] = Math.round(b * 255);
 		}
 
+		if (params.mixer_enabled !== false && !this._mixerBypassed && hasColorMixer(params)) {
+			applyColorMixer(imageData, params);
+		}
+
 		var result = imageData;
 
 		if (clarity !== 0) {
@@ -829,6 +1137,153 @@ function escapeHtml(str) {
 		.replace(/</g, '&lt;')
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;');
+}
+
+function hasColorMixer(params) {
+	if (!params || params.mixer_enabled === false) return false;
+	for (var i = 0; i < MIXER_BANDS.length; i++) {
+		var id = MIXER_BANDS[i].id;
+		if ((parseFloat(params['mixer_hue_' + id]) || 0) !== 0 ||
+		    (parseFloat(params['mixer_sat_' + id]) || 0) !== 0 ||
+		    (parseFloat(params['mixer_lum_' + id]) || 0) !== 0) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function getMixerWeights(H) {
+	H = ((H % 360) + 360) % 360;
+	var i1, i2, c1, c2;
+	if (H < 30) {
+		i1 = 0; i2 = 1; c1 = 0; c2 = 30;
+	} else if (H < 60) {
+		i1 = 1; i2 = 2; c1 = 30; c2 = 60;
+	} else if (H < 120) {
+		i1 = 2; i2 = 3; c1 = 60; c2 = 120;
+	} else if (H < 180) {
+		i1 = 3; i2 = 4; c1 = 120; c2 = 180;
+	} else if (H < 240) {
+		i1 = 4; i2 = 5; c1 = 180; c2 = 240;
+	} else if (H < 280) {
+		i1 = 5; i2 = 6; c1 = 240; c2 = 280;
+	} else if (H < 320) {
+		i1 = 6; i2 = 7; c1 = 280; c2 = 320;
+	} else {
+		i1 = 7; i2 = 0; c1 = 320; c2 = 360;
+	}
+	var t = (H - c1) / (c2 - c1);
+	var w = t * t * (3 - 2 * t);
+	return { i1: i1, i2: i2, w1: 1 - w, w2: w };
+}
+
+function getClosestMixerChannel(h) {
+	h = ((h % 360) + 360) % 360;
+	if (h < 15 || h >= 340) return 'red';
+	if (h < 45) return 'orange';
+	if (h < 90) return 'yellow';
+	if (h < 150) return 'green';
+	if (h < 210) return 'aqua';
+	if (h < 260) return 'blue';
+	if (h < 300) return 'purple';
+	return 'magenta';
+}
+
+function hslToRgb(h, s, l) {
+	if (s === 0) return [l, l, l];
+	var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+	var p = 2 * l - q;
+	return [
+		hueToRgb(p, q, h + 1/3),
+		hueToRgb(p, q, h),
+		hueToRgb(p, q, h - 1/3)
+	];
+}
+
+function hueToRgb(p, q, t) {
+	if (t < 0) t += 1;
+	if (t > 1) t -= 1;
+	if (t < 1/6) return p + (q - p) * 6 * t;
+	if (t < 1/2) return q;
+	if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+	return p;
+}
+
+function applyColorMixer(imageData, params) {
+	var hueShifts = new Float32Array(8);
+	var satShifts = new Float32Array(8);
+	var lumShifts = new Float32Array(8);
+	var any = false;
+
+	for (var k = 0; k < 8; k++) {
+		var id = MIXER_BANDS[k].id;
+		var hVal = parseFloat(params['mixer_hue_' + id]) || 0;
+		var sVal = parseFloat(params['mixer_sat_' + id]) || 0;
+		var lVal = parseFloat(params['mixer_lum_' + id]) || 0;
+		hueShifts[k] = (hVal / 100) * MIXER_BANDS[k].maxShift;
+		satShifts[k] = sVal / 100;
+		lumShifts[k] = lVal / 100;
+		if (hVal !== 0 || sVal !== 0 || lVal !== 0) any = true;
+	}
+	if (!any) return imageData;
+
+	var d = imageData.data;
+	for (var i = 0; i < d.length; i += 4) {
+		if (d[i + 3] === 0) continue;
+
+		var r = d[i] / 255;
+		var g = d[i + 1] / 255;
+		var b = d[i + 2] / 255;
+
+		var max = Math.max(r, g, b);
+		var min = Math.min(r, g, b);
+		var delta = max - min;
+		if (delta < 0.002) continue; // Achromatic pixel
+
+		var l = (max + min) * 0.5;
+		var s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+		var h;
+		if (max === r) {
+			h = (g - b) / delta + (g < b ? 6 : 0);
+		} else if (max === g) {
+			h = (b - r) / delta + 2;
+		} else {
+			h = (r - g) / delta + 4;
+		}
+		h *= 60; // in [0, 360)
+
+		var wInfo = getMixerWeights(h);
+		var dH = wInfo.w1 * hueShifts[wInfo.i1] + wInfo.w2 * hueShifts[wInfo.i2];
+		var dS = wInfo.w1 * satShifts[wInfo.i1] + wInfo.w2 * satShifts[wInfo.i2];
+		var dL = wInfo.w1 * lumShifts[wInfo.i1] + wInfo.w2 * lumShifts[wInfo.i2];
+
+		if (dH === 0 && dS === 0 && dL === 0) continue;
+
+		var newH = ((h + dH) % 360 + 360) % 360 / 360;
+
+		var newS = s;
+		if (dS < 0) {
+			newS = s * (1 + dS);
+		} else if (dS > 0) {
+			newS = s + (1 - s) * dS * 0.75;
+		}
+		if (newS < 0) newS = 0; else if (newS > 1) newS = 1;
+
+		var newL = l;
+		if (dL < 0) {
+			newL = l * (1 + dL * 0.5);
+		} else if (dL > 0) {
+			newL = l + (1 - l) * dL * 0.5;
+		}
+		if (newL < 0) newL = 0; else if (newL > 1) newL = 1;
+
+		var rgb = hslToRgb(newH, newS, newL);
+		d[i] = Math.round(rgb[0] * 255);
+		d[i + 1] = Math.round(rgb[1] * 255);
+		d[i + 2] = Math.round(rgb[2] * 255);
+	}
+
+	return imageData;
 }
 
 export default Image_rawDevelop_class;

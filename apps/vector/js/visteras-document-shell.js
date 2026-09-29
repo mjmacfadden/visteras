@@ -1015,7 +1015,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     }
 
     const storedRulers = localStorage.getItem(RULERS_KEY);
-    const show = storedRulers == null ? true : storedRulers !== '0';
+    const show = storedRulers == null ? false : storedRulers !== '0';
     setRulersVisible(show);
 
     requestAnimationFrame(() => {
