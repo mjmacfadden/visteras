@@ -97,6 +97,10 @@ module.exports = function (env, argv) {
 		},
 		static: [
 			{
+				directory: path.resolve(__dirname, "../home"),
+				publicPath: "/",
+			},
+			{
 				directory: path.resolve(__dirname, "./"),
 				publicPath: "/studio",
 			},
@@ -117,9 +121,6 @@ module.exports = function (env, argv) {
 			if (!devServer || !devServer.app) {
 				throw new Error("webpack-dev-server app is missing");
 			}
-			devServer.app.get("/", function (_req, res) {
-				res.redirect("/studio/");
-			});
 			devServer.app.get("/vector", function (req, res, next) {
 				if (req.path === "/vector") {
 					return res.redirect("/vector/");

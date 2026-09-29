@@ -58,34 +58,8 @@ mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage"
 # Apex CNAME for visteras.com (GitHub Pages custom domain)
 printf '%s\n' 'visteras.com' > "$SITE/CNAME"
 
-# Simple hub at / — links to the apps
-cat > "$SITE/index.html" << 'HTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visteras</title>
-  <meta http-equiv="refresh" content="0; url=/studio/" />
-  <link rel="canonical" href="https://visteras.com/studio/" />
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 36rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
-    a { color: #2f6fae; }
-  </style>
-</head>
-<body>
-  <h1>Visteras</h1>
-  <p>Client-side creative suite. Your files stay on your device.</p>
-  <ul>
-    <li><a href="/studio/">Studio</a> — raster image editor</li>
-    <li><a href="/vector/">Vector</a> — SVG editor</li>
-    <li><a href="/publish/">Publish</a> — personal morning newspaper</li>
-    <li><a href="/collage/">Collage</a> — printable collage fodder generator</li>
-  </ul>
-  <p><noscript>JavaScript is off — open <a href="/studio/">/studio/</a>, <a href="/vector/">/vector/</a>, <a href="/publish/">/publish/</a>, or <a href="/collage/">/collage/</a>.</noscript></p>
-</body>
-</html>
-HTML
+# Keep homepage source outside the generated site tree.
+copy_tree "$ROOT/apps/home" "$SITE"
 
 echo "==> Copying Studio static tree → site/studio/"
 # Static hosting needs: index, dist, images, SW, manifests, tools/examples if referenced.
