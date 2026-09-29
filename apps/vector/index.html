@@ -79,26 +79,6 @@
           </div>
         </div>
 
-        <!-- View Menu (Precedes Object to match Studio) -->
-        <div class="menu_entry" id="menu_view">
-          <div class="menu_entry_title">View</div>
-          <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item" id="action_fit_workspace">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
-            <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
-            <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
-            <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
-            <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
-            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
-            <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
-            <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
-            <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_source">View SVG Source... <span class="menu_dropdown_shortcut">⌘U</span></div>
-          </div>
-        </div>
-
         <!-- Object Menu -->
         <div class="menu_entry" id="menu_object">
           <div class="menu_entry_title">Object</div>
@@ -134,6 +114,27 @@
         </div>
 
         <!-- Help Menu -->
+        <!-- View Menu (Precedes Object to match Studio) -->
+        <div class="menu_entry" id="menu_view">
+          <div class="menu_entry_title">View</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_fit_workspace">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
+            <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
+            <div class="menu_dropdown_item" id="action_snap_point" role="menuitemcheckbox" aria-checked="true">Snap to Point</div>
+            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_source">View SVG Source... <span class="menu_dropdown_shortcut">⌘U</span></div>
+          </div>
+        </div>
+
         <div class="menu_entry" id="menu_help">
           <div class="menu_entry_title">Help</div>
           <div class="menu_dropdown_list">
@@ -171,7 +172,8 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js?v=center-artboard-1';
-    import { mountPenTools } from './js/visteras-pen-tools.js';
+    import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
+    import { mountPenTools } from './js/visteras-pen-tools.js?v=exact-snap-2';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountSelectionTools } from './js/visteras-selection.js?v=smoke-stroke-align-5';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
@@ -1837,6 +1839,7 @@
     applyStudioSkin();
     setupMenuBar();
     setupPropertiesPanel();
+    mountVectorWorkspace(svgEditor);
     mountPenTools(svgEditor);
     mountScissorsTool(svgEditor);
     // Disarm SVG-Edit wireframe shortcut="F" so ⌘/Ctrl+F is paste-in-place only.
