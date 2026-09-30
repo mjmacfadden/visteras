@@ -55,7 +55,8 @@ const P = (label, over) => ({ label, settings: { ...DEFAULT_SETTINGS, ...over } 
  * corners 75 → cornerThreshold 60, paths 50 → simplify 1.25).
  */
 export const TRACE_PRESETS = {
-  default: P('Default', { mode: 'bw', threshold: 128 }),
+  // B&W presets ignore white (just the black shapes), like Illustrator's B&W Logo.
+  default: P('Default', { mode: 'bw', threshold: 128, ignoreWhite: true }),
   'high-fidelity-photo': P('High Fidelity Photo', {
     mode: 'color', palette: 'fulltone', fullTone: 93, // ld 8, cp 8
     method: 'overlapping', noise: 4, corners: 25, paths: 90, // fs 2, ct 120, simp 0.25
@@ -68,9 +69,9 @@ export const TRACE_PRESETS = {
   '6-colors': P('6 Colors', { mode: 'color', palette: 'limited', colors: 6 }),
   '16-colors': P('16 Colors', { mode: 'color', palette: 'limited', colors: 16 }),
   'shades-of-gray': P('Shades of Gray', { mode: 'grayscale', grays: 8 }),
-  'bw-logo': P('Black and White Logo', { mode: 'bw', threshold: 128, noise: 9, corners: 90, paths: 88 }),
+  'bw-logo': P('Black and White Logo', { mode: 'bw', threshold: 128, noise: 9, corners: 90, paths: 88, ignoreWhite: true }),
   'sketched-art': P('Sketched Art', { mode: 'bw', threshold: 128, noise: 49, paths: 40, ignoreWhite: true }),
-  silhouettes: P('Silhouettes', { mode: 'bw', threshold: 200, noise: 49 }),
+  silhouettes: P('Silhouettes', { mode: 'bw', threshold: 200, noise: 49, ignoreWhite: true }),
   'line-art': P('Line Art', { mode: 'bw', threshold: 128, paths: 60, ignoreWhite: true }),
   'technical-drawing': P('Technical Drawing', { mode: 'bw', threshold: 128, paths: 80, corners: 90, noise: 9, snapCurves: true, ignoreWhite: true }),
 };
@@ -126,7 +127,7 @@ export function pathsToSimplify(paths) {
 }
 
 export function cornersToThreshold(corners) {
-  return 150 - 1.2 * clampNum(corners, 0, 100, 75);
+  return Math.round(150 - 1.2 * clampNum(corners, 0, 100, 75)); // VTracer wants an i32
 }
 
 export function noiseToSpeckle(noise) {
@@ -207,7 +208,7 @@ export function mapSettingsToVtracer(settings, { scale = 1, autoColors = null } 
     ignoreWhite: s.ignoreWhite && vt.clustering !== 'bw' && vt.hierarchical === 'cutout',
     snapCurves: s.snapCurves,
   };
-  return { vt, prep, post, resolvedPalette, settings: s };
+  return { vt: sanitizeVtracerConfig(vt), prep, post, resolvedPalette, settings: s };
 }
 
 // ---------------------------------------------------------------------------
@@ -944,6 +945,200 @@ export function groupPathsForExpand(paths, hierarchical = 'cutout') {
 }
 
 // ---------------------------------------------------------------------------
+// VTracer config sanitizer (the wasm deserializer rejects non-integers)
+// ---------------------------------------------------------------------------
+
+/**
+ * Integer VTracer options and their valid ranges, from the bundled wasm's
+ * serde types: usize filterSpeckle/maxIterations/maxColors, i32
+ * colorPrecision/layerDifference/cornerThreshold/spliceThreshold, u32
+ * pathPrecision/adaptiveWindow/watershedDetail, u8 binaryThreshold.
+ * A float such as cornerThreshold 116.4 fails with "invalid type: floating
+ * point, expected i32". colorPrecision 0 traps ("unreachable").
+ */
+export const VTRACER_INT_FIELDS = Object.freeze({
+  filterSpeckle: [0, 128],
+  colorPrecision: [1, 8],
+  layerDifference: [0, 255],
+  cornerThreshold: [0, 180],
+  spliceThreshold: [0, 180],
+  maxIterations: [1, 100],
+  pathPrecision: [0, 8],
+  binaryThreshold: [0, 255],
+  maxColors: [2, 256],
+  adaptiveWindow: [1, 4096],
+  watershedDetail: [0, 100],
+});
+
+/** Float VTracer options (kept as floats, but clamped and finite). */
+export const VTRACER_FLOAT_FIELDS = Object.freeze({
+  simplify: [0, 20],
+  lengthThreshold: [0, 100],
+  adaptiveT: [0, 1],
+});
+
+/**
+ * THE one place a VTracer config is made safe for the wasm: every integer
+ * field is rounded and clamped, float fields are clamped, non-finite values
+ * fall back to the range minimum. Returns a new object.
+ */
+export function sanitizeVtracerConfig(vt = {}) {
+  const out = { ...vt };
+  for (const [k, [lo, hi]] of Object.entries(VTRACER_INT_FIELDS)) {
+    if (!(k in out) || out[k] == null) continue;
+    const n = Number(out[k]);
+    out[k] = Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : lo;
+  }
+  for (const [k, [lo, hi]] of Object.entries(VTRACER_FLOAT_FIELDS)) {
+    if (!(k in out) || out[k] == null) continue;
+    const n = Number(out[k]);
+    out[k] = Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : lo;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Degenerate subpath cleanup
+// ---------------------------------------------------------------------------
+
+/** Split an absolute path (M/L/H/V/C/Q/Z) into subpaths; null if it uses anything else. */
+function splitSubpaths(d) {
+  const tokens = String(d || '').match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) || [];
+  const subs = [];
+  let cur = null;
+  let cmd = null;
+  let i = 0;
+  let x = 0, y = 0, sx = 0, sy = 0;
+  const num = () => parseFloat(tokens[i++]);
+  while (i < tokens.length) {
+    const t = tokens[i];
+    if (/^[a-zA-Z]$/.test(t)) { cmd = t; i++; if (cmd === 'Z' || cmd === 'z') { if (cur) { cur.text.push('Z'); cur.closed = true; x = sx; y = sy; } continue; } }
+    else if (!cmd) return null;
+    if (cmd === 'M') {
+      x = num(); y = num(); sx = x; sy = y;
+      cur = { text: [`M ${x} ${y}`], pts: [[x, y]], closed: false };
+      subs.push(cur);
+      cmd = 'L';
+    } else if (!cur) {
+      return null;
+    } else if (cmd === 'L') {
+      x = num(); y = num(); cur.text.push(`L ${x} ${y}`); cur.pts.push([x, y]);
+    } else if (cmd === 'H') {
+      x = num(); cur.text.push(`L ${x} ${y}`); cur.pts.push([x, y]);
+    } else if (cmd === 'V') {
+      y = num(); cur.text.push(`L ${x} ${y}`); cur.pts.push([x, y]);
+    } else if (cmd === 'C') {
+      const x1 = num(), y1 = num(), x2 = num(), y2 = num(), x3 = num(), y3 = num();
+      for (const t of [0.25, 0.5, 0.75]) {
+        const u = 1 - t;
+        cur.pts.push([u * u * u * x + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3, u * u * u * y + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3]);
+      }
+      cur.pts.push([x3, y3]);
+      cur.text.push(`C ${x1} ${y1} ${x2} ${y2} ${x3} ${y3}`);
+      x = x3; y = y3;
+    } else if (cmd === 'Q') {
+      const x1 = num(), y1 = num(), x2 = num(), y2 = num();
+      for (const t of [0.25, 0.5, 0.75]) {
+        const u = 1 - t;
+        cur.pts.push([u * u * x + 2 * u * t * x1 + t * t * x2, u * u * y + 2 * u * t * y1 + t * t * y2]);
+      }
+      cur.pts.push([x2, y2]);
+      cur.text.push(`Q ${x1} ${y1} ${x2} ${y2}`);
+      x = x2; y = y2;
+    } else {
+      return null; // relative or arc commands: leave the path alone
+    }
+    if (![x, y].every(Number.isFinite)) return null;
+  }
+  return subs;
+}
+
+/** Area (shoelace over the flattened outline) and bbox of one subpath. */
+export function subpathMetrics(pts) {
+  let a = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let k = 0; k < pts.length; k++) {
+    const [x0, y0] = pts[k];
+    const [x1, y1] = pts[(k + 1) % pts.length];
+    a += x0 * y1 - x1 * y0;
+    if (x0 < minX) minX = x0; if (x0 > maxX) maxX = x0;
+    if (y0 < minY) minY = y0; if (y0 > maxY) maxY = y0;
+  }
+  return { area: Math.abs(a) / 2, width: maxX - minX, height: maxY - minY };
+}
+
+/**
+ * Drop zero-area and near-zero-area subpaths (area < minArea px² or a bbox
+ * side < minSize px), e.g. the "M 334 426 C 333.67 426.33 …" slivers VTracer
+ * emits along color boundaries. Returns '' when nothing survives.
+ */
+export function cleanSubpaths(d, { minArea = 1, minSize = 0.5 } = {}) {
+  const subs = splitSubpaths(d);
+  if (!subs) return d;
+  const keep = subs.filter((s) => {
+    if (s.pts.length < 3) return false;
+    const m = subpathMetrics(s.pts);
+    return m.area >= minArea && m.width >= minSize && m.height >= minSize;
+  });
+  if (keep.length === subs.length) return d;
+  return keep.map((s) => s.text.join(' ')).join(' ');
+}
+
+/** cleanSubpaths over a path list; paths left empty are removed. */
+export function cleanTracePaths(paths, opts) {
+  const out = [];
+  for (const p of paths || []) {
+    const d = cleanSubpaths(p.d, opts);
+    if (d && /[LCQ]/.test(d)) out.push(d === p.d ? p : { ...p, d });
+  }
+  return out;
+}
+
+/**
+ * B&W (Ignore White off): the white shapes are background / counters and go
+ * BELOW the black ones (stable), like Illustrator. Other modes are untouched.
+ */
+export function stackWhiteBelow(paths) {
+  const white = [];
+  const rest = [];
+  for (const p of paths) (isNearWhiteFill(p.fill) ? white : rest).push(p);
+  return white.length && rest.length ? white.concat(rest) : paths;
+}
+
+// ---------------------------------------------------------------------------
+// Expand output hygiene (works on any DOM-like element tree)
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove every trace helper from an expanded group, in place: helper nodes
+ * ([data-trace-bounds], <image>, [data-trace-source]) and every data-trace-*
+ * attribute and the visteras-live-trace class. Returns the element.
+ */
+export function stripTraceArtifacts(root) {
+  const walk = (el) => {
+    for (const ch of [...(el.children || [])]) {
+      const helper = ch.localName === 'image'
+        || ch.getAttribute?.('data-trace-bounds') != null
+        || ch.getAttribute?.('data-trace-source') != null;
+      if (helper) ch.remove();
+      else walk(ch);
+    }
+    const names = typeof el.getAttributeNames === 'function' ? el.getAttributeNames() : [];
+    for (const n of names) {
+      if (n.startsWith('data-trace-') || n === 'data-visteras-trace') el.removeAttribute(n);
+    }
+    const cls = el.getAttribute?.('class');
+    if (cls && /\bvisteras-live-trace\b/.test(cls)) {
+      const rest = cls.replace(/\bvisteras-live-trace\b/g, '').trim();
+      if (rest) el.setAttribute('class', rest);
+      else el.removeAttribute('class');
+    }
+  };
+  walk(root);
+  return root;
+}
+
+// ---------------------------------------------------------------------------
 // Full pipeline (runs in the worker; convertPixels is injected)
 // ---------------------------------------------------------------------------
 
@@ -979,18 +1174,20 @@ export function runTracePipeline(convertPixels, rgba, width, height, settings, {
     vt.palette = vt.palette.concat(vt.palette[0] === '#FFFFFF' ? ['#000000'] : ['#FFFFFF']);
   }
   const t1 = now();
-  const svg = convertPixels(rgba, width, height, vt);
+  const config = sanitizeVtracerConfig(vt); // integer fields must be integers (i32/u32/usize/u8)
+  const svg = convertPixels(rgba, width, height, config);
   const t2 = now();
   const inv = scale > 0 ? 1 / scale : 1;
   const toSource = makeScaleTransformer(inv, 2);
   let paths = parseVtracerSvg(svg).map((p) => ({ fill: p.fill, d: transformSvgPathD(p.d, toSource) }));
   if (post.ignoreWhite) paths = applyIgnoreWhite(paths, vt.hierarchical);
   if (post.snapCurves) paths = paths.map((p) => ({ fill: p.fill, d: snapCurvesToLines(p.d, { curveTol: 0.5, angleTol: 2 }) }));
-  paths = paths.filter((p) => p.d && /[LC]/.test(p.d));
+  paths = cleanTracePaths(paths.filter((p) => p.d && /[LC]/.test(p.d)));
+  if (prep.kind === 'binarize') paths = stackWhiteBelow(paths);
   return {
     paths,
     stats: traceStats(paths),
-    vt,
+    vt: config,
     hierarchical: vt.hierarchical,
     palette,
     prepMs: Math.round(t1 - t0),

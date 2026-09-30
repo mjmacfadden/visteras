@@ -47,11 +47,16 @@ import {
   snapToGrays,
   binarize,
   runTracePipeline,
-} from './visteras-image-trace-core.js?v=live-trace-1';
+  sanitizeVtracerConfig,
+  cleanSubpaths,
+  cleanTracePaths,
+  stackWhiteBelow,
+  stripTraceArtifacts,
+} from './visteras-image-trace-core.js?v=trace-dialog-2';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const LIVE_CLASS = 'visteras-live-trace';
-const WORKER_URL = new URL('./visteras-image-trace-worker.js?v=live-trace-1', import.meta.url);
+const WORKER_URL = new URL('./visteras-image-trace-worker.js?v=trace-dialog-2', import.meta.url);
 const WASM_URL = new URL('../lib/vtracer/vtracer_wasm_bg.wasm', import.meta.url);
 const DEBOUNCE_MS = 300;
 const RESTART_AFTER_MS = 500;
@@ -761,8 +766,23 @@ async function requestPreview() {
     if (ctl.session !== session || session.committing) return;
     if (err?.code === 'stale') return; // the newer job owns the busy state
     noteTraceError(session, err);
+    if (err?.code !== 'aborted') rollbackPreview(session); // never leave a wrapper behind
     setBusy(session, false);
+    refreshUi();
   }
+}
+
+/** Error path: drop the preview wrapper and show the original image again. */
+function rollbackPreview(session) {
+  try {
+    if (session.group) endLiveGroup(session);
+  } catch (e) {
+    console.warn('[image-trace] rollback', e);
+  }
+  session.lastResult = null;
+  session.stats = null;
+  session.dirty = false;
+  if (session.image?.isConnected) selectOnly(session.image);
 }
 
 /** Full-resolution result (≤ 8 MP) unless the preview is already exact and current. */
@@ -785,7 +805,7 @@ function buildExpandedGroup(canvas, group) {
   const m = result ? gm.multiply(consolidatedMatrix(result)) : gm;
   const r3 = (v) => Math.round(v * 1000) / 1000;
   const tp = (x, y) => ({ x: r3(m.a * x + m.c * y + m.e), y: r3(m.b * x + m.d * y + m.f) });
-  const paths = resultPaths(result).map((p) => ({ fill: p.fill, d: transformSvgPathD(p.d, tp) }));
+  const paths = cleanTracePaths(resultPaths(result).map((p) => ({ fill: p.fill, d: transformSvgPathD(p.d, tp) })));
   const out = document.createElementNS(SVG_NS, 'g');
   out.setAttribute('id', canvas.getNextId());
   out.setAttribute('data-name', 'Image Trace');
@@ -804,7 +824,7 @@ function buildExpandedGroup(canvas, group) {
     }
     out.appendChild(sub);
   }
-  return out;
+  return stripTraceArtifacts(out); // no bounds rect, <image> or data-trace-* in the output
 }
 
 /**
@@ -826,22 +846,43 @@ async function expandSession() {
     if (ctl.session !== session) return null; // cancelled meanwhile
     session.committing = false;
     noteTraceError(session, err);
+    if (err?.code !== 'aborted') rollbackPreview(session);
     setBusy(session, false);
+    refreshUi();
     return null;
   }
   if (ctl.session !== session) return null;
   const canvas = sc();
   const image = session.image;
-  // Bake exactly what the live group would show, then put the image back and swap.
-  beginLiveGroup(session);
-  const result = buildResultGroup(canvas, image, res.srcW, res.srcH, res.paths, res.hierarchical, liveParts(session.group).result);
-  showResult(session, result);
-  const out = buildExpandedGroup(canvas, session.group);
-  endLiveGroup(session);
-  const parent = image.parentNode;
-  parent.insertBefore(out, image);
-  const next = image.nextSibling;
-  image.remove();
+  let out = null;
+  let parent = null;
+  let next = null;
+  try {
+    // Bake exactly what the live group would show, then put the image back and swap.
+    beginLiveGroup(session);
+    const result = buildResultGroup(canvas, image, res.srcW, res.srcH, res.paths, res.hierarchical, liveParts(session.group).result);
+    showResult(session, result);
+    out = buildExpandedGroup(canvas, session.group);
+    endLiveGroup(session);
+    if (!out.querySelector('path')) throw new TraceError('empty', 'The tracing produced no shapes. Try another threshold or preset.');
+    parent = image.parentNode;
+    parent.insertBefore(out, image);
+    next = image.nextSibling;
+    image.remove();
+  } catch (err) {
+    // Roll back to the untouched image: no wrapper, no half-inserted group, no history.
+    try { out?.remove(); } catch (_) { /* ignore */ }
+    try {
+      if (session.group) endLiveGroup(session);
+      if (!image.isConnected && parent) parent.insertBefore(image, next && next.parentNode === parent ? next : null);
+    } catch (e) { console.warn('[image-trace] rollback', e); }
+    session.committing = false;
+    noteTraceError(session, err);
+    rollbackPreview(session);
+    setBusy(session, false);
+    refreshUi();
+    return null;
+  }
   const { BatchCommand, InsertElementCommand, RemoveElementCommand } = canvas.history;
   const batch = new BatchCommand('Image Trace');
   batch.addSubCommand(new InsertElementCommand(out));
@@ -988,7 +1029,7 @@ function computeDialogPosition({ area, target = null, size, viewport, margin = 1
 
 // Eye icon: Studio's visibility eye (raw-develop panel eye), per "shared tools use Studio's icon".
 const EYE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-const TRACE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7cb9ff" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M6 17c2.5-6 4.5-9 6-9s2 3 3.5 3S18 9 18 9"/><circle cx="8" cy="8" r="1.4" fill="#7cb9ff" stroke="none"/></svg>';
+const TRACE_ICON = '<svg class="vit-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M6 17c2.5-6 4.5-9 6-9s2 3 3.5 3S18 9 18 9"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg>';
 
 function presetOptionsHtml(selected, withCustom = true) {
   const opts = Object.entries(TRACE_PRESETS).map(([id, p]) => `<option value="${id}"${id === selected ? ' selected' : ''}>${p.label}</option>`);
@@ -1032,19 +1073,19 @@ function ensureDialog() {
             <option value="fulltone">Full Tone</option>
           </select></div>
         <div class="vit-slider" data-show="color-limited"><div class="vit-slider-head"><span>Colors</span><span id="vit_colors_val">6</span></div>
-          <input type="range" id="vit_colors" min="2" max="30" step="1" value="6"></div>
+          <input type="range" class="vit-range" id="vit_colors" min="2" max="30" step="1" value="6"></div>
         <div class="vit-slider" data-show="color-fulltone"><div class="vit-slider-head"><span>Colors</span><span id="vit_fulltone_val">50%</span></div>
-          <input type="range" id="vit_fulltone" min="0" max="100" step="1" value="50"></div>
+          <input type="range" class="vit-range" id="vit_fulltone" min="0" max="100" step="1" value="50"></div>
         <div class="vit-slider" data-show="bw"><div class="vit-slider-head"><span>Threshold</span><span id="vit_threshold_val">128</span></div>
-          <input type="range" id="vit_threshold" min="0" max="255" step="1" value="128"></div>
+          <input type="range" class="vit-range" id="vit_threshold" min="0" max="255" step="1" value="128"></div>
         <details class="vit-advanced" id="vit_advanced">
           <summary>Advanced</summary>
           <div class="vit-slider"><div class="vit-slider-head"><span>Paths</span><span id="vit_paths_val">50%</span></div>
-            <input type="range" id="vit_paths" min="0" max="100" step="1" value="50"></div>
+            <input type="range" class="vit-range" id="vit_paths" min="0" max="100" step="1" value="50"></div>
           <div class="vit-slider"><div class="vit-slider-head"><span>Corners</span><span id="vit_corners_val">75%</span></div>
-            <input type="range" id="vit_corners" min="0" max="100" step="1" value="75"></div>
+            <input type="range" class="vit-range" id="vit_corners" min="0" max="100" step="1" value="75"></div>
           <div class="vit-slider"><div class="vit-slider-head"><span>Noise</span><span id="vit_noise_val">25 px</span></div>
-            <input type="range" id="vit_noise" min="1" max="100" step="1" value="25"></div>
+            <input type="range" class="vit-range" id="vit_noise" min="1" max="100" step="1" value="25"></div>
           <div class="vit-row"><label>Method</label>
             <div class="vit-seg" role="radiogroup" aria-label="Method">
               <label title="Abutting: paths are cut out of each other"><input type="radio" name="vit_method" value="abutting" checked> Abutting</label>
@@ -1515,6 +1556,12 @@ export {
   // dialog placement (pure)
   computeDialogPosition,
   clampDialogPosition,
+  // output hygiene + wasm config (pure, from the core)
+  sanitizeVtracerConfig,
+  cleanSubpaths,
+  cleanTracePaths,
+  stackWhiteBelow,
+  stripTraceArtifacts,
   liveParts,
   applyView,
   computeImageLayout,

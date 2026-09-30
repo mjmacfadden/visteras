@@ -13,7 +13,7 @@
  * accepts a precompiled WebAssembly.Module, so no fetch happens in here.
  */
 import { initVTracer, convertPixels } from '../lib/vtracer/vtracer.js';
-import { runTracePipeline } from './visteras-image-trace-core.js?v=live-trace-1';
+import { runTracePipeline } from './visteras-image-trace-core.js?v=trace-dialog-2';
 
 let ready = null;
 

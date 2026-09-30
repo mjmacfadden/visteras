@@ -31,6 +31,15 @@ import {
   computeDialogPosition,
   clampDialogPosition,
 } from '../js/visteras-image-trace.js';
+import {
+  VTRACER_INT_FIELDS,
+  sanitizeVtracerConfig,
+  cleanSubpaths,
+  cleanTracePaths,
+  stackWhiteBelow,
+  stripTraceArtifacts,
+  subpathMetrics,
+} from '../js/visteras-image-trace-core.js';
 
 // Minimal zero-dependency PNG decoder for Node test runner
 function decodePng(buf) {
@@ -810,8 +819,8 @@ test('Object menu has a single "Image Trace…" item (no Make/Release/Expand sub
   assert.ok(!/menu_image_trace|menu_submenu_list/.test(html), 'old submenu is gone');
   const js = fs.readFileSync(path.resolve(import.meta.dirname, '../js/visteras-image-trace.js'), 'utf8');
   assert.ok(!/image_trace_panel|action_image_trace_(make|release|expand|panel)|vit_trace\b/.test(js), 'old panel / submenu wiring is gone');
-  assert.match(html, /visteras-image-trace\.js\?v=trace-dialog-1/);
-  assert.match(html, /visteras-image-trace\.css\?v=trace-dialog-1/);
+  assert.match(html, /visteras-image-trace\.js\?v=trace-dialog-2/);
+  assert.match(html, /visteras-image-trace\.css\?v=trace-dialog-2/);
 });
 
 test('dialog placement docks right of the canvas area, beside the image', () => {
@@ -842,4 +851,132 @@ test('dialog placement and dragging stay inside the viewport', () => {
   // A canvas area that runs off-screen still yields an on-screen dialog.
   const p = computeDialogPosition({ area: { left: 0, top: 0, right: 2000, bottom: 1500 }, size, viewport });
   assert.ok(p.left >= 8 && p.left + size.width <= viewport.width - 8 && p.top >= 8 && p.top + size.height <= viewport.height - 8);
+});
+
+// ---- VTracer integer params, output hygiene, accent -------------------------
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const assertIntFields = (vt, ctx) => {
+  for (const [k, [lo, hi]] of Object.entries(VTRACER_INT_FIELDS)) {
+    if (vt[k] == null) continue;
+    assert.ok(Number.isInteger(vt[k]), `${k}=${vt[k]} is an integer (${ctx})`);
+    assert.ok(vt[k] >= lo && vt[k] <= hi, `${k}=${vt[k]} in [${lo},${hi}] (${ctx})`);
+  }
+};
+
+test('fuzz: slider floats in and beyond range always map to integer, in-range VTracer fields', () => {
+  const r = rng(74);
+  const f = (lo, hi) => lo + r() * (hi - lo);
+  const pick = (a) => a[Math.floor(r() * a.length)];
+  for (let i = 0; i < 2000; i++) {
+    const s = {
+      mode: pick(['color', 'grayscale', 'bw']), palette: pick(['automatic', 'limited', 'fulltone']),
+      method: pick(['abutting', 'overlapping']), ignoreWhite: r() < 0.5, snapCurves: r() < 0.5,
+      colors: f(-10, 60), fullTone: f(-50, 250), grays: f(-5, 100), threshold: f(-100, 400),
+      paths: f(-50, 250), corners: f(-50, 250), noise: f(-20, 300),
+    };
+    const scale = f(0.01, 1.5);
+    const { vt } = mapSettingsToVtracer(s, { scale, autoColors: r() < 0.5 ? Math.floor(f(1, 40)) : null });
+    assertIntFields(vt, JSON.stringify({ ...s, scale }));
+    assert.ok(Number.isFinite(vt.simplify) && Number.isFinite(vt.lengthThreshold));
+  }
+  // The values from Mike's console: corners 28 / 14 / 83 / 32 / 29 → 116.4, 133.2, 50.4, 111.6, 115.2
+  for (const corners of [28, 14, 83, 32, 29]) assertIntFields(mapSettingsToVtracer({ corners }).vt, `corners ${corners}`);
+  // Raw configs with garbage are sanitized too; float fields stay floats.
+  for (let i = 0; i < 500; i++) {
+    const raw = {};
+    for (const k of Object.keys(VTRACER_INT_FIELDS)) raw[k] = r() < 0.1 ? NaN : f(-500, 5000);
+    raw.simplify = 1.37; raw.lengthThreshold = 4.5;
+    const out = sanitizeVtracerConfig(raw);
+    assertIntFields(out, 'raw');
+    assert.equal(out.simplify, 1.37);
+    assert.equal(out.lengthThreshold, 4.5);
+  }
+});
+
+test('fuzzed settings trace through the real VTracer wasm without type errors', async () => {
+  await initVTracer();
+  const r = rng(564);
+  const img = canvas(48, 48, (x, y) => ((x - 24) ** 2 + (y - 24) ** 2 < 300 ? [0, 0, 0] : [255, 255, 255]));
+  for (let i = 0; i < 30; i++) {
+    const s = { mode: ['color', 'grayscale', 'bw'][i % 3], palette: ['automatic', 'limited', 'fulltone'][i % 3], ignoreWhite: i % 2 === 0,
+      method: i % 4 < 2 ? 'abutting' : 'overlapping', corners: r() * 100, paths: r() * 100, noise: 1 + r() * 99, fullTone: r() * 100, threshold: r() * 255, colors: 2 + r() * 28 };
+    const res = runTracePipeline(convertPixels, new Uint8ClampedArray(img), 48, 48, s, { scale: 0.3 + r() * 0.7 });
+    assertIntFields(res.vt, JSON.stringify(s));
+  }
+});
+
+test('cleanSubpaths drops zero-area and sliver subpaths, keeps real shapes', () => {
+  const square = 'M 10 10 L 110 10 L 110 110 L 10 110 Z';
+  const sliver = 'M 334 426 C 333.67 426.33 333 427 333 427 L 334 426 Z';
+  const line = 'M 5 5 L 50 5 L 5 5 Z';
+  const d = `${square} ${sliver} ${line}`;
+  assert.equal(cleanSubpaths(d), square);
+  assert.equal(cleanSubpaths(square), square, 'untouched when clean');
+  const out = cleanTracePaths([{ fill: '#000000', d }, { fill: '#FFFFFF', d: sliver }]);
+  assert.deepEqual(out, [{ fill: '#000000', d: square }]);
+  assert.ok(subpathMetrics([[0, 0], [10, 0], [10, 10], [0, 10]]).area === 100);
+});
+
+test('B&W: presets ignore white; with Ignore White off white stacks below black and no slivers remain', async () => {
+  for (const id of ['default', 'bw-logo', 'silhouettes']) assert.equal(presetSettings(id).ignoreWhite, true, id);
+  assert.deepEqual(stackWhiteBelow([{ fill: '#000000' }, { fill: '#FFFFFF' }, { fill: '#000000' }]).map((p) => p.fill), ['#FFFFFF', '#000000', '#000000']);
+  await initVTracer();
+  const img = canvas(120, 120, (x, y) => ((x - 60) ** 2 + (y - 60) ** 2 < 1600 && !((x - 60) ** 2 + (y - 60) ** 2 < 200) ? [0, 0, 0] : [255, 255, 255]));
+  const res = runTracePipeline(convertPixels, img, 120, 120, { ...presetSettings('default'), ignoreWhite: false });
+  const fills = res.paths.map((p) => p.fill.toUpperCase());
+  assert.ok(fills.includes('#000000'));
+  if (fills.includes('#FFFFFF')) assert.ok(fills.lastIndexOf('#FFFFFF') < fills.indexOf('#000000'), `white below black: ${fills}`);
+  for (const p of res.paths) assert.equal(cleanSubpaths(p.d), p.d, 'no degenerate subpaths left');
+  const on = runTracePipeline(convertPixels, canvas(120, 120, (x, y) => ((x - 60) ** 2 + (y - 60) ** 2 < 1600 ? [0, 0, 0] : [255, 255, 255])), 120, 120, presetSettings('default'));
+  assert.deepEqual([...new Set(on.paths.map((p) => p.fill.toUpperCase()))], ['#000000'], 'Default preset gives just black shapes');
+});
+
+test('stripTraceArtifacts removes bounds/image helpers and every data-trace-* attribute', () => {
+  const el = (localName, attrs = {}, children = []) => {
+    const node = {
+      localName, attrs: { ...attrs }, children, parent: null,
+      getAttribute(n) { return n in this.attrs ? this.attrs[n] : null; },
+      setAttribute(n, v) { this.attrs[n] = String(v); },
+      removeAttribute(n) { delete this.attrs[n]; },
+      getAttributeNames() { return Object.keys(this.attrs); },
+      remove() { const i = this.parent.children.indexOf(this); if (i >= 0) this.parent.children.splice(i, 1); },
+    };
+    for (const c of children) c.parent = node;
+    return node;
+  };
+  const root = el('g', { id: 'g1', 'data-trace-settings': '{}', 'data-visteras-trace': '1', class: 'visteras-live-trace keep' }, [
+    el('image', { 'data-trace-source': '1' }),
+    el('g', { 'data-trace-result': '1', 'data-trace-width': '564' }, [
+      el('rect', { 'data-trace-bounds': '1' }),
+      el('path', { d: 'M 0 0 L 1 0 L 1 1 Z', 'data-trace-x': '1', fill: '#000' }),
+    ]),
+  ]);
+  stripTraceArtifacts(root);
+  const all = [];
+  const walk = (n) => { all.push(n); n.children.forEach(walk); };
+  walk(root);
+  assert.deepEqual(all.map((n) => n.localName), ['g', 'g', 'path']);
+  for (const n of all) assert.ok(!n.getAttributeNames().some((a) => a.startsWith('data-trace-') || a === 'data-visteras-trace'), n.localName);
+  assert.equal(root.getAttribute('class'), 'keep');
+  assert.equal(all[2].getAttribute('fill'), '#000');
+});
+
+test('trace UI uses the Vector orange accent: no hardcoded blue in the trace CSS/JS', () => {
+  const files = ['../css/visteras-image-trace.css', '../js/visteras-image-trace.js', '../js/visteras-image-trace-core.js'];
+  for (const f of files) {
+    const src = fs.readFileSync(path.resolve(import.meta.dirname, f), 'utf8');
+    assert.ok(!/studio-blue|--link-color|\bblue\b/i.test(src.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')), `${f}: no blue tokens`);
+    for (const m of src.matchAll(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi)) {
+      const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join('') : m[1];
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+      assert.ok(!(b > r + 40 && b > g + 20), `${f}: blue-ish colour #${m[1]}`);
+    }
+  }
+  const css = fs.readFileSync(path.resolve(import.meta.dirname, '../css/visteras-image-trace.css'), 'utf8');
+  assert.match(css, /\.vit-btn-primary \{[^}]*var\(--studio-orange\)/);
+  assert.match(css, /\.vit-range::-webkit-slider-runnable-track \{ height: 2px/);
 });
