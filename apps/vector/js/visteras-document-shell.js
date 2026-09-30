@@ -424,6 +424,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     state.activeId = id;
     setBaseUnit(next.unit || 'px');
     loadSvg(next.svg, next.width, next.height);
+    if (svgEditor) svgEditor.title = next.title;
+    try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
     renderTabs();
     updateStatusBar();
   }
@@ -451,6 +453,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       doc.svg = captureSvg();
       doc.dirty = false;
       doc.isStartupDefault = true;
+      doc.fileHandle = null;
+      if (svgEditor) svgEditor.title = doc.title;
+      try { localStorage.setItem(ACTIVE_TITLE_KEY, doc.title); } catch { /* ignore */ }
       renderTabs();
       updateStatusBar();
       return;
@@ -462,6 +467,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       state.activeId = next.id;
       setBaseUnit(next.unit || 'px');
       loadSvg(next.svg, next.width, next.height);
+      if (svgEditor) svgEditor.title = next.title;
+      try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
     }
     renderTabs();
     updateStatusBar();
@@ -487,6 +494,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         doc.svg = captureSvg();
         doc.dirty = false;
         doc.isStartupDefault = false;
+        doc.fileHandle = null;
+        if (svgEditor) svgEditor.title = doc.title;
+        try { localStorage.setItem(ACTIVE_TITLE_KEY, doc.title); } catch { /* ignore */ }
       }
       renderTabs();
       updateStatusBar();
@@ -495,7 +505,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
 
     saveActiveToModel();
     const newDoc = createDocModel({
-      title,
+      title: title || `Untitled-${state.autoTitleCount++}`,
       width,
       height,
       unit,
@@ -512,6 +522,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     } finally {
       setTimeout(() => { state.suppressDirty = false; }, 50);
     }
+    if (svgEditor) svgEditor.title = newDoc.title;
+    try { localStorage.setItem(ACTIVE_TITLE_KEY, newDoc.title); } catch { /* ignore */ }
     renderTabs();
     updateStatusBar();
     return newDoc;
@@ -521,13 +533,15 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     const replace = !forceNew && isActiveUntouchedDefault();
     setBaseUnit(unit || 'px');
 
+    const resolvedTitle = (title && String(title).trim()) || (replace && getActiveDoc()?.title) || `Untitled-${state.autoTitleCount++}`;
+
     let targetDoc;
     if (replace) {
       targetDoc = getActiveDoc();
     } else {
       saveActiveToModel();
       targetDoc = createDocModel({
-        title: title || `Untitled-${state.autoTitleCount++}`,
+        title: resolvedTitle,
         width: width || 800,
         height: height || 600,
         unit: unit || 'px',
@@ -540,17 +554,15 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     }
 
     if (targetDoc) {
-      targetDoc.title = title || 'untitled';
+      targetDoc.title = resolvedTitle;
       targetDoc.unit = unit || 'px';
       targetDoc.dirty = false;
       targetDoc.isStartupDefault = false;
-      if (fileHandle) targetDoc.fileHandle = fileHandle;
+      targetDoc.fileHandle = fileHandle || null;
     }
 
-    if (title) {
-      if (svgEditor) svgEditor.title = title;
-      try { localStorage.setItem(ACTIVE_TITLE_KEY, title); } catch { /* ignore */ }
-    }
+    if (svgEditor) svgEditor.title = resolvedTitle;
+    try { localStorage.setItem(ACTIVE_TITLE_KEY, resolvedTitle); } catch { /* ignore */ }
 
     state.suppressDirty = true;
     try {

@@ -611,7 +611,8 @@
         reader.onload = (re) => {
           const raw = re.target.result;
           let svgContent = raw;
-          let base = (file.name || 'untitled').replace(/\.(vvd|svg)$/i, '');
+          const fileBase = (file.name || '').replace(/\.(vvd|svg)$/i, '').trim();
+          let base = fileBase;
           let docWidth = null;
           let docHeight = null;
           let docUnit = null;
@@ -620,14 +621,19 @@
             try {
               const bundle = JSON.parse(raw);
               if (bundle.svg) svgContent = bundle.svg;
-              if (bundle.title) base = bundle.title;
               if (bundle.width) docWidth = bundle.width;
               if (bundle.height) docHeight = bundle.height;
               if (bundle.unit) docUnit = bundle.unit;
+              if (!base || /^untitled(-\d+)?$/i.test(base)) {
+                if (bundle.title && !/^untitled(-\d+)?$/i.test(bundle.title)) {
+                  base = bundle.title;
+                }
+              }
             } catch (err) {
               console.warn('VVD parse error, reading as raw text:', err);
             }
           }
+          if (!base) base = (file.name || 'untitled').replace(/\.(vvd|svg)$/i, '') || 'untitled';
 
           const shell = window.__visterasDocumentShell;
           if (shell?.openDocument) {
@@ -643,6 +649,7 @@
             if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
             sc.setSvgString(svgContent);
             if (base) svgEditor.title = base;
+            try { localStorage.setItem('visteras_vector_active_doc_title', base); } catch { /* ignore */ }
             try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
             try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
           }
@@ -736,25 +743,25 @@
           console.warn('Could not generate vvd thumbnail:', e);
         }
 
-        const vvdData = {
+        const buildVvdJson = (docTitle) => JSON.stringify({
           $schema: 'visteras-vector-document-v1',
           version: 1,
           app: 'visteras-vector',
           exportedAt: new Date().toISOString(),
-          title: title,
+          title: docTitle,
           width: res.w,
           height: res.h,
           unit: unit,
           thumbnail: thumbUrl,
           svg: svgStr,
-        };
-        const vvdJson = JSON.stringify(vvdData, null, 2);
+        }, null, 2);
+
         const fileName = `${title}.vvd`;
 
         if (!forceSaveAs && activeDoc?.fileHandle) {
           try {
             const writable = await activeDoc.fileHandle.createWritable();
-            await writable.write(vvdJson);
+            await writable.write(buildVvdJson(title));
             await writable.close();
             shell?.clearActiveDirty?.();
             shell?.renderTabs?.();
@@ -775,10 +782,10 @@
                 accept: { 'application/json': ['.vvd'], 'application/x-visteras-vector': ['.vvd'] },
               }],
             });
-            const writable = await handle.createWritable();
-            await writable.write(vvdJson);
-            await writable.close();
             const savedBase = handle.name.replace(/\.(vvd|svg)$/i, '');
+            const writable = await handle.createWritable();
+            await writable.write(buildVvdJson(savedBase));
+            await writable.close();
             if (activeDoc) {
               activeDoc.title = savedBase;
               activeDoc.fileHandle = handle;
@@ -795,6 +802,7 @@
           }
         }
 
+        const vvdJson = buildVvdJson(title);
         const blob = new Blob([vvdJson], { type: 'application/json;charset=utf-8' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
