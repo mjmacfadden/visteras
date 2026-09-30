@@ -1321,9 +1321,10 @@
       propPanel.id = 'properties_panel';
       propPanel.className = 'sidebar_block';
       propPanel.innerHTML = `
-        <div class="sidebar_block_header" id="properties_panel_header" title="Toggle Properties Panel">
-          <span class="sidebar_block_title">Properties</span>
-          <span class="sidebar_block_arrow"></span>
+        <div class="sidebar_block_header panel_tabs_header" id="properties_panel_header">
+          <div class="panel_tabs" role="tablist">
+            <button type="button" class="panel_tab_btn active" id="prop_tab_btn" role="tab" aria-selected="true" tabindex="0">Properties</button>
+          </div>
         </div>
         <div class="sidebar_block_content" id="properties_content">
           
@@ -1887,9 +1888,11 @@
       moveEl('elem_id', 'slot_elem_id');
       moveEl('elem_class', 'slot_elem_class');
 
-      // Setup collapsible headers
+      // Properties header click handler (tab expands if collapsed)
       document.getElementById('properties_panel_header')?.addEventListener('click', () => {
-        propPanel.classList.toggle('collapsed');
+        if (propPanel.classList.contains('collapsed')) {
+          propPanel.classList.remove('collapsed');
+        }
       });
 
       document.querySelectorAll('.prop_section_header').forEach(header => {

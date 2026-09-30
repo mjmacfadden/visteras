@@ -1783,11 +1783,11 @@ function ensureColorSwatchesBlock() {
     propsContent?.removeAttribute('role');
     const header = document.getElementById('properties_panel_header');
     if (header) {
-      header.className = 'sidebar_block_header';
-      header.title = 'Toggle Properties Panel';
+      header.className = 'sidebar_block_header panel_tabs_header';
       header.innerHTML = `
-        <span class="sidebar_block_title">Properties</span>
-        <span class="sidebar_block_arrow"></span>
+        <div class="panel_tabs" role="tablist">
+          <button type="button" class="panel_tab_btn active" id="prop_tab_btn" role="tab" aria-selected="true" tabindex="0">Properties</button>
+        </div>
       `;
     }
     propPanel.classList.remove('vcs-block', 'vcs-tabbed-props');
