@@ -1,0 +1,4 @@
+<!-- Visteras Rounded Rectangle tool icon: same frame, stroke and #CCCCCC glyph colour as the unified rect.svg (apps/studio/images/icons/rectangle.svg), with a larger corner radius. Studio has no Rounded Rectangle tool, so there is no Studio source to copy. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#CCCCCC" stroke-width="2">
+	<rect x="3" y="5" width="18" height="14" rx="5" ry="5"/>
+</svg>

@@ -82,13 +82,31 @@ var ext_polystar_default = {
 			callback() {
 				const buttonTemplate = `
             <se-flyingbutton id="tools_polygon" title="${`${name}:title`}">
-              <se-button id="tool_star" title="${`${name}:buttons.0.title`}" src="star.svg">
+              <se-button id="tool_star" title="${`${name}:buttons.0.title`}" src="star.svg?v=unify-icons-1">
               </se-button>
-              <se-button id="tool_polygon" title="${`${name}:buttons.1.title`}" src="polygon.svg">
+              <se-button id="tool_polygon" title="${`${name}:buttons.1.title`}" src="polygon.svg?v=unify-icons-1">
               </se-button>
             </se-flyingbutton>
           `;
-				svgCanvas.insertChildAtIndex($id("tools_left"), buttonTemplate, 10);
+				// Visteras: Polygon and Star live in the shared Rectangle/shape flyout
+				// (Rectangle, Rounded Rectangle, Ellipse, Polygon, Star, Shape library).
+				const shapeFlyout = $id("tools_rect");
+				if (shapeFlyout) {
+					const mk = (id, title, src) => {
+						const b = document.createElement("se-button");
+						b.id = id;
+						b.setAttribute("title", title);
+						b.setAttribute("src", src);
+						return b;
+					};
+					const polygonBtn = mk("tool_polygon", `${name}:buttons.1.title`, "polygon.svg?v=unify-icons-1");
+					const starBtn = mk("tool_star", `${name}:buttons.0.title`, "star.svg?v=unify-icons-1");
+					const lib = $id("tool_shapelib");
+					if (lib && lib.parentElement === shapeFlyout) {
+						shapeFlyout.insertBefore(polygonBtn, lib);
+						shapeFlyout.insertBefore(starBtn, lib);
+					} else shapeFlyout.append(polygonBtn, starBtn);
+				} else svgCanvas.insertChildAtIndex($id("tools_left"), buttonTemplate, 10);
 				$click($id("tool_star"), () => {
 					if (this.leftPanel.updateLeftPanel("tool_star")) {
 						svgCanvas.setMode("star");

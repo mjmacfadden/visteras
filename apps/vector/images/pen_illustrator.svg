@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><defs><mask id="nib-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="30" height="30"><rect width="30" height="30" fill="white"/><path d="m3 22 8-8" fill="none" stroke="black" stroke-width="1.5"/><circle cx="12" cy="13" r="1.7" fill="black"/></mask></defs><path d="M3 22 7 9 14 5 21 12 17 19Z" fill="#ccc" mask="url(#nib-cutout)"/><path d="m15 3 4-2 7 7-2 4Z" fill="#ccc"/></svg>
+<!-- Visteras unified tool icon: identical geometry to apps/studio/images/icons/pen.svg (Studio is the source). Glyph colour #CCCCCC = Studio's black glyph under invert(0.8). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#CCCCCC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+  <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+  <path d="M2 2l7.586 7.586"/>
+  <circle cx="11" cy="11" r="2"/>
+</svg>

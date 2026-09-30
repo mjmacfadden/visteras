@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- White/Hollow Direct Selection Arrow Icon -->
-  <path d="M4 3 L4 19 L8.5 15 L12.5 22.5 L15.5 21 L11.5 13.5 L18 13.5 Z" fill="#ffffff" stroke="currentColor" stroke-width="1.5"/>
+<!-- Visteras unified tool icon: identical geometry to apps/vector/images/direct_select.svg (Vector is the source). currentColor renders #CCCCCC under Studio's invert(0.8) icon filter. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <path d="M4 4 L21 12 L12 12 L12 21 Z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>

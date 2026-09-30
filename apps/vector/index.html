@@ -176,9 +176,9 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=select-style-1';
+    import Editor from './Editor.js?v=merge-icons-1';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
-    import { mountPenTools } from './js/visteras-pen-tools.js?v=pen-auto-1';
+    import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-5';
@@ -195,6 +195,7 @@
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-png-1';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
+    import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1549,9 +1550,41 @@
             background: transparent !important;
           }
         `;
+        // Shape library (se-explorerbutton): only the toolbar button image, never the
+        // library previews in .image-lib. Same 15px cell + orange pressed tint as other tools.
+        const explorerButtonShadowCss = `
+          .menu-button {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: transparent !important;
+          }
+          .menu-button > img.button-icon {
+            width: 15px !important;
+            height: 15px !important;
+            max-width: 15px !important;
+            max-height: 15px !important;
+            object-fit: contain !important;
+            transition: filter 0.12s;
+          }
+          :host([pressed]) .menu-button > img.button-icon,
+          .overall.pressed .menu-button > img.button-icon {
+            filter: ${orangeFilter} !important;
+          }
+        `;
         const apply = () => {
           const root = document.getElementById('tools_left');
           if (!root) return;
+          root.querySelectorAll('se-explorerbutton').forEach((host) => {
+            if (!host.shadowRoot) return;
+            let style = host.shadowRoot.querySelector('style[data-visteras-tool-accent]');
+            if (!style) {
+              style = document.createElement('style');
+              style.setAttribute('data-visteras-tool-accent', '1');
+              host.shadowRoot.appendChild(style);
+            }
+            style.textContent = explorerButtonShadowCss;
+          });
           root.querySelectorAll('se-button, se-flyingbutton').forEach((host) => {
             if (!host.shadowRoot) return;
             let style = host.shadowRoot.querySelector('style[data-visteras-tool-accent]');
@@ -2037,6 +2070,8 @@
     // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
     mountVisterasFontPicker({ svgEditor });
     mountVisterasTypeOnPath({ svgEditor });
+    // Shape library picker in the options bar (shape flyout's last tool)
+    mountShapePicker({ svgEditor });
 
     // Reference raster images (place / move / scale — no pixel editing)
     mountVisterasReferenceImages({ svgEditor });

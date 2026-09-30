@@ -48,7 +48,7 @@ var ext_panning_default = {
 				const btitle = `${svgEditor.i18next.t(`${name}:buttons.0.title`)} ${svgEditor.i18next.t(`${name}:buttons.0.key`)}`;
 				const buttonTemplate = document.createElement("template");
 				buttonTemplate.innerHTML = `
-        <se-button id="ext-panning" title="${btitle}" src="panning.svg"></se-button>
+        <se-button id="ext-panning" title="${btitle}" src="panning.svg?v=unify-icons-1"></se-button>
         `;
 				insertAfter($id("tool_zoom"), buttonTemplate.content.cloneNode(true));
 				$click($id("ext-panning"), () => {
