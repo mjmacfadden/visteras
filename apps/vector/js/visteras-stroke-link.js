@@ -220,8 +220,23 @@ export function mountStrokeLink(svgEditor, ctrl = null) {
   for (const name of ['undo', 'redo']) {
     const orig = undoMgr[name].bind(undoMgr);
     undoMgr[name] = function (...args) {
+      // Undo/redo repopulates layers and drops the selection, so the wells
+      // fell back to the defaults. Keep the selection that was active.
+      const before = (sc.getSelectedElements?.() || []).filter((el) => el?.isConnected);
       guard++;
-      try { return orig(...args); } finally { discard(); guard--; fresh = null; }
+      try { return orig(...args); } finally {
+        discard(); guard--; fresh = null;
+        if (before.length) {
+          setTimeout(() => {
+            const live = before.filter((el) => el.isConnected && content()?.contains(el));
+            const mode = String(sc.getMode?.() || 'select');
+            if (mode !== 'select' && !/eyedrop/i.test(mode)) return;
+            if (!live.length || (sc.getSelectedElements?.() || []).filter(Boolean).length) return;
+            try { sc.addToSelection(live, true); } catch { /* ignore */ }
+            refreshUi();
+          }, 0);
+        }
+      }
     };
   }
 

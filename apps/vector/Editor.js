@@ -40976,10 +40976,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					} else p = q.getMouseTarget(e), e.shiftKey && r !== p && q.removeFromSelection([p]);
 					q.dragStartTransforms = null, q.hasDragStartTransform = !1;
 					let n = t[0];
-					n && (n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
+					// Visteras: only drop the temporary pointer-events style; stock SVG-Edit removed the whole
+					// style="" attribute on select, wiping style-based stroke/fill (and mix-blend-mode).
+					n && (n.style.removeProperty("pointer-events"), n.getAttribute("style")?.trim() || n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
 						e.style.removeProperty("pointer-events");
 					}) : og(n, (e) => {
-						e.removeAttribute("style");
+						e.style?.removeProperty("pointer-events"), e.getAttribute?.("style")?.trim() || e.removeAttribute?.("style");
 					}));
 				}
 				return;

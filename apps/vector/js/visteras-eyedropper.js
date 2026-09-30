@@ -38,6 +38,7 @@
 import {
   createImageSampler, sampleImageElementAt, sampleRenderedAt, sampleWithFallback, imageHref, imageGeometry,
 } from './visteras-eyedropper-raster.js?v=raster-1';
+import { parseCssPaint } from './visteras-paint-resolver.js?v=paint-resolver-2';
 
 const MODE = 'eyedropper';
 
@@ -504,14 +505,99 @@ export function styleFromCurShape(cur = {}) {
 // ─── Hit-testing ─────────────────────────────────────────────────────────────
 const EXCLUDE_ANCESTORS = '#selectorParentGroup, #canvasBackground, defs, clipPath, mask, marker, pattern, symbol, [data-visteras-overlay]';
 
+const num0 = (v, d = 1) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+
+/** Product of `opacity` from el up to (not including) `stop`; 0 ⇒ invisible. */
+export function effectiveOpacity(el, getCS, stop = null) {
+  let o = 1;
+  for (let n = el; n && n !== stop && n.nodeType === 1; n = n.parentNode) {
+    o *= num0(getCS(n)?.opacity, 1);
+    if (o <= 0) return 0;
+    if (n.nodeName === 'svg' && n.id === 'svgcontent') break;
+  }
+  return o;
+}
+
+/** Is this fill/stroke actually painted (not none/transparent, opacity > 0)? */
+export function isPaintPainted(cs, which) {
+  if (!cs) return false;
+  const get = (p) => (typeof cs.getPropertyValue === 'function' ? cs.getPropertyValue(p) : cs[p]);
+  const raw = get(which);
+  if (raw == null || String(raw).trim() === '') return false;
+  const p = parseCssPaint(raw);
+  if (p ? p.none : /^\s*none\s*$/i.test(String(raw))) return false; // unknown syntax (named colour…) ⇒ painted
+  if (num0(get(`${which}-opacity`), 1) <= 0) return false;
+  if (which === 'stroke' && num0(get('stroke-width'), 1) <= 0) return false;
+  return true;
+}
+
+/** Client point → element-local SVGPoint (Chromium needs an SVGPoint). */
+export function localPoint(el, clientX, clientY) {
+  const ctm = el?.getScreenCTM?.();
+  if (!ctm) return null;
+  const inv = ctm.inverse();
+  const x = inv.a * clientX + inv.c * clientY + inv.e;
+  const y = inv.b * clientX + inv.d * clientY + inv.f;
+  let pt = el.ownerSVGElement?.createSVGPoint?.();
+  if (pt) { pt.x = x; pt.y = y; } else pt = typeof DOMPoint === 'function' ? new DOMPoint(x, y) : { x, y };
+  return pt;
+}
+
+function findHelperFor(body) {
+  if (!body?.id) return null;
+  for (const c of body.parentNode?.children || []) {
+    if (c !== body && c.getAttribute?.(STROKE_HELPER_FOR_ATTR) === body.id) return c;
+  }
+  try { return (body.ownerSVGElement || body.ownerDocument)?.querySelector?.(`[${STROKE_HELPER_FOR_ATTR}="${CSS.escape(body.id)}"]`) || null; } catch { return null; }
+}
+
+/**
+ * Illustrator-style hit test: does the pointer hit a PAINTED area of `el`?
+ * An unfilled (none / transparent / fill-opacity 0) interior is not a hit;
+ * only a painted stroke is. For Inside/Outside stroked bodies the visible ring
+ * is the helper's stroke (clipped to the inside / masked to the outside).
+ * Images and text count within what the browser hit-tested.
+ * @param {Element} el body (not a helper)
+ * @param {{ getCS?: Function, helper?: Element|null }} [opts]
+ */
+export function isPaintedHit(el, clientX, clientY, opts = {}) {
+  const getCS = opts.getCS || ((e) => getComputedStyle(e));
+  if (!el) return false;
+  const content = opts.content || el.ownerDocument?.getElementById?.('svgcontent') || null;
+  if (effectiveOpacity(el, getCS, content) <= 0) return false;
+  if (el.nodeName === 'image' || el.nodeName === 'text') return true;
+  if (typeof el.isPointInFill !== 'function') return true; // not geometry: trust the browser
+  const cs = getCS(el);
+  const pt = localPoint(el, clientX, clientY);
+  if (!pt) return true;
+  const inFill = (() => { try { return !!el.isPointInFill(pt); } catch { return false; } })();
+  if (isPaintPainted(cs, 'fill') && inFill) return true;
+  const align = String(el.getAttribute?.(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  const helper = align === 'center' ? null : ('helper' in opts ? opts.helper : findHelperFor(el));
+  if (helper && typeof helper.isPointInStroke === 'function') {
+    const hcs = getCS(helper);
+    if (!isPaintPainted(hcs, 'stroke') || effectiveOpacity(helper, getCS, content) <= 0) return false;
+    const hp = localPoint(helper, clientX, clientY) || pt;
+    let onRing = false;
+    try { onRing = !!helper.isPointInStroke(hp); } catch { onRing = false; }
+    if (!onRing) return false;
+    // Inside ring is clipped to the body; outside ring is masked off the body.
+    return align === 'inside' ? inFill : (align === 'outside' ? !inFill : true);
+  }
+  if (!isPaintPainted(cs, 'stroke')) return false;
+  try { return !!el.isPointInStroke?.(pt); } catch { return false; }
+}
+
 /**
  * Topmost painted leaf under the pointer inside #svgcontent (never the
- * selection chrome, background, defs or hidden elements).
+ * selection chrome, background, defs or hidden elements). Unpainted areas
+ * (e.g. the interior of an unfilled path) pass through to what's below.
  */
 export function pickTargetAt(clientX, clientY, api = null, opts = {}) {
   const content = document.getElementById('svgcontent');
   if (!content) return null;
   const list = document.elementsFromPoint(clientX, clientY) || [];
+  const tried = new Set();
   for (const hit of list) {
     if (hit === content || !content.contains(hit)) continue;
     if (hit.closest?.(EXCLUDE_ANCESTORS)) continue;
@@ -519,10 +605,12 @@ export function pickTargetAt(clientX, clientY, api = null, opts = {}) {
     if (el.nodeName === 'tspan' || el.nodeName === 'textPath') el = el.closest('text');
     if (!el) continue;
     el = resolveBody(el, api);
-    if (!el || isStrokeHelper(el)) continue;
+    if (!el || isStrokeHelper(el) || tried.has(el)) continue;
+    tried.add(el);
     if (!LEAF_TAGS.has(el.nodeName) && !(opts.images && el.nodeName === 'image')) continue;
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
+    if (!isPaintedHit(el, clientX, clientY, { content })) continue;
     return el;
   }
   return null;
