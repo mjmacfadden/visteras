@@ -25,6 +25,7 @@ const RECENT_KEY = 'visteras_vector_recent_document_presets';
 const LAST_PRESET_KEY = 'visteras_vector_last_new_preset';
 const UNIT_KEY = 'visteras_vector_base_unit';
 const RULERS_KEY = 'visteras_vector_show_rulers';
+const ACTIVE_TITLE_KEY = 'visteras_vector_active_doc_title';
 const WORKSPACE_PADDING = 32;
 const EMPTY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"></svg>';
 
@@ -514,6 +515,76 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     renderTabs();
     updateStatusBar();
     return newDoc;
+  }
+
+  function openDocument({ title, width, height, unit = 'px', svg, fileHandle = null, forceNew = false } = {}) {
+    const replace = !forceNew && isActiveUntouchedDefault();
+    setBaseUnit(unit || 'px');
+
+    let targetDoc;
+    if (replace) {
+      targetDoc = getActiveDoc();
+    } else {
+      saveActiveToModel();
+      targetDoc = createDocModel({
+        title: title || `Untitled-${state.autoTitleCount++}`,
+        width: width || 800,
+        height: height || 600,
+        unit: unit || 'px',
+        svg: EMPTY_SVG,
+        dirty: false,
+        isStartupDefault: false,
+      });
+      state.documents.push(targetDoc);
+      state.activeId = targetDoc.id;
+    }
+
+    if (targetDoc) {
+      targetDoc.title = title || 'untitled';
+      targetDoc.unit = unit || 'px';
+      targetDoc.dirty = false;
+      targetDoc.isStartupDefault = false;
+      if (fileHandle) targetDoc.fileHandle = fileHandle;
+    }
+
+    if (title) {
+      if (svgEditor) svgEditor.title = title;
+      try { localStorage.setItem(ACTIVE_TITLE_KEY, title); } catch { /* ignore */ }
+    }
+
+    state.suppressDirty = true;
+    try {
+      if (width && height) {
+        setResolution(width, height);
+      }
+      if (svg) {
+        sc.setSvgString(svg);
+        const res = sc.getResolution?.() || { w: sc.contentW || 800, h: sc.contentH || 600 };
+        const finalW = width || res.w || 800;
+        const finalH = height || res.h || 600;
+        if (targetDoc) {
+          targetDoc.width = finalW;
+          targetDoc.height = finalH;
+          targetDoc.svg = captureSvg();
+        }
+        setResolution(finalW, finalH);
+      } else if (targetDoc) {
+        targetDoc.svg = captureSvg();
+      }
+      try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
+      try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
+      try { svgEditor.topPanel?.updateContextPanel?.(); } catch { /* ignore */ }
+      updateRulers();
+      requestAnimationFrame(() => {
+        try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
+      });
+    } finally {
+      setTimeout(() => { state.suppressDirty = false; }, 80);
+    }
+
+    renderTabs();
+    updateStatusBar();
+    return targetDoc;
   }
 
   // ----- status bar -----
@@ -1029,15 +1100,21 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         } finally {
           setTimeout(() => { state.suppressDirty = false; }, 80);
         }
+        const storedTitle = localStorage.getItem(ACTIVE_TITLE_KEY);
+        const hasContent = svgHasUserContent(captureSvg());
+        const initialTitle = (hasContent && storedTitle) ? storedTitle : `Untitled-${state.autoTitleCount++}`;
         const initial = createDocModel({
-          title: `Untitled-${state.autoTitleCount++}`,
+          title: initialTitle,
           width: w,
           height: h,
           unit: getBaseUnit(),
           svg: captureSvg(),
           dirty: false,
-          isStartupDefault: true,
+          isStartupDefault: !hasContent,
         });
+        if (hasContent && storedTitle && svgEditor) {
+          svgEditor.title = storedTitle;
+        }
         state.documents = [initial];
         state.activeId = initial.id;
         renderTabs();
@@ -1060,6 +1137,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     openNewModal,
     closeNewModal,
     createDocument,
+    openDocument,
+    renderTabs,
     switchDocument,
     closeDocument,
     fitDefaultArtboard,

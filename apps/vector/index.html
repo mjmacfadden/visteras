@@ -605,7 +605,7 @@
         window.__visterasDocumentShell?.openNewModal?.();
       });
 
-      function openVectorFile(file) {
+      function openVectorFile(file, fileHandle = null) {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (re) => {
@@ -629,28 +629,50 @@
             }
           }
 
-          sc.setSvgString(svgContent);
-          if (base) svgEditor.title = base;
-
-          // Opened file becomes the clean baseline (Studio parity).
-          setTimeout(() => {
-            const shell = window.__visterasDocumentShell;
-            const doc = shell?.getActiveDoc?.();
-            if (doc && base) doc.title = base;
-            if (doc && docWidth && docHeight) {
-              doc.width = docWidth;
-              doc.height = docHeight;
-              if (docUnit) doc.unit = docUnit;
-              sc.setResolution(docWidth, docHeight);
-            }
-            shell?.clearActiveDirty?.();
-            shell?.updateStatusBar?.();
-          }, 80);
+          const shell = window.__visterasDocumentShell;
+          if (shell?.openDocument) {
+            shell.openDocument({
+              title: base,
+              width: docWidth,
+              height: docHeight,
+              unit: docUnit || 'px',
+              svg: svgContent,
+              fileHandle: fileHandle,
+            });
+          } else {
+            if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
+            sc.setSvgString(svgContent);
+            if (base) svgEditor.title = base;
+            try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
+            try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
+          }
         };
         reader.readAsText(file);
       }
 
-      document.getElementById('action_open')?.addEventListener('click', () => {
+      document.getElementById('action_open')?.addEventListener('click', async () => {
+        if (window.showOpenFilePicker) {
+          try {
+            const [handle] = await window.showOpenFilePicker({
+              multiple: false,
+              types: [{
+                description: 'Visteras Vector Documents (*.vvd, *.svg)',
+                accept: {
+                  'application/json': ['.vvd'],
+                  'image/svg+xml': ['.svg'],
+                },
+              }],
+            });
+            if (handle) {
+              const file = await handle.getFile();
+              openVectorFile(file, handle);
+              return;
+            }
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            console.warn('showOpenFilePicker failed, falling back to input:', err);
+          }
+        }
         const fileInput = document.createElement('input');
         fileInput.type = 'file';
         fileInput.accept = '.vvd,image/svg+xml,.svg,application/json,application/x-visteras-vector';
@@ -735,6 +757,8 @@
             await writable.write(vvdJson);
             await writable.close();
             shell?.clearActiveDirty?.();
+            shell?.renderTabs?.();
+            try { localStorage.setItem('visteras_vector_active_doc_title', title); } catch { /* ignore */ }
             if (svgEditor) svgEditor.showSaveWarning = false;
             return;
           } catch (err) {
@@ -760,7 +784,9 @@
               activeDoc.fileHandle = handle;
             }
             svgEditor.title = savedBase;
+            try { localStorage.setItem('visteras_vector_active_doc_title', savedBase); } catch { /* ignore */ }
             shell?.clearActiveDirty?.();
+            shell?.renderTabs?.();
             if (svgEditor) svgEditor.showSaveWarning = false;
             return;
           } catch (err) {
@@ -776,7 +802,9 @@
         a.click();
         URL.revokeObjectURL(a.href);
         // Download started — clear dirty like Studio after save.
+        try { localStorage.setItem('visteras_vector_active_doc_title', title); } catch { /* ignore */ }
         shell?.clearActiveDirty?.();
+        shell?.renderTabs?.();
         if (svgEditor) svgEditor.showSaveWarning = false;
       }
 
