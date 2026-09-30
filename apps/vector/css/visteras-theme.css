@@ -868,6 +868,64 @@ html, body {
   stroke: #ffffff !important;
 }
 
+/* Floating Tool Panels (e.g. Pathfinder Popup) */
+.visteras_floating_panel {
+  position: fixed;
+  z-index: 10000;
+  width: 220px;
+  background: var(--studio-options-bg, #2d2d2d);
+  border: 1px solid var(--studio-border-light, #505050);
+  border-radius: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  font-family: var(--ui-font);
+  user-select: none;
+  overflow: hidden;
+}
+
+.floating_panel_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  background: var(--studio-header-bg, #242424);
+  border-bottom: 1px solid var(--studio-border-med, #3c3c3c);
+  cursor: move;
+}
+
+.floating_panel_title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--studio-text, #cccccc);
+  letter-spacing: 0.02em;
+}
+
+.floating_panel_close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  color: var(--studio-text-muted, #888888);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s, background-color 0.12s;
+}
+
+.floating_panel_close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.floating_panel_body {
+  padding: 10px;
+}
+
 #properties_panel se-select {
   width: 100% !important;
 }

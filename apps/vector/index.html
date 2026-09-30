@@ -137,11 +137,7 @@
         <div class="menu_entry" id="menu_window">
           <div class="menu_entry_title">Window</div>
           <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item" id="action_pathfinder_unite">Pathfinder: Unite</div>
-            <div class="menu_dropdown_item" id="action_pathfinder_minus_front">Pathfinder: Minus Front</div>
-            <div class="menu_dropdown_item" id="action_pathfinder_intersect">Pathfinder: Intersect</div>
-            <div class="menu_dropdown_item" id="action_pathfinder_exclude">Pathfinder: Exclude</div>
-            <div class="menu_dropdown_item" id="action_pathfinder_divide">Pathfinder: Divide</div>
+            <div class="menu_dropdown_item" id="action_window_pathfinder">Pathfinder</div>
           </div>
         </div>
 
@@ -172,6 +168,49 @@
         </a>
       </div>
     </nav>
+
+    <!-- Pathfinder Floating Window / Popup -->
+    <div id="visteras_pathfinder_panel" class="visteras_floating_panel" style="display: none; top: 90px; right: 280px;" role="dialog" aria-label="Pathfinder">
+      <div class="floating_panel_header" id="pathfinder_panel_header">
+        <span class="floating_panel_title">Pathfinder</span>
+        <button type="button" class="floating_panel_close" id="pathfinder_panel_close" title="Close" aria-label="Close">×</button>
+      </div>
+      <div class="floating_panel_body">
+        <div class="prop_pathfinder_grid">
+          <button type="button" class="prop_pathfinder_btn" id="popup_pathfinder_unite" title="Unite (Merge selected shapes into one outline)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3h12v5h5v12H8v-5H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button type="button" class="prop_pathfinder_btn" id="popup_pathfinder_minus_front" title="Minus Front (Subtract top shape from bottom shape)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3h12v5H8v12H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+              <rect x="8" y="8" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button type="button" class="prop_pathfinder_btn" id="popup_pathfinder_intersect" title="Intersect (Keep only the overlapping area)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2"/>
+              <rect x="8" y="8" width="12" height="12" fill="none" stroke="#777777" stroke-width="1.2" stroke-dasharray="2 2"/>
+              <rect x="8" y="8" width="7" height="7" fill="#555555" stroke="#cccccc" stroke-width="1.5"/>
+            </svg>
+          </button>
+          <button type="button" class="prop_pathfinder_btn" id="popup_pathfinder_exclude" title="Exclude (Keep non-overlapping areas)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3h12v5H8v12H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+              <path d="M15 8h5v12H8v-5h7V8z" fill="#555555" stroke="#cccccc" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button type="button" class="prop_pathfinder_btn" id="popup_pathfinder_divide" title="Divide (Slice shapes into separate component pieces)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 3h11v4H7v11H3V3z" fill="#555555" stroke="#cccccc" stroke-width="1.2" stroke-linejoin="round"/>
+              <rect x="8" y="8" width="6" height="6" fill="#cccccc" stroke="#cccccc" stroke-width="1.2"/>
+              <path d="M15 8h5v12H8v-4h7V8z" fill="#555555" stroke="#cccccc" stroke-width="1.2" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- ==================================================================
          2. SVG-Edit Application Container
@@ -795,12 +834,85 @@
       document.getElementById('action_type_on_path')?.addEventListener('click', triggerTypeOnPath);
       document.getElementById('action_type_on_path_object')?.addEventListener('click', triggerTypeOnPath);
 
-      // Pathfinder Menu Actions
-      document.getElementById('action_pathfinder_unite')?.addEventListener('click', () => executePathfinder('unite'));
-      document.getElementById('action_pathfinder_minus_front')?.addEventListener('click', () => executePathfinder('minus_front'));
-      document.getElementById('action_pathfinder_intersect')?.addEventListener('click', () => executePathfinder('intersect'));
-      document.getElementById('action_pathfinder_exclude')?.addEventListener('click', () => executePathfinder('exclude'));
-      document.getElementById('action_pathfinder_divide')?.addEventListener('click', () => executePathfinder('divide'));
+      // Window → Pathfinder Floating Popup
+      const pathfinderPanel = document.getElementById('visteras_pathfinder_panel');
+      const pathfinderHeader = document.getElementById('pathfinder_panel_header');
+      const pathfinderClose = document.getElementById('pathfinder_panel_close');
+
+      function togglePathfinderPanel() {
+        if (!pathfinderPanel) return;
+        const isHidden = pathfinderPanel.style.display === 'none';
+        if (isHidden) {
+          pathfinderPanel.style.display = 'block';
+          // Ensure it is positioned visible on screen
+          const rect = pathfinderPanel.getBoundingClientRect();
+          if (rect.right > window.innerWidth || rect.bottom > window.innerHeight) {
+            pathfinderPanel.style.top = '90px';
+            pathfinderPanel.style.left = `${Math.max(20, window.innerWidth - 520)}px`;
+            pathfinderPanel.style.right = 'auto';
+          }
+        } else {
+          pathfinderPanel.style.display = 'none';
+        }
+      }
+
+      document.getElementById('action_window_pathfinder')?.addEventListener('click', () => {
+        togglePathfinderPanel();
+      });
+
+      pathfinderClose?.addEventListener('click', () => {
+        if (pathfinderPanel) pathfinderPanel.style.display = 'none';
+      });
+
+      // Draggable panel by its header
+      if (pathfinderHeader && pathfinderPanel) {
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let panelStartX = 0;
+        let panelStartY = 0;
+
+        pathfinderHeader.addEventListener('mousedown', (e) => {
+          if (e.target === pathfinderClose) return;
+          isDragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          const rect = pathfinderPanel.getBoundingClientRect();
+          panelStartX = rect.left;
+          panelStartY = rect.top;
+          pathfinderPanel.style.left = `${panelStartX}px`;
+          pathfinderPanel.style.top = `${panelStartY}px`;
+          pathfinderPanel.style.right = 'auto';
+          pathfinderPanel.style.bottom = 'auto';
+          document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          if (!isDragging) return;
+          const deltaX = e.clientX - dragStartX;
+          const deltaY = e.clientY - dragStartY;
+          const newLeft = Math.max(0, Math.min(window.innerWidth - pathfinderPanel.offsetWidth, panelStartX + deltaX));
+          const newTop = Math.max(0, Math.min(window.innerHeight - pathfinderPanel.offsetHeight, panelStartY + deltaY));
+          pathfinderPanel.style.left = `${newLeft}px`;
+          pathfinderPanel.style.top = `${newTop}px`;
+        });
+
+        document.addEventListener('mouseup', () => {
+          if (isDragging) {
+            isDragging = false;
+            document.body.style.userSelect = '';
+          }
+        });
+      }
+
+      // Wire Popup Pathfinder buttons
+      const popupPathfinderOps = ['unite', 'minus_front', 'intersect', 'exclude', 'divide'];
+      popupPathfinderOps.forEach(op => {
+        document.getElementById(`popup_pathfinder_${op}`)?.addEventListener('click', (e) => {
+          e.preventDefault();
+          executePathfinder(op);
+        });
+      });
 
       document.getElementById('action_toggle_wireframe')?.addEventListener('click', () => {
         document.getElementById('tool_wireframe')?.click();
