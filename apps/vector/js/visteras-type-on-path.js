@@ -720,9 +720,16 @@ function syncOptionsPanel(svgEditor) {
   if (offsetVal) offsetVal.textContent = `${pct}%`;
 
   const ta = tp.getAttribute('text-anchor') || 'start';
+  const normAlign = (ta === 'middle' || ta === 'end') ? ta : 'start';
   const alignSelect = panel.querySelector('#top_align');
   if (alignSelect) {
-    alignSelect.value = (ta === 'middle' || ta === 'end') ? ta : 'start';
+    alignSelect.value = normAlign;
+  }
+  const alignBtns = panel.querySelectorAll('.top-align-btn');
+  for (const btn of alignBtns) {
+    const isActive = btn.dataset.align === normAlign;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   }
 
   const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
@@ -778,17 +785,17 @@ function wireOptionsPanel(svgEditor) {
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
   });
 
-  alignSelect?.addEventListener('change', (e) => {
+  function setTypeOnPathAlign(align) {
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
-    const align = e.target.value;
-    tp.setAttribute('text-anchor', align);
-    tp.parentElement?.setAttribute('text-anchor', align);
-    if (align === 'middle') {
+    const a = (align === 'middle' || align === 'center') ? 'middle' : (align === 'end' || align === 'right') ? 'end' : 'start';
+    tp.setAttribute('text-anchor', a);
+    tp.parentElement?.setAttribute('text-anchor', a);
+    if (a === 'middle') {
       tp.setAttribute('startOffset', '50%');
       if (offsetSlider) offsetSlider.value = '50';
       if (offsetVal) offsetVal.textContent = '50%';
-    } else if (align === 'end') {
+    } else if (a === 'end') {
       tp.setAttribute('startOffset', '100%');
       if (offsetSlider) offsetSlider.value = '100';
       if (offsetVal) offsetVal.textContent = '100%';
@@ -797,7 +804,28 @@ function wireOptionsPanel(svgEditor) {
       if (offsetSlider) offsetSlider.value = '0';
       if (offsetVal) offsetVal.textContent = '0%';
     }
+    const alignBtns = panel.querySelectorAll('.top-align-btn');
+    for (const btn of alignBtns) {
+      const isActive = btn.dataset.align === a;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    }
+    if (alignSelect) {
+      alignSelect.value = a;
+    }
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
+  }
+
+  const alignBtns = panel.querySelectorAll('.top-align-btn');
+  for (const btn of alignBtns) {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      setTypeOnPathAlign(btn.dataset.align);
+    });
+  }
+
+  alignSelect?.addEventListener('change', (e) => {
+    setTypeOnPathAlign(e.target.value);
   });
 
   function applyAlignToPath(mode) {

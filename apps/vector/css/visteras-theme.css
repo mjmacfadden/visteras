@@ -1611,3 +1611,55 @@ elix-dialog {
   border: 1px solid rgba(74, 85, 104, 0.9);
 }
 
+/* ==========================================================================
+   Type on Path Alignment Segmented Control
+   ========================================================================== */
+.top-align-group {
+  display: flex !important;
+  width: 100% !important;
+  height: 26px !important;
+  background: #1e1e1e !important;
+  border: 1px solid #444444 !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.top-align-btn {
+  flex: 1 !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #444444 !important;
+  color: #999999 !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transition: background-color 0.12s, color 0.12s !important;
+}
+
+.top-align-btn:last-child {
+  border-right: none !important;
+}
+
+.top-align-btn:hover {
+  background: #333333 !important;
+  color: #eeeeee !important;
+}
+
+.top-align-btn.active,
+.top-align-btn[aria-pressed="true"] {
+  background: rgba(250, 124, 27, 0.2) !important;
+  color: #fa7c1b !important;
+}
+
+.top-align-btn svg {
+  display: block !important;
+  pointer-events: none !important;
+}
+
+

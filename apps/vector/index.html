@@ -1613,11 +1613,18 @@
                 </div>
                 <div style="margin-bottom:8px;">
                   <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Alignment</div>
-                  <select id="top_align" style="box-sizing:border-box;width:100%;height:26px;background:#1e1e1e;border:1px solid #444;color:#eee;border-radius:4px;padding:0 6px;font-size:12px;">
-                    <option value="start">Start</option>
-                    <option value="middle">Center</option>
-                    <option value="end">End</option>
-                  </select>
+                  <div class="top-align-group" id="top_align_group" role="group" aria-label="Type on path alignment">
+                    <button type="button" class="top-align-btn active" id="top_align_start" data-align="start" title="Left Align" aria-label="Left Align" aria-pressed="true">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                    <button type="button" class="top-align-btn" id="top_align_middle" data-align="middle" title="Center Align" aria-label="Center Align" aria-pressed="false">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                    <button type="button" class="top-align-btn" id="top_align_end" data-align="end" title="Right Align" aria-label="Right Align" aria-pressed="false">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-4-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm4-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-4-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                  </div>
+                  <input type="hidden" id="top_align" value="start" />
                 </div>
                 <div style="margin-bottom:8px;">
                   <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Align to Path</div>
