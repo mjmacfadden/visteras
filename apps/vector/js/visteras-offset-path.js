@@ -523,7 +523,7 @@ export function mountOffsetPath(editor) {
 
   // Keyboard: ⌥⌘O
   document.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'o') {
+    if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === 'KeyO') {
       e.preventDefault();
       document.getElementById('action_offset_path')?.click();
     }

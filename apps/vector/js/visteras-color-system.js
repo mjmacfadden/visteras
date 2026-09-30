@@ -1068,6 +1068,15 @@ function createColorController(svgEditor) {
     getActiveTarget: () => state.activeTarget,
     getWorkingHex: () => (state.workingNone ? 'none' : state.workingHex),
 
+    // Stroke-align helpers shared with other tools (Eyedropper, Shape Builder).
+    readElementStrokeWeight,
+    readElementStrokeAlign,
+    applyStrokeAlignToTargets,
+    applyStrokeAlignToElement,
+    resolveStrokeAlignBody,
+    isStrokeAlignHelper,
+    isStrokeAlignWrap,
+
     subscribe(fn) {
       state.listeners.add(fn);
       return () => state.listeners.delete(fn);

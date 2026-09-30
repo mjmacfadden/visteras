@@ -68433,7 +68433,6 @@ var ez = function(e) {
 			layerView: !1
 		}, this.curPrefs = {}, this.urldata = {}, this.defaultExtensions = [
 			"ext-connector",
-			"ext-eyedropper",
 			"ext-grid",
 			"ext-markers",
 			"ext-panning",

@@ -1,31 +1,65 @@
 /**
- * Visteras Vector — Eyedropper Tool (I).
- * Adobe Illustrator-style colour sampler / style applicator:
+ * Visteras Vector — Eyedropper Tool (I), Illustrator behaviour (MVP).
  *
- * Behaviour
- * ─────────
- * • Press I to activate the tool.
- * • Click any object to SAMPLE its fill, stroke, stroke-width, opacity, etc.
- *   The cursor shows a small swatch of the sampled style.
- * • With objects selected BEFORE clicking: APPLY the sampled style to ALL
- *   selected objects (Illustrator behaviour — opposite of SVG-Edit default).
- * • Alt/Option+click always SAMPLES regardless of selection.
- * • Shift+click APPLIES without clearing the sampled style afterwards.
- * • Escape while the tool is active: clear sample and return to Select.
+ * • Click an object WITH a selection → the clicked object's appearance is
+ *   applied to every selected object (one undo step). Selection is unchanged.
+ * • Click an object with NOTHING selected → its appearance becomes the current
+ *   defaults (fill/stroke wells, weight, opacity, dashes, caps/joins, align).
+ * • Option/Alt-click an object → the current selection's appearance (or the
+ *   current defaults when nothing is selected) is applied to the clicked object.
+ * • Hold Cmd/Ctrl → temporarily switch to the last selection tool; releasing
+ *   the key returns to the Eyedropper (deferred until the mouse is released).
+ * • Click empty canvas → no-op. Esc → Select tool.
  *
- * Options Panel
- * ─────────────
- * A collapsible "Eyedropper Options" panel is injected into #sidepanels when
- * the eyedropper mode is active. The panel lets the user choose which style
- * attributes to sample / apply.
+ * Appearance = fill, fill-opacity, stroke, stroke-opacity, user stroke weight,
+ * stroke align, dasharray, linecap, linejoin, miterlimit, opacity and
+ * mix-blend-mode. Values are read from the computed style, so paint inherited
+ * from a group, inline style="" and CSS classes are all honoured. Missing /
+ * default values reset the corresponding property on the target.
+ *
+ * Not in the MVP: Shift pixel sampling, desktop sampling, Shift+Alt append,
+ * character/paragraph styles, the Eyedropper Options dialog, a filled cursor.
  */
 
 const MODE = 'eyedropper';
 
-// ─── Internal style state ────────────────────────────────────────────────────
-/** @type {Record<string,string>} sampled style attributes */
-let _sampledStyle = {};
+const STROKE_ALIGN_ATTR = 'data-visteras-stroke-align';
+const STROKE_WEIGHT_ATTR = 'data-visteras-stroke-weight';
+const STROKE_PAINT_ATTR = 'data-visteras-stroke-paint';
+const STROKE_HELPER_ATTR = 'data-visteras-stroke-align-helper';
+const STROKE_HELPER_FOR_ATTR = 'data-visteras-helper-for';
+const STROKE_WRAP_ATTR = 'data-visteras-sa-wrap';
+const STROKE_BODY_ATTR = 'data-visteras-sa-body';
 
+/** Leaf elements the eyedropper can sample from / apply to. */
+export const LEAF_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text']);
+
+/** Option group → SVG properties it covers ('stroke-align' is virtual). */
+const GROUPS = {
+  Fill: ['fill', 'fill-opacity'],
+  Stroke: ['stroke', 'stroke-opacity'],
+  StrokeWidth: ['stroke-width'],
+  StrokeAlign: ['stroke-align'],
+  Opacity: ['opacity'],
+  StrokeDash: ['stroke-dasharray'],
+  StrokeCaps: ['stroke-linecap', 'stroke-linejoin'],
+  Miter: ['stroke-miterlimit'],
+  Blend: ['mix-blend-mode'],
+};
+
+/** Initial/default values: a sampled default resets the target property. */
+const DEFAULTS = {
+  'fill-opacity': '1',
+  'stroke-opacity': '1',
+  'stroke-dasharray': 'none',
+  'stroke-linecap': 'butt',
+  'stroke-linejoin': 'miter',
+  'stroke-miterlimit': '4',
+  opacity: '1',
+  'mix-blend-mode': 'normal',
+};
+
+// ─── Options (persisted) ─────────────────────────────────────────────────────
 /** Options: which attributes to include when sampling / applying */
 let _options = {
   sampleFill: true,
@@ -34,12 +68,18 @@ let _options = {
   sampleOpacity: true,
   sampleStrokeDash: true,
   sampleStrokeCaps: true,
+  sampleStrokeAlign: true,
+  sampleMiter: true,
+  sampleBlend: true,
   applyFill: true,
   applyStroke: true,
   applyStrokeWidth: true,
   applyOpacity: true,
   applyStrokeDash: true,
   applyStrokeCaps: true,
+  applyStrokeAlign: true,
+  applyMiter: true,
+  applyBlend: true,
 };
 
 // Load persisted options from localStorage
@@ -56,158 +96,375 @@ function _saveOptions() {
   } catch (_) { /* ignore */ }
 }
 
-// ─── Sampling ────────────────────────────────────────────────────────────────
+function enabledProps(kind) {
+  const out = new Set();
+  for (const [group, props] of Object.entries(GROUPS)) {
+    if (_options[kind + group] !== false) props.forEach((p) => out.add(p));
+  }
+  return out;
+}
+
+// ─── Pure helpers ────────────────────────────────────────────────────────────
+const attr = (el, name) => (el && typeof el.getAttribute === 'function' ? el.getAttribute(name) : null);
+const hasAttr = (el, name) => attr(el, name) != null;
+
+export function isStrokeHelper(el) { return hasAttr(el, STROKE_HELPER_ATTR); }
+export function isStrokeWrap(el) { return hasAttr(el, STROKE_WRAP_ATTR); }
+
 /**
- * Sample style attributes from an SVG element according to current options.
- * @param {SVGElement} el
- * @returns {Record<string,string>} sampled attributes (raw SVG attribute names)
+ * Map a stroke-align helper or wrap to its user body (the element that owns
+ * the appearance). Other elements are returned unchanged.
  */
-export function sampleStyleFrom(el) {
+export function resolveBody(el, api = null) {
+  if (!el) return null;
+  if (api?.resolveStrokeAlignBody && (isStrokeHelper(el) || isStrokeWrap(el))) {
+    return api.resolveStrokeAlignBody(el) || el;
+  }
+  if (isStrokeHelper(el)) {
+    const id = attr(el, STROKE_HELPER_FOR_ATTR);
+    const doc = el.ownerDocument || (typeof document !== 'undefined' ? document : null);
+    const byId = id && doc?.getElementById?.(id);
+    if (byId) return byId;
+    const parent = el.parentNode;
+    if (parent && isStrokeWrap(parent)) {
+      for (const c of parent.children || []) if (hasAttr(c, STROKE_BODY_ATTR)) return c;
+    }
+    return el;
+  }
+  if (isStrokeWrap(el)) {
+    for (const c of el.children || []) if (hasAttr(c, STROKE_BODY_ATTR)) return c;
+  }
+  return el;
+}
+
+function hexByte(n) { return Math.max(0, Math.min(255, Math.round(Number(n)))).toString(16).padStart(2, '0'); }
+
+/** Normalise a paint value: rgb()→#hex, url("…#id")→url(#id), transparent→none. */
+export function normalizePaint(v) {
+  if (v == null) return null;
+  let s = String(v).trim();
+  if (!s) return null;
+  const lower = s.toLowerCase();
+  if (lower === 'none' || lower === 'transparent') return 'none';
+  const url = s.match(/^url\(\s*["']?[^"')]*?(#[^"')\s]+)["']?\s*\)/i);
+  if (url) return `url(${url[1]})`;
+  const rgb = lower.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);
+  if (rgb) {
+    if (rgb[4] != null) {
+      const a = rgb[4].endsWith('%') ? parseFloat(rgb[4]) / 100 : parseFloat(rgb[4]);
+      if (a === 0) return 'none';
+    }
+    return `#${hexByte(rgb[1])}${hexByte(rgb[2])}${hexByte(rgb[3])}`;
+  }
+  if (/^#[0-9a-f]{3}$/i.test(s) || /^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
+  return s;
+}
+
+/** "5px, 3px" → "5 3"; none/empty → none. */
+export function normalizeDash(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s || s === 'none') return 'none';
+  const parts = s.split(/[\s,]+/).filter(Boolean).map((p) => {
+    const n = parseFloat(p);
+    return Number.isFinite(n) ? String(+n.toFixed(4)) : p;
+  });
+  if (!parts.length || parts.every((p) => p === '0')) return 'none';
+  return parts.join(' ');
+}
+
+function normalizeNumber(v) {
+  if (v == null || v === '') return null;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? String(+n.toFixed(4)) : null;
+}
+
+function inlineStyleValue(el, prop) {
+  const v = el?.style?.getPropertyValue?.(prop);
+  return v ? v.trim() : null;
+}
+
+function isDefault(prop, v) {
+  if (v == null) return true;
+  if (!(prop in DEFAULTS)) return false;
+  if (prop === 'stroke-dasharray') return normalizeDash(v) === 'none';
+  if (prop.endsWith('opacity') || prop === 'stroke-miterlimit') return Number(v) === Number(DEFAULTS[prop]);
+  return String(v).trim().toLowerCase() === DEFAULTS[prop];
+}
+
+function readAlign(el, api) {
+  if (api?.readElementStrokeAlign) return api.readElementStrokeAlign(el);
+  const a = String(attr(el, STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  return a === 'inside' || a === 'outside' ? a : 'center';
+}
+
+function readWeight(el, api) {
+  if (api?.readElementStrokeWeight) {
+    const w = api.readElementStrokeWeight(el);
+    if (w != null) return w;
+  }
+  const stored = attr(el, STROKE_WEIGHT_ATTR);
+  if (stored != null && stored !== '' && Number.isFinite(Number(stored))) return Number(stored);
+  return null;
+}
+
+/**
+ * Sample the appearance of an element. Returns a map of property → value for
+ * every enabled sample option; a null value means "absent/default — reset it
+ * on the target". Uses getComputedStyle when available (browser), otherwise
+ * attributes + inline style (Node tests).
+ *
+ * @param {Element} el
+ * @param {{getComputedStyle?:Function, api?:object}} [env]
+ * @returns {Record<string,string|null>}
+ */
+export function sampleStyleFrom(el, env = {}) {
+  const api = env.api || null;
+  el = resolveBody(el, api);
   if (!el || ['svg', 'g', 'use', 'defs'].includes(el.nodeName)) return {};
+  const gcs = env.getComputedStyle !== undefined
+    ? env.getComputedStyle
+    : (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function' ? window.getComputedStyle.bind(window) : null);
+  let cs = null;
+  if (gcs) { try { cs = gcs(el); } catch { cs = null; } }
+  const read = (prop) => {
+    if (cs) {
+      const v = cs.getPropertyValue(prop);
+      return v != null && String(v).trim() !== '' ? String(v).trim() : null;
+    }
+    return inlineStyleValue(el, prop) ?? attr(el, prop);
+  };
+
+  const want = enabledProps('sample');
   const s = {};
-  const g = (attr) => el.getAttribute(attr) ?? null;
-  if (_options.sampleFill) {
-    const f = g('fill'); if (f !== null) s['fill'] = f;
-    const fo = g('fill-opacity'); if (fo !== null) s['fill-opacity'] = fo;
+  const aligned = readAlign(el, api) !== 'center';
+
+  if (want.has('fill')) s.fill = normalizePaint(read('fill'));
+  if (want.has('stroke')) {
+    let st = normalizePaint(read('stroke'));
+    // Inside/Outside aligned bodies render with stroke="none"; the real paint
+    // is stored on the body.
+    if (aligned && (st == null || st === 'none')) {
+      const stored = attr(el, STROKE_PAINT_ATTR);
+      if (stored != null && stored !== '') st = normalizePaint(stored);
+    }
+    s.stroke = st;
   }
-  if (_options.sampleStroke) {
-    const st = g('stroke'); if (st !== null) s['stroke'] = st;
-    const so = g('stroke-opacity'); if (so !== null) s['stroke-opacity'] = so;
+  for (const prop of ['fill-opacity', 'stroke-opacity', 'opacity', 'stroke-miterlimit']) {
+    if (!want.has(prop)) continue;
+    const v = normalizeNumber(read(prop));
+    s[prop] = isDefault(prop, v) ? null : v;
   }
-  if (_options.sampleStrokeWidth) {
-    const sw = g('stroke-width'); if (sw !== null) s['stroke-width'] = sw;
+  if (want.has('stroke-width')) {
+    const w = readWeight(el, api);
+    s['stroke-width'] = w != null ? String(w) : normalizeNumber(read('stroke-width'));
   }
-  if (_options.sampleOpacity) {
-    const op = g('opacity'); if (op !== null) s['opacity'] = op;
+  if (want.has('stroke-align')) s['stroke-align'] = readAlign(el, api);
+  if (want.has('stroke-dasharray')) {
+    const d = normalizeDash(read('stroke-dasharray'));
+    s['stroke-dasharray'] = isDefault('stroke-dasharray', d) ? null : d;
   }
-  if (_options.sampleStrokeDash) {
-    const da = g('stroke-dasharray'); if (da !== null) s['stroke-dasharray'] = da;
-  }
-  if (_options.sampleStrokeCaps) {
-    const lc = g('stroke-linecap'); if (lc !== null) s['stroke-linecap'] = lc;
-    const lj = g('stroke-linejoin'); if (lj !== null) s['stroke-linejoin'] = lj;
+  for (const prop of ['stroke-linecap', 'stroke-linejoin', 'mix-blend-mode']) {
+    if (!want.has(prop)) continue;
+    const v = read(prop);
+    s[prop] = isDefault(prop, v) ? null : String(v).trim();
   }
   return s;
 }
 
+/** Expand targets: groups → painted leaves, wraps/helpers → body. */
+export function expandTargets(targets, api = null) {
+  const out = [];
+  const seen = new Set();
+  const push = (el) => {
+    const b = resolveBody(el, api);
+    if (!b || seen.has(b) || !LEAF_TAGS.has(b.nodeName)) return;
+    if (isStrokeHelper(b)) return;
+    seen.add(b);
+    out.push(b);
+  };
+  const walk = (el) => {
+    if (!el) return;
+    if (isStrokeWrap(el)) { push(el); return; }
+    if (el.nodeName === 'g' || el.nodeName === 'a') {
+      for (const c of el.children || []) walk(c);
+      return;
+    }
+    if (el.nodeName === 'tspan' || el.nodeName === 'textPath') { walk(el.closest?.('text')); return; }
+    push(el);
+  };
+  for (const t of targets || []) walk(t);
+  return out;
+}
+
+const ALIGN_RECORD = [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR, 'stroke', 'stroke-width', 'clip-path', 'mask'];
+
 /**
- * Apply previously sampled styles to an array of SVG elements, recording an
- * undo history entry.
- * @param {SVGElement[]} targets
- * @param {Record<string,string>} style
- * @param {{ChangeElementCommand:any, undoMgr:any}} history
+ * Apply a sampled appearance to targets as ONE undo step.
+ * @param {Element[]} targets
+ * @param {Record<string,string|null>} style from sampleStyleFrom
+ * @param {{ChangeElementCommand:any, BatchCommand?:any, undoMgr:any}} history
+ * @param {{api?:object, sc?:object, name?:string, afterHistory?:Function}} [env]
+ * @returns {object|null} the history command
  */
-export function applyStyleToElements(targets, style, history) {
-  if (!targets.length || !Object.keys(style).length) return;
-  const { ChangeElementCommand } = history;
-  const batch = [];
+export function applyStyleToElements(targets, style, history, env = {}) {
+  const api = env.api || null;
+  const sc = env.sc || null;
+  const elems = expandTargets(targets, api);
+  if (!elems.length || !style || !Object.keys(style).length) return null;
+  const allowed = enabledProps('apply');
+  const keys = Object.keys(style).filter((k) => allowed.has(k));
+  if (!keys.length) return null;
+  const { ChangeElementCommand, BatchCommand } = history;
 
-  // Determine which attrs to apply based on options
-  const allowed = new Set();
-  if (_options.applyFill) { allowed.add('fill'); allowed.add('fill-opacity'); }
-  if (_options.applyStroke) { allowed.add('stroke'); allowed.add('stroke-opacity'); }
-  if (_options.applyStrokeWidth) allowed.add('stroke-width');
-  if (_options.applyOpacity) allowed.add('opacity');
-  if (_options.applyStrokeDash) allowed.add('stroke-dasharray');
-  if (_options.applyStrokeCaps) { allowed.add('stroke-linecap'); allowed.add('stroke-linejoin'); }
+  const subs = [];
+  const alignTouched = [];
+  for (const el of elems) {
+    const before = {};
+    const record = (name) => { if (!(name in before)) before[name] = attr(el, name); };
+    const setAttr = (name, v) => {
+      record(name);
+      if (v == null || v === '') el.removeAttribute(name); else el.setAttribute(name, String(v));
+    };
+    const stripInline = (prop) => {
+      if (inlineStyleValue(el, prop) == null) return;
+      record('style');
+      el.style.removeProperty(prop);
+      if (!attr(el, 'style')?.trim()) el.removeAttribute('style');
+    };
+    const wasAligned = hasAttr(el, STROKE_ALIGN_ATTR) && readAlign(el, api) !== 'center';
+    let weight = null;
 
-  for (const el of targets) {
-    const changes = {};
-    for (const [attr, val] of Object.entries(style)) {
-      if (!allowed.has(attr)) continue;
-      changes[attr] = el.getAttribute(attr) ?? '';
-      if (val === null || val === 'none' && attr === 'stroke-dasharray') {
-        el.removeAttribute(attr);
-      } else {
-        el.setAttribute(attr, val);
+    for (const k of keys) {
+      if (k === 'stroke-align') continue;
+      const v = style[k];
+      if (k === 'mix-blend-mode') {
+        if (el.style) {
+          record('style');
+          if (v == null) el.style.removeProperty('mix-blend-mode');
+          else el.style.setProperty('mix-blend-mode', v);
+          if (!attr(el, 'style')?.trim()) el.removeAttribute('style');
+        }
+        continue;
       }
+      if (k === 'stroke-width') {
+        if (v == null) continue; // no weight info: keep target weight
+        weight = Number(v);
+        setAttr('stroke-width', v);
+        if (hasAttr(el, STROKE_WEIGHT_ATTR) || wasAligned) setAttr(STROKE_WEIGHT_ATTR, v);
+        stripInline('stroke-width');
+        continue;
+      }
+      if (k === 'stroke' && wasAligned) {
+        // Keep the stored paint in sync so align re-render uses the new paint.
+        setAttr(STROKE_PAINT_ATTR, v == null ? 'none' : v);
+      }
+      setAttr(k, (k === 'stroke-dasharray' && v === 'none') ? null : v);
+      stripInline(k);
     }
-    if (Object.keys(changes).length) {
-      batch.push(new ChangeElementCommand(el, changes));
+
+    // Stroke align: (re)render via the colour system so helpers stay correct.
+    const wantAlign = keys.includes('stroke-align') && style['stroke-align'] ? style['stroke-align'] : readAlign(el, api);
+    if (api?.applyStrokeAlignToElement && sc && (wantAlign !== 'center' || wasAligned)) {
+      ALIGN_RECORD.forEach(record);
+      const w = weight != null ? weight : (readWeight(el, api) ?? 1);
+      try { api.applyStrokeAlignToElement(el, sc, { align: wantAlign, userWidth: w }); } catch { /* ignore */ }
+      alignTouched.push(el);
+    } else if (keys.includes('stroke-align') && style['stroke-align'] && hasAttr(el, STROKE_ALIGN_ATTR)) {
+      setAttr(STROKE_ALIGN_ATTR, style['stroke-align']);
     }
+
+    const changed = Object.keys(before).some((n) => before[n] !== attr(el, n));
+    if (changed) subs.push(new ChangeElementCommand(el, before));
   }
+  if (!subs.length) return null;
 
-  if (!batch.length) return;
-
-  // Wrap in a BatchCommand if available, or add individually
-  try {
-    const { BatchCommand } = history;
-    const cmd = new BatchCommand('Eyedropper Apply');
-    batch.forEach(c => cmd.addSubCommand(c));
+  let cmd = null;
+  if (BatchCommand) {
+    const resync = () => {
+      if (!api?.applyStrokeAlignToElement || !sc) return;
+      for (const el of alignTouched) {
+        try {
+          const align = readAlign(el, api);
+          if (align !== 'center') {
+            api.applyStrokeAlignToElement(el, sc, { align, userWidth: readWeight(el, api) ?? 1 });
+          } else {
+            // Clear helpers, then restore the exact recorded attributes.
+            const snap = {};
+            ALIGN_RECORD.forEach((n) => { snap[n] = attr(el, n); });
+            api.applyStrokeAlignToElement(el, sc, { align: 'center', userWidth: readWeight(el, api) ?? 1 });
+            for (const [n, v] of Object.entries(snap)) {
+              if (v == null) el.removeAttribute(n); else el.setAttribute(n, v);
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    };
+    class EyedropperCommand extends BatchCommand {
+      unapply(handler) { super.unapply?.(handler); resync(); env.afterHistory?.(); }
+      apply(handler) { super.apply?.(handler); resync(); env.afterHistory?.(); }
+    }
+    cmd = new EyedropperCommand(env.name || 'Eyedropper Apply');
+    subs.forEach((c) => cmd.addSubCommand(c));
     history.undoMgr.addCommandToHistory(cmd);
-  } catch (_) {
-    // Fallback: add each individually (older SVG-Edit)
-    batch.forEach(c => history.undoMgr.addCommandToHistory(c));
+  } else {
+    subs.forEach((c) => history.undoMgr.addCommandToHistory(c));
+    cmd = subs[0];
   }
+  return cmd;
 }
 
-// ─── Cursor HUD ──────────────────────────────────────────────────────────────
-let _hudEl = null;
-let _hudFillSwatch = null;
-let _hudStrokeSwatch = null;
-let _hudStatus = null;
-
-function _buildHud() {
-  if (_hudEl) return;
-
-  _hudEl = document.createElement('div');
-  _hudEl.id = 'visteras-eyedropper-hud';
-  _hudEl.style.cssText = [
-    'position:fixed',
-    'pointer-events:none',
-    'z-index:99999',
-    'display:none',
-    'align-items:center',
-    'gap:4px',
-    'background:rgba(30,30,30,0.85)',
-    'border:1px solid rgba(255,255,255,0.18)',
-    'border-radius:6px',
-    'padding:5px 8px',
-    'font:11px/1.4 -apple-system,sans-serif',
-    'color:#fff',
-    'white-space:nowrap',
-    'box-shadow:0 2px 8px rgba(0,0,0,0.4)',
-    'transform:translate(14px,-50%)',
-  ].join(';');
-
-  // Fill swatch
-  _hudFillSwatch = document.createElement('div');
-  _hudFillSwatch.style.cssText = 'width:14px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,0.3);background:#fff;flex-shrink:0';
-
-  // Stroke ring
-  _hudStrokeSwatch = document.createElement('div');
-  _hudStrokeSwatch.style.cssText = 'width:14px;height:14px;border-radius:3px;border:2px solid #fff;background:transparent;flex-shrink:0';
-
-  // Status label
-  _hudStatus = document.createElement('span');
-  _hudStatus.style.cssText = 'font-size:10px;opacity:0.8';
-
-  _hudEl.style.display = 'flex';
-  _hudEl.appendChild(_hudFillSwatch);
-  _hudEl.appendChild(_hudStrokeSwatch);
-  _hudEl.appendChild(_hudStatus);
-  _hudEl.style.display = 'none';
-  document.body.appendChild(_hudEl);
+/** Build an appearance map from SVG-Edit's current (default) style. */
+export function styleFromCurShape(cur = {}) {
+  const hex = (v) => {
+    if (v == null) return null;
+    const s = String(v).trim();
+    if (/^[0-9a-f]{6}$/i.test(s)) return `#${s.toLowerCase()}`;
+    return normalizePaint(s);
+  };
+  const num = (v, prop) => { const n = normalizeNumber(v); return isDefault(prop, n) ? null : n; };
+  const want = enabledProps('sample');
+  const s = {};
+  if (want.has('fill')) s.fill = hex(cur.fill);
+  if (want.has('stroke')) s.stroke = hex(cur.stroke);
+  if (want.has('fill-opacity')) s['fill-opacity'] = num(cur.fill_opacity, 'fill-opacity');
+  if (want.has('stroke-opacity')) s['stroke-opacity'] = num(cur.stroke_opacity, 'stroke-opacity');
+  if (want.has('opacity')) s.opacity = num(cur.opacity, 'opacity');
+  if (want.has('stroke-width') && cur.stroke_width != null) s['stroke-width'] = String(cur.stroke_width);
+  if (want.has('stroke-align')) s['stroke-align'] = cur._visterasStrokeAlign || 'center';
+  if (want.has('stroke-dasharray')) {
+    const d = normalizeDash(cur.stroke_dasharray);
+    s['stroke-dasharray'] = d === 'none' ? null : d;
+  }
+  if (want.has('stroke-linecap')) s['stroke-linecap'] = isDefault('stroke-linecap', cur.stroke_linecap) ? null : cur.stroke_linecap;
+  if (want.has('stroke-linejoin')) s['stroke-linejoin'] = isDefault('stroke-linejoin', cur.stroke_linejoin) ? null : cur.stroke_linejoin;
+  return s;
 }
 
-function _updateHud(hasSample) {
-  if (!_hudEl) return;
-  const fill = _sampledStyle['fill'] ?? 'transparent';
-  const stroke = _sampledStyle['stroke'] ?? 'none';
-  _hudFillSwatch.style.background = fill === 'none' ? 'transparent' : fill;
-  _hudStrokeSwatch.style.borderColor = stroke === 'none' ? 'rgba(255,255,255,0.25)' : stroke;
-  _hudStatus.textContent = hasSample ? 'click to apply' : 'click to sample';
-}
+// ─── Hit-testing ─────────────────────────────────────────────────────────────
+const EXCLUDE_ANCESTORS = '#selectorParentGroup, #canvasBackground, defs, clipPath, mask, marker, pattern, symbol, [data-visteras-overlay]';
 
-function _showHud(x, y) {
-  if (!_hudEl) return;
-  _hudEl.style.display = 'flex';
-  _hudEl.style.left = x + 'px';
-  _hudEl.style.top = y + 'px';
-}
-
-function _hideHud() {
-  if (_hudEl) _hudEl.style.display = 'none';
+/**
+ * Topmost painted leaf under the pointer inside #svgcontent (never the
+ * selection chrome, background, defs or hidden elements).
+ */
+export function pickTargetAt(clientX, clientY, api = null) {
+  const content = document.getElementById('svgcontent');
+  if (!content) return null;
+  const list = document.elementsFromPoint(clientX, clientY) || [];
+  for (const hit of list) {
+    if (hit === content || !content.contains(hit)) continue;
+    if (hit.closest?.(EXCLUDE_ANCESTORS)) continue;
+    let el = hit;
+    if (el.nodeName === 'tspan' || el.nodeName === 'textPath') el = el.closest('text');
+    if (!el) continue;
+    el = resolveBody(el, api);
+    if (!el || !LEAF_TAGS.has(el.nodeName) || isStrokeHelper(el)) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
+    return el;
+  }
+  return null;
 }
 
 // ─── Options panel ───────────────────────────────────────────────────────────
@@ -226,17 +483,23 @@ function _buildOptionsPanel() {
   const ROWS = [
     { key: 'sampleFill',       label: 'Sample Fill' },
     { key: 'sampleStroke',     label: 'Sample Stroke' },
-    { key: 'sampleStrokeWidth',label: 'Sample Stroke Width' },
+    { key: 'sampleStrokeWidth',label: 'Sample Stroke Weight' },
+    { key: 'sampleStrokeAlign',label: 'Sample Stroke Align' },
     { key: 'sampleOpacity',    label: 'Sample Opacity' },
     { key: 'sampleStrokeDash', label: 'Sample Dash Array' },
     { key: 'sampleStrokeCaps', label: 'Sample Line Caps/Joins' },
+    { key: 'sampleMiter',      label: 'Sample Miter Limit' },
+    { key: 'sampleBlend',      label: 'Sample Blend Mode' },
     null, // divider
     { key: 'applyFill',        label: 'Apply Fill' },
     { key: 'applyStroke',      label: 'Apply Stroke' },
-    { key: 'applyStrokeWidth', label: 'Apply Stroke Width' },
+    { key: 'applyStrokeWidth', label: 'Apply Stroke Weight' },
+    { key: 'applyStrokeAlign', label: 'Apply Stroke Align' },
     { key: 'applyOpacity',     label: 'Apply Opacity' },
     { key: 'applyStrokeDash',  label: 'Apply Dash Array' },
     { key: 'applyStrokeCaps',  label: 'Apply Line Caps/Joins' },
+    { key: 'applyMiter',       label: 'Apply Miter Limit' },
+    { key: 'applyBlend',       label: 'Apply Blend Mode' },
   ];
 
   for (const row of ROWS) {
@@ -250,7 +513,7 @@ function _buildOptionsPanel() {
     label.style.cssText = 'display:flex;align-items:center;gap:7px;cursor:pointer;margin-bottom:4px;user-select:none';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = !!_options[row.key];
+    cb.checked = _options[row.key] !== false;
     cb.style.cssText = 'accent-color:#7cb9ff;width:13px;height:13px;margin:0;cursor:pointer';
     cb.addEventListener('change', () => {
       _options[row.key] = cb.checked;
@@ -273,31 +536,54 @@ function _showOptionsPanel(show) {
   if (panel) panel.style.display = show ? 'block' : 'none';
 }
 
-// ─── Cursor style ────────────────────────────────────────────────────────────
+// ─── Cursor + toolbar ────────────────────────────────────────────────────────
 function _injectCursorStyle() {
   if (document.getElementById('visteras-eyedropper-cursor-style')) return;
   const style = document.createElement('style');
   style.id = 'visteras-eyedropper-cursor-style';
+  // Same cursor + hotspot as Studio's pick_color tool.
   style.textContent = `
     body[data-mode="${MODE}"] #svgcanvas,
     body[data-mode="${MODE}"] #svgcanvas * {
-      cursor: crosshair !important;
+      cursor: url('images/cursor-eyedropper.svg') 2 22, crosshair !important;
     }
   `;
   document.head.appendChild(style);
 }
 
+function _injectToolbarButton(editor) {
+  if (document.getElementById('tool_eyedropper')) return;
+  const toolsLeft = document.getElementById('tools_left');
+  if (!toolsLeft) return;
+  const btn = document.createElement('se-button');
+  btn.id = 'tool_eyedropper';
+  btn.setAttribute('title', 'Eyedropper Tool (I)');
+  btn.setAttribute('src', 'eye_dropper.svg');
+  btn.addEventListener('click', () => {
+    if (editor.leftPanel?.updateLeftPanel?.('tool_eyedropper') === false) return;
+    editor.svgCanvas.setMode(MODE);
+  });
+  const anchor = document.getElementById('tool_image') || document.getElementById('tools_swatch_sep');
+  if (anchor?.parentNode === toolsLeft) toolsLeft.insertBefore(btn, anchor);
+  else toolsLeft.appendChild(btn);
+}
+
+function isTyping() {
+  const a = document.activeElement;
+  return !!(window.__visterasIsTypingDirectly || a?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(a?.nodeName));
+}
+
 // ─── Main mount ──────────────────────────────────────────────────────────────
 /**
- * Mount the enhanced Visteras Eyedropper tool on top of the SVG-Edit
- * ext-eyedropper extension.
- *
- * @param {object} editor  - The SVG-Edit Editor instance.
+ * @param {object} editor - The SVG-Edit Editor instance.
  */
 export function mountEyedropperTool(editor) {
+  if (window.__visterasEyedropperMounted) return;
+  window.__visterasEyedropperMounted = true;
   _loadOptions();
   _injectCursorStyle();
-  _buildHud();
+  _injectToolbarButton(editor);
+  _buildOptionsPanel();
 
   const sc = editor.svgCanvas;
   const history = {
@@ -305,93 +591,156 @@ export function mountEyedropperTool(editor) {
     BatchCommand: sc.history.BatchCommand,
     undoMgr: sc.undoMgr,
   };
+  const api = () => window.__visterasColorSystem || null;
+  const env = () => ({ api: api(), sc });
+  const selection = () => (sc.getSelectedElements?.() || []).filter((el) => el && el.isConnected !== false);
 
-  // Build options panel once the DOM is ready (sidepanels exist after init)
-  _buildOptionsPanel();
+  const afterApply = (elems) => {
+    try { sc.call('changed', elems); } catch { /* ignore */ }
+    window.__updatePropertiesVisibility?.();
+    window.__visterasUpdateSwatches?.();
+    try { api()?.syncFromCanvas?.(); } catch { /* ignore */ }
+  };
 
-  // ── Mode change listener ──────────────────────────────────────────────────
-  document.addEventListener('modeChange', () => {
-    const active = sc.getMode() === MODE;
-    _showOptionsPanel(active);
-    if (!active) {
-      _hideHud();
-      _sampledStyle = {};
-    }
-    // Update body attribute so CSS cursor rule applies
-    document.body.setAttribute('data-mode', active ? MODE : sc.getMode());
-  });
-
-  // ── Workarea mouse move ───────────────────────────────────────────────────
-  const workarea = editor.workarea || document.getElementById('workarea');
-  if (workarea) {
-    workarea.addEventListener('mousemove', (e) => {
-      if (sc.getMode() !== MODE) return;
-      const hasSample = Object.keys(_sampledStyle).length > 0;
-      _updateHud(hasSample);
-      _showHud(e.clientX, e.clientY);
-    });
-
-    workarea.addEventListener('mouseleave', () => _hideHud());
-  }
-
-  // ── Override mouseDown to implement Illustrator-style sample/apply ────────
-  // We listen at the capture phase on the SVG canvas element so we fire
-  // before the ext-eyedropper's handler.
-  const svgCanvasEl = document.getElementById('svgcanvas');
-  if (svgCanvasEl) {
-    svgCanvasEl.addEventListener('mousedown', (e) => {
-      if (sc.getMode() !== MODE) return;
-
-      // Find the actual SVG element under the pointer (may be deep in shadow
-      // DOM or <g> wrappers). Walk up to find the first painted shape.
-      let target = e.target;
-      while (target && ['g', 'svg'].includes(target.nodeName)) {
-        target = target.parentElement;
-      }
-      if (!target || ['svg', 'g', 'use', 'defs'].includes(target.nodeName)) return;
-
-      e.stopPropagation(); // prevent ext-eyedropper from also running
-
-      const altDown = e.altKey || e.metaKey;
-      const selectedEls = (sc.getSelectedElements ? sc.getSelectedElements() : []).filter(Boolean);
-      const hasSelection = selectedEls.length > 0;
-      const hasSample = Object.keys(_sampledStyle).length > 0;
-
-      if (altDown || !hasSample || !hasSelection) {
-        // SAMPLE mode: record style from clicked element
-        const sampled = sampleStyleFrom(target);
-        if (Object.keys(sampled).length) {
-          _sampledStyle = sampled;
-          _updateHud(true);
+  /** No selection: load the sampled appearance as the current defaults. */
+  const loadDefaults = (style) => {
+    const ctrl = api();
+    const prevTarget = ctrl?.getActiveTarget?.();
+    for (const t of ['fill', 'stroke']) {
+      if (!(t in style) || style[t] == null) continue;
+      const v = style[t];
+      sc.setCurShape?.(t, v);
+      if (sc.curProperties) sc.curProperties[t] = v;
+      if (/^#[0-9a-f]{3,6}$/i.test(v) || v === 'none') {
+        sc.setCurProperties?.(`${t}_paint`, { type: 'solidColor' });
+        if (ctrl) {
+          ctrl.setActiveTarget(t, { syncColor: false });
+          // apply:false — nothing is selected; we set the defaults ourselves so
+          // a stale path object can never be painted by accident.
+          ctrl.setWorkingColor(v, { apply: false });
+          if (v !== 'none') ctrl.pushRecent?.(v);
         }
-      } else {
-        // APPLY mode: apply to all selected elements
-        applyStyleToElements(selectedEls, _sampledStyle, history);
-        // Notify SVG-Edit that elements changed so panels update
-        sc.call('changed', selectedEls);
-        if (window.__updatePropertiesVisibility) window.__updatePropertiesVisibility();
-      }
-    }, true /* capture */);
-  }
-
-  // ── Escape key: clear sample, return to Select ────────────────────────────
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sc.getMode() === MODE) {
-      if (Object.keys(_sampledStyle).length > 0) {
-        _sampledStyle = {};
-        _updateHud(false);
-      } else {
-        // Return to select tool
-        editor.leftPanel?.clickSelect?.();
-        _hideHud();
       }
     }
+    if (ctrl && prevTarget) ctrl.setActiveTarget(prevTarget, { syncColor: false });
+    if (style['stroke-width'] != null) {
+      const w = Number(style['stroke-width']);
+      if (Number.isFinite(w)) {
+        sc.setStrokeWidth?.(w);
+        const input = document.getElementById('stroke_width');
+        if (input) input.value = String(w);
+      }
+    }
+    if ('fill-opacity' in style) sc.setPaintOpacity?.('fill', Number(style['fill-opacity'] ?? 1), true);
+    if ('stroke-opacity' in style) sc.setPaintOpacity?.('stroke', Number(style['stroke-opacity'] ?? 1), true);
+    if ('opacity' in style) sc.setCurShape?.('opacity', Number(style.opacity ?? 1));
+    if ('stroke-dasharray' in style) sc.setCurShape?.('stroke_dasharray', style['stroke-dasharray'] ?? 'none');
+    if ('stroke-linecap' in style) sc.setCurShape?.('stroke_linecap', style['stroke-linecap'] ?? 'butt');
+    if ('stroke-linejoin' in style) sc.setCurShape?.('stroke_linejoin', style['stroke-linejoin'] ?? 'miter');
+    if ('stroke-align' in style && sc.curShape) sc.curShape._visterasStrokeAlign = style['stroke-align'] || 'center';
+    try { editor.bottomPanel?.updateColorpickers?.(true); } catch { /* ignore */ }
+    window.__visterasUpdateSwatches?.();
+    try { ctrl?.syncFromCanvas?.(); } catch { /* ignore */ }
+  };
+
+  const firstLeaf = (els) => expandTargets(els, api())[0] || null;
+
+  // Undo/redo keep the selection that was active when the eyedropper applied
+  // (toolbar undo repopulates layers and clears it, like Shape Builder).
+  const keepSelection = (els) => () => setTimeout(() => {
+    const live = els.filter((el) => el?.isConnected);
+    try {
+      sc.clearSelection();
+      if (live.length) sc.addToSelection(live, true);
+      afterApply(live);
+    } catch { /* ignore */ }
+  }, 0);
+
+  const handleClick = (e) => {
+    const target = pickTargetAt(e.clientX, e.clientY, api());
+    if (!target) return; // empty canvas: no-op
+    const sel = selection();
+    if (e.altKey) {
+      // Option-click: current selection appearance (or defaults) → clicked.
+      const src = sel.length ? firstLeaf(sel) : null;
+      const style = src ? sampleStyleFrom(src, env()) : styleFromCurShape(sc.curShape || {});
+      if (applyStyleToElements([target], style, history, { ...env(), afterHistory: keepSelection(sel) })) afterApply([target]);
+      return;
+    }
+    const style = sampleStyleFrom(target, env());
+    if (!Object.keys(style).length) return;
+    if (sel.length) {
+      if (applyStyleToElements(sel, style, history, { ...env(), afterHistory: keepSelection(sel) })) afterApply(sel);
+    } else {
+      loadDefaults(style);
+    }
+  };
+
+  // Own the gesture: capture before SVG-Edit's canvas handlers (which would
+  // start a rubber-band / clear the selection).
+  let ownPointer = false;
+  let mouseDown = false;
+  window.addEventListener('mousedown', (e) => {
+    mouseDown = true;
+    if (sc.getMode() !== MODE || e.button !== 0 || sc.spaceKey) return;
+    if (!e.target?.closest?.('#svgcanvas')) return;
+    ownPointer = true;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    handleClick(e);
+  }, true);
+  const swallow = (e) => {
+    if (!ownPointer) return;
+    e.stopImmediatePropagation();
+    if (e.type === 'mouseup') ownPointer = false;
+  };
+  window.addEventListener('mousemove', swallow, true);
+  window.addEventListener('mouseup', (e) => {
+    mouseDown = false;
+    swallow(e);
+    if (pendingRestore && !e.metaKey && !e.ctrlKey) restoreEyedropper();
+  }, true);
+
+  // ── Cmd/Ctrl: temporary selection tool (Studio handle_alt_eyedropper) ────
+  let lastSelectTool = 'tool_select';
+  let tempTool = false;
+  let pendingRestore = false;
+  const SELECT_MODES = new Set(['select', 'pathedit', 'multiselect', 'resize', 'rotate']);
+  const restoreEyedropper = () => {
+    pendingRestore = false;
+    if (!tempTool) return;
+    tempTool = false;
+    if (SELECT_MODES.has(sc.getMode())) document.getElementById('tool_eyedropper')?.click();
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Meta' && e.key !== 'Control') return;
+    if (tempTool || sc.getMode() !== MODE || isTyping() || mouseDown) return;
+    tempTool = true;
+    document.getElementById(lastSelectTool)?.click();
+  }, true);
+  window.addEventListener('keyup', (e) => {
+    if (!tempTool || (e.key !== 'Meta' && e.key !== 'Control')) return;
+    if (mouseDown) pendingRestore = true;
+    else restoreEyedropper();
+  }, true);
+  window.addEventListener('blur', () => { if (tempTool) restoreEyedropper(); });
+
+  // ── Mode changes ──────────────────────────────────────────────────────────
+  document.addEventListener('modeChange', () => {
+    const mode = sc.getMode();
+    const active = mode === MODE;
+    _showOptionsPanel(active);
+    if (mode === 'select') {
+      lastSelectTool = document.getElementById('tool_direct_select')?.pressed ? 'tool_direct_select' : 'tool_select';
+    } else if (mode === 'pathedit') {
+      lastSelectTool = 'tool_direct_select';
+    }
+    if (tempTool && !active && !SELECT_MODES.has(mode)) { tempTool = false; pendingRestore = false; }
   });
 
-  // ── Sync body data-mode on all mode changes ───────────────────────────────
-  // (body[data-mode] is used by CSS cursor rule)
-  sc.bind?.('modeChange', () => {
-    document.body.setAttribute('data-mode', sc.getMode());
+  // ── Escape: back to Select ────────────────────────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sc.getMode() === MODE) editor.leftPanel?.clickSelect?.();
   });
 }
 
