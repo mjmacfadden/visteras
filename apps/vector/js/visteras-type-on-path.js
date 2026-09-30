@@ -1,3 +1,4 @@
+import { beginTextEdit } from './visteras-text-editing.js';
 /**
  * Visteras Vector — Type on Path (Illustrator-style textPath).
  * Client-side: binds editable <text>/<textPath> to a selected path or shape.
@@ -11,6 +12,42 @@ const CARET_CLASS = 'visteras-top-caret';
 const STUDIO_BLUE = '#3f8ff7';
 
 let activeEditingContext = null;
+
+// Preserve element identity so selections and path references survive history replay.
+function captureAttributes(elements) {
+  return elements.map(el => ({ el, attrs: Object.fromEntries([...el.attributes].map(a => [a.name, a.value])) }));
+}
+function recordAttributes(sc, before, title, inserted = []) {
+  const batch = new sc.history.BatchCommand(title);
+  for (const el of inserted) batch.addSubCommand(new sc.history.InsertElementCommand(el));
+  for (const { el, attrs } of before) {
+    const previous = {};
+    for (const name of new Set([...Object.keys(attrs), ...[...el.attributes].map(a => a.name)])) {
+      if ((attrs[name] ?? null) !== el.getAttribute(name)) previous[name] = attrs[name] ?? null;
+    }
+    if ('href' in previous || 'xlink:href' in previous) {
+      previous['#href'] = attrs.href || attrs['xlink:href'] || null;
+      delete previous.href;
+      delete previous['xlink:href'];
+    }
+    if (Object.keys(previous).length) batch.addSubCommand(new sc.history.ChangeElementCommand(el, previous));
+  }
+  if (!batch.isEmpty()) sc.addCommandToHistory(batch);
+}
+
+// Use one baseline mechanism. SVG middle aligns the x-height, whereas central
+// centers the font's em box on the path.
+function applyPathBaseline(text, tp, mode) {
+  const db = { baseline: 'alphabetic', ascender: 'text-before-edge', center: 'central', descender: 'text-after-edge' }[mode] || 'alphabetic';
+  for (const el of [text, tp]) {
+    el.removeAttribute('dy');
+    el.style?.removeProperty('dominant-baseline');
+    el.style?.removeProperty('alignment-baseline');
+    el.setAttribute('dominant-baseline', db);
+    el.setAttribute('alignment-baseline', db);
+  }
+  text.setAttribute('data-visteras-align-path', mode);
+}
 
 function showToast(message, ms = 2500) {
   let el = document.getElementById('visteras_top_toast');
@@ -293,6 +330,7 @@ function setupPathHoverEffects(pathEl, textEl) {
   pathEl.setAttribute('data-visteras-top-source', '1');
 
   const onEnter = () => {
+    if (!pathEl.hasAttribute('data-visteras-top-source')) return;
     if (pathEl.classList.contains('visteras-top-selected')) return;
     pathEl.classList.add('visteras-top-hovered');
     pathEl.style.stroke = STUDIO_BLUE;
@@ -302,6 +340,7 @@ function setupPathHoverEffects(pathEl, textEl) {
   };
 
   const onLeave = () => {
+    if (!pathEl.hasAttribute('data-visteras-top-source')) return;
     pathEl.classList.remove('visteras-top-hovered');
     if (!pathEl.classList.contains('visteras-top-selected')) {
       pathEl.style.stroke = 'transparent';
@@ -332,290 +371,33 @@ function setupPathHoverEffects(pathEl, textEl) {
  * Captures typing directly on the path with a live blinking caret on the curve.
  */
 export function startDirectInPlaceEdit(svgEditor, textEl) {
-  const tp = textEl.querySelector('textPath');
-  if (!tp) return;
-
-  // End any currently running editor
-  if (activeEditingContext) {
-    activeEditingContext.commit();
-  }
-
-  // Hide selector grips while actively typing
-  const sc = svgEditor.svgCanvas;
-  sc.selectorManager?.requestSelector(textEl)?.showGrips(false);
-
-  // Strip existing caret if any
-  const removeCaret = () => {
-    const carets = tp.querySelectorAll(`.${CARET_CLASS}`);
-    carets.forEach(c => c.remove());
-  };
-  removeCaret();
-
-  let currentText = tp.textContent || '';
-  let cursorPos = currentText.length;
-  let isAllSelected = true; // Start with full selection like standard in-place editors
-
-  // Render currentText with live blinking caret at insertion point along curve
-  const render = () => {
-    tp.textContent = '';
-    const beforeText = currentText.slice(0, cursorPos);
-    const afterText = currentText.slice(cursorPos);
-
-    if (beforeText.length > 0) {
-      tp.appendChild(document.createTextNode(beforeText));
-    }
-
-    const caretSpan = document.createElementNS(SVG_NS, 'tspan');
-    caretSpan.className.baseVal = CARET_CLASS;
-    caretSpan.textContent = cursorPos === currentText.length ? ' |' : '|';
-    tp.appendChild(caretSpan);
-
-    if (afterText.length > 0) {
-      tp.appendChild(document.createTextNode(afterText));
-    }
-  };
-
-  render();
-
-  // Hidden input trap to support IME, mobile keyboards, paste, etc.
-  let trap = document.getElementById('visteras_text_trap');
-  if (!trap) {
-    trap = document.createElement('input');
-    trap.id = 'visteras_text_trap';
-    trap.type = 'text';
-    trap.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
-    document.body.appendChild(trap);
-  }
-  trap.value = currentText;
-
-  const syncTrap = () => {
-    if (trap) {
-      trap.value = currentText;
-      try {
-        trap.setSelectionRange(cursorPos, cursorPos);
-      } catch (_) {}
-    }
-  };
-
-  let isCommitted = false;
-  window.__visterasIsTypingDirectly = true;
-  const commit = () => {
-    if (isCommitted) return;
-    isCommitted = true;
-    window.__visterasIsTypingDirectly = false;
-    activeEditingContext = null;
-
-    removeCaret();
-    const finalVal = currentText.trim() || 'Lorem ipsum';
-    tp.textContent = finalVal;
-
-    window.removeEventListener('keydown', onKeyDown, true);
-    window.removeEventListener('pointerdown', onPointerDown, true);
-    window.removeEventListener('paste', onPaste, true);
-    if (trap) {
-      trap.removeEventListener('input', onTrapInput);
-      trap.removeEventListener('compositionend', onTrapCompositionEnd);
-    }
-
-    if (sc) {
-      sc.call?.('changed', [textEl]);
-      sc.clearSelection();
-      sc.addToSelection([textEl], true);
-      sc.call?.('selected', [textEl]);
-    }
-  };
-
-  const onKeyDown = (e) => {
-    // Commit on Enter or Escape
-    if (e.key === 'Enter' || e.key === 'Escape') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      commit();
-      return;
-    }
-
-    // Backspace: Delete previous character or clear selection
-    if (e.key === 'Backspace') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      if (isAllSelected) {
-        currentText = '';
-        cursorPos = 0;
-        isAllSelected = false;
-      } else if (cursorPos > 0) {
-        currentText = currentText.slice(0, cursorPos - 1) + currentText.slice(cursorPos);
-        cursorPos--;
-      }
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Delete: Delete next character or clear selection
-    if (e.key === 'Delete') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      if (isAllSelected) {
-        currentText = '';
-        cursorPos = 0;
-        isAllSelected = false;
-      } else if (cursorPos < currentText.length) {
-        currentText = currentText.slice(0, cursorPos) + currentText.slice(cursorPos + 1);
-      }
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Cursor navigation: Left
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      isAllSelected = false;
-      cursorPos = Math.max(0, cursorPos - 1);
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Cursor navigation: Right
-    if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      isAllSelected = false;
-      cursorPos = Math.min(currentText.length, cursorPos + 1);
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Cursor navigation: Home
-    if (e.key === 'Home') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      isAllSelected = false;
-      cursorPos = 0;
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Cursor navigation: End
-    if (e.key === 'End') {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      isAllSelected = false;
-      cursorPos = currentText.length;
-      render();
-      syncTrap();
-      return;
-    }
-
-    // Select all: Cmd+A / Ctrl+A
-    if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      isAllSelected = true;
-      return;
-    }
-
-    // Let system shortcuts through if Cmd/Ctrl/Alt are pressed
-    if (e.metaKey || e.ctrlKey || e.altKey) {
-      return;
-    }
-
-    // Regular typing keys
-    if (e.key && e.key.length === 1) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      e.stopPropagation();
-      if (isAllSelected) {
-        currentText = e.key;
-        cursorPos = 1;
-        isAllSelected = false;
-      } else {
-        currentText = currentText.slice(0, cursorPos) + e.key + currentText.slice(cursorPos);
-        cursorPos++;
-      }
-      render();
-      syncTrap();
-      return;
-    }
-  };
-
-  const onPaste = (e) => {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    e.stopPropagation();
-    const pasted = (e.clipboardData || window.clipboardData)?.getData('text') || '';
-    if (pasted) {
-      if (isAllSelected) {
-        currentText = pasted;
-        cursorPos = pasted.length;
-        isAllSelected = false;
-      } else {
-        currentText = currentText.slice(0, cursorPos) + pasted + currentText.slice(cursorPos);
-        cursorPos += pasted.length;
-      }
-      render();
-      syncTrap();
-    }
-  };
-
-  const onTrapInput = () => {
-    if (trap.value !== currentText) {
-      currentText = trap.value;
-      cursorPos = trap.selectionStart || currentText.length;
-      isAllSelected = false;
-      render();
-    }
-  };
-
-  const onTrapCompositionEnd = () => {
-    currentText = trap.value;
-    cursorPos = trap.selectionStart || currentText.length;
-    isAllSelected = false;
-    render();
-  };
-
-  const onPointerDown = (e) => {
-    if (e.target === textEl || textEl.contains(e.target)) return;
-    commit();
-  };
-
-  trap.addEventListener('input', onTrapInput);
-  trap.addEventListener('compositionend', onTrapCompositionEnd);
-  window.addEventListener('keydown', onKeyDown, true);
-  window.addEventListener('paste', onPaste, true);
-
-  // Defer pointerdown listener so the initial click that opened edit doesn't immediately close it
-  setTimeout(() => {
-    if (!isCommitted) {
-      window.addEventListener('pointerdown', onPointerDown, true);
-    }
-  }, 100);
-
-  trap.focus();
-  try {
-    trap.select();
-  } catch (_) {}
-
-  activeEditingContext = { commit, textEl };
+  beginTextEdit(svgEditor, textEl);
 }
 
 function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   const sc = svgEditor.svgCanvas;
-  const pathEl = ensurePathElement(svgEditor, shapeEl);
+  activeEditingContext?.commit();
+  const existing = findExistingTypeOnPath(shapeEl);
+  if (existing) {
+    sc.clearSelection();
+    sc.addToSelection([existing], true);
+    startDirectInPlaceEdit(svgEditor, existing);
+    return existing;
+  }
+  const batch = new sc.history.BatchCommand('Create type on path');
+  let pathEl = shapeEl;
+  if (shapeEl.localName !== 'path') {
+    pathEl = document.createElementNS(SVG_NS, 'path');
+    for (const attr of shapeEl.attributes) pathEl.setAttributeNS(attr.namespaceURI, attr.name, attr.value);
+    pathEl.setAttribute('d', shapeToPathD(shapeEl));
+    const parent = shapeEl.parentNode, next = shapeEl.nextSibling;
+    shapeEl.replaceWith(pathEl);
+    batch.addSubCommand(new sc.history.RemoveElementCommand(shapeEl, next, parent));
+    batch.addSubCommand(new sc.history.InsertElementCommand(pathEl));
+  }
+  const sourceBefore = captureAttributes([pathEl]);
   const { family, size, fill } = readTextStyle(svgEditor);
-  const content = opts.content != null ? String(opts.content) : 'Type';
+  const content = opts.content != null ? String(opts.content) : 'Lorem Ipsum';
   const align = opts.align || 'start';
   const reverse = !!opts.reverse;
 
@@ -666,8 +448,9 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   textPath.textContent = content;
   text.appendChild(textPath);
 
-  const parent = shapeEl.parentNode;
-  if (shapeEl.nextSibling) parent.insertBefore(text, shapeEl.nextSibling);
+  applyPathBaseline(text, textPath, alignPath);
+  const parent = pathEl.parentNode;
+  if (pathEl.nextSibling) parent.insertBefore(text, pathEl.nextSibling);
   else parent.appendChild(text);
 
   // Path loses stroke and fill; thin 1px blue line on hover
@@ -677,7 +460,12 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   attachPathBBoxProxy(text, pathEl);
 
   if (sc.history?.InsertElementCommand && typeof sc.addCommandToHistory === 'function') {
-    try { sc.addCommandToHistory(new sc.history.InsertElementCommand(text)); } catch (_) {}
+    const old = sourceBefore[0].attrs;
+    const attrs = {};
+    for (const name of new Set([...Object.keys(old), ...[...pathEl.attributes].map(a => a.name)])) attrs[name] = old[name] ?? null;
+    batch.addSubCommand(new sc.history.ChangeElementCommand(pathEl, attrs));
+    batch.addSubCommand(new sc.history.InsertElementCommand(text));
+    sc.addCommandToHistory(batch);
   }
 
   // Register selection in SVG-Edit
@@ -694,7 +482,7 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
 
   // Directly start in-place text editing on the artboard
   setTimeout(() => {
-    startDirectInPlaceEdit(svgEditor, text);
+    if (text.isConnected) startDirectInPlaceEdit(svgEditor, text);
   }, 40);
 
   return text;
@@ -712,6 +500,42 @@ function isTypeOnPathText(el) {
   return !!(text && (text.getAttribute(TOP_ATTR) === '1' || text.querySelector('textPath')));
 }
 
+export function findExistingTypeOnPath(el) {
+  if (!el) return null;
+
+  if (isTypeOnPathText(el)) {
+    return el.nodeName === 'text' ? el : el.closest?.('text');
+  }
+
+  const id = el.id;
+  if (id) {
+    const root = el.ownerSVGElement || document.getElementById('svgcontent') || document;
+    const textPaths = root.querySelectorAll ? root.querySelectorAll('textPath') : [];
+    for (const tp of textPaths) {
+      const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+      if (href === id || href === `${id}_rev` || href.replace(/_rev$/, '') === id.replace(/_rev$/, '')) {
+        const text = tp.closest?.('text');
+        if (text) return text;
+      }
+    }
+  }
+
+  if (el.hasAttribute?.('data-visteras-top-source') || el.classList?.contains?.('visteras-type-on-path-source')) {
+    const root = el.ownerSVGElement || document.getElementById('svgcontent') || document;
+    const allTopTexts = root.querySelectorAll ? root.querySelectorAll(`text.${TOP_CLASS}, text[${TOP_ATTR}]`) : [];
+    for (const t of allTopTexts) {
+      const tp = t.querySelector('textPath');
+      if (tp) {
+        const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
+        const baseId = href.replace(/_rev$/, '');
+        if (baseId && baseId === el.id) return t;
+      }
+    }
+  }
+
+  return null;
+}
+
 function ensureOptionsPanel() {
   return document.getElementById('sec_type_on_path');
 }
@@ -719,7 +543,11 @@ function ensureOptionsPanel() {
 function syncOptionsPanel(svgEditor) {
   const panel = ensureOptionsPanel();
   if (!panel) return;
-  const el = getSelected(svgEditor);
+  let el = getSelected(svgEditor);
+  if (el && !isTypeOnPathText(el)) {
+    const companion = findExistingTypeOnPath(el);
+    if (companion) el = companion;
+  }
   const tp = findTextPath(el);
   const on = !!(tp && isTypeOnPathText(tp.parentElement || el));
 
@@ -795,14 +623,18 @@ function wireOptionsPanel(svgEditor) {
   const tracking = panel.querySelector('#top_tracking');
   const trackingVal = panel.querySelector('#top_tracking_val');
 
+  let offsetBefore, trackingBefore;
   offsetSlider?.addEventListener('input', (e) => {
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
+    offsetBefore ||= captureAttributes([tp]);
     const v = e.target.value;
     if (offsetVal) offsetVal.textContent = `${v}%`;
     tp.setAttribute('startOffset', `${v}%`);
   });
   offsetSlider?.addEventListener('change', (e) => {
+    if (offsetBefore) recordAttributes(svgEditor.svgCanvas, offsetBefore, 'Offset path text');
+    offsetBefore = null;
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
@@ -811,7 +643,11 @@ function wireOptionsPanel(svgEditor) {
   function setTypeOnPathAlign(align) {
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
+    const before = captureAttributes([tp, tp.parentElement]);
     const a = (align === 'middle' || align === 'center') ? 'middle' : (align === 'end' || align === 'right') ? 'end' : 'start';
+    for (const el of [tp, tp.parentElement]) {
+      for (const attr of ['x','y','dx']) el.removeAttribute(attr);
+    }
     tp.setAttribute('text-anchor', a);
     tp.parentElement?.setAttribute('text-anchor', a);
     if (a === 'middle') {
@@ -836,6 +672,7 @@ function wireOptionsPanel(svgEditor) {
     if (alignSelect) {
       alignSelect.value = a;
     }
+    recordAttributes(svgEditor.svgCanvas, before, 'Align path text');
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
   }
 
@@ -855,48 +692,9 @@ function wireOptionsPanel(svgEditor) {
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
     const textEl = tp.parentElement;
-    const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
-
-    const baselineMap = {
-      baseline: 'alphabetic',
-      ascender: 'hanging',
-      center: 'middle',
-      descender: 'ideographic',
-    };
-
-    const dyMap = {
-      baseline: 0,
-      ascender: -0.8 * fontSize,
-      center: -0.35 * fontSize,
-      descender: 0.25 * fontSize,
-    };
-
-    const db = baselineMap[mode] || 'alphabetic';
-    const dy = dyMap[mode] ?? 0;
-
-    tp.setAttribute('dominant-baseline', db);
-    tp.setAttribute('alignment-baseline', db);
-    if (tp.style) {
-      tp.style.dominantBaseline = db;
-      tp.style.alignmentBaseline = db;
-    }
-
-    if (textEl) {
-      textEl.setAttribute('dominant-baseline', db);
-      textEl.setAttribute('alignment-baseline', db);
-      if (textEl.style) {
-        textEl.style.dominantBaseline = db;
-        textEl.style.alignmentBaseline = db;
-      }
-      textEl.setAttribute('data-visteras-align-path', mode);
-      textEl.setAttribute('dy', String(dy));
-    }
-    tp.setAttribute('dy', String(dy));
-
-    const href = tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href');
-    if (href) {
-      setTextPathHref(tp, href.replace(/^#/, ''));
-    }
+    const before = captureAttributes([textEl, tp]);
+    applyPathBaseline(textEl, tp, mode);
+    recordAttributes(svgEditor.svgCanvas, before, 'Align text to path');
 
     svgEditor.svgCanvas?.call?.('changed', [textEl || tp]);
   }
@@ -909,11 +707,14 @@ function wireOptionsPanel(svgEditor) {
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
     const textEl = tp.parentElement;
+    trackingBefore ||= captureAttributes([textEl]);
     const v = e.target.value;
     if (trackingVal) trackingVal.textContent = v;
     textEl?.setAttribute('letter-spacing', v);
   });
   tracking?.addEventListener('change', () => {
+    if (trackingBefore) recordAttributes(svgEditor.svgCanvas, trackingBefore, 'Track path text');
+    trackingBefore = null;
     const tp = findTextPath(getSelected(svgEditor));
     if (!tp) return;
     svgEditor.svgCanvas?.call?.('changed', [tp.parentElement]);
@@ -932,8 +733,11 @@ function wireOptionsPanel(svgEditor) {
       e.target.checked = !e.target.checked;
       return;
     }
+    const before = captureAttributes([tp]);
+    const existingReverse = document.getElementById(`${baseId}_rev`);
     const newId = e.target.checked ? ensureReversedClone(sc, pathEl, baseId) : baseId;
     setTextPathHref(tp, newId);
+    recordAttributes(sc, before, 'Reverse path text', e.target.checked && !existingReverse ? [document.getElementById(newId)] : []);
     sc.call?.('changed', [tp.parentElement]);
   });
 }
@@ -1267,16 +1071,7 @@ function hookSelectorManager(svgEditor) {
     };
   }
 
-  // Intercept double-click on artboard to open direct in-place text editing
-  window.addEventListener('dblclick', (evt) => {
-    const target = evt.target;
-    const textEl = target?.closest?.(`text.${TOP_CLASS}, text[${TOP_ATTR}]`);
-    if (textEl) {
-      evt.preventDefault();
-      evt.stopPropagation();
-      startDirectInPlaceEdit(svgEditor, textEl);
-    }
-  }, true);
+
 }
 
 /**
@@ -1325,23 +1120,31 @@ function hookRemapAndDimensions(svgEditor) {
     const origDelete = sc.deleteSelectedElements.bind(sc);
     sc.deleteSelectedElements = function() {
       const selected = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements().filter(Boolean) : [];
-      selected.forEach((el) => {
-        if (el && isTypeOnPathText(el)) {
-          const tp = el.querySelector('textPath');
-          if (tp) {
-            const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
-            const baseId = href.replace(/_rev$/, '');
-            const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
-            if (pathEl && pathEl.hasAttribute('data-visteras-top-source')) {
-              pathEl.remove();
-            }
-            const defs = getDefs(sc);
-            const revEl = defs?.querySelector(`#${CSS.escape(baseId)}_rev`);
-            if (revEl) revEl.remove();
-          }
+      const batch = new sc.history.BatchCommand('Delete path text');
+      const bound = new Set();
+      for (const el of selected) {
+        const text = findExistingTypeOnPath(el);
+        const tp = text?.querySelector('textPath');
+        if (!tp) continue;
+        bound.add(text);
+        const id = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '').replace(/_rev$/, '');
+        for (const nodeId of [id, `${id}_rev`]) {
+          const node = document.getElementById(nodeId);
+          if (node && (node.hasAttribute('data-visteras-top-source') || node.hasAttribute('data-visteras-textpath-rev-of'))) bound.add(node);
         }
-      });
-      const res = origDelete();
+      }
+      for (const el of bound) {
+        if (selected.includes(el)) continue;
+        batch.addSubCommand(new sc.history.RemoveElementCommand(el, el.nextSibling, el.parentNode));
+        el.remove();
+      }
+      // Include native deletion in the same undo step as its bound geometry.
+      const addHistory = sc.addCommandToHistory;
+      sc.addCommandToHistory = command => batch.addSubCommand(command);
+      let res;
+      try { res = origDelete(); }
+      finally { sc.addCommandToHistory = addHistory; }
+      if (!batch.isEmpty()) addHistory.call(sc, batch);
       if (typeof window.__updatePropertiesVisibility === 'function') {
         window.__updatePropertiesVisibility();
       }
@@ -1440,13 +1243,7 @@ export function mountVisterasTypeOnPath(opts = {}) {
   hookSelectorManager(svgEditor);
   hookRemapAndDimensions(svgEditor);
 
-  document.getElementById('action_type_on_path')?.addEventListener('click', () => {
-    armTypeOnPathMode(svgEditor);
-  });
-  document.getElementById('action_type_on_path_object')?.addEventListener('click', () => {
-    armTypeOnPathMode(svgEditor);
-  });
-
+  // The main menu delegates to this callback in index.html.
   window.__visterasTypeOnPath = () => armTypeOnPathMode(svgEditor);
   window.__visterasSyncTypeOnPath = () => syncOptionsPanel(svgEditor);
 

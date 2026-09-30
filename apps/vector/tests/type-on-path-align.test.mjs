@@ -61,28 +61,24 @@ test('Type on Path: JS wires Left, Center, and Right align buttons to update tex
   assert.match(js, /else\s*\{\s*tp\.setAttribute\('startOffset',\s*'0%'\);/);
 });
 
-test('Type on Path: Align to Path updates dominant-baseline, alignment-baseline, and data attribute', () => {
+test('Align to Path clears legacy double offsets and centers the font box', async () => {
+  const { default: vm } = await import('node:vm');
   const js = fs.readFileSync(topJsPath, 'utf8');
-
-  // Verify baselineMap in applyAlignToPath maps modes to valid SVG baselines
-  assert.match(js, /const baselineMap = \{\s*baseline:\s*'alphabetic',\s*ascender:\s*'hanging',\s*center:\s*'middle',\s*descender:\s*'ideographic',?\s*\};/);
-
-  // Verify applyAlignToPath sets dominant-baseline and alignment-baseline on both tp and textEl
-  assert.match(js, /tp\.setAttribute\('dominant-baseline',\s*db\);/);
-  assert.match(js, /tp\.setAttribute\('alignment-baseline',\s*db\);/);
-  assert.match(js, /textEl\.setAttribute\('dominant-baseline',\s*db\);/);
-  assert.match(js, /textEl\.setAttribute\('alignment-baseline',\s*db\);/);
-
-  // Verify persistence and re-render triggers
-  assert.match(js, /textEl\.setAttribute\('data-visteras-align-path',\s*mode\);/);
-  assert.match(js, /setTextPathHref\(tp,\s*href\.replace\(\/\^#\/,\s*''\)\);/);
-
-  // Verify createTypeOnPath initializes dominant-baseline and data-visteras-align-path
-  assert.match(js, /text\.setAttribute\('data-visteras-align-path',\s*alignPath\);/);
-  assert.match(js, /textPath\.setAttribute\('dominant-baseline',\s*db\);/);
-
-  // Verify syncOptionsPanel reads data-visteras-align-path or falls back to dominant-baseline
-  assert.match(js, /let mode = textEl\?\.getAttribute\('data-visteras-align-path'\);/);
-  assert.match(js, /const db = tp\.getAttribute\('dominant-baseline'\) \|\| textEl\?\.getAttribute\('dominant-baseline'\)/);
+  const context = vm.createContext({});
+  vm.runInContext(js.slice(js.indexOf('function applyPathBaseline'), js.indexOf('function showToast')), context);
+  const element = () => ({
+    attrs: { dy: '-8' }, style: { removeProperty() {} },
+    removeAttribute(key) { delete this.attrs[key]; },
+    setAttribute(key, value) { this.attrs[key] = value; },
+  });
+  for (const [mode, baseline] of Object.entries({ baseline: 'alphabetic', ascender: 'text-before-edge', center: 'central', descender: 'text-after-edge' })) {
+    const text = element(), tp = element();
+    context.applyPathBaseline(text, tp, mode);
+    assert.equal(text.attrs['data-visteras-align-path'], mode);
+    for (const el of [text, tp]) {
+      assert.equal(el.attrs.dy, undefined);
+      assert.equal(el.attrs['dominant-baseline'], baseline);
+      assert.equal(el.attrs['alignment-baseline'], baseline);
+    }
+  }
 });
-

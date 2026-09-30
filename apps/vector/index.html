@@ -237,7 +237,8 @@
     import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
-    import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
+    import { mountTextEditing } from './js/visteras-text-editing.js';
+    import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js?v=text-editing-3';
     import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=merge-trace-1';
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
@@ -2361,6 +2362,7 @@
 
     // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
     mountVisterasFontPicker({ svgEditor });
+    mountTextEditing(svgEditor);
     mountVisterasTypeOnPath({ svgEditor });
     // Shape library picker in the options bar (shape flyout's last tool)
     mountShapePicker({ svgEditor });
