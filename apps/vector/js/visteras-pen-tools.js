@@ -8,7 +8,7 @@ export function mountPenTools(editor) {
   const old=document.getElementById('tool_path');
   const flyout=document.createElement('se-flyingbutton');
   flyout.id='visteras_pen_subtools';flyout.title='Pen Tool';
-  const definitions=[['tool_path','Pen Tool','pen_illustrator.svg','path'],['tool_add_anchor','Add Anchor Point Tool','pen_add_anchor.svg','add_anchor'],['tool_delete_anchor','Delete Anchor Point Tool','pen_delete_anchor.svg','delete_anchor']];
+  const definitions=[['tool_path','Pen Tool','pen_illustrator.svg?v=unify-icons-1','path'],['tool_add_anchor','Add Anchor Point Tool','pen_add_anchor.svg','add_anchor'],['tool_delete_anchor','Delete Anchor Point Tool','pen_delete_anchor.svg','delete_anchor']];
   for(const [id,title,src,mode] of definitions){
     const button=document.createElement('se-button');
     button.id=id;button.title=title;button.setAttribute('src',src);

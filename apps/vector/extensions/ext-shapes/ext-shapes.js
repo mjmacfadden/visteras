@@ -53,7 +53,7 @@ var ext_shapes_default = {
 					const extPath = svgEditor.configObj.curConfig.extPath;
 					const buttonTemplate = `
           <se-explorerbutton id="tool_shapelib" title="${svgEditor.i18next.t(`${name}:buttons.0.title`)}" lib="${extPath}/ext-shapes/shapelib/"
-          src="shapelib.svg"></se-explorerbutton>
+          src="shapelib.svg?v=unify-icons-1"></se-explorerbutton>
           `;
 					canv.insertChildAtIndex($id("tools_left"), buttonTemplate, 9);
 					$click($id("tool_shapelib"), () => {

@@ -82,9 +82,9 @@ var ext_polystar_default = {
 			callback() {
 				const buttonTemplate = `
             <se-flyingbutton id="tools_polygon" title="${`${name}:title`}">
-              <se-button id="tool_star" title="${`${name}:buttons.0.title`}" src="star.svg">
+              <se-button id="tool_star" title="${`${name}:buttons.0.title`}" src="star.svg?v=unify-icons-1">
               </se-button>
-              <se-button id="tool_polygon" title="${`${name}:buttons.1.title`}" src="polygon.svg">
+              <se-button id="tool_polygon" title="${`${name}:buttons.1.title`}" src="polygon.svg?v=unify-icons-1">
               </se-button>
             </se-flyingbutton>
           `;
