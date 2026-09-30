@@ -242,6 +242,51 @@
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
 
+    // Studio-style Toast Notification System (replaces standard browser alert() modals)
+    function showStudioToast(message, type = 'error', duration = 3500) {
+      if (typeof document === 'undefined') return null;
+      let notifier = document.getElementById('visteras_notifier');
+      if (!notifier) {
+        notifier = document.createElement('div');
+        notifier.id = 'visteras_notifier';
+        notifier.className = 'alertify-notifier ajs-top ajs-center';
+        document.body.appendChild(notifier);
+      }
+
+      const msgEl = document.createElement('div');
+      msgEl.className = `ajs-message ajs-${type}`;
+      msgEl.textContent = message;
+      notifier.appendChild(msgEl);
+
+      requestAnimationFrame(() => {
+        msgEl.classList.add('ajs-visible');
+      });
+
+      let timer = null;
+      const dismiss = () => {
+        if (timer) clearTimeout(timer);
+        msgEl.classList.remove('ajs-visible');
+        setTimeout(() => {
+          msgEl.remove();
+        }, 250);
+      };
+
+      msgEl.addEventListener('click', dismiss);
+      if (duration > 0) {
+        timer = setTimeout(dismiss, duration);
+      }
+      return msgEl;
+    }
+
+    window.showStudioToast = showStudioToast;
+    window.showToast = showStudioToast;
+    window.showWarning = (msg) => showStudioToast(msg, 'error');
+
+    // Direct all JavaScript alert() calls to the Studio red toast
+    window.alert = function(msg) {
+      showStudioToast(String(msg), 'error');
+    };
+
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
 
@@ -302,20 +347,30 @@
       if (!sc) return;
 
       const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
-      if (selElems.length !== 2) {
-        alert('Pathfinder operations require exactly 2 selected objects.');
-        return;
+      if (operation === 'unite') {
+        if (selElems.length < 2) {
+          showStudioToast('Pathfinder Unite requires at least 2 selected objects.', 'error');
+          return;
+        }
+      } else {
+        if (selElems.length !== 2) {
+          showStudioToast('This Pathfinder operation requires exactly 2 selected objects.', 'error');
+          return;
+        }
       }
 
-      const [elemA, elemB] = selElems;
+      // Determine stacking order: bottom to top
+      const sortedElems = [...selElems].sort((a, b) => {
+        if (a === b) return 0;
+        const pos = a.compareDocumentPosition(b);
+        return (pos & Node.DOCUMENT_POSITION_FOLLOWING) ? -1 : 1;
+      });
 
-      // Determine stacking order: DOM following means elemB is above elemA
-      const isBFollowingA = (elemA.compareDocumentPosition(elemB) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-      const bottomElem = isBFollowingA ? elemA : elemB;
-      const topElem = isBFollowingA ? elemB : elemA;
+      const bottomElem = sortedElems[0];
+      const topElem = sortedElems[sortedElems.length - 1];
 
       if (!window.paper) {
-        alert('Pathfinder engine (Paper.js) is loading or unavailable.');
+        showStudioToast('Pathfinder engine (Paper.js) is loading or unavailable.', 'error');
         return;
       }
 
@@ -345,14 +400,18 @@
       }
 
       try {
-        const itemBottom = toPathItem(scope.project.importSVG(bottomElem));
-        const itemTop = toPathItem(scope.project.importSVG(topElem));
-
-        if (!itemBottom || !itemTop) {
-          alert('Unable to process the geometry of the selected objects. Please ensure both are shapes or paths.');
-          scope.project.clear();
-          return;
+        const paperItems = [];
+        for (const el of sortedElems) {
+          const p = toPathItem(scope.project.importSVG(el));
+          if (!p) {
+            showStudioToast('Unable to process the geometry of the selected objects. Please ensure all are shapes or paths.', 'error');
+            scope.project.clear();
+            return;
+          }
+          paperItems.push(p);
         }
+
+        const [itemBottom, itemTop] = (sortedElems.length === 2) ? [paperItems[0], paperItems[1]] : [];
 
         const svgNS = 'http://www.w3.org/2000/svg';
         const parentNode = topElem.parentNode;
@@ -413,15 +472,18 @@
         const newElements = [];
 
         if (operation === 'unite') {
-          const res = itemBottom.unite(itemTop);
-          const newPath = createPathFromPaper(res, topElem);
+          let united = paperItems[0];
+          for (let i = 1; i < paperItems.length; i++) {
+            united = united.unite(paperItems[i]);
+          }
+          const newPath = createPathFromPaper(united, topElem);
           if (newPath) newElements.push(newPath);
         } else if (operation === 'minus_front') {
           const overlap = itemBottom.intersect(itemTop);
           const overlapExport = overlap ? overlap.exportSVG({ asString: false }) : null;
           const overlapD = overlapExport ? overlapExport.getAttribute('d') : null;
           if (!overlapD || !overlapD.trim()) {
-            alert('The selected shapes do not overlap.');
+            showStudioToast('The selected shapes do not overlap.', 'error');
             scope.project.clear();
             return;
           }
@@ -432,7 +494,7 @@
           const res = itemBottom.intersect(itemTop);
           const newPath = createPathFromPaper(res, topElem);
           if (!newPath) {
-            alert('The selected shapes do not overlap.');
+            showStudioToast('The selected shapes do not overlap.', 'error');
             scope.project.clear();
             return;
           }
@@ -446,7 +508,7 @@
           const overlapExport = overlap ? overlap.exportSVG({ asString: false }) : null;
           const overlapD = overlapExport ? overlapExport.getAttribute('d') : null;
           if (!overlapD || !overlapD.trim()) {
-            alert('The selected shapes do not overlap.');
+            showStudioToast('The selected shapes do not overlap.', 'error');
             scope.project.clear();
             return;
           }
@@ -464,7 +526,7 @@
           if (pathTop) newElements.push(pathTop);
 
           if (newElements.length === 0) {
-            alert('Could not divide the selected shapes.');
+            showStudioToast('Could not divide the selected shapes.', 'error');
             scope.project.clear();
             return;
           }
@@ -482,11 +544,11 @@
         });
 
         // Add remove commands with sibling and parent references
-        batchCmd.addSubCommand(new RemoveElementCommand(bottomElem, bottomElem.nextSibling, bottomElem.parentNode));
-        batchCmd.addSubCommand(new RemoveElementCommand(topElem, topElem.nextSibling, topElem.parentNode));
-
-        bottomElem.remove();
-        topElem.remove();
+        const elemsToRemove = (operation === 'unite') ? sortedElems : [bottomElem, topElem];
+        elemsToRemove.forEach(el => {
+          batchCmd.addSubCommand(new RemoveElementCommand(el, el.nextSibling, el.parentNode));
+          el.remove();
+        });
 
         sc.undoMgr.addCommandToHistory(batchCmd);
 
@@ -501,7 +563,7 @@
 
       } catch (err) {
         console.error('Pathfinder operation error:', err);
-        alert('Pathfinder error: ' + (err.message || err));
+        showStudioToast('Pathfinder error: ' + (err.message || err), 'error');
       } finally {
         scope.project.clear();
       }
@@ -934,7 +996,7 @@
       });
 
       document.getElementById('action_about')?.addEventListener('click', () => {
-        alert('Visteras Vector v1.0\nBuilt on SVG-Edit 7.4.2 Engine\nCompanion vector editor to Visteras Studio');
+        showStudioToast('Visteras Vector v1.0\nBuilt on SVG-Edit 7.4.2 Engine\nCompanion vector editor to Visteras Studio', 'info');
       });
 
       document.getElementById('action_prefs')?.addEventListener('click', () => {
@@ -2084,10 +2146,10 @@
           }
         }
 
-        // Pathfinder section (strictly visible when 2 objects are selected)
+        // Pathfinder section (visible when 2 or more objects are selected)
         const pathfinderSec = document.getElementById('sec_pathfinder');
         if (pathfinderSec) {
-          pathfinderSec.style.display = (selElems.length === 2 && !isPathEdit) ? 'block' : 'none';
+          pathfinderSec.style.display = (selElems.length >= 2 && !isPathEdit) ? 'block' : 'none';
         }
 
         // Action buttons

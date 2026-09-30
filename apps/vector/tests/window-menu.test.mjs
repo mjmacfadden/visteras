@@ -58,3 +58,53 @@ test('Pathfinder Popup: contains the same 5 options matching the properties pane
   assert.match(html, /id="btn_pathfinder_exclude"/);
   assert.match(html, /id="btn_pathfinder_divide"/);
 });
+
+test('Pathfinder Unite: supports multi-selection (>= 2 objects) and sorts bottom-to-top', () => {
+  const html = fs.readFileSync(vectorHtmlPath, 'utf8');
+
+  // Verify executePathfinder allows selElems.length >= 2 for unite
+  assert.match(html, /if\s*\(operation\s*===\s*'unite'\)\s*\{\s*if\s*\(selElems\.length\s*<\s*2\)/);
+
+  // Verify other operations enforce exactly 2 objects
+  assert.match(html, /if\s*\(selElems\.length\s*!==\s*2\)\s*\{\s*showStudioToast\('This Pathfinder operation requires exactly 2 selected objects\.'/);
+
+  // Verify DOM document order sorting
+  assert.match(html, /const\s+sortedElems\s*=\s*\[\.\.\.selElems\]\.sort/);
+  assert.match(html, /Node\.DOCUMENT_POSITION_FOLLOWING/);
+
+  // Verify iterative unite across paperItems
+  assert.match(html, /let\s+united\s*=\s*paperItems\[0\];/);
+  assert.match(html, /for\s*\(let\s+i\s*=\s*1;\s*i\s*<\s*paperItems\.length;\s*i\+\+\)\s*\{\s*united\s*=\s*united\.unite\(paperItems\[i\]\);/);
+
+  // Verify removal of all united elements
+  assert.match(html, /const\s+elemsToRemove\s*=\s*\(operation\s*===\s*'unite'\)\s*\?\s*sortedElems\s*:\s*\[bottomElem,\s*topElem\];/);
+
+  // Verify properties panel visibility shows for >= 2 objects
+  assert.match(html, /pathfinderSec\.style\.display\s*=\s*\(selElems\.length\s*>=\s*2\s*&&\s*!isPathEdit\)\s*\?\s*'block'\s*:\s*'none';/);
+});
+
+test('Studio Toast: red toast system replaces standard browser alerts', () => {
+  const html = fs.readFileSync(vectorHtmlPath, 'utf8');
+  const cssPath = path.resolve(__dirname, '../css/visteras-theme.css');
+  const css = fs.readFileSync(cssPath, 'utf8');
+
+  // Verify showStudioToast is defined and mounted on window
+  assert.match(html, /function\s+showStudioToast\(message,\s*type\s*=\s*'error',\s*duration\s*=\s*3500\)/);
+  assert.match(html, /window\.showStudioToast\s*=\s*showStudioToast;/);
+  assert.match(html, /window\.showWarning\s*=\s*\(msg\)\s*=>\s*showStudioToast\(msg,\s*'error'\);/);
+
+  // Verify window.alert redirection
+  assert.match(html, /window\.alert\s*=\s*function\(msg\)\s*\{\s*showStudioToast\(String\(msg\),\s*'error'\);\s*\};/);
+
+  // Verify executePathfinder uses showStudioToast instead of alert
+  const execPathfinderBlock = html.match(/function\s+executePathfinder[\s\S]*?finally\s*\{[\s\S]*?\}/);
+  assert.ok(execPathfinderBlock, 'executePathfinder block found');
+  assert.equal(execPathfinderBlock[0].includes('alert('), false, 'executePathfinder must not contain raw alert() calls');
+  assert.match(execPathfinderBlock[0], /showStudioToast\(/);
+
+  // Verify Alertify CSS in visteras-theme.css matching Studio styling
+  assert.match(css, /\.alertify-notifier/);
+  assert.match(css, /\.ajs-message\.ajs-error\s*\{[^}]*background:\s*rgba\(217,\s*92,\s*92/);
+  assert.match(css, /text-shadow:\s*-1px\s*-1px\s*0\s*rgba\(0,\s*0,\s*0,\s*0\.5\)/);
+});
+
