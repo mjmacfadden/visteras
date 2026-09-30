@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newScope } from './helpers/paper-node.mjs';
 
-const { computeOffsetPath, readStrokeSpec, collectLeaves } = await import('../js/visteras-offset-path.js');
+const { computeOffsetPath, readStrokeSpec, collectLeaves, DEFAULT_OFFSET_OPTIONS } = await import('../js/visteras-offset-path.js');
 
 const scopeWith = (make) => { const s = newScope(); s.project.importSVG = () => make(s); return s; };
 const boundsOfD = (s, d) => { const p = new s.CompoundPath({ pathData: d, insert: false }); const b = p.bounds; return [b.x, b.y, b.width, b.height].map((v) => Math.round(v * 100) / 100); };
@@ -66,6 +66,29 @@ test('computeOffsetPath — returns null when importSVG throws or yields nothing
   assert.equal(computeOffsetPath(s, {}, { offset: 5 }), null);
   s.project.importSVG = () => new s.Group({ insert: false });
   assert.equal(computeOffsetPath(s, {}, { offset: 5 }), null);
+});
+
+test('DEFAULT_OFFSET_OPTIONS — Illustrator defaults: Miter, limit 4, offset 10, keep original', () => {
+  assert.deepEqual({ ...DEFAULT_OFFSET_OPTIONS }, { offset: 10, joins: 'miter', miterLimit: 4, copyOriginal: true });
+  assert.ok(Object.isFrozen(DEFAULT_OFFSET_OPTIONS));
+});
+
+test('computeOffsetPath — joins default to Miter (sharp corners, exact area)', () => {
+  const s = scopeWith((sc) => new sc.Path.Rectangle({ point: [0, 0], size: [100, 100], insert: false }));
+  const r = computeOffsetPath(s, {}, { offset: 10 });
+  const p = new s.CompoundPath({ pathData: r.d, insert: false });
+  assert.deepEqual(boundsOfD(s, r.d), [-10, -10, 120, 120]);
+  assert.equal(Math.round(Math.abs(p.area)), 14400);
+});
+
+test('computeOffsetPath — miter limit is passed to the envelope (default 4 bevels a sharp tip)', () => {
+  const tri = (sc) => new sc.Path({ segments: [[0, 0], [100, 0], [0, 20]], closed: true, insert: false });
+  const s = scopeWith(tri);
+  const def = boundsOfD(s, computeOffsetPath(s, {}, { offset: 5 }).d);
+  const lim4 = boundsOfD(s, computeOffsetPath(s, {}, { offset: 5, joins: 'miter', miterLimit: 4 }).d);
+  const lim20 = boundsOfD(s, computeOffsetPath(s, {}, { offset: 5, joins: 'miter', miterLimit: 20 }).d);
+  assert.deepEqual(def, lim4, 'default = miter limit 4');
+  assert.ok(lim20[2] > lim4[2] + 20, `limit 20 keeps the long tip: ${lim20} vs ${lim4}`);
 });
 
 // ─── readStrokeSpec ─────────────────────────────────────────────────────────

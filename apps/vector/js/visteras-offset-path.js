@@ -36,6 +36,13 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 // ─── Dialog HTML ─────────────────────────────────────────────────────────────
 const DIALOG_ID = 'visteras-offset-path-dialog';
 
+/**
+ * Illustrator defaults: Miter joins, miter limit 4. The dialog is built once,
+ * so later opens keep the last values used in this session; a reload starts
+ * from these again.
+ */
+export const DEFAULT_OFFSET_OPTIONS = Object.freeze({ offset: 10, joins: 'miter', miterLimit: 4, copyOriginal: true });
+
 function buildDialog() {
   if (document.getElementById(DIALOG_ID)) return;
 
@@ -85,7 +92,7 @@ function buildDialog() {
             Offset Distance
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input id="${DIALOG_ID}-offset" type="number" value="10" step="0.5"
+            <input id="${DIALOG_ID}-offset" type="number" value="${DEFAULT_OFFSET_OPTIONS.offset}" step="0.5"
               style="
                 flex:1;
                 background:#18181b;
@@ -119,9 +126,9 @@ function buildDialog() {
             font:13px/1 -apple-system,sans-serif;
             outline:none;
           ">
-            <option value="miter">Miter</option>
-            <option value="round" selected>Round</option>
-            <option value="bevel">Bevel</option>
+            <option value="miter"${DEFAULT_OFFSET_OPTIONS.joins === 'miter' ? ' selected' : ''}>Miter</option>
+            <option value="round"${DEFAULT_OFFSET_OPTIONS.joins === 'round' ? ' selected' : ''}>Round</option>
+            <option value="bevel"${DEFAULT_OFFSET_OPTIONS.joins === 'bevel' ? ' selected' : ''}>Bevel</option>
           </select>
         </label>
 
@@ -130,7 +137,7 @@ function buildDialog() {
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:#999;margin-bottom:5px">
             Miter Limit
           </div>
-          <input id="${DIALOG_ID}-miter" type="number" value="4" min="1" max="100" step="1"
+          <input id="${DIALOG_ID}-miter" type="number" value="${DEFAULT_OFFSET_OPTIONS.miterLimit}" min="1" max="100" step="1"
             style="
               width:100%;
               box-sizing:border-box;
@@ -192,7 +199,7 @@ function buildDialog() {
   joinsEl.addEventListener('change', () => {
     miterRow.style.display = joinsEl.value === 'miter' ? 'block' : 'none';
   });
-  miterRow.style.display = 'none'; // Round is default
+  miterRow.style.display = joinsEl.value === 'miter' ? 'block' : 'none'; // Miter is the default
 
   // Keyboard: Enter = OK, Escape = cancel
   overlay.addEventListener('keydown', (e) => {
@@ -220,9 +227,9 @@ function hideDialog() {
 
 function readDialogValues() {
   return {
-    offset: (() => { const v = parseFloat(document.getElementById(`${DIALOG_ID}-offset`)?.value); return Number.isFinite(v) ? v : 10; })(),
-    joins: document.getElementById(`${DIALOG_ID}-joins`)?.value || 'round',
-    miterLimit: parseFloat(document.getElementById(`${DIALOG_ID}-miter`)?.value) || 4,
+    offset: (() => { const v = parseFloat(document.getElementById(`${DIALOG_ID}-offset`)?.value); return Number.isFinite(v) ? v : DEFAULT_OFFSET_OPTIONS.offset; })(),
+    joins: document.getElementById(`${DIALOG_ID}-joins`)?.value || DEFAULT_OFFSET_OPTIONS.joins,
+    miterLimit: Math.max(1, parseFloat(document.getElementById(`${DIALOG_ID}-miter`)?.value) || DEFAULT_OFFSET_OPTIONS.miterLimit),
     copyOriginal: document.getElementById(`${DIALOG_ID}-copy`)?.checked ?? true,
   };
 }
@@ -309,7 +316,7 @@ function exportD(item) {
  * @returns {{ d: string, fillRule: string|null } | null}
  */
 export function computeOffsetPath(scope, sourceEl, opts) {
-  const { offset, joins = 'round', miterLimit = 4 } = opts || {};
+  const { offset, joins = DEFAULT_OFFSET_OPTIONS.joins, miterLimit = DEFAULT_OFFSET_OPTIONS.miterLimit } = opts || {};
   if (!Number.isFinite(offset) || Math.abs(offset) < 0.001) return null;
   const item = pathItemFromElement(scope, sourceEl);
   if (!item) return null;
