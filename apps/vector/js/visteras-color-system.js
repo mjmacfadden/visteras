@@ -1311,6 +1311,15 @@ function createColorController(svgEditor) {
       if (target) api.setActiveTarget(target, { syncColor: true });
       window.__visterasOpenColorPicker?.(state.activeTarget);
     },
+
+    refresh() {
+      api.syncFromCanvas();
+      api.emit();
+    },
+
+    mountTabs() {
+      mountColorSwatchesTabs(api, svgEditor);
+    },
   };
 
   window.__visterasColorTarget = state.activeTarget;
@@ -1756,6 +1765,13 @@ function ensureColorSwatchesBlock() {
   const propPanel = document.getElementById('properties_panel');
   if (!propPanel) return null;
 
+  // If panel dock exists or panels are hosted in the dock flyout, retired block is removed.
+  if (document.getElementById('vdock') || document.getElementById('vdock_flyout') || document.querySelector('#vdock_flyout #vcs_color_panel')) {
+    const oldBlock = document.getElementById('vcs_colors_block');
+    if (oldBlock) oldBlock.remove();
+    return null;
+  }
+
   // Undo prior Properties|Color|Swatches tab chrome from earlier PR revisions.
   if (propPanel.dataset.vcsTabs === '1') {
     const propsContent = document.getElementById('properties_content');
@@ -2140,11 +2156,10 @@ function mountSwatchesPanelContent(ctrl, content) {
 
 function mountColorSwatchesTabs(ctrl, svgEditor) {
   const block = ensureColorSwatchesBlock();
-  if (!block) return null;
-  const colorPane = document.getElementById('vcs_color_panel');
-  const swatchesPane = document.getElementById('vcs_swatches_panel');
-  mountColorPanelContent(ctrl, svgEditor, colorPane);
-  mountSwatchesPanelContent(ctrl, swatchesPane);
+  const colorPane = document.querySelector('#vdock_flyout #vcs_color_panel') || document.getElementById('vcs_color_panel');
+  const swatchesPane = document.querySelector('#vdock_flyout #vcs_swatches_panel') || document.getElementById('vcs_swatches_panel');
+  if (colorPane) mountColorPanelContent(ctrl, svgEditor, colorPane);
+  if (swatchesPane) mountSwatchesPanelContent(ctrl, swatchesPane);
   return block;
 }
 

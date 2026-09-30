@@ -241,7 +241,23 @@
 #vdock_flyout #vcs_swatches_panel {
   width: 100% !important;
   box-sizing: border-box !important;
+}
+
+#vdock_flyout #vcs_color_panel.active {
+  display: block !important;
   padding: 8px !important;
+}
+
+#vdock_flyout #vcs_swatches_panel.active {
+  display: block !important;
+  padding: 0 !important;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+#vdock_flyout #vcs_color_panel:not(.active),
+#vdock_flyout #vcs_swatches_panel:not(.active) {
+  display: none !important;
 }
 
 /* Stroke Panel inside flyout */

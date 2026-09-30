@@ -510,10 +510,10 @@ test('Panel Dock: mounts #vdock strip and #vdock_flyout with 4 groups', async ()
   assert.ok(vdock, '#vdock created');
   assert.equal(vdock.getAttribute('role'), 'toolbar');
 
-  // Verify 4 groups
+  // Verify 5 groups: color, swatches, stroke, gradient, layers
   const icons = vdock.querySelectorAll('.vdock-icon');
   const panels = icons.map(i => i.dataset.panel);
-  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'layers']);
+  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'layers']);
 
   // Verify flyout exists
   const flyout = env.doc.getElementById('vdock_flyout');
@@ -543,12 +543,16 @@ test('Panel Dock: open, close, and toggle API switches panels and updates header
   const flyout = document.getElementById('vdock_flyout');
   assert.equal(flyout.style.display, 'flex');
 
-  // Open Stroke: should display stroke/gradient tab header
+  // Open Stroke: displays Stroke title
   dockApi.open('stroke');
   assert.equal(dockApi.isOpen('stroke'), true);
   const titleSlot = document.getElementById('vdock_header_title_slot');
-  const tabs = titleSlot.querySelectorAll('.vdock-tab-btn');
-  assert.equal(tabs.length, 2, 'Stroke and Gradient tabs present');
+  assert.equal(titleSlot.querySelector('.vdock-flyout-title')?.textContent, 'Stroke');
+
+  // Open Gradient: displays Gradient title
+  dockApi.open('gradient');
+  assert.equal(dockApi.isOpen('gradient'), true);
+  assert.equal(titleSlot.querySelector('.vdock-flyout-title')?.textContent, 'Gradient');
 
   // Open Layers
   dockApi.open('layers');
@@ -659,5 +663,25 @@ test('Panel Dock: Toolbar has no chevron, displays only pressed panel, highlight
   assert.equal(colorBtn.getAttribute('pressed'), null);
   assert.equal(colorBtn.classList.contains('active'), false);
   assert.equal(colorPane.classList.contains('active'), false);
+
+  // 5. Gradient tool icon has its own button with Studio gradient ramp icon
+  const gradBtn = dock.querySelector('.vdock-icon[data-panel="gradient"]');
+  assert.ok(gradBtn, 'Gradient button exists in dock');
+  assert.match(gradBtn.getAttribute('title'), /Gradient/);
+
+  const dockJs = fs.readFileSync(path.resolve(vectorRoot, 'js/visteras-panel-dock.js'), 'utf8');
+  assert.match(dockJs, /data-panel="gradient"/);
+  assert.match(dockJs, /linearGradient id="vdock_gradient_ramp_icon"/);
+  assert.match(dockJs, /stop-color="currentColor"/);
+  assert.match(dockJs, /rect[^>]*fill="url\(#vdock_gradient_ramp_icon\)"/);
+
+  // Toggling Gradient opens gradient panel and highlights its own icon
+  gradBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dockApi.isOpen('gradient'), true);
+  assert.equal(gradBtn.getAttribute('pressed'), 'true');
+  assert.equal(gradBtn.classList.contains('active'), true);
+  const gradPane = env.doc.getElementById('vdock_gradient_panel');
+  assert.equal(gradPane.classList.contains('active'), true);
 });
+
 

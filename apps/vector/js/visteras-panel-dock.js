@@ -92,7 +92,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
     <div class="vdock-separator"></div>
 
-    <!-- Group 3: Stroke (+ Gradient) -->
+    <!-- Group 3: Stroke -->
     <div class="vdock-group" id="vdock_grp_stroke">
       <button type="button" class="vdock-icon" data-panel="stroke" title="Stroke (⌘F10 / Ctrl+F10)" aria-label="Stroke (⌘F10 / Ctrl+F10)" aria-expanded="false" aria-controls="vdock_flyout">
         <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" aria-hidden="true">
@@ -103,9 +103,24 @@ export function mountVisterasPanelDock({ svgEditor }) {
       </button>
     </div>
 
+    <!-- Group 4: Gradient -->
+    <div class="vdock-group" id="vdock_grp_gradient">
+      <button type="button" class="vdock-icon" data-panel="gradient" title="Gradient (⌘F9 / Ctrl+F9)" aria-label="Gradient (⌘F9 / Ctrl+F9)" aria-expanded="false" aria-controls="vdock_flyout">
+        <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true">
+          <defs>
+            <linearGradient id="vdock_gradient_ramp_icon" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="currentColor" stop-opacity="0"/>
+              <stop offset="100%" stop-color="currentColor" stop-opacity="1"/>
+            </linearGradient>
+          </defs>
+          <rect x="1.5" y="3.5" width="17" height="13" rx="1.5" fill="url(#vdock_gradient_ramp_icon)" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
+    </div>
+
     <div class="vdock-separator"></div>
 
-    <!-- Group 4: Layers -->
+    <!-- Group 5: Layers -->
     <div class="vdock-group" id="vdock_grp_layers">
       <button type="button" class="vdock-icon" data-panel="layers" title="Layers (F7)" aria-label="Layers (F7)" aria-expanded="false" aria-controls="vdock_flyout">
         <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">
@@ -152,23 +167,32 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
   // (A) Color Panel (#vcs_color_panel)
   let colorPane = document.getElementById('vcs_color_panel');
-  if (colorPane) {
-    colorPane.classList.add('vdock-panel-pane');
-    flyoutBody.appendChild(colorPane);
+  if (!colorPane) {
+    colorPane = document.createElement('div');
+    colorPane.id = 'vcs_color_panel';
   }
+  colorPane.classList.add('vdock-panel-pane');
+  colorPane.classList.remove('hidden', 'vcs-tab-pane', 'panel_tab_pane');
+  flyoutBody.appendChild(colorPane);
 
   // (B) Swatches Panel (#vcs_swatches_panel)
   let swatchesPane = document.getElementById('vcs_swatches_panel');
-  if (swatchesPane) {
-    swatchesPane.classList.add('vdock-panel-pane');
-    flyoutBody.appendChild(swatchesPane);
+  if (!swatchesPane) {
+    swatchesPane = document.createElement('div');
+    swatchesPane.id = 'vcs_swatches_panel';
   }
+  swatchesPane.classList.add('vdock-panel-pane');
+  swatchesPane.classList.remove('hidden', 'vcs-tab-pane', 'panel_tab_pane');
+  flyoutBody.appendChild(swatchesPane);
 
   // (C) Remove retired #vcs_colors_block container from #sidepanels
   const oldColorsBlock = document.getElementById('vcs_colors_block');
   if (oldColorsBlock) {
     oldColorsBlock.remove();
   }
+
+  // Ensure Color & Swatches content is mounted into these flyout panes
+  window.__visterasColorSystem?.mountTabs?.();
 
   // (D) Stroke Panel (#vdock_stroke_panel)
   const strokePane = document.createElement('div');
@@ -293,29 +317,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
   function setFlyoutHeader(panelId) {
     const slot = titleSlot || flyout.querySelector('#vdock_header_title_slot');
     if (!slot) return;
-    if (panelId === 'stroke' || panelId === 'gradient') {
-      slot.innerHTML = `
-        <div class="vdock-flyout-tabs" role="tablist">
-          <button type="button" class="vdock-tab-btn ${panelId === 'stroke' ? 'active' : ''}" data-tab="stroke">Stroke</button>
-          <button type="button" class="vdock-tab-btn ${panelId === 'gradient' ? 'active' : ''}" data-tab="gradient">Gradient</button>
-        </div>
-      `;
-      slot.querySelectorAll('.vdock-tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const tab = btn.dataset.tab;
-          state.activeTab.stroke = tab;
-          open(tab);
-        });
-      });
-    } else {
-      const titles = {
-        color: 'Color',
-        swatches: 'Swatches',
-        layers: 'Layers',
-      };
-      slot.innerHTML = `<span class="vdock-flyout-title">${titles[panelId] || panelId}</span>`;
-    }
+    const titles = {
+      color: 'Color',
+      swatches: 'Swatches',
+      stroke: 'Stroke',
+      gradient: 'Gradient',
+      layers: 'Layers',
+    };
+    slot.innerHTML = `<span class="vdock-flyout-title">${titles[panelId] || panelId}</span>`;
   }
 
   function updateWindowMenuCheckmarks() {
@@ -362,17 +371,10 @@ export function mountVisterasPanelDock({ svgEditor }) {
   function open(panelId, options = {}) {
     if (!panelId) return;
 
-    // Direct gradient or stroke tab tracking
-    if (panelId === 'stroke' || panelId === 'gradient') {
-      state.activeTab.stroke = panelId;
-    }
-
     state.open = panelId;
     saveState();
 
-    // Map stroke/gradient to stroke dock button
-    const dockBtnKey = (panelId === 'gradient') ? 'stroke' : panelId;
-    const targetBtn = dock.querySelector(`.vdock-icon[data-panel="${dockBtnKey}"]`);
+    const targetBtn = dock.querySelector(`.vdock-icon[data-panel="${panelId}"]`);
 
     // Update dock icon active states
     dock.querySelectorAll('.vdock-icon').forEach(btn => {
@@ -391,8 +393,8 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
     // Show appropriate pane in body
     const paneMap = {
-      color: document.getElementById('vcs_color_panel'),
-      swatches: document.getElementById('vcs_swatches_panel'),
+      color: colorPane,
+      swatches: swatchesPane,
       stroke: strokePane,
       gradient: gradPane,
       layers: layerPanel,
@@ -402,6 +404,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       if (pane) {
         const isActive = (k === panelId);
         pane.classList.toggle('active', isActive);
+        pane.classList.remove('hidden');
         pane.style.display = isActive ? (k === 'stroke' || k === 'gradient' ? 'flex' : 'block') : 'none';
       }
     });
@@ -413,6 +416,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
     // Refresh color system views if opening color or swatches
     if (panelId === 'color' || panelId === 'swatches') {
+      window.__visterasColorSystem?.mountTabs?.();
       window.__visterasColorSystem?.refresh?.();
     }
 
@@ -460,11 +464,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const p = btn.dataset.panel;
-      if (p === 'stroke') {
-        toggle(state.activeTab.stroke || 'stroke');
-      } else {
-        toggle(p);
-      }
+      toggle(p);
     });
   });
 
