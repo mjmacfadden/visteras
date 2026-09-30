@@ -44,6 +44,8 @@ export function pickInitial(saved, cats, shapesForCat) {
 const CSS = `
 #visteras_shapelib_panel{display:none;align-items:center;margin:0 20px 0 12px;height:100%;font-size:12px;color:#cccccc;white-space:nowrap}
 #visteras_shapelib_panel.visible{display:inline-flex}
+/* visteras-theme.css forces #tools_top > * {display:flex !important}; out-rank it while inactive. */
+#tools_top > #visteras_shapelib_panel:not(.visible),#visteras_shapelib_panel[hidden]{display:none !important}
 #visteras_shapelib_panel > label{margin:0 .5rem 0 0;line-height:1;color:#cccccc}
 #visteras_shapelib_panel .vsp-trigger{display:inline-flex;align-items:center;gap:6px;height:20px;min-width:130px;max-width:180px;padding:2px 4px;background:#1e1e1e;color:#cccccc;border:1px solid #4a4a4a;border-radius:2px;font:inherit;font-size:11px;cursor:pointer;text-align:left}
 #visteras_shapelib_panel .vsp-trigger:hover{border-color:#5a5a5a}
@@ -84,6 +86,7 @@ export function mountShapePicker({ svgEditor } = {}) {
   const panel = document.createElement('div');
   panel.id = 'visteras_shapelib_panel';
   panel.className = 'item shape';
+  panel.hidden = true;
   panel.innerHTML = '<label for="visteras_shapelib_trigger">Shape:</label>'
     + '<button type="button" id="visteras_shapelib_trigger" class="vsp-trigger" aria-haspopup="listbox" aria-expanded="false" title="Shape library">'
     + '<span class="vsp-preview"></span><span class="vsp-name">Loading…</span><span class="vsp-caret"></span></button>';
@@ -186,6 +189,7 @@ export function mountShapePicker({ svgEditor } = {}) {
   const sync = () => {
     const on = sc.getMode() === 'shapelib';
     panel.classList.toggle('visible', on);
+    panel.hidden = !on;
     if (!on && menu.isConnected) close();
     if (on) writeDraw();
   };
