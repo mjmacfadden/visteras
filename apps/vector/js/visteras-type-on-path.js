@@ -635,9 +635,23 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   text.setAttribute('text-anchor', align === 'middle' ? 'middle' : (align === 'end' ? 'end' : 'start'));
   text.setAttribute('xml:space', 'preserve');
 
+  const alignPath = opts.alignPath || 'baseline';
+  const baselineMap = {
+    baseline: 'alphabetic',
+    ascender: 'hanging',
+    center: 'middle',
+    descender: 'ideographic',
+  };
+  const db = baselineMap[alignPath] || 'alphabetic';
+  text.setAttribute('dominant-baseline', db);
+  text.setAttribute('alignment-baseline', db);
+  text.setAttribute('data-visteras-align-path', alignPath);
+
   const textPath = document.createElementNS(SVG_NS, 'textPath');
   if (typeof sc.getNextId === 'function') textPath.setAttribute('id', sc.getNextId());
   setTextPathHref(textPath, hrefId);
+  textPath.setAttribute('dominant-baseline', db);
+  textPath.setAttribute('alignment-baseline', db);
 
   if (align === 'middle') {
     textPath.setAttribute('startOffset', '50%');
@@ -739,16 +753,25 @@ function syncOptionsPanel(svgEditor) {
   }
 
   const textEl = tp.parentElement;
-  const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
-  const dyRaw = tp.getAttribute('dy') || textEl?.getAttribute('dy') || '0';
-  const dy = parseFloat(String(dyRaw)) || 0;
   const alignPath = panel.querySelector('#top_align_path');
   if (alignPath) {
-    const ratio = dy / fontSize;
-    let mode = 'baseline';
-    if (Math.abs(ratio + 0.8) < 0.15) mode = 'ascender';
-    else if (Math.abs(ratio + 0.35) < 0.15) mode = 'center';
-    else if (Math.abs(ratio - 0.25) < 0.15) mode = 'descender';
+    let mode = textEl?.getAttribute('data-visteras-align-path');
+    if (!mode) {
+      const db = tp.getAttribute('dominant-baseline') || textEl?.getAttribute('dominant-baseline') || '';
+      if (db === 'hanging' || db === 'text-before-edge' || db === 'text-top') mode = 'ascender';
+      else if (db === 'middle' || db === 'central') mode = 'center';
+      else if (db === 'ideographic' || db === 'text-after-edge' || db === 'text-bottom') mode = 'descender';
+      else {
+        const dyRaw = tp.getAttribute('dy') || textEl?.getAttribute('dy') || '0';
+        const dy = parseFloat(String(dyRaw)) || 0;
+        const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
+        const ratio = dy / fontSize;
+        if (Math.abs(ratio + 0.8) < 0.15) mode = 'ascender';
+        else if (Math.abs(ratio + 0.35) < 0.15) mode = 'center';
+        else if (Math.abs(ratio - 0.25) < 0.15) mode = 'descender';
+        else mode = 'baseline';
+      }
+    }
     alignPath.value = mode;
   }
 
@@ -833,16 +856,49 @@ function wireOptionsPanel(svgEditor) {
     if (!tp) return;
     const textEl = tp.parentElement;
     const fontSize = parseFloat(textEl?.getAttribute('font-size') || '24') || 24;
-    const map = {
+
+    const baselineMap = {
+      baseline: 'alphabetic',
+      ascender: 'hanging',
+      center: 'middle',
+      descender: 'ideographic',
+    };
+
+    const dyMap = {
       baseline: 0,
       ascender: -0.8 * fontSize,
       center: -0.35 * fontSize,
       descender: 0.25 * fontSize,
     };
-    const dy = map[mode] ?? 0;
+
+    const db = baselineMap[mode] || 'alphabetic';
+    const dy = dyMap[mode] ?? 0;
+
+    tp.setAttribute('dominant-baseline', db);
+    tp.setAttribute('alignment-baseline', db);
+    if (tp.style) {
+      tp.style.dominantBaseline = db;
+      tp.style.alignmentBaseline = db;
+    }
+
+    if (textEl) {
+      textEl.setAttribute('dominant-baseline', db);
+      textEl.setAttribute('alignment-baseline', db);
+      if (textEl.style) {
+        textEl.style.dominantBaseline = db;
+        textEl.style.alignmentBaseline = db;
+      }
+      textEl.setAttribute('data-visteras-align-path', mode);
+      textEl.setAttribute('dy', String(dy));
+    }
     tp.setAttribute('dy', String(dy));
-    textEl?.setAttribute('data-visteras-align-path', mode);
-    svgEditor.svgCanvas?.call?.('changed', [textEl]);
+
+    const href = tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href');
+    if (href) {
+      setTextPathHref(tp, href.replace(/^#/, ''));
+    }
+
+    svgEditor.svgCanvas?.call?.('changed', [textEl || tp]);
   }
 
   alignPath?.addEventListener('change', (e) => {
