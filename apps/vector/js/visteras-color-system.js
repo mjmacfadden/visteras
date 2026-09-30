@@ -14,6 +14,7 @@
  */
 
 import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
+import { mountStrokeLink } from './visteras-stroke-link.js?v=stroke-link-1';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
@@ -255,6 +256,17 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
   if (!elems.length) return false;
 
   const next = (value == null || value === '') ? null : String(value);
+  // Inside/Outside bodies always carry stroke="none" (the helper paints the
+  // ring), so writing none to the attr would be a no-op and the helper would
+  // keep its colour. Clear the stored paint instead; the stroke-link rule
+  // (visteras-stroke-link.js) then drops the align rendering and sets weight 0.
+  if (attr === 'stroke' && (next == null || next === 'none')) {
+    for (const el of elems) {
+      if (readElementStrokeAlign(el) !== 'center' && el.getAttribute(STROKE_PAINT_ATTR) !== 'none') {
+        el.setAttribute(STROKE_PAINT_ATTR, 'none');
+      }
+    }
+  }
   const inPathEdit = sc.getCurrentMode?.() === 'pathedit' || !!sc.directSelection?.active;
   const canUseStock = !inPathEdit
     && typeof sc.changeSelectedAttribute === 'function'
@@ -2708,6 +2720,10 @@ export function mountVisterasColorSystem({ svgEditor } = {}) {
   setTimeout(() => {
     ctrl.syncFromCanvas();
   }, 600);
+
+  // Linked stroke colour ↔ weight (none ⇒ 0, 0→>0 ⇒ black), one place for
+  // every source.
+  try { mountStrokeLink(svgEditor, ctrl); } catch (err) { console.warn('[visteras-color-system] stroke link failed', err); }
 
   window.__visterasColorSystemMounted = true;
   console.info('[visteras-color-system] mounted');
