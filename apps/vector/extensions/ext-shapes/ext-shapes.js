@@ -51,11 +51,25 @@ var ext_shapes_default = {
 			callback() {
 				if ($id("tool_shapelib") === null) {
 					const extPath = svgEditor.configObj.curConfig.extPath;
-					const buttonTemplate = `
+					// Visteras: a plain tool button, last in the Rectangle/shape flyout. The
+					// shape picker lives in the options bar (js/visteras-shape-picker.js),
+					// which writes the chosen path to this button's data-draw.
+					const shapeFlyout = $id("tools_rect");
+					if (shapeFlyout) {
+						const b = document.createElement("se-button");
+						b.id = "tool_shapelib";
+						b.setAttribute("title", svgEditor.i18next.t(`${name}:buttons.0.title`));
+						b.setAttribute("src", "shapelib.svg?v=unify-icons-1");
+						b.dataset.lib = `${extPath}/ext-shapes/shapelib/`;
+						shapeFlyout.append(b);
+						document.dispatchEvent(new CustomEvent("visteras:shapelib-ready", { detail: b }));
+					} else {
+						const buttonTemplate = `
           <se-explorerbutton id="tool_shapelib" title="${svgEditor.i18next.t(`${name}:buttons.0.title`)}" lib="${extPath}/ext-shapes/shapelib/"
           src="shapelib.svg?v=unify-icons-1"></se-explorerbutton>
           `;
-					canv.insertChildAtIndex($id("tools_left"), buttonTemplate, 9);
+						canv.insertChildAtIndex($id("tools_left"), buttonTemplate, 9);
+					}
 					$click($id("tool_shapelib"), () => {
 						if (this.leftPanel.updateLeftPanel("tool_shapelib")) canv.setMode(modeId);
 					});
@@ -64,6 +78,7 @@ var ext_shapes_default = {
 			mouseDown(opts) {
 				if (canv.getMode() !== modeId) return;
 				const currentD = document.getElementById("tool_shapelib").dataset.draw;
+				if (!currentD) return;
 				startX = opts.start_x;
 				const x = startX;
 				startY = opts.start_y;
@@ -88,6 +103,7 @@ var ext_shapes_default = {
 			},
 			mouseMove(opts) {
 				if (canv.getMode() !== modeId) return;
+				if (!curShape) return;
 				const zoom = canv.getZoom();
 				const evt = opts.event;
 				const x = opts.mouse_x / zoom;
@@ -126,10 +142,12 @@ var ext_shapes_default = {
 				lastBBox = curShape.getBBox();
 			},
 			mouseUp(opts) {
-				if (canv.getMode() !== modeId) return;
+				if (canv.getMode() !== modeId || !curShape) return;
+				const shape = curShape;
+				curShape = null;
 				return {
 					keep: opts.event.clientX !== startClientPos.x && opts.event.clientY !== startClientPos.y,
-					element: curShape,
+					element: shape,
 					started: false
 				};
 			}

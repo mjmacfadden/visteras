@@ -172,7 +172,7 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=unify-icons-1';
+    import Editor from './Editor.js?v=tool-flyouts-1';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=unify-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
@@ -187,6 +187,7 @@
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=smoke-stroke-align-5';
+    import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-1';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -2025,6 +2026,8 @@
     // Shared Visteras font picker (same DEFAULT_FONTS / loader as Studio)
     mountVisterasFontPicker({ svgEditor });
     mountVisterasTypeOnPath({ svgEditor });
+    // Shape library picker in the options bar (shape flyout's last tool)
+    mountShapePicker({ svgEditor });
 
     // Reference raster images (place / move / scale — no pixel editing)
     mountVisterasReferenceImages({ svgEditor });
