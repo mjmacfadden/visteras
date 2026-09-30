@@ -1,24 +1,24 @@
 /**
  * Visteras Vector — Offset Path  (Object → Offset Path…, ⌥⌘O)
  *
- * Creates a parallel offset copy of each selected closed path, placing the
- * result on top of the original in the same layer.  Positive offset expands;
- * negative shrinks.
+ * Creates a parallel offset copy of each selected shape (closed or open,
+ * groups expanded) in the same layer. Positive offset expands; negative
+ * shrinks. Also Object → Outline Stroke.
  *
  * Implementation detail
  * ─────────────────────
- * Paper.js does not expose a direct "stroke-expand" API the way Inkscape does,
- * but we can fake it reliably:
+ * Paper.js booleans only see fill geometry: a clone with a big strokeWidth
+ * unites to the original outline unchanged (the original bug: an identical
+ * copy, and an empty Outline Stroke). visteras-stroke-envelope.js builds the
+ * stroke region as real polygons (per-edge quads + SVG joins/caps):
  *
- *   1. Import the source path into a Paper.js scope.
- *   2. Clone it and set stroke-width = |offset| × 2 on the clone.
- *   3. Unite the clone's stroke outline with the original:
- *        positive offset → unite(original, stroke-envelope)
- *        negative offset → subtract stroke-envelope from original
- *   4. Export the result back as an SVG <path>.
+ *   offset +d  = original ∪ envelope(d)   (placed behind the original)
+ *   offset −d  = original − envelope(d)   (placed in front)
+ *   outline(w) = envelope(w/2)  (∩ / − original for Inside / Outside strokes)
  *
- * For the join-type we set Paper.js's strokeJoin on the stroke clone before
- * expanding, which naturally propagates to the outline geometry.
+ * Groups are expanded to their shapes; Inside/Outside wraps map to the body
+ * and the offset copy keeps its stroke alignment. One undo step each, with
+ * the selection restored on undo/redo.
  *
  * Keyboard: ⌥⌘O (wired up in setupMenuBar via action_offset_path)
  *
@@ -27,6 +27,9 @@
  *   mountOffsetPath(editor)          — registers menu item + dialog
  *   computeOffsetPath(scope, el, opts) — pure geometry (testable without DOM)
  */
+
+import { offsetItem, outlineItem } from './visteras-stroke-envelope.js?v=envelope-1';
+import { resolveElementPaint } from './visteras-paint-resolver.js?v=paint-resolver-2';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -217,7 +220,7 @@ function hideDialog() {
 
 function readDialogValues() {
   return {
-    offset: parseFloat(document.getElementById(`${DIALOG_ID}-offset`)?.value) || 10,
+    offset: (() => { const v = parseFloat(document.getElementById(`${DIALOG_ID}-offset`)?.value); return Number.isFinite(v) ? v : 10; })(),
     joins: document.getElementById(`${DIALOG_ID}-joins`)?.value || 'round',
     miterLimit: parseFloat(document.getElementById(`${DIALOG_ID}-miter`)?.value) || 4,
     copyOriginal: document.getElementById(`${DIALOG_ID}-copy`)?.checked ?? true,
@@ -225,265 +228,305 @@ function readDialogValues() {
 }
 
 // ─── Core geometry ───────────────────────────────────────────────────────────
+// Root cause of "Offset Path does nothing": the old code set strokeWidth on a
+// Paper clone and united it with the original, but Paper's booleans ignore
+// strokes, so the result was the original outline (an identical copy on top).
+// Outline Stroke's unite(filled).subtract(filled) was empty for the same
+// reason. The stroke region is now built as real geometry
+// (visteras-stroke-envelope.js).
+
+const LEAF_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line']);
+const STROKE_ALIGN_ATTR = 'data-visteras-stroke-align';
+const STROKE_WEIGHT_ATTR = 'data-visteras-stroke-weight';
+const STROKE_PAINT_ATTR = 'data-visteras-stroke-paint';
+const HELPER_ATTR = 'data-visteras-stroke-align-helper';
+const WRAP_ATTR = 'data-visteras-sa-wrap';
+const APPEARANCE_ATTRS = [
+  'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-opacity', 'stroke-width',
+  'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray',
+  'stroke-dashoffset', 'opacity', 'class', 'mix-blend-mode',
+];
+
+const csApi = () => (typeof window !== 'undefined' ? window.__visterasColorSystem : null) || null;
+const isWrap = (el) => !!el?.getAttribute?.(WRAP_ATTR);
+const isHelper = (el) => !!el?.getAttribute?.(HELPER_ATTR);
+
+/** Helper / wrap → the body that owns the appearance. */
+function bodyOf(el) {
+  if (!el) return null;
+  const a = csApi();
+  if ((isWrap(el) || isHelper(el)) && a?.resolveStrokeAlignBody) return a.resolveStrokeAlignBody(el) || null;
+  if (isWrap(el)) return [...el.children].find((c) => c.getAttribute('data-visteras-sa-body')) || null;
+  return el;
+}
+
+/** Top-level node that represents a body in the document (its wrap if any). */
+function anchorOf(body) {
+  return isWrap(body?.parentNode) ? body.parentNode : body;
+}
+
+/** Selected objects → painted leaf shapes (groups expanded, wraps → bodies). */
+export function collectLeaves(selected) {
+  const out = [];
+  const seen = new Set();
+  const push = (el) => { const b = bodyOf(el); if (b && !seen.has(b) && LEAF_TAGS.has(b.nodeName) && !isHelper(b)) { seen.add(b); out.push(b); } };
+  for (const el of selected || []) {
+    if (!el) continue;
+    if (el.nodeName === 'g' && !isWrap(el)) {
+      for (const c of el.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line')) if (!isHelper(c)) push(c);
+    } else push(el);
+  }
+  return out;
+}
+
+/** Import an element as one PathItem (Shapes expanded, groups united). Transform baked. */
+export function pathItemFromElement(scope, el) {
+  let item;
+  try { item = scope.project.importSVG(el, { expandShapes: true, insert: false }); } catch { return null; }
+  if (!item) return null;
+  const collect = (it) => {
+    if (!it) return [];
+    if (it instanceof scope.PathItem) return [it];
+    if (it instanceof scope.Shape) return [it.toPath(false)];
+    if (it.children) return [...it.children].flatMap(collect);
+    return [];
+  };
+  const parts = collect(item);
+  if (!parts.length) return null;
+  if (parts.length === 1) return parts[0];
+  return parts.slice(1).reduce((acc, p) => acc.unite(p, { insert: false }), parts[0]);
+}
+
+function exportD(item) {
+  // pathData needs no DOM (exportSVG does) and covers Path + CompoundPath.
+  const d = item?.pathData || '';
+  const fillRule = item?.fillRule === 'evenodd' ? 'evenodd' : 'nonzero';
+  return { d, fillRule };
+}
+
 /**
- * Compute offset path geometry for a single SVG path element.
- *
- * Strategy:
- *   • Import the element into a Paper.js scope.
- *   • For POSITIVE offset: unite(original, stroked-clone) where stroke-width = offset*2.
- *   • For NEGATIVE offset: subtract(original, stroked-clone).
- *   • Export the result path data string.
- *
- * @param {object} scope         - A fresh paper.PaperScope() with canvas set up.
- * @param {SVGElement} sourceEl  - The source SVG element.
- * @param {{ offset: number, joins: string, miterLimit: number }} opts
+ * Offset geometry for one element.
  * @returns {{ d: string, fillRule: string|null } | null}
  */
 export function computeOffsetPath(scope, sourceEl, opts) {
-  const { offset, joins, miterLimit } = opts;
-  if (Math.abs(offset) < 0.001) return null;
+  const { offset, joins = 'round', miterLimit = 4 } = opts || {};
+  if (!Number.isFinite(offset) || Math.abs(offset) < 0.001) return null;
+  const item = pathItemFromElement(scope, sourceEl);
+  if (!item) return null;
+  const res = offsetItem(scope, item, offset, { join: joins, miterLimit });
+  if (!res) return null;
+  const { d, fillRule } = exportD(res);
+  return d.trim() ? { d, fillRule: fillRule || 'nonzero' } : null;
+}
 
-  let item;
-  try {
-    item = scope.project.importSVG(sourceEl);
-  } catch (_) {
-    return null;
+// ─── Shared DOM helpers ──────────────────────────────────────────────────────
+function copyAppearance(src, dst) {
+  for (const n of APPEARANCE_ATTRS) {
+    const v = src.getAttribute(n);
+    if (v != null) dst.setAttribute(n, v);
   }
+  const style = (src.getAttribute('style') || '').split(';').map((s) => s.trim())
+    .filter((s) => s && !/^pointer-events\s*:/i.test(s)).join(';');
+  if (style) dst.setAttribute('style', style);
+}
 
-  // Flatten groups to a single PathItem
-  let pathItem = null;
-  if (item instanceof scope.PathItem) {
-    pathItem = item;
-  } else if (item instanceof scope.Shape) {
-    pathItem = item.toPath(true);
-  } else if (item instanceof scope.Group) {
-    // Unite all children
-    const children = [...item.children];
-    for (const child of children) {
-      const p = child instanceof scope.Shape ? child.toPath(true) :
-                child instanceof scope.PathItem ? child : null;
-      if (p) pathItem = pathItem ? pathItem.unite(p) : p;
-    }
-  }
+function wrapTransform(body) {
+  const w = isWrap(body?.parentNode) ? body.parentNode : null;
+  return w?.getAttribute('transform') || null;
+}
 
-  if (!pathItem) return null;
+/** Select `els` after the current task (undo/redo also call this). */
+function selectLater(sc, els) {
+  setTimeout(() => {
+    const live = els.filter((e) => e?.isConnected);
+    if (!live.length) return;
+    try { sc.clearSelection(); sc.addToSelection(live, true); } catch { /* ignore */ }
+    try { window.__updatePropertiesVisibility?.(); } catch { /* ignore */ }
+  }, 0);
+}
 
-  // Create the stroke-expanded envelope
-  const strokeClone = pathItem.clone();
-  strokeClone.strokeWidth = Math.abs(offset) * 2;
-  strokeClone.strokeColor = new scope.Color(0, 0, 0);
-  strokeClone.fillColor = new scope.Color(0, 0, 0);
-  strokeClone.strokeJoin = joins;
-  if (joins === 'miter') strokeClone.miterLimit = miterLimit;
+/** One undo step that also restores the selection on undo/redo. */
+function finishBatch(sc, batch, before, after) {
+  const origApply = batch.apply.bind(batch);
+  const origUnapply = batch.unapply.bind(batch);
+  batch.apply = (h) => { origApply(h); selectLater(sc, after); };
+  batch.unapply = (h) => { origUnapply(h); selectLater(sc, before); };
+  sc.undoMgr.addCommandToHistory(batch);
+  try { sc.clearSelection(); sc.addToSelection(after, true); } catch { /* ignore */ }
+  try { sc.call?.('changed', after); } catch { /* ignore */ }
+  try { window.__updatePropertiesVisibility?.(); } catch { /* ignore */ }
+}
 
-  let result;
-  if (offset > 0) {
-    // Expand: union of original + stroke envelope
-    result = pathItem.unite(strokeClone);
-  } else {
-    // Shrink: subtract stroke envelope from original
-    result = pathItem.subtract(strokeClone);
-  }
-
-  if (!result) return null;
-
-  const exported = result.exportSVG({ asString: false });
-  let d = '';
-  let fillRule = null;
-
-  if (exported.tagName?.toLowerCase() === 'path') {
-    d = exported.getAttribute('d') || '';
-    fillRule = exported.getAttribute('fill-rule');
-  } else {
-    // Group of paths — join their d attributes
-    const paths = exported.querySelectorAll('path');
-    const parts = [];
-    paths.forEach(p => {
-      const pd = p.getAttribute('d');
-      if (pd) parts.push(pd);
-      if (!fillRule) fillRule = p.getAttribute('fill-rule');
-    });
-    d = parts.join(' ');
-  }
-
-  return d.trim() ? { d, fillRule } : null;
+function newScope() {
+  const scope = new window.paper.PaperScope();
+  scope.setup(document.createElement('canvas'));
+  return scope;
 }
 
 // ─── Apply to selection ───────────────────────────────────────────────────────
 function executeOffsetPath(editor, opts) {
   const sc = editor.svgCanvas;
-  if (!sc) return;
-
+  if (!sc) return false;
   const selElems = (sc.getSelectedElements ? sc.getSelectedElements() : []).filter(Boolean);
-  if (!selElems.length) {
-    alert('Please select one or more paths to offset.');
-    return;
-  }
-
-  if (!window.paper) {
-    alert('Offset Path engine (Paper.js) is loading or unavailable.');
-    return;
-  }
+  const leaves = collectLeaves(selElems);
+  if (!leaves.length) { alert('Please select one or more paths or shapes to offset.'); return false; }
+  if (!window.paper) { alert('Offset Path engine (Paper.js) is loading or unavailable.'); return false; }
 
   const { BatchCommand, InsertElementCommand, RemoveElementCommand } = sc.history;
   const batchCmd = new BatchCommand('Offset Path');
-  const newElements = [];
-
-  const scope = new window.paper.PaperScope();
-  const canvas = document.createElement('canvas');
-  scope.setup(canvas);
-
+  const created = [];
+  const scope = newScope();
   try {
-    for (const el of selElems) {
+    for (const el of leaves) {
       const geom = computeOffsetPath(scope, el, opts);
       if (!geom) continue;
-
+      const anchor = anchorOf(el);
       const newPath = document.createElementNS(SVG_NS, 'path');
       newPath.setAttribute('id', sc.getNextId());
+      copyAppearance(el, newPath);
       newPath.setAttribute('d', geom.d);
-      if (geom.fillRule) newPath.setAttribute('fill-rule', geom.fillRule);
-
-      // Copy style from original
-      const styleAttrs = [
-        'fill', 'fill-opacity', 'stroke', 'stroke-opacity',
-        'stroke-width', 'stroke-linecap', 'stroke-linejoin',
-        'stroke-dasharray', 'stroke-dashoffset', 'opacity',
-      ];
-      for (const attr of styleAttrs) {
-        const val = el.getAttribute(attr);
-        if (val !== null) newPath.setAttribute(attr, val);
+      newPath.setAttribute('fill-rule', geom.fillRule || 'nonzero');
+      const wt = wrapTransform(el);
+      if (wt) newPath.setAttribute('transform', wt);
+      // Expanded copies go behind the original (both stay visible); shrunk
+      // copies go in front.
+      anchor.parentNode.insertBefore(newPath, opts.offset > 0 ? anchor : anchor.nextSibling);
+      // Keep Inside/Outside stroke alignment on the copy.
+      const align = String(el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+      if (align !== 'center' && csApi()?.applyStrokeAlignToElement) {
+        for (const n of [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR]) {
+          const v = el.getAttribute(n); if (v != null) newPath.setAttribute(n, v);
+        }
+        const w = Number(el.getAttribute(STROKE_WEIGHT_ATTR)) || Number(el.getAttribute('stroke-width')) || 1;
+        // The ring's clip/mask lives in <defs>: record those inserts too so
+        // undo leaves nothing behind.
+        const defsBefore = new Set(document.querySelectorAll('#svgcontent defs > *'));
+        try { csApi().applyStrokeAlignToElement(newPath, sc, { align, userWidth: w }); } catch { /* ignore */ }
+        for (const d of document.querySelectorAll('#svgcontent defs > *')) {
+          if (!defsBefore.has(d)) batchCmd.addSubCommand(new InsertElementCommand(d));
+        }
       }
-
-      // Place the new path after the original
-      el.parentNode.insertBefore(newPath, el.nextSibling);
-      batchCmd.addSubCommand(new InsertElementCommand(newPath));
-      newElements.push(newPath);
-
+      batchCmd.addSubCommand(new InsertElementCommand(anchorOf(newPath)));
+      created.push(newPath);
       if (!opts.copyOriginal) {
-        // Remove the original
-        batchCmd.addSubCommand(new RemoveElementCommand(el, el.nextSibling, el.parentNode));
-        el.remove();
+        const next = anchor.nextSibling; const parent = anchor.parentNode;
+        anchor.remove();
+        batchCmd.addSubCommand(new RemoveElementCommand(anchor, next, parent));
       }
     }
-
-    if (!newElements.length) {
-      alert('Could not compute offset for the selected shape(s). Try a smaller offset value.');
-      return;
+    if (!created.length) {
+      alert('Could not compute an offset for the selected shape(s). Try a smaller negative offset (open paths can only be expanded).');
+      return false;
     }
-
-    sc.undoMgr.addCommandToHistory(batchCmd);
-    sc.clearSelection();
-    sc.addToSelection(newElements, true);
-    sc.call('changed', newElements);
-    if (window.__updatePropertiesVisibility) window.__updatePropertiesVisibility();
+    finishBatch(sc, batchCmd, opts.copyOriginal ? selElems : leaves, created);
+    return true;
   } catch (err) {
     console.error('Offset Path error:', err);
     alert('Offset Path error: ' + (err.message || err));
+    return false;
   } finally {
-    scope.project.clear();
+    scope.project?.clear();
+    scope.remove?.();
   }
 }
 
-// ─── Outline Stroke helper ────────────────────────────────────────────────────
-/**
- * Convert a stroked path to a filled shape (Object → Outline Stroke).
- * Uses Paper.js to expand the stroke into a filled region.
- */
+// ─── Outline Stroke ──────────────────────────────────────────────────────────
+/** Effective stroke of an element: paint, width, joins, caps, alignment. */
+export function readStrokeSpec(el, getCS = (e) => getComputedStyle(e)) {
+  const cs = getCS(el);
+  const get = (p) => (cs?.getPropertyValue ? cs.getPropertyValue(p) : cs?.[p]) || '';
+  const align = String(el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  const aligned = align === 'inside' || align === 'outside';
+  const paint = resolveElementPaint(el, 'stroke', { getComputedStyle: getCS });
+  if (!paint || paint.none) return null;
+  let color = paint.hex;
+  if (!color) color = aligned ? el.getAttribute(STROKE_PAINT_ATTR) : (get('stroke') || el.getAttribute('stroke'));
+  if (!color || color === 'none') return null;
+  const cw = parseFloat(get('stroke-width'));
+  const aw = parseFloat(el.getAttribute('stroke-width'));
+  const width = aligned
+    ? (Number(el.getAttribute(STROKE_WEIGHT_ATTR)) || aw || 0)
+    : (Number.isFinite(cw) ? cw : (Number.isFinite(aw) ? aw : 1));
+  if (!(width > 0)) return null;
+  const opacity = parseFloat(get('stroke-opacity'));
+  const joinRaw = String(get('stroke-linejoin') || el.getAttribute('stroke-linejoin') || 'miter').toLowerCase();
+  return {
+    color: String(color).replace(/^url\((['"]?)(.*)\1\)$/, 'url($2)'),
+    width,
+    align: aligned ? align : 'center',
+    join: joinRaw === 'round' ? 'round' : (joinRaw === 'bevel' ? 'bevel' : 'miter'),
+    cap: (() => { const c = String(get('stroke-linecap') || el.getAttribute('stroke-linecap') || 'butt').toLowerCase(); return c === 'round' || c === 'square' ? c : 'butt'; })(),
+    miterLimit: parseFloat(get('stroke-miterlimit') || el.getAttribute('stroke-miterlimit')) || 4,
+    opacity: Number.isFinite(opacity) ? opacity : 1,
+    dashed: !!(get('stroke-dasharray') && get('stroke-dasharray') !== 'none'),
+  };
+}
+
 function executeOutlineStroke(editor) {
   const sc = editor.svgCanvas;
-  if (!sc) return;
-
+  if (!sc) return false;
   const selElems = (sc.getSelectedElements ? sc.getSelectedElements() : []).filter(Boolean);
-  if (!selElems.length) {
-    alert('Please select one or more stroked paths to outline.');
-    return;
-  }
-
-  if (!window.paper) {
-    alert('Outline Stroke requires Paper.js.');
-    return;
-  }
+  const leaves = collectLeaves(selElems);
+  if (!leaves.length) { alert('Please select one or more stroked paths to outline.'); return false; }
+  if (!window.paper) { alert('Outline Stroke requires Paper.js.'); return false; }
 
   const { BatchCommand, InsertElementCommand, RemoveElementCommand } = sc.history;
   const batchCmd = new BatchCommand('Outline Stroke');
-  const newElements = [];
-
-  const scope = new window.paper.PaperScope();
-  const canvas = document.createElement('canvas');
-  scope.setup(canvas);
-
+  const created = [];
+  const scope = newScope();
   try {
-    for (const el of selElems) {
-      const sw = parseFloat(el.getAttribute('stroke-width') || '0');
-      if (!sw || sw <= 0) continue; // No visible stroke to outline
-
-      let item;
-      try {
-        item = scope.project.importSVG(el);
-      } catch (_) { continue; }
-
-      let pathItem = item instanceof scope.PathItem ? item :
-                     item instanceof scope.Shape ? item.toPath(true) : null;
-      if (!pathItem) continue;
-
-      // Create the stroked outline as a new path
-      pathItem.strokeWidth = sw;
-      pathItem.strokeColor = new scope.Color(0);
-
-      // Get the stroke outline only (the "expand" of the stroke)
-      const strokePath = pathItem.clone();
-      const filled = pathItem.clone();
-      filled.strokeWidth = 0;
-      filled.strokeColor = null;
-
-      const outline = strokePath.unite(filled).subtract(filled);
-
-      const exported = outline.exportSVG({ asString: false });
-      let d = '';
-      if (exported.tagName?.toLowerCase() === 'path') {
-        d = exported.getAttribute('d') || '';
-      } else {
-        const paths = exported.querySelectorAll('path');
-        const parts = [];
-        paths.forEach(p => { const pd = p.getAttribute('d'); if (pd) parts.push(pd); });
-        d = parts.join(' ');
-      }
-
+    for (const el of leaves) {
+      const spec = readStrokeSpec(el);
+      if (!spec) continue;
+      const item = pathItemFromElement(scope, el);
+      if (!item) continue;
+      const outline = outlineItem(scope, item, spec.width, spec);
+      if (!outline) continue;
+      const { d } = exportD(outline);
       if (!d.trim()) continue;
 
-      const newPath = document.createElementNS(SVG_NS, 'path');
-      newPath.setAttribute('id', sc.getNextId());
-      newPath.setAttribute('d', d);
-      // Fill the outline with the original stroke color
-      const strokeColor = el.getAttribute('stroke') || '#000';
-      newPath.setAttribute('fill', strokeColor);
-      newPath.setAttribute('stroke', 'none');
+      const anchor = anchorOf(el);
+      const cs = getComputedStyle(el);
+      const fillPaint = resolveElementPaint(el, 'fill', { getComputedStyle: (e) => getComputedStyle(e) });
+      const hasFill = fillPaint && !fillPaint.none;
+      const mk = (attrs) => { const p = document.createElementNS(SVG_NS, 'path'); p.setAttribute('id', sc.getNextId()); for (const [k, v] of Object.entries(attrs)) if (v != null) p.setAttribute(k, v); return p; };
+      const strokePath = mk({ d, fill: spec.color, 'fill-rule': 'nonzero', stroke: 'none', 'fill-opacity': spec.opacity < 1 ? String(spec.opacity) : null });
+      let top = strokePath;
+      if (hasFill) {
+        // Illustrator: a group of the fill shape and the outlined stroke.
+        const src = exportD(item);
+        const fillOpacity = parseFloat(cs.getPropertyValue('fill-opacity'));
+        const fillVal = fillPaint.hex || el.getAttribute('fill') || cs.getPropertyValue('fill');
+        const fillPath = mk({ d: src.d, fill: fillVal, 'fill-rule': cs.getPropertyValue('fill-rule') || el.getAttribute('fill-rule') || 'nonzero', stroke: 'none', 'fill-opacity': Number.isFinite(fillOpacity) && fillOpacity < 1 ? String(fillOpacity) : null });
+        top = document.createElementNS(SVG_NS, 'g');
+        top.setAttribute('id', sc.getNextId());
+        top.append(fillPath, strokePath);
+      }
+      const op = parseFloat(cs.getPropertyValue('opacity'));
+      if (Number.isFinite(op) && op < 1) top.setAttribute('opacity', String(op));
+      const wt = wrapTransform(el);
+      if (wt) top.setAttribute('transform', wt);
 
-      el.parentNode.insertBefore(newPath, el.nextSibling);
-      batchCmd.addSubCommand(new InsertElementCommand(newPath));
-
-      // Remove original
-      batchCmd.addSubCommand(new RemoveElementCommand(el, el.nextSibling, el.parentNode));
-      el.remove();
-
-      newElements.push(newPath);
+      anchor.parentNode.insertBefore(top, anchor.nextSibling);
+      batchCmd.addSubCommand(new InsertElementCommand(top));
+      const next = anchor.nextSibling; const parent = anchor.parentNode;
+      anchor.remove();
+      batchCmd.addSubCommand(new RemoveElementCommand(anchor, next, parent));
+      created.push(top);
     }
-
-    if (!newElements.length) {
+    if (!created.length) {
       alert('No stroked paths found. Make sure selected objects have a visible stroke.');
-      return;
+      return false;
     }
-
-    sc.undoMgr.addCommandToHistory(batchCmd);
-    sc.clearSelection();
-    sc.addToSelection(newElements, true);
-    sc.call('changed', newElements);
-    if (window.__updatePropertiesVisibility) window.__updatePropertiesVisibility();
+    finishBatch(sc, batchCmd, selElems, created);
+    return true;
   } catch (err) {
     console.error('Outline Stroke error:', err);
     alert('Outline Stroke error: ' + (err.message || err));
+    return false;
   } finally {
-    scope.project.clear();
+    scope.project?.clear();
+    scope.remove?.();
   }
 }
 
