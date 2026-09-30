@@ -34,6 +34,13 @@ import { normalizeEditablePath } from './visteras-path-geometry.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 export const MODE = 'shape_builder';
 const OVERLAY_ID = 'visteras-shape-builder-overlay';
+// Cursor: the Selection tool's arrow (same geometry and hotspot as the
+// #workarea cursor in css/visteras-theme.css) with a '+' badge (merge) that
+// switches live to '−' while Alt/Option is held (delete).
+export const CURSOR_HOTSPOT = [4, 4];
+export const CURSOR_PLUS = './images/cursors/shape_builder_plus_cursor.svg';
+export const CURSOR_MINUS = './images/cursors/shape_builder_minus_cursor.svg';
+export const ALT_CLASS = 'visteras-shape-builder-alt';
 const MIN_AREA = 0.25;
 
 const HOVER_FILL = 'rgba(72,145,255,0.30)';
@@ -349,6 +356,12 @@ export function mountShapeBuilderTool(editor) {
   let paint = null; // { kind, indices:Set, points:[], last }
   let lastClient = null;
 
+  // Live '+' / '−' cursor badge. Toggled on Alt keydown/keyup, on every
+  // mousemove from e.altKey, and reset on blur / leaving the tool.
+  function setAltCursor(on) {
+    document.body?.classList.toggle(ALT_CLASS, !!on && sc.getMode() === MODE);
+  }
+
   const content = () => sc.getSvgContent?.() || document.getElementById('svgcontent');
   const asMatrix = (m) => new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f]);
   const docMatrix = (el) => asMatrix(content().getScreenCTM()).inverse().multiply(asMatrix(el.getScreenCTM()));
@@ -622,7 +635,7 @@ export function mountShapeBuilderTool(editor) {
   function inCanvas(e) {
     const t = e.target;
     const canvasEl = document.getElementById('svgcanvas');
-    if (!canvasEl || !t || !canvasEl.contains(t)) return false;
+    if (!canvasEl || !(t instanceof Node) || !canvasEl.contains(t)) return false;
     if (t.closest?.('#sidepanels, #tools_left, #tools_top, #rulers, .ruler, #properties_panel')) return false;
     return true;
   }
@@ -631,6 +644,7 @@ export function mountShapeBuilderTool(editor) {
     if (sc.getMode() !== MODE) return;
     lastClient = { x: e.clientX, y: e.clientY };
     altDown = e.altKey;
+    setAltCursor(e.altKey);
     if (!paint && !inCanvas(e)) {
       if (hoverIdx !== -1) { hoverIdx = -1; render(); }
       return;
@@ -698,6 +712,7 @@ export function mountShapeBuilderTool(editor) {
 
   const onKey = (e) => {
     if (sc.getMode() !== MODE) return;
+    if (e.key === 'Alt') setAltCursor(e.type === 'keydown');
     if (e.key === 'Alt' && altDown !== (e.type === 'keydown')) {
       altDown = e.type === 'keydown';
       render();
@@ -709,6 +724,10 @@ export function mountShapeBuilderTool(editor) {
   };
   window.addEventListener('keydown', onKey, true);
   window.addEventListener('keyup', onKey, true);
+  window.addEventListener('blur', () => {
+    setAltCursor(false);
+    if (altDown) { altDown = false; render(); }
+  });
 
   // Scroll changes: re-sync the overlay transform (zoom re-syncs on the next
   // mousemove; sc.bind would clobber another module's single bind slot).
@@ -724,6 +743,8 @@ export function mountShapeBuilderTool(editor) {
       render();
     } else {
       btn?.removeAttribute('pressed');
+      setAltCursor(false);
+      altDown = false;
       paint = null;
       invalidate();
       clearOverlay();
@@ -763,7 +784,11 @@ function injectCursorStyle() {
   style.textContent = `
     body[data-mode="${MODE}"] #svgcanvas,
     body[data-mode="${MODE}"] #svgcanvas * {
-      cursor: crosshair !important;
+      cursor: url("${CURSOR_PLUS}") ${CURSOR_HOTSPOT.join(' ')}, auto !important;
+    }
+    body.${ALT_CLASS}[data-mode="${MODE}"] #svgcanvas,
+    body.${ALT_CLASS}[data-mode="${MODE}"] #svgcanvas * {
+      cursor: url("${CURSOR_MINUS}") ${CURSOR_HOTSPOT.join(' ')}, auto !important;
     }
   `;
   document.head.appendChild(style);

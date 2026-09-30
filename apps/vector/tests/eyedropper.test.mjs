@@ -268,3 +268,85 @@ test('styleFromCurShape — current defaults for Option-click with no selection'
   assert.equal(s['stroke-linecap'], null);
   assert.equal(s['stroke-linejoin'], 'round');
 });
+
+// ─── Image sample: fill-only paint (Illustrator) ─────────────────────────────
+test('pixelSampleStyle — image click = fill colour + stroke none; Shift = active well only', async () => {
+  const { pixelSampleStyle } = await import('../js/visteras-eyedropper.js');
+  assert.deepEqual(pixelSampleStyle('#12ab34', { fromImage: true, well: 'stroke' }), { fill: '#12ab34', stroke: 'none' });
+  assert.deepEqual(pixelSampleStyle('#12ab34', { fromImage: true }), { fill: '#12ab34', stroke: 'none' });
+  assert.deepEqual(pixelSampleStyle('#12ab34', { well: 'stroke' }), { stroke: '#12ab34' });
+  assert.deepEqual(pixelSampleStyle('#12ab34', { well: 'fill' }), { fill: '#12ab34' });
+  assert.equal(pixelSampleStyle(null, { fromImage: true }), null); // transparent: no-op
+});
+
+test('applyStyleToElements — image sample onto an Outside-stroked body drops all stroke-align state in one step', async () => {
+  const { hasStrokeAlignState } = await import('../js/visteras-eyedropper.js');
+  const wrap = makeSvgElement({ 'data-visteras-sa-wrap': '1' });
+  wrap.nodeName = 'g';
+  const el = makeSvgElement({
+    id: 'r1', fill: '#fff', stroke: 'none', 'stroke-width': '6',
+    'data-visteras-stroke-align': 'outside', 'data-visteras-stroke-weight': '6',
+    'data-visteras-stroke-paint': '#ff0000', 'data-visteras-sa-body': '1',
+  });
+  el.parentNode = wrap;
+  wrap.children = [el];
+  assert.equal(hasStrokeAlignState(el), true);
+  const calls = [];
+  const api = {
+    readElementStrokeAlign: (e) => e.getAttribute('data-visteras-stroke-align') || 'center',
+    readElementStrokeWeight: (e) => Number(e.getAttribute('data-visteras-stroke-weight')) || null,
+    applyStrokeAlignToElement: (e, sc, opts) => {
+      calls.push(opts.align);
+      if (opts.align === 'center') {
+        // colour system: remove helper/defs, restore paint, unwrap
+        e.setAttribute('stroke', e.getAttribute('data-visteras-stroke-paint'));
+        e.removeAttribute('data-visteras-stroke-paint');
+        e.removeAttribute('data-visteras-sa-body');
+        e.setAttribute('data-visteras-stroke-align', 'center');
+        e.parentNode = null;
+      }
+    },
+  };
+  const history = makeHistory();
+  applyStyleToElements([el], { fill: '#12ab34', stroke: 'none' }, history, { api, sc: {}, ignoreOptions: true, dropStrokeAlign: true, name: 'Eyedropper Sample' });
+  assert.deepEqual(calls, ['center']);
+  assert.equal(el._attrs.fill, '#12ab34');
+  assert.equal(el._attrs.stroke, 'none');
+  for (const n of ['data-visteras-stroke-align', 'data-visteras-stroke-weight', 'data-visteras-stroke-paint', 'data-visteras-sa-body', 'data-visteras-sa-clip', 'data-visteras-sa-mask']) {
+    assert.equal(n in el._attrs, false, n);
+  }
+  assert.equal(hasStrokeAlignState(el), false);
+  assert.equal(history.undoMgr.cmds.length, 1);
+  assert.equal(history.undoMgr.cmds[0].name, 'Eyedropper Sample');
+  // Undo record holds the full Outside state so it can be restored.
+  const rec = history.applied[0].changes;
+  assert.equal(rec['data-visteras-stroke-align'], 'outside');
+  assert.equal(rec['data-visteras-stroke-paint'], '#ff0000');
+  assert.equal(rec['data-visteras-stroke-weight'], '6');
+  assert.equal(rec['data-visteras-sa-body'], '1');
+  assert.equal(rec.stroke, 'none');
+  assert.equal(rec.fill, '#fff');
+});
+
+test('applyStyleToElements — without dropStrokeAlign (Shift sample) the Outside align is kept', () => {
+  const el = makeSvgElement({ stroke: 'none', 'stroke-width': '6', 'data-visteras-stroke-align': 'outside', 'data-visteras-stroke-weight': '6', 'data-visteras-stroke-paint': '#ff0000' });
+  const calls = [];
+  const api = {
+    readElementStrokeAlign: (e) => e.getAttribute('data-visteras-stroke-align') || 'center',
+    applyStrokeAlignToElement: (e, sc, opts) => calls.push(opts.align),
+  };
+  applyStyleToElements([el], { stroke: '#00ff00' }, makeHistory(), { api, sc: {}, ignoreOptions: true });
+  assert.deepEqual(calls, ['outside']);
+  assert.equal(el._attrs['data-visteras-stroke-paint'], '#00ff00');
+  assert.equal(el._attrs['data-visteras-stroke-align'], 'outside');
+});
+
+test('applyStyleToElements — image sample onto a plain shape sets fill + stroke none', () => {
+  const el = makeSvgElement({ fill: '#fff', stroke: '#000', 'stroke-width': '2' });
+  const history = makeHistory();
+  applyStyleToElements([el], { fill: '#abcdef', stroke: 'none' }, history, { ignoreOptions: true, dropStrokeAlign: true });
+  assert.equal(el._attrs.fill, '#abcdef');
+  assert.equal(el._attrs.stroke, 'none');
+  assert.equal(el._attrs['stroke-width'], '2');
+  assert.deepEqual(history.applied[0].changes, { fill: '#fff', stroke: '#000' });
+});

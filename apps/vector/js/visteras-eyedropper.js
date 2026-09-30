@@ -18,11 +18,17 @@
  * default values reset the corresponding property on the target.
  *
  * Raster sampling (visteras-eyedropper-raster.js):
- * • Click a placed <image> → point-sample the pixel under the cursor.
+ * • Click a placed <image> → point-sample the pixel under the cursor. As in
+ *   Illustrator the image counts as fill-only paint: fill = pixel colour AND
+ *   stroke = none on the selection (one undo step; Inside/Outside stroke-align
+ *   helpers are removed and come back on undo) or, with nothing selected, as
+ *   the defaults (fill = colour, stroke = none, colour → recent).
  * • Shift-click any object → sample the rendered pixel under the cursor.
- *   The colour goes to the active fill/stroke well: onto the selection (one
- *   undo step, selection kept) or, with nothing selected, into the default
+ *   The colour goes to the active fill/stroke well only: onto the selection
+ *   (one undo step, selection kept) or, with nothing selected, into the default
  *   well + recent colours. Transparent pixels (alpha 0) are a no-op.
+ * • The selection box/handles stay visible (non-interactive) while the tool is
+ *   active and after every apply / undo / redo (visteras-selection.js).
  *   Cross-origin (tainted) images fall back to window.EyeDropper, then a toast.
  *
  * Not yet: desktop sampling outside the canvas, Shift+Alt append,
@@ -42,6 +48,8 @@ const STROKE_HELPER_ATTR = 'data-visteras-stroke-align-helper';
 const STROKE_HELPER_FOR_ATTR = 'data-visteras-helper-for';
 const STROKE_WRAP_ATTR = 'data-visteras-sa-wrap';
 const STROKE_BODY_ATTR = 'data-visteras-sa-body';
+const STROKE_CLIP_ATTR = 'data-visteras-sa-clip';
+const STROKE_MASK_ATTR = 'data-visteras-sa-mask';
 
 /** Leaf elements the eyedropper can sample from / apply to. */
 export const LEAF_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text']);
@@ -310,6 +318,29 @@ export function expandTargets(targets, api = null) {
 }
 
 const ALIGN_RECORD = [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR, 'stroke', 'stroke-width', 'clip-path', 'mask'];
+/** Everything stroke-align leaves on a body; dropped when the stroke goes to none. */
+const ALIGN_STATE_ATTRS = [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR, STROKE_BODY_ATTR, STROKE_CLIP_ATTR, STROKE_MASK_ATTR];
+
+/**
+ * Style for a pixel sample.
+ * Plain click on a raster <image>: Illustrator treats the image as fill-only
+ * paint → fill = colour, stroke = none. Shift-click (rendered sample): the
+ * colour goes to the active well only.
+ * @param {string} hex
+ * @param {{fromImage?:boolean, well?:'fill'|'stroke'}} [opts]
+ */
+export function pixelSampleStyle(hex, opts = {}) {
+  if (!hex) return null;
+  if (opts.fromImage) return { fill: hex, stroke: 'none' };
+  return { [opts.well === 'stroke' ? 'stroke' : 'fill']: hex };
+}
+
+/** Does el carry any Inside/Outside stroke-align state (attrs, helper, wrap)? */
+export function hasStrokeAlignState(el) {
+  if (!el) return false;
+  if (ALIGN_STATE_ATTRS.some((n) => hasAttr(el, n))) return true;
+  return isStrokeWrap(el.parentNode);
+}
 
 /**
  * Apply a sampled appearance to targets as ONE undo step.
@@ -345,8 +376,24 @@ export function applyStyleToElements(targets, style, history, env = {}) {
       el.style.removeProperty(prop);
       if (!attr(el, 'style')?.trim()) el.removeAttribute('style');
     };
-    const wasAligned = hasAttr(el, STROKE_ALIGN_ATTR) && readAlign(el, api) !== 'center';
+    let wasAligned = hasAttr(el, STROKE_ALIGN_ATTR) && readAlign(el, api) !== 'center';
     let weight = null;
+
+    // Stroke → none (image sample): drop stroke-align entirely — helper,
+    // clip/mask defs, wrap and data attributes. The recorded attrs let undo
+    // restore them, and the batch resync re-renders the helper.
+    const strokeOff = keys.includes('stroke') && (style.stroke == null || style.stroke === 'none');
+    if (env.dropStrokeAlign && strokeOff && hasStrokeAlignState(el)) {
+      ALIGN_RECORD.forEach(record);
+      ALIGN_STATE_ATTRS.forEach(record);
+      record('transform'); // unwrap may bake a wrap transform onto the body
+      if (api?.applyStrokeAlignToElement && sc) {
+        try { api.applyStrokeAlignToElement(el, sc, { align: 'center', userWidth: readWeight(el, api) ?? 1 }); } catch { /* ignore */ }
+      }
+      ALIGN_STATE_ATTRS.forEach((n) => setAttr(n, null));
+      wasAligned = false;
+      alignTouched.push(el);
+    }
 
     for (const k of keys) {
       if (k === 'stroke-align') continue;
@@ -723,23 +770,36 @@ export function mountEyedropperTool(editor) {
   const sampler = createImageSampler();
   window.__visterasEyedropperSampler = sampler; // for smoke/debug
 
-  /** Apply a sampled pixel colour to the active fill/stroke well. */
-  const applySampledColor = (hex) => {
+  /**
+   * Apply a sampled pixel colour. fromImage (plain click on a raster <image>):
+   * fill = colour + stroke = none. Otherwise (Shift-click): active well only.
+   */
+  const applySampledColor = (hex, fromImage = false) => {
     if (!hex) return; // transparent pixel: no-op
     const ctrl = api();
     const well = ctrl?.getActiveTarget?.() === 'stroke' ? 'stroke' : 'fill';
     const sel = selection();
-    const style = { [well]: hex };
+    const style = pixelSampleStyle(hex, { fromImage, well });
     if (sel.length && expandTargets(sel, api()).length) {
+      // Dropping stroke-align unwraps the body; a selected wrap <g> would be
+      // left disconnected, so reselect its body instead.
+      const bodyOf = new Map(sel.map((el) => [el, resolveBody(el, api())]));
       const cmd = applyStyleToElements(sel, style, history, {
-        ...env(), ignoreOptions: true, name: 'Eyedropper Sample', afterHistory: keepSelection(sel),
+        ...env(), ignoreOptions: true, dropStrokeAlign: fromImage, name: 'Eyedropper Sample',
+        afterHistory: keepSelection(sel.map((el) => bodyOf.get(el) || el).filter((el, i, a) => a.indexOf(el) === i)),
       });
-      if (cmd) afterApply(sel);
+      const now = sel.map((el) => (el.isConnected ? el : bodyOf.get(el))).filter((el, i, a) => el?.isConnected && a.indexOf(el) === i);
+      if (cmd) {
+        if (now.length !== sel.length || now.some((el, i) => el !== sel[i])) {
+          try { sc.clearSelection(); sc.addToSelection(now, true); } catch { /* ignore */ }
+        }
+        afterApply(now);
+      }
       try { ctrl?.pushRecent?.(hex); ctrl?.emit?.(); } catch { /* ignore */ }
     } else {
       loadDefaults(style);
     }
-    window.__visterasLastEyedropperSample = { hex, well, selection: sel.length };
+    window.__visterasLastEyedropperSample = { hex, well: fromImage ? 'fill+stroke:none' : well, selection: sel.length };
   };
 
   let sampling = null; // in-flight pixel sample (one at a time)
@@ -757,7 +817,7 @@ export function mountEyedropperTool(editor) {
       return r?.hex || null;
     };
     const run = sampleWithFallback(primary, { fallback, toast, onError: (err) => console.warn('[eyedropper]', err) })
-      .then((r) => { if (r) applySampledColor(r.hex); return r; })
+      .then((r) => { if (r) applySampledColor(r.hex, !shiftKey && hit?.nodeName === 'image'); return r; })
       .finally(() => { if (sampling === run) sampling = null; });
     sampling = run;
     window.__visterasEyedropperPending = run;

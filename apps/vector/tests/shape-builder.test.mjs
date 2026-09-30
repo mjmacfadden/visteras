@@ -160,3 +160,20 @@ test('cleanItem — removes sliver children from compound paths', () => {
   const simple = { className: 'Path', area: 1 };
   assert.equal(cleanItem(simple), simple);
 });
+
+test('cursor: Selection arrow + badge SVGs, Selection hotspot, ≤32px', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { CURSOR_HOTSPOT, CURSOR_PLUS, CURSOR_MINUS, ALT_CLASS } = await import('../js/visteras-shape-builder.js');
+  assert.deepEqual(CURSOR_HOTSPOT, [4, 4]);
+  assert.equal(typeof ALT_CLASS, 'string');
+  const theme = await readFile(new URL('../css/visteras-theme.css', import.meta.url), 'utf8');
+  assert.ok(/#workarea \{\s*cursor: url\("data:image\/svg\+xml,[^"]*M4 4 L21 12 L12 12 L12 21 Z[^"]*"\) 4 4,/.test(theme), 'Selection cursor geometry/hotspot changed');
+  for (const [file, badge] of [[CURSOR_PLUS, 'M16 18.5 H21 M18.5 16 V21'], [CURSOR_MINUS, 'M16 18.5 H21"']]) {
+    const svg = await readFile(new URL('../' + file.replace(/^\.\//, ''), import.meta.url), 'utf8');
+    const w = Number(svg.match(/width="(\d+)"/)[1]);
+    const h = Number(svg.match(/height="(\d+)"/)[1]);
+    assert.ok(w <= 32 && h <= 32);
+    assert.ok(svg.includes('d="M4 4 L21 12 L12 12 L12 21 Z"'));
+    assert.ok(svg.includes(badge), file);
+  }
+});

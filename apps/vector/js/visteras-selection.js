@@ -52,7 +52,10 @@ export function mountSelectionTools(editor) {
     overlay.replaceChildren();
     const elements = selected(), mode = sc.getMode();
     const shapeMode = shapeModes.has(mode);
-    const show = ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
+    // Eyedropper: keep the box + handles visible (display only, not
+    // interactive) so it's clear which objects receive the sampled paint.
+    const passive = mode === 'eyedropper';
+    const show = passive || ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
     for (const selector of manager.selectors) {
       selector.selectorGroup.setAttribute('display', 'none');
     }
@@ -61,6 +64,7 @@ export function mountSelectionTools(editor) {
       return;
     }
     manager.selectorGripsGroup.setAttribute('display', 'none');
+    if (passive) overlay.setAttribute('pointer-events', 'none'); else overlay.removeAttribute('pointer-events');
     const {b,m} = drag?.visualFrame || selectionFrame(elements), zoom = sc.getZoom();
     const x = b.x, y = b.y, w = b.width, h = b.height;
     const screen = (x,y) => { const p = point(x,y,m); return [p.x*zoom,p.y*zoom]; };
@@ -76,6 +80,7 @@ export function mountSelectionTools(editor) {
       const [cx,cy] = screen(...p);
       create('rect', { x: cx-4, y: cy-4, width: 8, height: 8, fill: 'white', stroke: '#3f8ff7', 'data-selection-handle': dir, style: `cursor:${dir}-resize` }, overlay);
     }
+    if (passive) for (const el of overlay.children) { el.setAttribute('pointer-events', 'none'); el.style.cursor = ''; }
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(refresh);
