@@ -193,6 +193,7 @@ export function mountSelectionTools(editor) {
     if (command && !e.altKey && key === 'z') id = e.shiftKey ? 'tool_redo' : 'tool_undo';
     else if (!command && !e.altKey && !e.shiftKey) id = toolKeys[key] || (key === 'd' ? 'swatch_default_btn' : null);
     else if (!command && !e.altKey && e.shiftKey && key === 'x') id = 'swatch_swap_btn';
+    else if (!command && !e.altKey && e.shiftKey && key === 'e') id = 'tool_eraser';
     const button = id && document.getElementById(id);
     if (button) {
       e.preventDefault(); e.stopImmediatePropagation();
