@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Diagonal line from bottom-left to top-right, with square anchor points at each end -->
+  <line x1="5" y1="19" x2="19" y2="5" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+  <!-- Square anchor point at bottom-left -->
+  <rect x="2.5" y="16.5" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+  <!-- Square anchor point at top-right -->
+  <rect x="16.5" y="2.5" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+</svg>
