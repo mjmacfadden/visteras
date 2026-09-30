@@ -613,3 +613,51 @@ test('Panel Dock: Width resizing is clamped and saved in localStorage', async ()
   assert.equal(saved.mode, 'iconic');
   assert.equal(saved.open, 'color');
 });
+
+test('Panel Dock: Toolbar has no chevron, displays only pressed panel, highlights orange, and toggles on second click', async () => {
+  const env = setupMockEnvironment();
+  const { mountVisterasPanelDock } = await import('../js/visteras-panel-dock.js');
+  const dockApi = mountVisterasPanelDock({ svgEditor: {} });
+
+  const dock = env.doc.getElementById('vdock');
+  // 1. No chevron in dock toolbar
+  assert.equal(dock.querySelector('#vdock_chevron'), null, 'Dock toolbar does not have chevron');
+
+  // 2. Initial state: all closed
+  dockApi.close();
+  const colorBtn = dock.querySelector('.vdock-icon[data-panel="color"]');
+  const swatchesBtn = dock.querySelector('.vdock-icon[data-panel="swatches"]');
+  const colorPane = env.doc.getElementById('vcs_color_panel');
+  const swatchesPane = env.doc.getElementById('vcs_swatches_panel');
+  const layerPane = env.doc.getElementById('layerpanel');
+
+  assert.equal(colorBtn.getAttribute('pressed'), null);
+  assert.equal(colorBtn.classList.contains('active'), false);
+
+  // 3. Open Color panel
+  dockApi.open('color');
+  assert.equal(dockApi.isOpen('color'), true);
+  assert.equal(colorBtn.getAttribute('pressed'), 'true', 'Pressed icon has pressed="true" attribute');
+  assert.equal(colorBtn.classList.contains('active'), true, 'Pressed icon has active class');
+  assert.equal(swatchesBtn.getAttribute('pressed'), null);
+  assert.equal(swatchesBtn.classList.contains('active'), false);
+
+  // Verify only Color pane is active; other panels are not active
+  assert.equal(colorPane.classList.contains('active'), true, 'Color panel is active');
+  assert.equal(swatchesPane.classList.contains('active'), false, 'Swatches panel is not active');
+  assert.equal(layerPane.classList.contains('active'), false, 'Layer panel is not active');
+
+  // Verify CSS defines toolbar orange highlight and single-panel display rules
+  const css = fs.readFileSync(dockCssPath, 'utf8');
+  assert.match(css, /\.vdock-icon\.active[\s\S]*?border-left:\s*2px solid var\(--studio-orange/);
+  assert.match(css, /\.vdock-panel-pane\s*\{[\s\S]*?display:\s*none\s*!important;/);
+  assert.match(css, /\.vdock-panel-pane\.active\s*\{[\s\S]*?display:\s*block\s*!important;/);
+
+  // 4. Clicking the same panel icon a second time closes it
+  colorBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dockApi.isOpen(), false, 'Clicking panel tool a second time closes it');
+  assert.equal(colorBtn.getAttribute('pressed'), null);
+  assert.equal(colorBtn.classList.contains('active'), false);
+  assert.equal(colorPane.classList.contains('active'), false);
+});
+

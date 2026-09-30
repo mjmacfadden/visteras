@@ -22,27 +22,6 @@
   overflow: hidden !important;
 }
 
-.vdock-chevron {
-  width: 28px;
-  height: 20px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
-  color: #777777;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-  padding: 0;
-  transition: color 0.12s, background 0.12s;
-}
-
-.vdock-chevron:hover {
-  color: #ffffff;
-  background: #2f2f2f;
-}
-
 .vdock-group {
   display: flex;
   flex-direction: column;
@@ -62,28 +41,46 @@
   width: 28px;
   height: 28px;
   background: transparent;
-  border: none;
-  border-radius: 3px;
+  border: 1px solid transparent;
+  border-radius: 2px;
   color: #999999;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  box-sizing: border-box;
   position: relative;
   transition: color 0.12s, background 0.12s;
 }
 
 .vdock-icon:hover {
   color: #ffffff;
-  background: #2f2f2f;
+  background: #505050;
 }
 
 .vdock-icon.active,
+.vdock-icon[pressed],
 .vdock-icon[aria-expanded="true"] {
-  color: #ffffff;
-  background: #333333;
-  box-shadow: inset -2px 0 0 var(--studio-orange, #fa7c1b);
+  background-color: #242424 !important;
+  border: 1px solid #1a1a1a !important;
+  border-left: 2px solid var(--studio-orange, #fa7c1b) !important;
+  box-sizing: border-box !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 2px !important;
+  color: var(--studio-orange, #fa7c1b) !important;
+}
+
+.vdock-icon.active:hover,
+.vdock-icon[pressed]:hover,
+.vdock-icon[aria-expanded="true"]:hover {
+  background-color: #1e1e1e !important;
+}
+
+.vdock-icon.active svg,
+.vdock-icon[pressed] svg,
+.vdock-icon[aria-expanded="true"] svg {
+  color: var(--studio-orange, #fa7c1b) !important;
 }
 
 /* ==========================================================================
@@ -214,18 +211,22 @@
    ========================================================================== */
 
 .vdock-panel-pane {
-  display: none;
-  width: 100%;
-  box-sizing: border-box;
+  display: none !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .vdock-panel-pane.active {
-  display: block;
+  display: block !important;
+}
+
+#vdock_stroke_panel.active,
+#vdock_gradient_panel.active {
+  display: flex !important;
 }
 
 /* Layers panel inside flyout */
 #vdock_flyout #layerpanel {
-  display: block !important;
   width: 100% !important;
   padding: 6px !important;
   box-sizing: border-box !important;
@@ -238,7 +239,6 @@
 /* Color & Swatches inside flyout */
 #vdock_flyout #vcs_color_panel,
 #vdock_flyout #vcs_swatches_panel {
-  display: block !important;
   width: 100% !important;
   box-sizing: border-box !important;
   padding: 8px !important;
@@ -247,7 +247,6 @@
 /* Stroke Panel inside flyout */
 #vdock_stroke_panel {
   padding: 10px !important;
-  display: flex;
   flex-direction: column;
   gap: 10px;
   font-size: 11px;
@@ -300,7 +299,6 @@
 /* Gradient Panel Stub */
 #vdock_gradient_panel {
   padding: 16px;
-  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;

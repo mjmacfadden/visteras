@@ -69,12 +69,6 @@ export function mountVisterasPanelDock({ svgEditor }) {
   dock.setAttribute('aria-label', 'Panels Dock');
 
   dock.innerHTML = `
-    <button type="button" class="vdock-chevron" id="vdock_chevron" title="Panels Dock" aria-label="Panels Dock">
-      <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true">
-        <path d="M5 3.5L9.5 8 5 12.5" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
-
     <!-- Group 1: Color -->
     <div class="vdock-group" id="vdock_grp_color">
       <button type="button" class="vdock-icon" data-panel="color" title="Color (F6)" aria-label="Color (F6)" aria-expanded="false" aria-controls="vdock_flyout">
@@ -144,7 +138,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       <div id="vdock_header_title_slot">
         <span class="vdock-flyout-title" id="vdock_flyout_title">Panel</span>
       </div>
-      <button type="button" class="vdock-collapse-btn" id="vdock_collapse_btn" title="Collapse to Icons (Esc)" aria-label="Collapse panel">»</button>
+      <button type="button" class="vdock-collapse-btn" id="vdock_collapse_btn" title="Close panel" aria-label="Close panel">×</button>
     </div>
     <div class="vdock-flyout-body" id="vdock_flyout_body"></div>
   `;
@@ -385,6 +379,11 @@ export function mountVisterasPanelDock({ svgEditor }) {
       const isTarget = btn === targetBtn;
       btn.classList.toggle('active', isTarget);
       btn.setAttribute('aria-expanded', String(isTarget));
+      if (isTarget) {
+        btn.setAttribute('pressed', 'true');
+      } else {
+        btn.removeAttribute('pressed');
+      }
     });
 
     // Set header
@@ -403,7 +402,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       if (pane) {
         const isActive = (k === panelId);
         pane.classList.toggle('active', isActive);
-        pane.style.display = isActive ? 'block' : 'none';
+        pane.style.display = isActive ? (k === 'stroke' || k === 'gradient' ? 'flex' : 'block') : 'none';
       }
     });
 
@@ -428,10 +427,15 @@ export function mountVisterasPanelDock({ svgEditor }) {
     saveState();
 
     flyout.style.display = 'none';
+    flyout.querySelectorAll('.vdock-panel-pane').forEach(pane => {
+      pane.classList.remove('active');
+      pane.style.display = 'none';
+    });
 
     dock.querySelectorAll('.vdock-icon').forEach(btn => {
       btn.classList.remove('active');
       btn.setAttribute('aria-expanded', 'false');
+      btn.removeAttribute('pressed');
     });
 
     updateWindowMenuCheckmarks();
@@ -464,17 +468,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     });
   });
 
-  // Chevron click toggles last open panel or Color
-  dock.querySelector('#vdock_chevron')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (state.open) {
-      close();
-    } else {
-      open('color');
-    }
-  });
-
-  // Collapse button in flyout header
+  // Close button in flyout header
   flyout.querySelector('#vdock_collapse_btn')?.addEventListener('click', (e) => {
     e.stopPropagation();
     close();
@@ -518,16 +512,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     });
   }
 
-  // ─── 6. Auto-Collapse & Keyboard Shortcuts ────────────────────────────────
-
-  // Auto-collapse when clicking document or canvas outside dock and flyout
-  document.addEventListener('mousedown', (e) => {
-    if (!state.open) return;
-    if (dock.contains(e.target) || flyout.contains(e.target)) return;
-    // Don't close if clicking a popup modal (e.g. color picker, pathfinder)
-    if (e.target.closest?.('#vcs_picker_modal, #visteras_pathfinder_panel, .modal_dialog')) return;
-    close();
-  });
+  // ─── 6. Panel Toggling & Keyboard Shortcuts ───────────────────────────────
 
   function toggleProperties() {
     state.propertiesHidden = !state.propertiesHidden;
