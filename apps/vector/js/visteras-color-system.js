@@ -1973,8 +1973,8 @@ function mountSwatchesPanelContent(ctrl, content) {
           </button>
         </div>
       </div>
-      <div class="vcs-section-label">User</div>
-      <div class="vcs-swatch-grid" id="vcs_user_grid"></div>
+      <div class="vcs-section-label" id="vcs_user_label" style="display:none;">User</div>
+      <div class="vcs-swatch-grid" id="vcs_user_grid" style="display:none;"></div>
       <div class="swatches_schemes_wrapper">
         <div id="vcs_swatches_folders_container" class="swatches_folders_container"></div>
       </div>
