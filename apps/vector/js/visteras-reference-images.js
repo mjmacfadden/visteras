@@ -471,6 +471,9 @@ function setupClipboardPaste(svgEditor) {
       if (target?.isContentEditable) return;
       if (target?.shadowRoot?.activeElement && ['INPUT', 'TEXTAREA'].includes(target.shadowRoot.activeElement.nodeName)) return;
       if (window.__visterasIsTypingDirectly) return;
+      // Vector's own ⌘C (image/png on the clipboard): the clipboard bridge
+      // pastes the internal copy instead of placing the PNG again.
+      if (window.__visterasTakeOwnPaste?.(e)) return;
 
       const items = e.clipboardData?.items;
       if (!items || !items.length) return;

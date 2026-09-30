@@ -7,7 +7,20 @@
  * is empty / not preferred), import via svgCanvas.importSvgString.
  *
  * Does not modify Editor.js — patches svgCanvas after init.
+ *
+ * OS clipboard (Illustrator-style, visteras-clipboard-payload.js): a single
+ * raster image is written as image/png at natural resolution; vector / mixed
+ * selections as a PNG render + SVG (text/plain, image/svg+xml when
+ * ClipboardItem.supports it). The ClipboardItem is created synchronously in the
+ * gesture with Promise<Blob> values; on failure the copy event's setData text
+ * stays. SVG-Edit's internal clipboard is filled too, so paste back into
+ * Vector stays lossless, and Cut deletes the selection as one undo step.
  */
+
+import {
+	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
+	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
+} from './visteras-clipboard-payload.js?v=clipboard-png-1';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
@@ -104,7 +117,10 @@ function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	const vbW = Math.max(1, (maxX - minX) + pad * 2);
 	const vbH = Math.max(1, (maxY - minY) + pad * 2);
 
-	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}" data-visteras-format="1" data-visteras-source="vector">\n${parts.join('\n')}\n</svg>`;
+	// Clip paths, masks and gradients the selection references travel with it.
+	let defs = '';
+	try { defs = referencedDefsMarkup(selected); } catch (e) { defs = ''; }
+	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}" data-visteras-format="1" data-visteras-source="vector">\n${defs ? defs + '\n' : ''}${parts.join('\n')}\n</svg>`;
 }
 
 async function writeSvgClipboard(svgText) {
@@ -135,6 +151,57 @@ async function writeSvgClipboard(svgText) {
 		console.warn('Vector clipboard write failed:', err);
 	}
 	return false;
+}
+
+/**
+ * Write the rich payload (PNG + SVG) to the OS clipboard. Must be called
+ * synchronously inside the user gesture: the ClipboardItem is built right
+ * away with Promise<Blob> values (Safari), rendering resolves afterwards.
+ * Never throws; resolves to true when the rich write succeeded.
+ */
+// What Vector last put on the OS clipboard, so ⌘V can tell its own copy
+// (→ lossless internal paste) from content copied in another app since.
+let lastOwn = null;
+
+function writeRichClipboard(selected, svgText) {
+	const kind = classifySelection(selected);
+	const state = { kind, types: [], ok: false, error: null, ts: Date.now() };
+	window.__visterasClipboardLast = state;
+	const own = { kind, svgText, w: null, h: null };
+	lastOwn = own;
+	if (kind === 'empty') return Promise.resolve(false);
+	const canWrite = typeof ClipboardItem !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.write === 'function';
+	if (!canWrite) { state.error = 'async clipboard unavailable'; return writeSvgClipboard(svgText).then(() => false); }
+	let write;
+	try {
+		const png = () => (kind === 'image' ? renderImagePng(selected[0]) : renderSvgTextPng(svgText)).then((blob) => {
+			try { createImageBitmap(blob).then((bmp) => { own.w = bmp.width; own.h = bmp.height; bmp.close?.(); }).catch(() => {}); } catch (e) { /* ignore */ }
+			return blob;
+		});
+		const { types, items } = buildClipboardItems({ kind, svgText, png, supports: clipboardSupports() });
+		state.types = types;
+		// Keep the promises from surfacing as unhandled when the write is refused.
+		for (const v of Object.values(items)) v.catch(() => {});
+		write = navigator.clipboard.write([new ClipboardItem(items)]);
+	} catch (err) {
+		write = Promise.reject(err);
+	}
+	state.pending = write.then(() => { state.ok = true; return true; }).catch((err) => {
+		state.error = String(err && err.message || err);
+		console.warn('Vector clipboard (PNG) write failed, keeping text/SVG:', err);
+		return svgText ? writeSvgClipboard(svgText).then(() => false) : false;
+	});
+	return state.pending;
+}
+
+// One OS write per gesture even if several paths (copy event, wrapped
+// copySelectedElements) run for the same Cmd+C.
+let lastRichWrite = 0;
+function writeOnce(selected, svgText) {
+	const now = Date.now();
+	if (now - lastRichWrite < 150) return;
+	lastRichWrite = now;
+	writeRichClipboard(selected, svgText);
 }
 
 function publishChannel(svgText) {
@@ -250,10 +317,8 @@ export function installVisterasClipboardBridge(opts = {}) {
 
 	// Synchronous native copy and cut capture on document
 	const onCopyOrCut = (e) => {
-		const target = e.target;
-		if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-			return;
-		}
+		// Inputs, text editing and page text selections keep the native copy.
+		if (isTextCopyContext(e)) return;
 
 		const selected = getSelectedElementsSafe();
 		if (!selected.length) return;
@@ -276,7 +341,17 @@ export function installVisterasClipboardBridge(opts = {}) {
 			}
 		}
 
-		writeSvgClipboard(svgText);
+		// Rich OS payload (replaces the text above once rendered; if it fails the
+		// text/SVG from setData stays).
+		lastRichWrite = 0;
+		writeOnce(selected, svgText);
+		// Internal SVG-Edit clipboard for lossless paste back into Vector
+		// (Editor's own ⌘C/⌘X shortcut is gated on svgEditor.selectedElement,
+		// which Vector does not maintain). Cut = copy + delete, one undo step.
+		try {
+			if (e.type === 'cut' && origCutRaw) origCutRaw();
+			else if (origCopy) origCopy();
+		} catch (err) { console.warn('Vector internal copy failed:', err); }
 	};
 
 	document.addEventListener('copy', onCopyOrCut, true);
@@ -286,6 +361,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 	const origCopy = svgCanvas.copySelectedElements
 		? svgCanvas.copySelectedElements.bind(svgCanvas)
 		: null;
+	const origCutRaw = typeof svgCanvas.cutSelectedElements === 'function'
+		? svgCanvas.cutSelectedElements.bind(svgCanvas)
+		: null;
 
 	svgCanvas.copySelectedElements = function wrappedCopySelectedElements(...args) {
 		const result = origCopy ? origCopy(...args) : undefined;
@@ -294,7 +372,7 @@ export function installVisterasClipboardBridge(opts = {}) {
 			const svgText = serializeSelectedToSvg(svgCanvas, selected);
 			if (svgText) {
 				publishChannel(svgText);
-				writeSvgClipboard(svgText);
+				writeOnce(selected, svgText);
 			}
 		} catch (err) {
 			console.warn('visteras copy bridge failed:', err);
@@ -311,27 +389,84 @@ export function installVisterasClipboardBridge(opts = {}) {
 				const svgText = serializeSelectedToSvg(svgCanvas, selected);
 				if (svgText) {
 					publishChannel(svgText);
-					writeSvgClipboard(svgText);
+					writeOnce(selected, svgText);
 				}
 			} catch (err) { /* ignore */ }
 			return origCut(...args);
 		};
 	}
 
-	// --- Paste: intercept paste events ---
-	const onPaste = async (e) => {
-		const target = e.target;
-		if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-			return;
-		}
+	// --- Paste ---
+	// ⌘V: SVG-Edit's shortcut would paste the internal clipboard even after
+	// the user copied something else in another app. Decide in the paste event
+	// instead: Vector's own copy → internal (lossless) paste; anything else →
+	// import the SVG / place the image. If a browser sends no paste event,
+	// fall back to the internal paste shortly after the key.
+	const pasteInternal = () => {
+		try {
+			if (svgEditor && typeof svgEditor.pasteInCenter === 'function') svgEditor.pasteInCenter();
+			else svgCanvas.pasteElements();
+		} catch (err) { console.warn('Vector internal paste failed:', err); }
+	};
+	let pendingPaste = null;
+	const cancelPendingPaste = () => { if (pendingPaste) { clearTimeout(pendingPaste); pendingPaste = null; } };
+	document.addEventListener('keydown', (e) => {
+		const k = String(e.key || '').toLowerCase();
+		if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || (k !== 'v' && e.code !== 'KeyV')) return;
+		if (isTextCopyContext(e)) return;
+		// Block the Editor's immediate internal paste; keep the native paste event.
+		e.stopImmediatePropagation();
+		cancelPendingPaste();
+		pendingPaste = setTimeout(() => { pendingPaste = null; if (hasInternalClipboard(svgCanvas)) pasteInternal(); }, 200);
+	}, true);
 
-		// Prefer SVG-Edit internal clipboard when it has content (same-app paste)
-		if (hasInternalClipboard(svgCanvas)) {
-			return;
+	/** True when this paste event is Vector's own copy and was handled (internal paste). */
+	const takeOwnPaste = (e) => {
+		if (!e) return false;
+		if (e.__visterasOwnPaste !== undefined) return e.__visterasOwnPaste;
+		e.__visterasOwnPaste = false;
+		cancelPendingPaste();
+		if (isTextCopyContext(e) || !lastOwn || !hasInternalClipboard(svgCanvas) || !e.clipboardData) return false;
+		const dt = e.clipboardData;
+		let text = '';
+		try { text = dt.getData('text/plain') || ''; } catch (err) { text = ''; }
+		if (text && lastOwn.svgText && text === lastOwn.svgText) {
+			e.preventDefault(); e.stopImmediatePropagation();
+			e.__visterasOwnPaste = true;
+			pasteInternal();
+			return true;
 		}
+		if (lastOwn.kind === 'image' && !text) {
+			let file = null;
+			try { const it = [...dt.items].find((i) => i.kind === 'file' && i.type.startsWith('image/')); file = it ? it.getAsFile() : null; } catch (err) { file = null; }
+			if (!file) return false;
+			// The browser re-encodes clipboard images: compare pixel size.
+			e.preventDefault(); e.stopImmediatePropagation();
+			e.__visterasOwnPaste = true;
+			const own = lastOwn;
+			const place = () => window.placeReferenceImage?.(svgEditor, file, { sendBack: false })?.catch?.((err) => console.warn('image paste failed', err));
+			createImageBitmap(file).then((bmp) => {
+				const mine = own.w != null && bmp.width === own.w && bmp.height === own.h;
+				bmp.close?.();
+				if (mine) pasteInternal(); else place();
+			}).catch(place);
+			return true;
+		}
+		return false;
+	};
+	// Reference-image paste (window capture) asks first.
+	window.__visterasTakeOwnPaste = takeOwnPaste;
+
+	const onPaste = async (e) => {
+		if (isTextCopyContext(e)) return;
+		if (takeOwnPaste(e)) return;
 
 		const svgText = await readSvgFromEvent(e);
-		if (!svgText) return;
+		if (!svgText) {
+			// Nothing importable: keep the old behaviour (internal paste if any).
+			if (hasInternalClipboard(svgCanvas)) pasteInternal();
+			return;
+		}
 
 		e.preventDefault();
 		e.stopPropagation();
