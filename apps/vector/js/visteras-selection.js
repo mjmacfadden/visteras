@@ -194,6 +194,7 @@ export function mountSelectionTools(editor) {
     else if (!command && !e.altKey && !e.shiftKey) id = toolKeys[key] || (key === 'd' ? 'swatch_default_btn' : null);
     else if (!command && !e.altKey && e.shiftKey && key === 'x') id = 'swatch_swap_btn';
     else if (!command && !e.altKey && e.shiftKey && key === 'e') id = 'tool_eraser';
+    else if (!command && !e.altKey && e.shiftKey && key === 'm') id = 'tool_shape_builder';
     const button = id && document.getElementById(id);
     if (button) {
       e.preventDefault(); e.stopImmediatePropagation();

@@ -182,6 +182,7 @@
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-1';
     import { mountOffsetPath } from './js/visteras-offset-path.js?v=offset-path-1';
+    import { mountShapeBuilderTool } from './js/visteras-shape-builder.js?v=shape-builder-1';
     import { mountSelectionTools } from './js/visteras-selection.js?v=snap-point-direct-2';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -1979,6 +1980,7 @@
     mountEraserTool(svgEditor);
     mountEyedropperTool(svgEditor);
     mountOffsetPath(svgEditor);
+    mountShapeBuilderTool(svgEditor);
     // Disarm SVG-Edit wireframe shortcut="F" so ⌘/Ctrl+F is paste-in-place only.
     // Bare F is handled in setupMenuBar's capture keydown (Outline Mode).
     const wireBtn = document.getElementById('tool_wireframe');
