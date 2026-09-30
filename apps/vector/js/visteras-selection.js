@@ -1,4 +1,4 @@
-import { mountDirectSelection } from './visteras-direct-selection.js?v=ds-illustrator-1';
+import { mountDirectSelection } from './visteras-direct-selection.js?v=merge-trace-1';
 import { mountNudge } from './visteras-nudge.js?v=nudge-1';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {

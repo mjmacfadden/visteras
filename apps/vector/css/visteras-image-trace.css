@@ -1,0 +1,246 @@
+/* Visteras Vector — Image Trace (live preview, dialog, Properties-bar button) */
+
+/* ---- Live trace views (editor-only styling) ---------------------------- */
+g.visteras-live-trace[data-trace-view="result-outlines"] > g[data-trace-result] > path {
+  stroke: #000 !important;
+  stroke-width: 0.5px !important;
+  vector-effect: non-scaling-stroke;
+}
+g.visteras-live-trace[data-trace-view="outlines"] > g[data-trace-result] > path,
+g.visteras-live-trace[data-trace-view="outlines-source"] > g[data-trace-result] > path {
+  fill: none !important;
+  stroke: #000 !important;
+  stroke-width: 0.5px !important;
+  vector-effect: non-scaling-stroke;
+}
+g.visteras-live-trace[data-trace-peek="1"] > g[data-trace-result] { display: none !important; }
+
+/* ---- Tracing overlay ---------------------------------------------------- */
+.vit-overlay {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(20, 20, 20, 0.38);
+  pointer-events: none;
+  z-index: 40;
+  color: #fff;
+  font: 600 11px/1.2 var(--ui-font, system-ui, sans-serif);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.vit-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--studio-orange, #fa7c1b);
+  border-radius: 50%;
+  animation: vit-spin 0.8s linear infinite;
+}
+@keyframes vit-spin { to { transform: rotate(360deg); } }
+
+/* ---- Image Trace dialog (matches Offset Path / Studio modals) ---------- */
+.vit-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: transparent; /* modal, but the artboard preview stays fully visible */
+}
+#image_trace_dialog {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 300px;
+  max-height: calc(100vh - 16px);
+  display: flex;
+  flex-direction: column;
+  background: #2a2a2e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+  font: 12px/1.45 -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #ddd;
+  overflow: hidden;
+  outline: none;
+}
+#image_trace_dialog .vit-titlebar {
+  flex: none;
+  background: #1e1e22;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+#image_trace_dialog.is-dragging { box-shadow: 0 16px 56px rgba(0, 0, 0, 0.7); }
+#image_trace_dialog .vit-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#image_trace_dialog.is-committing .vit-body > :not(.vit-info) { opacity: 0.45; pointer-events: none; }
+#image_trace_dialog .vit-row { display: flex; align-items: center; gap: 8px; }
+#image_trace_dialog .vit-row-top { align-items: flex-start; }
+#image_trace_dialog .vit-row > label:first-child {
+  width: 58px;
+  flex: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #999;
+}
+#image_trace_dialog select {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  background: #18181b;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  padding: 0 6px;
+  font: 12px -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+}
+#image_trace_dialog select:focus { border-color: var(--studio-orange) !important; }
+#image_trace_dialog .vit-title-icon { color: var(--studio-orange); flex: none; }
+#image_trace_dialog :focus-visible { outline: 1px solid var(--studio-orange); outline-offset: 1px; }
+#image_trace_dialog .vit-eye {
+  width: 30px;
+  height: 26px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  cursor: pointer;
+  touch-action: none;
+}
+#image_trace_dialog .vit-eye.is-held { background: var(--studio-orange); border-color: var(--studio-orange); color: #fff; }
+#image_trace_dialog .vit-eye:disabled { opacity: 0.4; cursor: default; }
+#image_trace_dialog .vit-slider { display: flex; flex-direction: column; gap: 2px; }
+#image_trace_dialog .vit-slider-head { display: flex; justify-content: space-between; color: #999; font-size: 11px; }
+#image_trace_dialog .vit-slider-head span:last-child { color: #ddd; font-variant-numeric: tabular-nums; }
+#image_trace_dialog input[type="checkbox"], #image_trace_dialog input[type="radio"] { accent-color: var(--studio-orange); margin: 0; }
+
+/* Studio's minimal Photoshop-style slider (apps/studio .properties_range, PR #74) */
+#image_trace_dialog input[type="range"].vit-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  accent-color: transparent;
+}
+#image_trace_dialog input[type="range"].vit-range:focus { outline: none; }
+#image_trace_dialog .vit-range::-webkit-slider-runnable-track { height: 2px; background: #4a4a4a; border-radius: 1px; }
+#image_trace_dialog .vit-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #c8c8c8;
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+#image_trace_dialog .vit-range:hover::-webkit-slider-thumb,
+#image_trace_dialog .vit-range:focus-visible::-webkit-slider-thumb { background: var(--studio-orange); }
+#image_trace_dialog .vit-range::-moz-range-track { height: 2px; background: #4a4a4a; border-radius: 1px; border: 0; }
+#image_trace_dialog .vit-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c8c8c8;
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+#image_trace_dialog .vit-range:hover::-moz-range-thumb,
+#image_trace_dialog .vit-range:focus-visible::-moz-range-thumb { background: var(--studio-orange); }
+/* Photoshop-style luminance cue on the B&W threshold track */
+#image_trace_dialog #vit_threshold::-webkit-slider-runnable-track { background: linear-gradient(to right, #000000, #ffffff); }
+#image_trace_dialog #vit_threshold::-moz-range-track { background: linear-gradient(to right, #000000, #ffffff); }
+#image_trace_dialog .vit-advanced { border-top: 1px solid rgba(255, 255, 255, 0.07); padding-top: 6px; }
+#image_trace_dialog .vit-advanced > summary { cursor: pointer; color: #ddd; padding: 2px 0 4px; user-select: none; }
+#image_trace_dialog .vit-advanced[open] { display: flex; flex-direction: column; gap: 8px; }
+#image_trace_dialog .vit-seg, #image_trace_dialog .vit-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+#image_trace_dialog .vit-checks-col { flex-direction: column; gap: 4px; }
+#image_trace_dialog .vit-seg label, #image_trace_dialog .vit-checks label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+#image_trace_dialog .vit-info {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+}
+#image_trace_dialog .vit-info-row { display: grid; grid-template-columns: 58px 1fr 48px 1fr; gap: 2px 4px; color: #999; }
+#image_trace_dialog .vit-info-row b { color: #ddd; font-weight: 600; font-variant-numeric: tabular-nums; }
+#image_trace_dialog .vit-status { color: #888; min-height: 15px; }
+#image_trace_dialog .vit-status.is-busy { color: var(--studio-orange); }
+#image_trace_dialog .vit-warning { display: none; color: #e7c35a; line-height: 1.35; }
+#image_trace_dialog .vit-error {
+  display: none;
+  color: #ffb4a8;
+  background: rgba(200, 60, 40, 0.18);
+  border: 1px solid rgba(220, 90, 70, 0.55);
+  border-radius: 5px;
+  padding: 5px 6px;
+  line-height: 1.35;
+}
+#image_trace_dialog .vit-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+#image_trace_dialog .vit-preview { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+#image_trace_dialog .vit-buttons { display: flex; gap: 8px; }
+#image_trace_dialog .vit-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #ccc;
+  padding: 6px 16px;
+  font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer;
+}
+#image_trace_dialog .vit-btn:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.32); color: #fff; }
+#image_trace_dialog .vit-btn:disabled { opacity: 0.45; cursor: default; }
+#image_trace_dialog .vit-btn-primary { background: var(--studio-orange); border-color: var(--studio-orange); color: #fff; padding: 6px 18px; font-weight: 500; }
+#image_trace_dialog .vit-btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+
+/* ---- Properties bar ------------------------------------------------------ */
+.vit-prop-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.vit-prop-btn {
+  flex: 1;
+  height: 24px;
+  padding: 0 10px;
+  background: #333;
+  color: #ddd;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.vit-prop-btn:hover { background: #444; border-color: #666; }

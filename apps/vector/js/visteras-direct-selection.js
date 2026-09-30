@@ -101,7 +101,7 @@ export function mountDirectSelection(editor) {
 
   function leaves(elements) {
     return [...new Set(elements.flatMap(el => el.matches?.(SHAPES) ? [el] : [...(el.querySelectorAll?.(SHAPES) || [])]))]
-      .filter(el => el.isConnected && !el.closest('defs,clipPath,mask') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).pointerEvents !== 'none');
+      .filter(el => el.isConnected && !el.closest('defs,clipPath,mask,[data-visteras-trace]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).pointerEvents !== 'none');
   }
   function readGeometry(el) {
     const path = document.createElementNS(svgNS, 'path');
@@ -500,7 +500,8 @@ export function mountDirectSelection(editor) {
   new MutationObserver(schedule).observe(sc.getSvgContent(), { subtree: true, childList: true, attributes: true });
   document.addEventListener('mousedown', e => {
     if (sc.getMode() !== 'pathedit' || e.button !== 0 || sc.spaceKey || !sc.getSvgRoot().contains(e.target)) return;
-    const el = e.target.closest?.(SHAPES), artwork = el && sc.getSvgContent().contains(el) ? el : null;
+    // A live Image Trace has no directly selectable insides until it is expanded.
+    const el = e.target.closest?.(SHAPES), artwork = el && sc.getSvgContent().contains(el) && !el.closest('[data-visteras-trace]') ? el : null;
     const ownGrip = e.target.hasAttribute?.('data-direct-record');
     const snapCandidate = (hoverSnap && isSnapPointEnabled() && hoverSnap.el.isConnected) ? hoverSnap : null;
     const targetArtwork = snapCandidate ? snapCandidate.el : artwork;
