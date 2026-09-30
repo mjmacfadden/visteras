@@ -103,3 +103,13 @@
   z-index: -1 !important;
 }
 
+/* --------------------------------------------------------------------------
+ * 7. Text selection highlight block (#text_selectblock).
+ *    Matches Studio's accent blue (#1C79C4) selection highlight style.
+ * -------------------------------------------------------------------------- */
+#text_selectblock {
+  fill: #1C79C4 !important;
+  opacity: 0.45 !important;
+}
+
+

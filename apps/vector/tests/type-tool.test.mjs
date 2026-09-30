@@ -45,3 +45,38 @@ test('Type Tool: color system updates curText for new text creation', () => {
   // Verify curText receives the paint value
   assert.match(code, /if \(sc\.curText\) sc\.curText\[state\.activeTarget\] = val;/);
 });
+
+test('Type Tool: point text seeds Lorem Ipsum, start anchor, and default Roboto font', () => {
+  const editorPath = path.resolve(__dirname, '../Editor.js');
+  const editorCode = fs.readFileSync(editorPath, 'utf8');
+
+  // Verify default text config uses Roboto
+  assert.match(editorCode, /text:\s*\{\s*stroke_width:\s*0,\s*font_size:\s*24,\s*font_family:\s*"Roboto"\s*\}/);
+
+  // Verify mouseDown case "text" seeds Lorem Ipsum, start anchor, and Roboto
+  assert.match(editorCode, /case\s+"text":\s*\{\s*q\.setStarted\(!0\);/);
+  assert.match(editorCode, /"text-anchor":\s*"start"/);
+  assert.match(editorCode, /"font-family":\s*q\.getCurText\("font_family"\)\s*\|\|\s*"Roboto"/);
+  assert.match(editorCode, /if\s*\(txtElem\)\s*txtElem\.textContent\s*=\s*"Lorem Ipsum";/);
+
+  // Verify index.html config also sets text font_family to Roboto
+  const html = fs.readFileSync(vectorHtmlPath, 'utf8');
+  assert.match(html, /font_family:\s*'Roboto'/);
+});
+
+test('Type Tool: textActions.start selects Lorem Ipsum and renders Studio accent highlight', () => {
+  const editorPath = path.resolve(__dirname, '../Editor.js');
+  const editorCode = fs.readFileSync(editorPath, 'utf8');
+
+  // Verify textActions.start selects full text range
+  assert.match(editorCode, /start\(e\)\s*\{\s*this\.#e\s*=\s*e;\s*let len\s*=\s*e\?\.textContent\?\.length/);
+  assert.match(editorCode, /this\.#t\.setSelectionRange\(0,\s*len\);/);
+  assert.match(editorCode, /this\.#p\(0,\s*len,\s*!0\);/);
+
+  // Verify #text_selectblock uses Studio blue (#1C79C4) and 0.45 opacity
+  assert.match(editorCode, /id:\s*"text_selectblock",\s*fill:\s*"#1C79C4",\s*opacity:\s*\.45/);
+
+  const css = fs.readFileSync(hygieneCssPath, 'utf8');
+  assert.match(css, /#text_selectblock\s*\{\s*fill:\s*#1C79C4\s*!important;\s*opacity:\s*0\.45\s*!important;\s*\}/);
+});
+

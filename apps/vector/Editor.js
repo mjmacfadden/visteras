@@ -40607,12 +40607,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				this.#f(t);
 				return;
 			}
-			n || this.#t.setSelectionRange(e, t), this.#r = Og("text_selectblock"), this.#r || (this.#r = document.createElementNS(Eh.SVG, "path"), kg(this.#r, {
+			n || this.#t.setSelectionRange(e, t), this.#r = Og("text_selectblock"), this.#r || (this.#r = document.createElementNS(Eh.SVG, "path"), Og("selectorParentGroup").append(this.#r)), kg(this.#r, {
 				id: "text_selectblock",
-				fill: "green",
-				opacity: .5,
+				fill: "#1C79C4",
+				opacity: .45,
 				style: "pointer-events:none"
-			}), Og("selectorParentGroup").append(this.#r));
+			});
 			let r = this.#a[e], i = this.#a[t];
 			this.#n.setAttribute("visibility", "hidden");
 			let a = this.#v(r.x, this.#o.y), o = this.#v(r.x + (i.x - r.x), this.#o.y), s = this.#v(r.x, this.#o.y + this.#o.height), c = this.#v(r.x + (i.x - r.x), this.#o.y + this.#o.height), l = "M" + a.x + "," + a.y + " L" + o.x + "," + o.y + " " + c.x + "," + c.y + " " + s.x + "," + s.y + "z";
@@ -40673,7 +40673,19 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			this.#e = e, my.textActions.toEditMode(t, n);
 		}
 		start(e) {
-			this.#e = e, my.textActions.toEditMode();
+			this.#e = e;
+			let len = e?.textContent?.length || 0;
+			if (this.#t) {
+				this.#t.value = e?.textContent || "";
+				this.#t.focus();
+				if (len > 0) {
+					this.#t.setSelectionRange(0, len);
+				}
+			}
+			my.textActions.toEditMode();
+			if (this.#t && len > 0) {
+				this.#p(0, len, !0);
+			}
 		}
 		mouseDown(e, t, n, r) {
 			let i = this.#_(n, r);
@@ -41384,24 +41396,27 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					}
 				});
 				break;
-			case "text":
-				q.setStarted(!0), q.addSVGElementsFromJson({
+			case "text": {
+				q.setStarted(!0);
+				let txtElem = q.addSVGElementsFromJson({
 					element: "text",
 					curStyles: !0,
 					attr: {
 						x: f,
 						y: p,
 						id: q.getNextId(),
-						fill: q.getCurText("fill"),
-						"stroke-width": q.getCurText("stroke_width"),
-						"font-size": q.getCurText("font_size"),
-						"font-family": q.getCurText("font_family"),
-						"text-anchor": "middle",
+						fill: q.getCurText("fill") || "#000000",
+						"stroke-width": q.getCurText("stroke_width") ?? 0,
+						"font-size": q.getCurText("font_size") || 24,
+						"font-family": q.getCurText("font_family") || "Roboto",
+						"text-anchor": "start",
 						"xml:space": "preserve",
 						opacity: i.opacity
 					}
 				});
+				if (txtElem) txtElem.textContent = "Lorem Ipsum";
 				break;
+			}
 			case "path":
 			case "pathedit":
 				q.setStartX(q.getStartX() * r), q.setStartY(q.getStartY() * r), q.pathActions.mouseDown(e, m, q.getStartX(), q.getStartY()), q.setStarted(!0);
@@ -68469,7 +68484,7 @@ var ez = function(e) {
 			text: {
 				stroke_width: 0,
 				font_size: 24,
-				font_family: "Serif"
+				font_family: "Roboto"
 			},
 			initOpacity: 1,
 			initTool: "select",

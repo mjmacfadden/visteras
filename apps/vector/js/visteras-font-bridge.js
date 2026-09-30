@@ -393,6 +393,12 @@ export function mountVisterasFontPicker({ svgEditor } = {}) {
 	// Preload default + set UI
 	setLabel(current);
 	loadFontFamily({ family: current, source: 'google' }).catch(() => {});
+	if (svgEditor) {
+		const sc = svgEditor.svgCanvas || svgEditor;
+		if (sc && typeof sc.setCurText === 'function') {
+			sc.setCurText('font_family', current);
+		}
+	}
 
 	return {
 		selectFamily,
