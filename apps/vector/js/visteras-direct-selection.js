@@ -205,6 +205,20 @@ export function mountDirectSelection(editor) {
   }
   function schedule() { if (!pending) pending = requestAnimationFrame(refresh); }
   function clearPoints() { for (const rec of records) rec.selected.clear(); }
+  // Illustrator: clicking another object without Shift fully deselects the
+  // previous ones (no leftover hollow anchors, outlines or handles).
+  function keepOnly(rec) { records = records.filter(r => r === rec); }
+  // Anchor under the pointer (screen px) for an object that has no grips yet.
+  function anchorHit(el, e, radius = 5) {
+    const m = el.getScreenCTM(); if (!m) return null;
+    const segs = records.find(r => r.el === el)?.segments || readGeometry(el);
+    let best = null;
+    for (const a of anchors(segs)) {
+      const s = segs[a.index], p = new DOMPoint(s.x, s.y).matrixTransform(m), d = Math.hypot(p.x - e.clientX, p.y - e.clientY);
+      if (d <= radius && (!best || d < best.d)) best = { index: a.index, d };
+    }
+    return best;
+  }
   function snapshot() {
     return records.filter(r => r.el.isConnected).map(rec => ({ rec, d: rec.el.getAttribute('d'), segments: readGeometry(rec.el), inverse: matrix(rec.el).inverse() }));
   }
@@ -245,7 +259,11 @@ export function mountDirectSelection(editor) {
         else if (item.d !== null) item.rec.el.setAttribute('d', item.d);
       }
       if (g.selection) records.forEach((r,i) => { r.selected = new Set(g.selection[i] || []); });
-    } else if (g.type !== 'marquee') {
+    } else if (g.type === 'marquee') {
+      // Objects the marquee caught no anchors of are deselected (Illustrator);
+      // a plain click on empty canvas therefore clears everything.
+      records = records.filter(r => r.selected.size);
+    } else {
       if (g.moved) commit(g.before, g.type === 'control' ? 'Move direction handle' : 'Move anchors');
       else if (g.collapse) { clearPoints(); g.collapse.rec.selected.add(g.collapse.index); }
     }
@@ -513,23 +531,29 @@ export function mountDirectSelection(editor) {
         rec.selected.has(index) ? rec.selected.delete(index) : rec.selected.add(index);
         schedule(); return;
       }
+      if (!control) keepOnly(rec);
       const collapse = !control && rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
       if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
       gesture = { type: control ? 'control' : 'anchors', rec, index, control, start: position(e), before: snapshot(), collapse };
-    } else if (snapCandidate) {
-      const rec = prepare(snapCandidate.el);
-      const index = snapCandidate.anchorIndex;
+    } else if (snapCandidate || (artwork && anchorHit(artwork, e))) {
+      // Clicking a specific anchor: only it is active, the object's other
+      // anchors show hollow; Shift toggles anchors.
+      const hitEl = snapCandidate ? snapCandidate.el : artwork;
+      const rec = prepare(hitEl);
+      const index = snapCandidate ? snapCandidate.anchorIndex : anchorHit(artwork, e).index;
       if (e.shiftKey) {
         rec.selected.has(index) ? rec.selected.delete(index) : rec.selected.add(index);
         schedule(); return;
       }
+      keepOnly(rec);
       const collapse = rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
       if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
       gesture = { type: 'anchors', rec, index, control: null, start: position(e), before: snapshot(), collapse };
     } else if (artwork) {
       const rec = prepare(artwork);
       if (!rec) return;
-      if (!e.shiftKey) clearPoints();
+      // Body/segment click: the object with ALL anchors active.
+      if (!e.shiftKey) { keepOnly(rec); clearPoints(); }
       const all = anchors(rec.segments).map(a => a.index);
       const deselect = e.shiftKey && all.every(i => rec.selected.has(i));
       for (const i of all) deselect ? rec.selected.delete(i) : rec.selected.add(i);

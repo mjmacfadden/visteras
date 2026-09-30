@@ -31,9 +31,9 @@ function setup(mode='select', count=1) {
     selectorManager:{selectorParentGroup:overlay,selectorGripsGroup:grips,selectors:[{selectorGroup:native}]},call(){},
     addCommandToHistory:c=>history.push(c),history:{BatchCommand:class{constructor(){this.items=[];}addSubCommand(c){this.items.push(c);}},ChangeElementCommand:class{constructor(el,old){this.el=el;this.old=old;}}}};
   const document={head:new Node(),createElementNS:()=>new Node(),createElement:()=>new Node(),getElementById:()=>({}),addEventListener:(type,fn)=>(events[type]??=[]).push(fn)};
-  const context=vm.createContext({document,window:{addEventListener(){}},mountDirectSelection(){},requestAnimationFrame:f=>(frames.push(f),frames.length),MutationObserver:class{observe(){}},DOMMatrix:Matrix,DOMPoint:class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(m){return {x:m.a*this.x+m.c*this.y+m.e,y:m.b*this.x+m.d*this.y+m.f};}}});
+  const context=vm.createContext({document,window:{addEventListener(){}},mountDirectSelection(){},mountNudge(){},requestAnimationFrame:f=>(frames.push(f),frames.length),MutationObserver:class{observe(){}},DOMMatrix:Matrix,DOMPoint:class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(m){return {x:m.a*this.x+m.c*this.y+m.e,y:m.b*this.x+m.d*this.y+m.f};}}});
   context.sc = sc;
-  vm.runInContext(fs.readFileSync(new URL('../js/visteras-selection.js',import.meta.url),'utf8').replace(/^import .*;$/m,'').replace('export function','function')+';mountSelectionTools({svgCanvas:sc});',context);
+  vm.runInContext(fs.readFileSync(new URL('../js/visteras-selection.js',import.meta.url),'utf8').replace(/^import .*;$/gm,'').replace('export function','function')+';mountSelectionTools({svgCanvas:sc});',context);
   const flush=()=>{while(frames.length)frames.shift()();};flush();
   const fire=(type,props={})=>{const e={button:0,clientX:100,clientY:50,preventDefault(){},stopImmediatePropagation(){this.stopped=true;},...props};for(const fn of events[type]||[]){fn(e);if(e.stopped)break;}};
   const handle=dir=>overlay.children[0].children.find(n=>n.attrs['data-selection-handle']===dir);

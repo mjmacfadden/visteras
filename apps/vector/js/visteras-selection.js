@@ -1,7 +1,9 @@
-import { mountDirectSelection } from './visteras-direct-selection.js?v=snap-point-direct-2';
+import { mountDirectSelection } from './visteras-direct-selection.js?v=ds-illustrator-1';
+import { mountNudge } from './visteras-nudge.js?v=nudge-1';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {
   mountDirectSelection(editor);
+  mountNudge(editor);
   const sc = editor.svgCanvas;
   const ns = 'http://www.w3.org/2000/svg';
   // SVGEdit still uses selectors internally for hit testing and geometry.
