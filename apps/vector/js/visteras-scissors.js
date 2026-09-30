@@ -282,7 +282,7 @@ export function mountScissorsTool(editor) {
   window.addEventListener('mousedown', (e) => {
     if (sc.getMode() !== MODE || e.button !== 0) return;
     if (!sc.getSvgRoot?.().contains(e.target) && !document.getElementById('svgcanvas')?.contains(e.target)) return;
-    if (e.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) return;
+    if (e.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel, #vdock, #vdock_flyout')) return;
 
     const hit = findBestHit(e.clientX, e.clientY);
     if (!hit) return; // mid-segment / empty canvas — no cut

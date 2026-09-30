@@ -1,0 +1,378 @@
+/* ==========================================================================
+   Visteras Vector — Collapsed Panel Dock & Flyout System
+   Matches Illustrator collapsed iconic dock pattern with Studio dark theme
+   ========================================================================== */
+
+#vdock {
+  grid-area: dock !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 100% !important;
+  background-color: var(--studio-panel-bg, #242424) !important;
+  border-left: 1px solid var(--studio-border-dark, #1a1a1a) !important;
+  border-right: 1px solid var(--studio-border-dark, #1a1a1a) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  padding: 4px 0 !important;
+  user-select: none !important;
+  z-index: 45 !important;
+  overflow: hidden !important;
+}
+
+.vdock-chevron {
+  width: 28px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #777777;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  padding: 0;
+  transition: color 0.12s, background 0.12s;
+}
+
+.vdock-chevron:hover {
+  color: #ffffff;
+  background: #2f2f2f;
+}
+
+.vdock-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.vdock-separator {
+  width: 20px;
+  height: 1px;
+  background: #333333;
+  margin: 6px 0;
+}
+
+.vdock-icon {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #999999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  position: relative;
+  transition: color 0.12s, background 0.12s;
+}
+
+.vdock-icon:hover {
+  color: #ffffff;
+  background: #2f2f2f;
+}
+
+.vdock-icon.active,
+.vdock-icon[aria-expanded="true"] {
+  color: #ffffff;
+  background: #333333;
+  box-shadow: inset -2px 0 0 var(--studio-orange, #fa7c1b);
+}
+
+/* ==========================================================================
+   Flyout Panel Container (Left of Dock Strip)
+   ========================================================================== */
+
+#vdock_flyout {
+  position: fixed;
+  z-index: 1000;
+  background: var(--studio-panel-bg, #282828);
+  border: 1px solid var(--studio-border-dark, #1a1a1a);
+  border-radius: 4px 0 0 4px;
+  box-shadow: -8px 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+  box-sizing: border-box;
+  min-width: 220px;
+  max-width: 480px;
+  width: 240px;
+}
+
+.vdock-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  z-index: 100;
+}
+
+.vdock-resize-handle:hover,
+.vdock-resize-handle.active {
+  background: rgba(250, 124, 27, 0.4);
+}
+
+.vdock-flyout-header {
+  height: 28px;
+  min-height: 28px;
+  background: #202020;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px 0 10px;
+  box-sizing: border-box;
+}
+
+.vdock-flyout-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #cccccc;
+}
+
+.vdock-flyout-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+}
+
+.vdock-tab-btn {
+  background: transparent !important;
+  border: none !important;
+  border-right: 1px solid #1c1c1c !important;
+  border-bottom: 2px solid transparent !important;
+  color: #8c8c8c !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  padding: 0 12px !important;
+  cursor: pointer !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  transition: background 0.15s, color 0.15s, border-color 0.15s !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.vdock-tab-btn:hover {
+  color: #e0e0e0 !important;
+  background-color: #2b2b2b !important;
+}
+
+.vdock-tab-btn.active {
+  color: #ffffff !important;
+  background-color: #282828 !important;
+  border-bottom-color: var(--studio-orange, #fa7c1b) !important;
+}
+
+.vdock-collapse-btn {
+  background: transparent;
+  border: none;
+  color: #888888;
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.vdock-collapse-btn:hover {
+  color: #ffffff;
+  background: #333333;
+}
+
+.vdock-flyout-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   Panel Panes Inside Flyout Body
+   ========================================================================== */
+
+.vdock-panel-pane {
+  display: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vdock-panel-pane.active {
+  display: block;
+}
+
+/* Layers panel inside flyout */
+#vdock_flyout #layerpanel {
+  display: block !important;
+  width: 100% !important;
+  padding: 6px !important;
+  box-sizing: border-box !important;
+}
+
+#vdock_flyout #layersLabel {
+  display: none !important;
+}
+
+/* Color & Swatches inside flyout */
+#vdock_flyout #vcs_color_panel,
+#vdock_flyout #vcs_swatches_panel {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px !important;
+}
+
+/* Stroke Panel inside flyout */
+#vdock_stroke_panel {
+  padding: 10px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 11px;
+  color: #cccccc;
+}
+
+.vdock-stroke-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vdock-stroke-label {
+  font-size: 11px;
+  color: #aaaaaa;
+  font-weight: 500;
+  min-width: 68px;
+}
+
+.vdock-stroke-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.vdock-stroke-weight-box {
+  display: flex;
+  align-items: center;
+  background: #1c1c1c;
+  border: 1px solid #383838;
+  border-radius: 3px;
+  height: 24px;
+  padding: 0 4px;
+  width: 80px;
+}
+
+.vdock-stroke-weight-box input {
+  background: transparent;
+  border: none;
+  color: #eeeeee;
+  font-size: 11px;
+  width: 100%;
+  outline: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gradient Panel Stub */
+#vdock_gradient_panel {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #aaaaaa;
+  text-align: center;
+  font-size: 11px;
+}
+
+.vdock-gradient-ramp-preview {
+  width: 100%;
+  height: 28px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #111111 0%, #fa7c1b 50%, #ffffff 100%);
+  border: 1px solid #444444;
+}
+
+.vdock-gradient-stub-text {
+  line-height: 1.4;
+  color: #888888;
+}
+
+/* Window Menu Checkmarks */
+.menu_dropdown_item .menu_check {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--studio-orange, #fa7c1b);
+  margin-left: auto;
+  display: inline-block;
+  min-width: 14px;
+  text-align: right;
+}
+
+.menu_dropdown_item .menu_dropdown_shortcut {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+/* Responsive & Fullscreen Panel Visibility */
+.svg_editor.visteras-properties-hidden {
+  grid-template-columns: 36px 16px 1fr 36px 0 !important;
+}
+
+.svg_editor.visteras-rulers-hidden.visteras-properties-hidden {
+  grid-template-columns: 36px 0 1fr 36px 0 !important;
+}
+
+.svg_editor.visteras-properties-hidden #sidepanels {
+  display: none !important;
+}
+
+.svg_editor.visteras-panels-hidden {
+  grid-template-columns: 36px 16px 1fr 0 0 !important;
+}
+
+.svg_editor.visteras-rulers-hidden.visteras-panels-hidden {
+  grid-template-columns: 36px 0 1fr 0 0 !important;
+}
+
+.svg_editor.visteras-panels-hidden #vdock,
+.svg_editor.visteras-panels-hidden #sidepanels,
+.svg_editor.visteras-panels-hidden #vdock_flyout {
+  display: none !important;
+}
+
+@media (max-width: 899px) {
+  .svg_editor {
+    grid-template-columns: 36px 16px 1fr 36px 0 !important;
+  }
+  .svg_editor.visteras-rulers-hidden {
+    grid-template-columns: 36px 0 1fr 36px 0 !important;
+  }
+  .svg_editor #sidepanels {
+    display: none !important;
+  }
+}

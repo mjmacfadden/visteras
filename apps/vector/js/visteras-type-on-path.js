@@ -912,7 +912,7 @@ function armTypeOnPathMode(svgEditor) {
   const onPointerMove = (evt) => {
     if (!svgEditor._waitingForTypeOnPath) return;
 
-    if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) {
+    if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel, #vdock, #vdock_flyout')) {
       if (lastHovered) {
         lastHovered.classList.remove('visteras-top-mode-hover-target');
         if (!lastHovered.classList.contains('visteras-top-selected')) {
@@ -966,7 +966,7 @@ function armTypeOnPathMode(svgEditor) {
   const onPointerDown = (evt) => {
     if (!svgEditor._waitingForTypeOnPath) return;
 
-    if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) {
+    if (evt.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel, #vdock, #vdock_flyout')) {
       return;
     }
 

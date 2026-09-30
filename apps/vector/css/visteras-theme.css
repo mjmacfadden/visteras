@@ -226,13 +226,14 @@ html, body {
   /* Col 1: 36px left toolbar
      Col 2: 16px ruler Y
      Col 3: 1fr workspace
-     Col 4: 240px right panel */
-  grid-template-columns: 36px 16px 1fr 240px !important;
+     Col 4: 36px dock
+     Col 5: 240px right panel */
+  grid-template-columns: 36px 16px 1fr 36px 240px !important;
   grid-template-areas:
-    "top top top top"
-    "left corner rulerX side"
-    "left rulerY workarea side"
-    "bottom bottom bottom bottom" !important;
+    "top top top top top"
+    "left corner rulerX dock side"
+    "left rulerY workarea dock side"
+    "bottom bottom bottom bottom bottom" !important;
   background: var(--studio-chassis-bg) !important;
   font-family: var(--ui-font) !important;
   color: var(--studio-text) !important;

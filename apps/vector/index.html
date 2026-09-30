@@ -24,6 +24,7 @@
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
+  <link href="./css/visteras-panel-dock.css?v=dock-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -137,6 +138,13 @@
         <div class="menu_entry" id="menu_window">
           <div class="menu_entry_title">Window</div>
           <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_window_color">Color <span class="menu_dropdown_shortcut">F6</span></div>
+            <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
+            <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
+            <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_window_properties">Properties</div>
             <div class="menu_dropdown_item" id="action_window_pathfinder">Pathfinder</div>
           </div>
         </div>
@@ -241,6 +249,7 @@
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
+    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
 
     // Studio-style Toast Notification System (replaces standard browser alert() modals)
     function showStudioToast(message, type = 'error', duration = 3500) {
@@ -912,7 +921,33 @@
         } else {
           pathfinderPanel.style.display = 'none';
         }
+        window.__visterasDock?.updateWindowMenuCheckmarks?.();
       }
+
+      // Window Menu Panel Toggles
+      document.getElementById('action_window_color')?.addEventListener('click', () => {
+        window.__visterasDock?.toggle?.('color');
+      });
+
+      document.getElementById('action_window_swatches')?.addEventListener('click', () => {
+        window.__visterasDock?.toggle?.('swatches');
+      });
+
+      document.getElementById('action_window_stroke')?.addEventListener('click', () => {
+        window.__visterasDock?.toggle?.('stroke');
+      });
+
+      document.getElementById('action_window_gradient')?.addEventListener('click', () => {
+        window.__visterasDock?.toggle?.('gradient');
+      });
+
+      document.getElementById('action_window_layers')?.addEventListener('click', () => {
+        window.__visterasDock?.toggle?.('layers');
+      });
+
+      document.getElementById('action_window_properties')?.addEventListener('click', () => {
+        window.__visterasDock?.toggleProperties?.();
+      });
 
       document.getElementById('action_window_pathfinder')?.addEventListener('click', () => {
         togglePathfinderPanel();
@@ -920,6 +955,7 @@
 
       pathfinderClose?.addEventListener('click', () => {
         if (pathfinderPanel) pathfinderPanel.style.display = 'none';
+        window.__visterasDock?.updateWindowMenuCheckmarks?.();
       });
 
       // Draggable panel by its header
@@ -2259,6 +2295,9 @@
 
     // Color system: Color|Swatches tabs, picker modal, toolbar + Appearance fill/stroke
     mountVisterasColorSystem({ svgEditor });
+
+    // Iconic panel dock: Color, Swatches, Stroke, Gradient, Layers
+    mountVisterasPanelDock({ svgEditor });
   </script>
 <script src="tool-free.js"></script>
 </body>

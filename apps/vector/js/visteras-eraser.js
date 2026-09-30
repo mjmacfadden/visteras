@@ -483,7 +483,7 @@ export function mountEraserTool(editor) {
     if (!canvasContainer || (!canvasContainer.contains(e.target) && !sc.getSvgRoot?.().contains(e.target))) {
       return;
     }
-    if (e.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel')) {
+    if (e.target.closest?.('#sidepanels, #tools_left, #menu_bar, .menu_bar, #tools_top, #properties_panel, #vdock, #vdock_flyout')) {
       return;
     }
 

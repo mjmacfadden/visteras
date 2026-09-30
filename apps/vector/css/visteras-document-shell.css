@@ -7,16 +7,17 @@
    Left toolbar stays in the left column — tabs must NOT sit above/over tools. */
 .svg_editor {
   grid-template-rows: 45px 28px 16px 1fr 24px !important;
+  grid-template-columns: 36px 16px 1fr 36px 240px !important;
   grid-template-areas:
-    "top top top top"
-    "left tabs tabs side"
-    "left corner rulerX side"
-    "left rulerY workarea side"
-    "bottom bottom bottom bottom" !important;
+    "top top top top top"
+    "left tabs tabs dock side"
+    "left corner rulerX dock side"
+    "left rulerY workarea dock side"
+    "bottom bottom bottom bottom bottom" !important;
 }
 
 .svg_editor.visteras-rulers-hidden {
-  grid-template-columns: 36px 0 1fr 240px !important;
+  grid-template-columns: 36px 0 1fr 36px 240px !important;
   grid-template-rows: 45px 28px 0 1fr 24px !important;
 }
 

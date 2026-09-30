@@ -1718,6 +1718,10 @@ function paintWell(el, paint, which) {
 }
 
 function activateVcsTab(tab) {
+  if (window.__visterasDock) {
+    window.__visterasDock.open(tab === 'swatches' ? 'swatches' : 'color');
+    return;
+  }
   const block = document.getElementById('vcs_colors_block');
   if (!block) return;
   const tabs = {
@@ -2341,16 +2345,52 @@ function mountAppearanceColors(ctrl, svgEditor) {
     setAlignButtons(readStrokeAlign());
   }
 
-  const openFor = (target) => {
+  const handleChipClick = (target, chip, e) => {
+    e.stopPropagation();
     ctrl.setActiveTarget(target, { syncColor: true });
-    ctrl.openPicker(target);
+    if (window.__visterasDock) {
+      const panel = e.shiftKey ? 'color' : 'swatches';
+      window.__visterasDock.open(panel, { anchor: chip });
+    } else {
+      ctrl.openPicker(target);
+    }
   };
 
-  fillChip.addEventListener('click', (e) => { e.stopPropagation(); openFor('fill'); });
-  strokeChip.addEventListener('click', (e) => { e.stopPropagation(); openFor('stroke'); });
-  // Words "Fill" / "Stroke" open the color picker modal (Illustrator-like).
-  fillTarget?.addEventListener('click', (e) => { e.stopPropagation(); openFor('fill'); });
-  strokeTarget?.addEventListener('click', (e) => { e.stopPropagation(); openFor('stroke'); });
+  fillChip.addEventListener('click', (e) => handleChipClick('fill', fillChip, e));
+  strokeChip.addEventListener('click', (e) => handleChipClick('stroke', strokeChip, e));
+
+  fillChip.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    ctrl.setActiveTarget('fill', { syncColor: true });
+    ctrl.openPicker('fill');
+  });
+  strokeChip.addEventListener('dblclick', (e) => {
+    e.stopPropagation();
+    ctrl.setActiveTarget('stroke', { syncColor: true });
+    ctrl.openPicker('stroke');
+  });
+
+  // Clicking word "Fill" opens Swatches flyout (or Color on Shift-click)
+  fillTarget?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ctrl.setActiveTarget('fill', { syncColor: true });
+    if (window.__visterasDock) {
+      window.__visterasDock.open(e.shiftKey ? 'color' : 'swatches');
+    } else {
+      ctrl.openPicker('fill');
+    }
+  });
+
+  // Clicking word "Stroke" opens Stroke flyout
+  strokeTarget?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ctrl.setActiveTarget('stroke', { syncColor: true });
+    if (window.__visterasDock) {
+      window.__visterasDock.open('stroke');
+    } else {
+      ctrl.openPicker('stroke');
+    }
+  });
   fillNone?.addEventListener('click', (e) => {
     e.stopPropagation();
     ctrl.setActiveTarget('fill', { syncColor: false });

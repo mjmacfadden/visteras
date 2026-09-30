@@ -636,7 +636,7 @@ export function mountShapeBuilderTool(editor) {
     const t = e.target;
     const canvasEl = document.getElementById('svgcanvas');
     if (!canvasEl || !(t instanceof Node) || !canvasEl.contains(t)) return false;
-    if (t.closest?.('#sidepanels, #tools_left, #tools_top, #rulers, .ruler, #properties_panel')) return false;
+    if (t.closest?.('#sidepanels, #tools_left, #tools_top, #rulers, .ruler, #properties_panel, #vdock, #vdock_flyout')) return false;
     return true;
   }
 
