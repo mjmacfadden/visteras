@@ -1,18 +1,18 @@
 /**
- * Visteras Vector — Image Trace (Illustrator-style live trace).
+ * Visteras Vector — Image Trace (Illustrator-style, dialog driven).
  *
- * - Object > Image Trace > Make / Release / Expand, a docked non-modal Image
- *   Trace panel, and Properties-bar controls.
+ * - Object > Image Trace… (enabled for a single raster image) opens a
+ *   draggable modal dialog with the preset, View, eye and sliders.
  * - The trace is previewed IN PLACE on the artboard: the source <image> is
- *   hidden while the live result shows, re-tracing (in a Web Worker running
+ *   hidden while the result shows, re-tracing (in a Web Worker running
  *   VisionCortex VTracer) after a slider is released.
- * - Live object model:
+ * - Transient preview model (never in history):
  *     <g class="visteras-live-trace" data-visteras-trace="1" data-trace-view="…" data-trace-settings='{…}'>
  *       <image data-trace-source="1" display="none" …/>
  *       <g data-trace-result="1" transform="…"> …paths in source-pixel coordinates… </g>
  *     </g>
- * - Make, Expand, Release and committed option edits ("Tracing Options") are
- *   one undo step each; preview re-traces stay out of history.
+ * - Cancel / Esc restores the image exactly with no history. Expand / Enter
+ *   replaces the image with grouped paths as ONE undo step ("Image Trace").
  *
  * Pure helpers live in visteras-image-trace-core.js (shared with the worker
  * and the Node tests).
@@ -124,7 +124,7 @@ const CROSS_ORIGIN_MESSAGE = 'This image comes from another website, so the brow
 
 /**
  * Decode the source. If the CORS request fails we retry without CORS: if that
- * loads, reading pixels throws a SecurityError that is reported in-panel (B9).
+ * loads, reading pixels throws a SecurityError that is reported in the dialog (B9).
  */
 async function loadSource(href) {
   try {
@@ -400,14 +400,6 @@ function liveParts(group) {
   return { image, result };
 }
 
-function readSettings(group) {
-  try {
-    return normalizeSettings(JSON.parse(group.getAttribute('data-trace-settings') || '{}'));
-  } catch (_) {
-    return normalizeSettings({});
-  }
-}
-
 function settingsJson(settings) {
   const s = normalizeSettings(settings);
   delete s.view;
@@ -510,10 +502,6 @@ function consolidatedMatrix(el) {
   return svg.createSVGMatrix();
 }
 
-function combinedTransformAttr(...els) {
-  return els.map((el) => el?.getAttribute('transform')).filter(Boolean).join(' ');
-}
-
 // ---------------------------------------------------------------------------
 // Controller state
 // ---------------------------------------------------------------------------
@@ -522,13 +510,14 @@ const ctl = {
   svgEditor: null,
   sc: null,
   engine: new TraceEngine(),
-  panel: null,
+  dialog: null, // { backdrop, box }
   session: null,
-  settings: presetSettings('default'), // panel state (last used)
+  settings: presetSettings('default'), // dialog state (last used)
   debounce: 0,
   overlay: null,
   overlayRaf: 0,
   timings: [],
+  selecting: false,
 };
 
 function sc() {
@@ -543,7 +532,7 @@ function selectedElements() {
   }
 }
 
-/** The single selected raster image (not a live source), or null. */
+/** The single selected raster image (not inside a live trace), or null. */
 function selectedImage() {
   const sel = selectedElements();
   if (sel.length !== 1) return null;
@@ -552,6 +541,7 @@ function selectedImage() {
   return null;
 }
 
+/** A legacy live-trace group (documents saved from the earlier live-trace build). */
 function selectedLiveTrace() {
   const sel = selectedElements();
   if (sel.length !== 1) return null;
@@ -560,16 +550,18 @@ function selectedLiveTrace() {
   return el.closest?.('[data-visteras-trace="1"]') || null;
 }
 
+function undoStackSize() {
+  try { return sc().undoMgr.getUndoStackSize(); } catch (_) { return -1; }
+}
+
 function refreshUi() {
   try { ctl.svgEditor.topPanel?.updateContextPanel?.(); } catch (_) { /* ignore */ }
   try { window.__updatePropertiesVisibility?.(); } catch (_) { /* ignore */ }
-  syncPanel();
+  syncDialog();
   syncPropsControls();
 }
 
 function selectOnly(el) {
-  // Our own re-selection must not look like "the user clicked away"
-  // (that would commit the pending preview into history).
   ctl.selecting = true;
   try {
     sc().clearSelection();
@@ -580,52 +572,30 @@ function selectOnly(el) {
   }
 }
 
-// ---- Sessions ----------------------------------------------------------------
+// ---- Session -------------------------------------------------------------------
 //
-// A session is the in-progress edit of one target:
-//   kind 'image': a raster image traced for the first time. The live group is
-//                 created on the first preview (not in history);
-//                 commit = "Make Image Trace", cancel restores the image.
-//   kind 'live' : an existing live trace whose options are being edited.
-//                 commit = "Tracing Options", cancel restores the old result.
+// One session per open Image Trace dialog. The preview wraps the image in a
+// transient live group (never in history). Cancel unwraps it exactly; Expand
+// replaces the image with the traced paths as ONE history step.
 
-function baseSession() {
+function newSession(image, settings) {
   return {
+    image,
+    group: null,
+    orig: null,
+    settings: normalizeSettings(settings),
+    view: 'result',
     src: null, // {img, srcW, srcH}
     previewPixels: null,
     lastResult: null,
     stats: null,
     dirty: false,
     busy: false,
+    committing: false,
     status: null,
     error: null,
     warning: null,
-  };
-}
-
-function newImageSession(image, settings) {
-  return {
-    ...baseSession(),
-    kind: 'image',
-    image,
-    group: null,
-    settings: normalizeSettings(settings),
-    view: 'result',
-    orig: null,
-  };
-}
-
-function newLiveSession(group) {
-  const { image, result } = liveParts(group);
-  return {
-    ...baseSession(),
-    kind: 'live',
-    image,
-    group,
-    settings: readSettings(group),
-    view: readView(group),
-    origResult: result,
-    origSettingsJson: group.getAttribute('data-trace-settings') || settingsJson(readSettings(group)),
+    undoSize: undoStackSize(),
   };
 }
 
@@ -638,7 +608,7 @@ async function ensureSource(session) {
   return session.src;
 }
 
-/** Image session: wrap the image in a (not-yet-historic) live group. */
+/** Wrap the image in a transient (not-in-history) live group for the preview. */
 function beginLiveGroup(session) {
   if (session.group) return session.group;
   const image = session.image;
@@ -648,6 +618,7 @@ function beginLiveGroup(session) {
     next: image.nextSibling,
     transform: image.getAttribute('transform'),
     display: image.getAttribute('display'),
+    style: image.getAttribute('style'), // restored verbatim (CSSOM edits reserialize it)
   };
   const g = document.createElementNS(SVG_NS, 'g');
   g.setAttribute('id', sc().getNextId());
@@ -665,7 +636,7 @@ function beginLiveGroup(session) {
   return g;
 }
 
-/** Cancel: put the image back exactly as it was. */
+/** Put the image back exactly as it was and drop the preview group. */
 function endLiveGroup(session) {
   const { group, image, orig } = session;
   if (!group || !orig) return;
@@ -676,12 +647,13 @@ function endLiveGroup(session) {
   if (orig.display) image.setAttribute('display', orig.display);
   else image.removeAttribute('display');
   image.removeAttribute('data-trace-source');
-  image.style.removeProperty('display');
+  if (orig.style != null) image.setAttribute('style', orig.style);
+  else image.removeAttribute('style');
   group.remove();
   session.group = null;
 }
 
-/** Swap the result group shown in a session's live group (no history). */
+/** Swap the result group shown in the session's live group (no history). */
 function showResult(session, result) {
   const { group } = session;
   const { result: current } = liveParts(group);
@@ -750,7 +722,7 @@ function setBusy(session, busy) {
   session.busy = busy;
   if (busy) showOverlay();
   else hideOverlay();
-  syncPanel();
+  syncDialog();
 }
 
 function noteTraceError(session, err) {
@@ -763,19 +735,18 @@ function noteTraceError(session, err) {
   session.error = err?.message || String(err);
 }
 
-/** Preview re-trace (only while Preview is checked). Out of history. */
+/** Preview re-trace (only while Preview is checked). Never in history. */
 async function requestPreview() {
   const session = ctl.session;
-  if (!session || !previewEnabled()) return;
+  if (!session || session.committing || !previewEnabled()) return;
   session.error = null;
   session.status = null;
   setBusy(session, true);
   try {
-    await ensureSource(session);
     const res = await runTrace(session, { full: false });
-    if (ctl.session !== session) return;
-    if (session.kind === 'image') beginLiveGroup(session);
-    const template = liveParts(session.group).result || session.origResult;
+    if (ctl.session !== session || session.committing) return;
+    beginLiveGroup(session);
+    const template = liveParts(session.group).result;
     const result = buildResultGroup(sc(), session.image, res.srcW, res.srcH, res.paths, res.hierarchical, template);
     session.group.setAttribute('data-trace-settings', settingsJson(session.settings));
     showResult(session, result);
@@ -787,184 +758,27 @@ async function requestPreview() {
     selectOnly(session.group);
     refreshUi();
   } catch (err) {
-    if (ctl.session !== session) return;
+    if (ctl.session !== session || session.committing) return;
     if (err?.code === 'stale') return; // the newer job owns the busy state
     noteTraceError(session, err);
     setBusy(session, false);
-    // Esc before the first result of a new trace: nothing to keep → restore.
-    if (err?.code === 'aborted' && session.kind === 'image' && !session.lastResult) cancelSession();
-    syncPanel();
   }
 }
 
-/**
- * Commit the session: full-resolution trace (≤ 8 MP) if the preview was
- * downscaled or is out of date, then ONE history step.
- */
-async function commitSession({ select = true } = {}) {
-  const session = ctl.session;
-  if (!session) return null;
-  session.error = null;
-  let res = session.lastResult;
-  const key = settingsJson(session.settings);
+/** Full-resolution result (≤ 8 MP) unless the preview is already exact and current. */
+async function finalResult(session) {
+  const res = session.lastResult;
+  if (res && res.scale >= 1 && res.key === settingsJson(session.settings)) return res;
+  setBusy(session, true);
   try {
-    if (!res || res.scale < 1 || res.key !== key) {
-      setBusy(session, true);
-      await ensureSource(session);
-      res = await runTrace(session, { full: true });
-      if (ctl.session !== session) return null;
-    }
-  } catch (err) {
-    if (ctl.session !== session) return null;
-    if (err?.code === 'stale') return null;
-    noteTraceError(session, err);
-    setBusy(session, false);
-    if (err?.code === 'aborted' && session.kind === 'image' && !session.lastResult) cancelSession();
-    syncPanel();
-    return null;
+    return await runTrace(session, { full: true });
+  } finally {
+    if (ctl.session === session) setBusy(session, false);
   }
-  const warning = res.scale < 1
-    ? `This image is ${res.megapixels.toFixed(1)} MP; it was traced at ${(res.megapixels * res.scale * res.scale).toFixed(1)} MP (the 8 MP limit).`
-    : null;
-  setBusy(session, false);
-  const canvas = sc();
-  const { BatchCommand, ChangeElementCommand, MoveElementCommand, InsertElementCommand } = canvas.history;
-  let group;
-  if (session.kind === 'image') {
-    const hadGroup = !!session.group;
-    group = beginLiveGroup(session);
-    const template = hadGroup ? liveParts(group).result : null;
-    const result = buildResultGroup(canvas, session.image, res.srcW, res.srcH, res.paths, res.hierarchical, template);
-    group.setAttribute('data-trace-settings', settingsJson(session.settings));
-    showResult(session, result);
-    const { image, orig } = session;
-    // Make Image Trace = [image attrs, image → live group, insert live group]
-    const batch = new BatchCommand('Make Image Trace');
-    batch.addSubCommand(new ChangeElementCommand(image, {
-      transform: orig.transform, display: orig.display, 'data-trace-source': null,
-    }, 'Image Trace source'));
-    batch.addSubCommand(new MoveElementCommand(image, orig.next && orig.next.parentNode === orig.parent ? orig.next : null, orig.parent));
-    batch.addSubCommand(new InsertElementCommand(group));
-    canvas.undoMgr.addCommandToHistory(batch);
-  } else {
-    group = session.group;
-    const template = liveParts(group).result || session.origResult;
-    const newResult = buildResultGroup(canvas, session.image, res.srcW, res.srcH, res.paths, res.hierarchical, template);
-    const newJson = settingsJson(session.settings);
-    showResult(session, newResult);
-    group.setAttribute('data-trace-settings', newJson);
-    const batch = new BatchCommand('Tracing Options');
-    batch.addSubCommand(makeSwapResultCommand(canvas, group, session.origResult, newResult, session.origSettingsJson, newJson));
-    canvas.undoMgr.addCommandToHistory(batch);
-  }
-  ctl.engine.dispose(); // terminate the worker after commit
-  ctl.settings = normalizeSettings(session.settings);
-  // Keep editing the (now committed) live object.
-  const next = newLiveSession(group);
-  next.stats = res.stats;
-  next.status = `Traced · ${res.ms} ms`;
-  next.warning = warning;
-  next.src = session.src;
-  next.previewPixels = session.previewPixels;
-  ctl.session = next;
-  if (select) selectOnly(group);
-  refreshUi();
-  return group;
 }
 
-/** Custom history command: swap one result group for another + the settings JSON. */
-function makeSwapResultCommand(canvas, group, oldResult, newResult, oldJson, newJson) {
-  const Base = canvas.history.Command;
-  const swap = (from, to, json) => {
-    if (from && from.parentNode === group) group.replaceChild(to, from);
-    else if (!to.parentNode) group.appendChild(to);
-    group.setAttribute('data-trace-settings', json);
-    applyView(group);
-  };
-  class SwapTraceResultCommand extends Base {
-    constructor() {
-      super();
-      this.elem = group;
-      this.text = 'Tracing Options';
-    }
-    type() { return 'SwapTraceResultCommand'; }
-    apply(handler) { super.apply(handler, () => swap(oldResult, newResult, newJson)); }
-    unapply(handler) { super.unapply(handler, () => swap(newResult, oldResult, oldJson)); }
-    elements() { return [group]; }
-  }
-  return new SwapTraceResultCommand();
-}
-
-/** Cancel restores the source (image session) or the last committed result (live). */
-function cancelSession() {
-  const session = ctl.session;
-  if (!session) return;
-  clearTimeout(ctl.debounce);
-  ctl.engine.abort();
-  hideOverlay();
-  if (session.kind === 'image') {
-    const image = session.image;
-    endLiveGroup(session);
-    ctl.session = newImageSession(image, session.settings);
-    ctl.session.src = session.src;
-    ctl.session.previewPixels = session.previewPixels;
-    ctl.session.status = 'Cancelled';
-    if (image.isConnected) selectOnly(image);
-  } else {
-    const { group, origResult, origSettingsJson } = session;
-    const { result } = liveParts(group);
-    if (result && origResult && result !== origResult) group.replaceChild(origResult, result);
-    group.setAttribute('data-trace-settings', origSettingsJson);
-    applyView(group, session.view);
-    ctl.session = newLiveSession(group);
-    ctl.session.status = 'Cancelled';
-  }
-  if (ctl.panel) writeControls(ctl.session.settings, ctl.session.view);
-  refreshUi();
-}
-
-// ---------------------------------------------------------------------------
-// Make / Expand / Release (menu, Properties bar)
-// ---------------------------------------------------------------------------
-
-async function settlePending() {
-  const s = ctl.session;
-  if (!s) return;
-  if (s.dirty) await commitSession({ select: false });
-  else if (s.busy) cancelSession();
-}
-
-async function makeTrace(image = selectedImage(), presetId = null) {
-  if (!image) {
-    showToast('Select a single raster image, then choose Object > Image Trace > Make.');
-    return null;
-  }
-  await settlePending();
-  const settings = presetId ? presetSettings(presetId) : normalizeSettings(ctl.settings);
-  ctl.session = newImageSession(image, settings);
-  if (ctl.panel) writeControls(settings, 'result');
-  syncPanel();
-  return commitSession();
-}
-
-async function applyPresetToLive(group, presetId) {
-  await settlePending();
-  ctl.session = newLiveSession(group);
-  ctl.session.settings = presetSettings(presetId);
-  if (ctl.panel) writeControls(ctl.session.settings, ctl.session.view);
-  return commitSession();
-}
-
-async function expandTrace(group = selectedLiveTrace()) {
-  if (!group) {
-    showToast('Select a live Image Trace object to expand.');
-    return null;
-  }
-  if (ctl.session?.group === group) {
-    if (ctl.session.dirty) await commitSession({ select: false });
-    else if (ctl.session.busy) cancelSession();
-  }
-  const canvas = sc();
+/** Plain <g> of per-color subgroups with every coordinate baked (from a live group). */
+function buildExpandedGroup(canvas, group) {
   const { result } = liveParts(group);
   const hierarchical = result?.getAttribute('data-trace-hierarchical') || 'cutout';
   const gm = consolidatedMatrix(group);
@@ -990,6 +804,86 @@ async function expandTrace(group = selectedLiveTrace()) {
     }
     out.appendChild(sub);
   }
+  return out;
+}
+
+/**
+ * Dialog Expand: the image becomes grouped vector paths as ONE undo step
+ * ("Image Trace": insert the group + remove the image). Undo restores the image.
+ */
+async function expandSession() {
+  const session = ctl.session;
+  if (!session || session.committing) return null;
+  clearTimeout(ctl.debounce);
+  ctl.debounce = 0;
+  session.committing = true;
+  session.error = null;
+  syncDialog();
+  let res;
+  try {
+    res = await finalResult(session);
+  } catch (err) {
+    if (ctl.session !== session) return null; // cancelled meanwhile
+    session.committing = false;
+    noteTraceError(session, err);
+    setBusy(session, false);
+    return null;
+  }
+  if (ctl.session !== session) return null;
+  const canvas = sc();
+  const image = session.image;
+  // Bake exactly what the live group would show, then put the image back and swap.
+  beginLiveGroup(session);
+  const result = buildResultGroup(canvas, image, res.srcW, res.srcH, res.paths, res.hierarchical, liveParts(session.group).result);
+  showResult(session, result);
+  const out = buildExpandedGroup(canvas, session.group);
+  endLiveGroup(session);
+  const parent = image.parentNode;
+  parent.insertBefore(out, image);
+  const next = image.nextSibling;
+  image.remove();
+  const { BatchCommand, InsertElementCommand, RemoveElementCommand } = canvas.history;
+  const batch = new BatchCommand('Image Trace');
+  batch.addSubCommand(new InsertElementCommand(out));
+  batch.addSubCommand(new RemoveElementCommand(image, next, parent));
+  canvas.undoMgr.addCommandToHistory(batch);
+  ctl.settings = normalizeSettings(session.settings);
+  ctl.session = null;
+  ctl.engine.dispose(); // free the worker (and its wasm memory)
+  hideOverlay();
+  hideDialog();
+  selectOnly(out);
+  refreshUi();
+  if (res.scale < 1) {
+    showToast(`This image is ${res.megapixels.toFixed(1)} MP; it was traced at ${(res.megapixels * res.scale * res.scale).toFixed(1)} MP (the 8 MP limit).`);
+  }
+  return out;
+}
+
+/** Dialog Cancel / Esc: the image comes back exactly, selected; no history. */
+function cancelDialog() {
+  const session = ctl.session;
+  clearTimeout(ctl.debounce);
+  ctl.debounce = 0;
+  ctl.engine.dispose();
+  hideOverlay();
+  ctl.session = null;
+  if (session) {
+    endLiveGroup(session);
+    if (session.image.isConnected) selectOnly(session.image);
+  }
+  hideDialog();
+  refreshUi();
+}
+
+/**
+ * Legacy: a live-trace group saved by the earlier build expands in one step
+ * (reached through Ungroup, since there is no longer a Make/Expand menu).
+ */
+function expandLiveTrace(group = selectedLiveTrace()) {
+  if (!group) return null;
+  const canvas = sc();
+  const out = buildExpandedGroup(canvas, group);
   const { BatchCommand, InsertElementCommand, RemoveElementCommand } = canvas.history;
   const batch = new BatchCommand('Expand Image Trace');
   const parent = group.parentNode;
@@ -999,49 +893,9 @@ async function expandTrace(group = selectedLiveTrace()) {
   group.remove();
   batch.addSubCommand(new RemoveElementCommand(group, next, parent));
   canvas.undoMgr.addCommandToHistory(batch);
-  ctl.session = null;
-  ctl.engine.dispose();
   selectOnly(out);
   refreshUi();
   return out;
-}
-
-async function releaseTrace(group = selectedLiveTrace()) {
-  if (!group) {
-    showToast('Select a live Image Trace object to release.');
-    return null;
-  }
-  if (ctl.session?.group === group && (ctl.session.dirty || ctl.session.busy)) cancelSession();
-  const canvas = sc();
-  const { image } = liveParts(group);
-  if (!image) return null;
-  const { BatchCommand, ChangeElementCommand, MoveElementCommand, RemoveElementCommand } = canvas.history;
-  const batch = new BatchCommand('Release Image Trace');
-  const old = {
-    transform: image.getAttribute('transform'),
-    display: image.getAttribute('display'),
-    'data-trace-source': image.getAttribute('data-trace-source'),
-  };
-  const t = combinedTransformAttr(group, image);
-  if (t) image.setAttribute('transform', t);
-  else image.removeAttribute('transform');
-  image.removeAttribute('display');
-  image.removeAttribute('data-trace-source');
-  image.style.removeProperty('display');
-  batch.addSubCommand(new ChangeElementCommand(image, old, 'Image Trace source'));
-  const oldNext = image.nextSibling;
-  const parent = group.parentNode;
-  parent.insertBefore(image, group);
-  batch.addSubCommand(new MoveElementCommand(image, oldNext, group));
-  const next = group.nextSibling;
-  group.remove();
-  batch.addSubCommand(new RemoveElementCommand(group, next, parent));
-  canvas.undoMgr.addCommandToHistory(batch);
-  ctl.session = null;
-  ctl.engine.dispose();
-  selectOnly(image);
-  refreshUi();
-  return image;
 }
 
 // ---------------------------------------------------------------------------
@@ -1087,12 +941,54 @@ function hideOverlay() {
 }
 
 // ---------------------------------------------------------------------------
-// Docked Image Trace panel
+// Dialog placement (pure — unit-tested)
+// ---------------------------------------------------------------------------
+
+/** Keep a dialog of `size` inside the viewport (with `margin`). */
+function clampDialogPosition(left, top, size, viewport, margin = 8) {
+  const maxLeft = Math.max(margin, viewport.width - size.width - margin);
+  const maxTop = Math.max(margin, viewport.height - size.height - margin);
+  return {
+    left: Math.round(Math.min(Math.max(left, margin), maxLeft)),
+    top: Math.round(Math.min(Math.max(top, margin), maxTop)),
+  };
+}
+
+function overlapArea(a, b) {
+  if (!a || !b) return 0;
+  const w = Math.min(a.left + a.width, b.right) - Math.max(a.left, b.left);
+  const h = Math.min(a.top + a.height, b.bottom) - Math.max(a.top, b.top);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+
+/**
+ * Dock the dialog to the right of the canvas area; use the left side instead
+ * when that covers less of the image. Always inside the viewport.
+ * @param {{area: {left:number,top:number,right:number,bottom:number}, target?: {left:number,top:number,right:number,bottom:number}|null,
+ *          size: {width:number,height:number}, viewport: {width:number,height:number}, margin?: number}} o
+ */
+function computeDialogPosition({ area, target = null, size, viewport, margin = 12 }) {
+  const top = area.top + margin;
+  const candidates = [
+    clampDialogPosition(area.right - size.width - margin, top, size, viewport),
+    clampDialogPosition(area.left + margin, top, size, viewport),
+  ];
+  let best = candidates[0];
+  let bestOverlap = overlapArea({ ...best, ...size }, target);
+  for (const c of candidates.slice(1)) {
+    const o = overlapArea({ ...c, ...size }, target);
+    if (o < bestOverlap) { best = c; bestOverlap = o; }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------
+// Image Trace dialog
 // ---------------------------------------------------------------------------
 
 // Eye icon: Studio's visibility eye (raw-develop panel eye), per "shared tools use Studio's icon".
 const EYE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-const PANEL_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M6 17c2.5-6 4.5-9 6-9s2 3 3.5 3S18 9 18 9"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg>';
+const TRACE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7cb9ff" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M6 17c2.5-6 4.5-9 6-9s2 3 3.5 3S18 9 18 9"/><circle cx="8" cy="8" r="1.4" fill="#7cb9ff" stroke="none"/></svg>';
 
 function presetOptionsHtml(selected, withCustom = true) {
   const opts = Object.entries(TRACE_PRESETS).map(([id, p]) => `<option value="${id}"${id === selected ? ' selected' : ''}>${p.label}</option>`);
@@ -1106,88 +1002,90 @@ function viewOptionsHtml(selected) {
 
 const $ = (id) => document.getElementById(id);
 
-function ensurePanel() {
-  if (ctl.panel && ctl.panel.isConnected) return ctl.panel;
-  const panel = document.createElement('div');
-  panel.id = 'image_trace_panel';
-  panel.className = 'sidebar_block vit-panel';
-  panel.style.display = 'none';
-  panel.innerHTML = `
-    <div class="sidebar_block_header vit-header">
-      <span class="sidebar_block_title">Image Trace</span>
-      <button type="button" class="vit-close" id="vit_close" title="Close panel" aria-label="Close Image Trace panel">×</button>
-    </div>
-    <div class="sidebar_block_content vit-body">
-      <div class="vit-row"><label for="vit_preset">Preset</label>
-        <select id="vit_preset">${presetOptionsHtml('default')}</select></div>
-      <div class="vit-row"><label for="vit_view">View</label>
-        <select id="vit_view">${viewOptionsHtml('result')}</select>
-        <button type="button" class="vit-eye" id="vit_eye" title="Press and hold to view the source image" aria-label="Hold to view source image">${EYE_ICON}</button></div>
-      <div class="vit-row"><label for="vit_mode">Mode</label>
-        <select id="vit_mode">
-          <option value="color">Color</option>
-          <option value="grayscale">Grayscale</option>
-          <option value="bw">Black and White</option>
-        </select></div>
-      <div class="vit-row" data-show="color"><label for="vit_palette">Palette</label>
-        <select id="vit_palette">
-          <option value="automatic">Automatic</option>
-          <option value="limited">Limited</option>
-          <option value="fulltone">Full Tone</option>
-        </select></div>
-      <div class="vit-slider" data-show="color-limited"><div class="vit-slider-head"><span>Colors</span><span id="vit_colors_val">6</span></div>
-        <input type="range" id="vit_colors" min="2" max="30" step="1" value="6"></div>
-      <div class="vit-slider" data-show="color-fulltone"><div class="vit-slider-head"><span>Colors</span><span id="vit_fulltone_val">50%</span></div>
-        <input type="range" id="vit_fulltone" min="0" max="100" step="1" value="50"></div>
-      <div class="vit-slider" data-show="bw"><div class="vit-slider-head"><span>Threshold</span><span id="vit_threshold_val">128</span></div>
-        <input type="range" id="vit_threshold" min="0" max="255" step="1" value="128"></div>
-      <details class="vit-advanced" id="vit_advanced">
-        <summary>Advanced</summary>
-        <div class="vit-slider"><div class="vit-slider-head"><span>Paths</span><span id="vit_paths_val">50%</span></div>
-          <input type="range" id="vit_paths" min="0" max="100" step="1" value="50"></div>
-        <div class="vit-slider"><div class="vit-slider-head"><span>Corners</span><span id="vit_corners_val">75%</span></div>
-          <input type="range" id="vit_corners" min="0" max="100" step="1" value="75"></div>
-        <div class="vit-slider"><div class="vit-slider-head"><span>Noise</span><span id="vit_noise_val">25 px</span></div>
-          <input type="range" id="vit_noise" min="1" max="100" step="1" value="25"></div>
-        <div class="vit-row"><label>Method</label>
-          <div class="vit-seg" role="radiogroup" aria-label="Method">
-            <label title="Abutting: paths are cut out of each other"><input type="radio" name="vit_method" value="abutting" checked> Abutting</label>
-            <label title="Overlapping: paths are stacked"><input type="radio" name="vit_method" value="overlapping"> Overlapping</label>
-          </div></div>
-        <div class="vit-row"><label>Create</label>
-          <div class="vit-checks">
-            <label><input type="checkbox" id="vit_fills" checked disabled> Fills</label>
-            <label title="Strokes are not available yet"><input type="checkbox" id="vit_strokes" disabled> Strokes</label>
-          </div></div>
-        <div class="vit-row vit-row-top"><label>Options</label>
-          <div class="vit-checks vit-checks-col">
-            <label><input type="checkbox" id="vit_snap"> Snap Curves To Lines</label>
-            <label title="Removes white areas (Abutting method)"><input type="checkbox" id="vit_ignore_white"> Ignore White</label>
-          </div></div>
-      </details>
-      <div class="vit-info" id="vit_info">
-        <div class="vit-info-row"><span>Paths:</span><b id="vit_info_paths">–</b><span>Colors:</span><b id="vit_info_colors">–</b></div>
-        <div class="vit-info-row"><span>Anchors:</span><b id="vit_info_anchors">–</b></div>
-        <div class="vit-status" id="vit_status"></div>
-        <div class="vit-warning" id="vit_warning" role="status"></div>
-        <div class="vit-error" id="vit_error" role="alert"></div>
+function ensureDialog() {
+  if (ctl.dialog && ctl.dialog.backdrop.isConnected) return ctl.dialog;
+  const backdrop = document.createElement('div');
+  backdrop.id = 'image_trace_backdrop';
+  backdrop.className = 'vit-backdrop';
+  backdrop.style.display = 'none';
+  backdrop.innerHTML = `
+    <div id="image_trace_dialog" class="vit-dialog" role="dialog" aria-modal="true" aria-labelledby="vit_title" tabindex="-1">
+      <div class="vit-titlebar" id="vit_titlebar" title="Drag to move">
+        ${TRACE_ICON}<span id="vit_title">Image Trace</span>
+      </div>
+      <div class="vit-body">
+        <div class="vit-row"><label for="vit_preset">Preset</label>
+          <select id="vit_preset">${presetOptionsHtml('default')}</select></div>
+        <div class="vit-row"><label for="vit_view">View</label>
+          <select id="vit_view">${viewOptionsHtml('result')}</select>
+          <button type="button" class="vit-eye" id="vit_eye" title="Press and hold to view the source image" aria-label="Hold to view source image">${EYE_ICON}</button></div>
+        <div class="vit-row"><label for="vit_mode">Mode</label>
+          <select id="vit_mode">
+            <option value="color">Color</option>
+            <option value="grayscale">Grayscale</option>
+            <option value="bw">Black and White</option>
+          </select></div>
+        <div class="vit-row" data-show="color"><label for="vit_palette">Palette</label>
+          <select id="vit_palette">
+            <option value="automatic">Automatic</option>
+            <option value="limited">Limited</option>
+            <option value="fulltone">Full Tone</option>
+          </select></div>
+        <div class="vit-slider" data-show="color-limited"><div class="vit-slider-head"><span>Colors</span><span id="vit_colors_val">6</span></div>
+          <input type="range" id="vit_colors" min="2" max="30" step="1" value="6"></div>
+        <div class="vit-slider" data-show="color-fulltone"><div class="vit-slider-head"><span>Colors</span><span id="vit_fulltone_val">50%</span></div>
+          <input type="range" id="vit_fulltone" min="0" max="100" step="1" value="50"></div>
+        <div class="vit-slider" data-show="bw"><div class="vit-slider-head"><span>Threshold</span><span id="vit_threshold_val">128</span></div>
+          <input type="range" id="vit_threshold" min="0" max="255" step="1" value="128"></div>
+        <details class="vit-advanced" id="vit_advanced">
+          <summary>Advanced</summary>
+          <div class="vit-slider"><div class="vit-slider-head"><span>Paths</span><span id="vit_paths_val">50%</span></div>
+            <input type="range" id="vit_paths" min="0" max="100" step="1" value="50"></div>
+          <div class="vit-slider"><div class="vit-slider-head"><span>Corners</span><span id="vit_corners_val">75%</span></div>
+            <input type="range" id="vit_corners" min="0" max="100" step="1" value="75"></div>
+          <div class="vit-slider"><div class="vit-slider-head"><span>Noise</span><span id="vit_noise_val">25 px</span></div>
+            <input type="range" id="vit_noise" min="1" max="100" step="1" value="25"></div>
+          <div class="vit-row"><label>Method</label>
+            <div class="vit-seg" role="radiogroup" aria-label="Method">
+              <label title="Abutting: paths are cut out of each other"><input type="radio" name="vit_method" value="abutting" checked> Abutting</label>
+              <label title="Overlapping: paths are stacked"><input type="radio" name="vit_method" value="overlapping"> Overlapping</label>
+            </div></div>
+          <div class="vit-row"><label>Create</label>
+            <div class="vit-checks">
+              <label><input type="checkbox" id="vit_fills" checked disabled> Fills</label>
+              <label title="Strokes are not available yet"><input type="checkbox" id="vit_strokes" disabled> Strokes</label>
+            </div></div>
+          <div class="vit-row vit-row-top"><label>Options</label>
+            <div class="vit-checks vit-checks-col">
+              <label><input type="checkbox" id="vit_snap"> Snap Curves To Lines</label>
+              <label title="Removes white areas (Abutting method)"><input type="checkbox" id="vit_ignore_white"> Ignore White</label>
+            </div></div>
+        </details>
+        <div class="vit-info" id="vit_info">
+          <div class="vit-info-row"><span>Paths:</span><b id="vit_info_paths">–</b><span>Colors:</span><b id="vit_info_colors">–</b></div>
+          <div class="vit-info-row"><span>Anchors:</span><b id="vit_info_anchors">–</b></div>
+          <div class="vit-status" id="vit_status"></div>
+          <div class="vit-warning" id="vit_warning" role="status"></div>
+          <div class="vit-error" id="vit_error" role="alert"></div>
+        </div>
       </div>
       <div class="vit-footer">
         <label class="vit-preview"><input type="checkbox" id="vit_preview" checked> Preview</label>
         <div class="vit-buttons">
           <button type="button" id="vit_cancel" class="vit-btn">Cancel</button>
-          <button type="button" id="vit_trace" class="vit-btn vit-btn-primary">Trace</button>
+          <button type="button" id="vit_expand" class="vit-btn vit-btn-primary" title="Convert the tracing to editable paths (Enter)">Expand</button>
         </div>
       </div>
     </div>`;
-  const props = document.getElementById('properties_panel');
-  const host = document.getElementById('sidepanel_content');
-  if (props && props.parentNode) props.parentNode.insertBefore(panel, props.nextSibling);
-  else if (host) host.prepend(panel);
-  else document.body.appendChild(panel);
-  ctl.panel = panel;
-  wirePanel(panel);
-  return panel;
+  document.body.appendChild(backdrop);
+  const box = backdrop.querySelector('#image_trace_dialog');
+  ctl.dialog = { backdrop, box };
+  wireDialog(backdrop, box);
+  return ctl.dialog;
+}
+
+function dialogOpen() {
+  return !!(ctl.dialog && ctl.dialog.backdrop.style.display !== 'none');
 }
 
 function previewEnabled() {
@@ -1195,12 +1093,8 @@ function previewEnabled() {
   return !cb || cb.checked;
 }
 
-function panelOpen() {
-  return !!(ctl.panel && ctl.panel.style.display !== 'none');
-}
-
 function writeControls(s, view) {
-  if (!ctl.panel) return;
+  if (!ctl.dialog) return;
   const set = (id, v) => { const el = $(id); if (el) el.value = String(v); };
   set('vit_preset', TRACE_PRESETS[s.preset] ? s.preset : 'custom');
   set('vit_view', view || 'result');
@@ -1212,7 +1106,7 @@ function writeControls(s, view) {
   set('vit_paths', s.paths);
   set('vit_corners', s.corners);
   set('vit_noise', s.noise);
-  ctl.panel.querySelectorAll('input[name="vit_method"]').forEach((r) => { r.checked = r.value === s.method; });
+  ctl.dialog.box.querySelectorAll('input[name="vit_method"]').forEach((r) => { r.checked = r.value === s.method; });
   $('vit_snap').checked = !!s.snapCurves;
   $('vit_ignore_white').checked = !!s.ignoreWhite;
   updateLabels();
@@ -1221,7 +1115,7 @@ function writeControls(s, view) {
 
 function readControls() {
   const v = (id) => $(id)?.value;
-  const method = ctl.panel.querySelector('input[name="vit_method"]:checked')?.value || 'abutting';
+  const method = ctl.dialog.box.querySelector('input[name="vit_method"]:checked')?.value || 'abutting';
   return normalizeSettings({
     preset: v('vit_preset'),
     mode: v('vit_mode'),
@@ -1252,7 +1146,7 @@ function updateLabels() {
 function updateVisibility() {
   const mode = $('vit_mode').value;
   const palette = $('vit_palette').value;
-  ctl.panel.querySelectorAll('[data-show]').forEach((el) => {
+  ctl.dialog.box.querySelectorAll('[data-show]').forEach((el) => {
     const want = el.getAttribute('data-show');
     let show = false;
     if (want === 'color') show = mode === 'color';
@@ -1281,22 +1175,22 @@ function onSettingsEdited({ fromPreset = false } = {}) {
   }
   ctl.settings = s;
   updateVisibility();
-  if (!session) return;
+  if (!session || session.committing) return;
   session.settings = s;
   scheduleRetrace();
-  syncPanel();
+  syncDialog();
 }
 
-function wirePanel(panel) {
+function wireDialog(backdrop, box) {
   // Sliders: `input` only updates the label; `change` (release) re-traces.
-  panel.querySelectorAll('input[type="range"]').forEach((input) => {
+  box.querySelectorAll('input[type="range"]').forEach((input) => {
     input.addEventListener('input', updateLabels);
     input.addEventListener('change', () => onSettingsEdited());
   });
   ['vit_mode', 'vit_palette', 'vit_snap', 'vit_ignore_white'].forEach((id) => {
     $(id).addEventListener('change', () => onSettingsEdited());
   });
-  panel.querySelectorAll('input[name="vit_method"]').forEach((r) => r.addEventListener('change', () => onSettingsEdited()));
+  box.querySelectorAll('input[name="vit_method"]').forEach((r) => r.addEventListener('change', () => onSettingsEdited()));
   $('vit_preset').addEventListener('change', () => {
     const id = $('vit_preset').value;
     if (!TRACE_PRESETS[id]) return;
@@ -1308,7 +1202,6 @@ function wirePanel(panel) {
     if (ctl.session) ctl.session.view = view;
     const group = ctl.session?.group;
     if (group && group.isConnected) applyView(group, view);
-    syncPropsControls();
   });
   const eye = $('vit_eye');
   const peekOn = (e) => {
@@ -1331,87 +1224,158 @@ function wirePanel(panel) {
   $('vit_preview').addEventListener('change', () => {
     if (previewEnabled() && ctl.session) requestPreview();
   });
-  $('vit_trace').addEventListener('click', () => {
-    if (ctl.session) commitSession();
+  $('vit_expand').addEventListener('click', () => { expandSession(); });
+  $('vit_cancel').addEventListener('click', () => cancelDialog());
+  // Clicks outside the dialog are swallowed (modal) and return focus to it.
+  backdrop.addEventListener('pointerdown', (e) => {
+    if (e.target !== backdrop) return;
+    e.preventDefault();
+    box.focus({ preventScroll: true });
   });
-  $('vit_cancel').addEventListener('click', () => cancelSession());
-  $('vit_close').addEventListener('click', () => closePanel());
+  // Drag by the title bar, kept inside the viewport.
+  const bar = $('vit_titlebar');
+  let drag = null;
+  bar.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const r = box.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    try { bar.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+    box.classList.add('is-dragging');
+    e.preventDefault();
+  });
+  bar.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    moveDialogTo(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  const endDrag = (e) => {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
+    drag = null;
+    box.classList.remove('is-dragging');
+  };
+  bar.addEventListener('pointerup', endDrag);
+  bar.addEventListener('pointercancel', endDrag);
+  bar.addEventListener('lostpointercapture', () => endDrag());
+  window.addEventListener('resize', () => {
+    if (!dialogOpen()) return;
+    const r = box.getBoundingClientRect();
+    moveDialogTo(r.left, r.top);
+  });
 }
 
-function syncPanel() {
-  if (!ctl.panel) return;
+function viewportSize() {
+  return { width: window.innerWidth, height: window.innerHeight };
+}
+
+function moveDialogTo(left, top) {
+  const box = ctl.dialog.box;
+  const r = box.getBoundingClientRect();
+  const p = clampDialogPosition(left, top, { width: r.width, height: r.height }, viewportSize());
+  box.style.left = `${p.left}px`;
+  box.style.top = `${p.top}px`;
+}
+
+function rectOf(el) {
+  if (!el || !el.isConnected) return null;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 || r.height > 0 ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null;
+}
+
+function positionDialog(image) {
+  const box = ctl.dialog.box;
+  const vp = viewportSize();
+  const area = rectOf(document.getElementById('workarea')) || { left: 0, top: 0, right: vp.width, bottom: vp.height };
+  const r = box.getBoundingClientRect();
+  const p = computeDialogPosition({ area, target: rectOf(image), size: { width: r.width, height: r.height }, viewport: vp });
+  box.style.left = `${p.left}px`;
+  box.style.top = `${p.top}px`;
+}
+
+function syncDialog() {
+  if (!ctl.dialog) return;
   const session = ctl.session;
-  const body = ctl.panel.querySelector('.vit-body');
-  body.classList.toggle('is-disabled', !session);
   const info = (id, v) => { const el = $(id); if (el) el.textContent = v; };
-  if (session && !session.stats && session.group) {
-    session.stats = traceStats(resultPaths(liveParts(session.group).result));
-  }
   const stats = session?.stats;
   info('vit_info_paths', stats ? String(stats.paths) : '–');
   info('vit_info_anchors', stats ? String(stats.anchors) : '–');
   info('vit_info_colors', stats ? String(stats.colors) : '–');
   let status = '';
-  if (!session) status = 'Select an image or a tracing object.';
-  else if (session.busy) status = 'Tracing…';
-  else if (session.status) status = session.status;
-  else if (session.kind === 'image') status = 'Change an option to preview, or click Trace.';
+  if (session?.committing) status = session.busy ? 'Tracing at full resolution…' : 'Expanding…';
+  else if (session?.busy) status = 'Tracing…';
+  else if (session?.status) status = session.status;
+  else if (session) status = previewEnabled() ? 'Change an option to update the preview.' : 'Check Preview to see the tracing.';
   info('vit_status', status);
   $('vit_status').classList.toggle('is-busy', !!session?.busy);
   info('vit_warning', session?.warning || '');
   info('vit_error', session?.error || '');
   $('vit_error').style.display = session?.error ? 'block' : 'none';
   $('vit_warning').style.display = session?.warning ? 'block' : 'none';
-  $('vit_cancel').disabled = !session || !(session.dirty || session.busy);
-  $('vit_trace').disabled = !session || session.busy;
+  ctl.dialog.box.classList.toggle('is-committing', !!session?.committing);
+  $('vit_expand').disabled = !session || session.committing;
   $('vit_eye').disabled = !session?.group;
 }
 
-/** Bring the session/panel in line with the selection. */
-function loadSessionForSelection() {
-  if (ctl.selecting) return;
-  const live = selectedLiveTrace();
-  const image = live ? null : selectedImage();
-  const cur = ctl.session;
-  if (cur && ((live && cur.group === live) || (image && cur.kind === 'image' && cur.image === image))) return;
-  if (cur && (cur.dirty || cur.busy)) {
-    // Clicking away keeps what was previewed (like Illustrator).
-    const pending = cur;
-    if (!pending.dirty) {
-      cancelSession();
-    } else {
-      commitSession({ select: false }).then(() => {
-        if (ctl.session && ctl.session.group === pending.group) {
-          ctl.session = null;
-          loadSessionForSelection();
-          syncPanel();
-          syncPropsControls();
-        }
-      });
-      return;
-    }
+function closeMenus() {
+  document.querySelectorAll('.menu_entry.open').forEach((m) => m.classList.remove('open'));
+}
+
+/** Object > Image Trace… (and the Properties-bar button). */
+function openDialog() {
+  if (dialogOpen()) return true;
+  const image = selectedImage();
+  if (!image) {
+    showToast('Select a single raster image, then choose Object > Image Trace….');
+    return false;
   }
-  if (live) ctl.session = newLiveSession(live);
-  else if (image) ctl.session = newImageSession(image, ctl.settings);
-  else ctl.session = null;
-  writeControls(ctl.session ? ctl.session.settings : ctl.settings, ctl.session?.view || 'result');
+  closeMenus();
+  ctl.session = newSession(image, ctl.settings);
+  const { backdrop, box } = ensureDialog();
+  writeControls(ctl.session.settings, 'result');
+  backdrop.style.display = 'block';
+  positionDialog(image);
+  syncDialog();
+  syncMenu();
+  box.focus({ preventScroll: true });
+  if (previewEnabled()) requestPreview();
+  return true;
 }
 
-function openPanel() {
-  const panel = ensurePanel();
-  panel.style.display = '';
-  loadSessionForSelection();
-  writeControls(ctl.session ? ctl.session.settings : ctl.settings, ctl.session?.view || 'result');
-  syncPanel();
-  const sp = document.getElementById('sidepanels');
-  if (sp) sp.scrollTop = Math.max(0, panel.offsetTop - 8);
+function hideDialog() {
+  if (!ctl.dialog) return;
+  const { backdrop, box } = ctl.dialog;
+  $('vit_eye')?.classList.remove('is-held');
+  if (box.contains(document.activeElement)) document.activeElement.blur();
+  backdrop.style.display = 'none';
 }
 
-/** Closing keeps the live object (a pending preview is committed). */
-async function closePanel() {
-  if (ctl.session?.dirty) await commitSession({ select: false });
-  else if (ctl.session?.busy) cancelSession();
-  if (ctl.panel) ctl.panel.style.display = 'none';
+function isTextField(el) {
+  if (!el || el.nodeType !== 1) return false;
+  if (el.isContentEditable || el.localName === 'textarea') return true;
+  if (el.localName !== 'input') return false;
+  return !['range', 'checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'file'].includes((el.type || '').toLowerCase());
+}
+
+/** While the dialog is open: Esc = Cancel, Enter = Expand, and no editor shortcuts. */
+function onDialogKeyDown(e) {
+  if (!dialogOpen()) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    cancelDialog();
+    return;
+  }
+  if (e.key === 'Enter' && !e.isComposing && !isTextField(e.target)) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.target?.id === 'vit_cancel') cancelDialog();
+    else expandSession();
+    return;
+  }
+  // Typing, arrows on sliders etc. keep their default action; the canvas never sees them.
+  e.stopPropagation();
+}
+
+function onDialogKeyUp(e) {
+  if (dialogOpen()) e.stopPropagation();
 }
 
 // ---------------------------------------------------------------------------
@@ -1424,104 +1388,45 @@ function injectPropsControls() {
     const row = document.createElement('div');
     row.className = 'prop_row vit-prop-row';
     row.id = 'prop_image_trace_row';
-    row.innerHTML = `
-      <button type="button" class="vit-prop-btn" id="prop_image_trace_btn" title="Image Trace with the selected preset">Image Trace</button>
-      <select id="prop_image_trace_preset" class="vit-prop-select" title="Tracing preset" aria-label="Tracing preset">${presetOptionsHtml('default', false)}</select>
-      <button type="button" class="vit-prop-icon" id="prop_image_trace_panel" title="Open the Image Trace panel" aria-label="Open the Image Trace panel">${PANEL_ICON}</button>`;
+    row.innerHTML = '<button type="button" class="vit-prop-btn" id="prop_image_trace_btn" title="Open Image Trace (Object > Image Trace…)">Image Trace…</button>';
     imgGroup.appendChild(row);
-    $('prop_image_trace_btn').addEventListener('click', () => makeTrace(selectedImage(), $('prop_image_trace_preset').value));
-    $('prop_image_trace_panel').addEventListener('click', () => openPanel());
-  }
-  const transformSec = document.getElementById('sec_transform');
-  if (transformSec && !document.getElementById('prop_live_trace_group')) {
-    const sec = document.createElement('div');
-    sec.className = 'prop_section vit-prop-section';
-    sec.id = 'prop_live_trace_group';
-    sec.style.display = 'none';
-    sec.innerHTML = `
-      <div class="vit-prop-title">Image Trace</div>
-      <div class="prop_row vit-prop-row">
-        <label class="vit-prop-label" for="prop_live_trace_preset">Preset</label>
-        <select id="prop_live_trace_preset" class="vit-prop-select">${presetOptionsHtml('default')}</select>
-        <button type="button" class="vit-prop-icon" id="prop_live_trace_panel" title="Open the Image Trace panel" aria-label="Open the Image Trace panel">${PANEL_ICON}</button>
-      </div>
-      <div class="prop_row vit-prop-row">
-        <label class="vit-prop-label" for="prop_live_trace_view">View</label>
-        <select id="prop_live_trace_view" class="vit-prop-select">${viewOptionsHtml('result')}</select>
-      </div>
-      <div class="prop_row vit-prop-row">
-        <button type="button" class="vit-prop-btn vit-prop-wide" id="prop_live_trace_expand" title="Convert the tracing to editable paths">Expand</button>
-      </div>`;
-    transformSec.parentNode.insertBefore(sec, transformSec.nextSibling);
-    $('prop_live_trace_preset').addEventListener('change', () => {
-      const id = $('prop_live_trace_preset').value;
-      const group = selectedLiveTrace();
-      if (group && TRACE_PRESETS[id]) applyPresetToLive(group, id);
-    });
-    $('prop_live_trace_view').addEventListener('change', () => {
-      const group = selectedLiveTrace();
-      if (!group) return;
-      const view = $('prop_live_trace_view').value;
-      applyView(group, view);
-      if (ctl.session?.group === group) ctl.session.view = view;
-      if (panelOpen()) $('vit_view').value = view;
-    });
-    $('prop_live_trace_panel').addEventListener('click', () => openPanel());
-    $('prop_live_trace_expand').addEventListener('click', () => expandTrace());
+    $('prop_image_trace_btn').addEventListener('click', () => openDialog());
   }
 }
 
 function syncPropsControls() {
-  const live = selectedLiveTrace();
-  const sec = document.getElementById('prop_live_trace_group');
-  if (sec) sec.style.display = live ? 'block' : 'none';
-  if (live) {
-    const s = readSettings(live);
-    const presetEl = $('prop_live_trace_preset');
-    if (presetEl) presetEl.value = TRACE_PRESETS[s.preset] ? s.preset : 'custom';
-    const viewEl = $('prop_live_trace_view');
-    if (viewEl) viewEl.value = readView(live);
-  }
   const row = document.getElementById('prop_image_trace_row');
-  if (row) row.style.display = selectedImage() ? 'flex' : 'none';
+  if (row) row.style.display = selectedImage() && !dialogOpen() ? 'flex' : 'none';
 }
 
 function syncMenu() {
-  const live = selectedLiveTrace();
-  const image = selectedImage();
-  $('action_image_trace_make')?.classList.toggle('disabled', !image);
-  $('action_image_trace_release')?.classList.toggle('disabled', !live);
-  $('action_image_trace_expand')?.classList.toggle('disabled', !live);
+  $('action_image_trace')?.classList.toggle('disabled', !selectedImage() || dialogOpen());
 }
 
 function wireMenu() {
-  const item = (id, fn) => {
-    const el = $(id);
-    if (!el) return;
+  const el = $('action_image_trace');
+  if (el) {
     el.addEventListener('click', (e) => {
+      syncMenu();
       if (el.classList.contains('disabled')) {
         e.stopPropagation();
         return;
       }
-      fn();
+      openDialog();
     });
-  };
-  item('action_image_trace_make', () => makeTrace());
-  item('action_image_trace_release', () => releaseTrace());
-  item('action_image_trace_expand', () => expandTrace());
-  item('action_image_trace_panel', () => openPanel());
+  }
   const obj = $('menu_object');
   obj?.addEventListener('mouseenter', syncMenu);
   obj?.querySelector('.menu_entry_title')?.addEventListener('click', syncMenu, true);
 }
 
 // ---------------------------------------------------------------------------
-// Guards: no direct selection / isolation inside a live trace, undo, Esc
+// Guards: live-trace insides, undo, keyboard
 // ---------------------------------------------------------------------------
 
 function installGuards() {
   const canvas = sc();
-  // Double-click would enter the group; a live trace has no editable insides until expanded.
+  // Double-click would enter the (preview or legacy) live group.
   document.addEventListener('dblclick', (e) => {
     const t = e.target;
     if (t && t.closest?.('[data-visteras-trace="1"]') && canvas.getSvgContent?.().contains(t)) {
@@ -1529,52 +1434,39 @@ function installGuards() {
       e.preventDefault();
     }
   }, true);
-  // Ungroup is unavailable for a live trace (Expand it first), like Illustrator.
+  // Ungroup on a legacy live trace expands it (one step) instead.
   const ungroup = canvas.ungroupSelectedElement;
   if (typeof ungroup === 'function') {
     canvas.ungroupSelectedElement = function (...args) {
-      if (selectedLiveTrace()) {
-        showToast('Expand the tracing (Object > Image Trace > Expand) before ungrouping.');
+      if (dialogOpen()) return undefined;
+      const live = selectedLiveTrace();
+      if (live) {
+        expandLiveTrace(live);
         return undefined;
       }
       return ungroup.apply(this, args);
     };
   }
-  // Undo / Redo: a pending preview is not in history, so resolve it first.
+  // Undo / Redo can't run under the dialog; if something calls them anyway, cancel first.
   const um = canvas.undoMgr;
   if (um && !um.__visterasTraceWrapped) {
     um.__visterasTraceWrapped = true;
     for (const name of ['undo', 'redo']) {
       const orig = um[name].bind(um);
       um[name] = function () {
-        if (ctl.session && (ctl.session.dirty || ctl.session.busy)) cancelSession();
-        const r = orig();
-        ctl.session = null;
-        setTimeout(() => { loadSessionForSelection(); syncPanel(); syncPropsControls(); }, 0);
-        return r;
+        if (dialogOpen() || ctl.session) cancelDialog();
+        return orig();
       };
     }
   }
-  // Esc aborts a running trace.
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape' || !ctl.session?.busy) return;
-    e.stopPropagation();
-    e.preventDefault();
-    ctl.engine.abort(); // the pending promise rejects with 'aborted' and cleans up
-  }, true);
+  window.addEventListener('keydown', onDialogKeyDown, true);
+  window.addEventListener('keyup', onDialogKeyUp, true);
 }
 
 function onContextChanged() {
   injectPropsControls();
   syncPropsControls();
-  if (panelOpen()) {
-    loadSessionForSelection();
-    syncPanel();
-  } else if (ctl.session && !ctl.session.dirty && !ctl.session.busy) {
-    const live = selectedLiveTrace();
-    const image = selectedImage();
-    if (ctl.session.group !== live && ctl.session.image !== image) ctl.session = null;
-  }
+  syncMenu();
 }
 
 /**
@@ -1584,17 +1476,17 @@ export function mountVisterasImageTrace({ svgEditor }) {
   if (!svgEditor) return;
   ctl.svgEditor = svgEditor;
   ctl.sc = svgEditor.svgCanvas;
-  window.__visterasTraceSelectedImage = () => openPanel();
+  window.__visterasTraceSelectedImage = () => openDialog();
   window.__visterasImageTrace = {
-    make: makeTrace,
-    expand: expandTrace,
-    release: releaseTrace,
-    openPanel,
-    closePanel,
-    cancel: cancelSession,
-    commit: commitSession,
+    open: openDialog,
+    cancel: cancelDialog,
+    expand: expandSession,
+    isOpen: dialogOpen,
+    canOpen: () => !!selectedImage(),
+    expandLiveTrace,
     get session() { return ctl.session; },
     get engine() { return ctl.engine; },
+    get dialog() { return ctl.dialog?.box || null; },
     timings: () => ctl.timings.slice(),
   };
   injectPropsControls();
@@ -1614,12 +1506,15 @@ export function mountVisterasImageTrace({ svgEditor }) {
       return r;
     };
   }
-  setTimeout(() => { injectPropsControls(); syncPropsControls(); }, 0);
+  setTimeout(() => { injectPropsControls(); syncPropsControls(); syncMenu(); }, 0);
 }
 
 export {
   // live-trace helpers (browser)
   isLiveTrace,
+  // dialog placement (pure)
+  computeDialogPosition,
+  clampDialogPosition,
   liveParts,
   applyView,
   computeImageLayout,

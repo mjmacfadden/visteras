@@ -28,6 +28,8 @@ import {
   traceStats,
   runTracePipeline,
   TRACE_PRESETS,
+  computeDialogPosition,
+  clampDialogPosition,
 } from '../js/visteras-image-trace.js';
 
 // Minimal zero-dependency PNG decoder for Node test runner
@@ -796,4 +798,48 @@ test('pipeline: Snap Curves to Lines turns a traced square into 4 axis-aligned l
     const [bx, by] = pts[i];
     assert.ok(ax === bx || ay === by, `segment ${i} is axis-aligned: ${d}`);
   }
+});
+
+// ---- Image Trace dialog (menu entry, placement) ------------------------------
+
+test('Object menu has a single "Image Trace…" item (no Make/Release/Expand submenu), disabled by default', () => {
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, '../index.html'), 'utf8');
+  const items = html.match(/id="action_image_trace[^"]*"/g) || [];
+  assert.deepEqual(items, ['id="action_image_trace"']);
+  assert.match(html, /<div class="menu_dropdown_item disabled" id="action_image_trace"[^>]*>Image Trace…<\/div>/);
+  assert.ok(!/menu_image_trace|menu_submenu_list/.test(html), 'old submenu is gone');
+  const js = fs.readFileSync(path.resolve(import.meta.dirname, '../js/visteras-image-trace.js'), 'utf8');
+  assert.ok(!/image_trace_panel|action_image_trace_(make|release|expand|panel)|vit_trace\b/.test(js), 'old panel / submenu wiring is gone');
+  assert.match(html, /visteras-image-trace\.js\?v=trace-dialog-1/);
+  assert.match(html, /visteras-image-trace\.css\?v=trace-dialog-1/);
+});
+
+test('dialog placement docks right of the canvas area, beside the image', () => {
+  const viewport = { width: 1440, height: 900 };
+  const area = { left: 60, top: 80, right: 1180, bottom: 860 };
+  const size = { width: 300, height: 520 };
+  // Image on the left half: dock on the right.
+  let p = computeDialogPosition({ area, target: { left: 200, top: 200, right: 600, bottom: 500 }, size, viewport });
+  assert.deepEqual(p, { left: 1180 - 300 - 12, top: 92 });
+  // Image under the right dock: move to the left side instead.
+  p = computeDialogPosition({ area, target: { left: 800, top: 150, right: 1150, bottom: 600 }, size, viewport });
+  assert.deepEqual(p, { left: 72, top: 92 });
+  // Image covering the whole area: both overlap equally, keep the right dock.
+  p = computeDialogPosition({ area, target: { left: 0, top: 0, right: 1440, bottom: 900 }, size, viewport });
+  assert.equal(p.left, 868);
+  // No target: right dock.
+  assert.deepEqual(computeDialogPosition({ area, size, viewport }), { left: 868, top: 92 });
+});
+
+test('dialog placement and dragging stay inside the viewport', () => {
+  const viewport = { width: 800, height: 600 };
+  const size = { width: 300, height: 400 };
+  assert.deepEqual(clampDialogPosition(-50, -20, size, viewport), { left: 8, top: 8 });
+  assert.deepEqual(clampDialogPosition(900, 900, size, viewport), { left: 492, top: 192 });
+  assert.deepEqual(clampDialogPosition(100.4, 50.6, size, viewport), { left: 100, top: 51 });
+  // Taller than the viewport: pinned to the top margin.
+  assert.deepEqual(clampDialogPosition(100, 300, { width: 300, height: 700 }, viewport), { left: 100, top: 8 });
+  // A canvas area that runs off-screen still yields an on-screen dialog.
+  const p = computeDialogPosition({ area: { left: 0, top: 0, right: 2000, bottom: 1500 }, size, viewport });
+  assert.ok(p.left >= 8 && p.left + size.width <= viewport.width - 8 && p.top >= 8 && p.top + size.height <= viewport.height - 8);
 });
