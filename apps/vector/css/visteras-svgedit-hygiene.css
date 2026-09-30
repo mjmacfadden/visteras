@@ -76,7 +76,30 @@
 #tools_top #g_title,
 #tools_top #link_url,
 #tools_top #linkLabel,
-#tools_top #image_url,
-#tools_top #text {
+#tools_top #image_url {
   display: none !important;
 }
+
+/* --------------------------------------------------------------------------
+ * 6. SVG-Edit off-screen text input buffer (#text).
+ *    Used to capture keyboard events during canvas text editing.
+ *    CRITICAL: Must NEVER be display:none, otherwise browser focus() fails
+ *    and the Type tool receives zero keyboard input!
+ * -------------------------------------------------------------------------- */
+#text,
+#tools_top #text,
+#tools_top > #text {
+  display: block !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+

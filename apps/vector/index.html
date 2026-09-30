@@ -2366,6 +2366,39 @@
 
     // Iconic panel dock: Color, Swatches, Stroke, Gradient, Layers
     mountVisterasPanelDock({ svgEditor });
+
+    // Canvas text editing (#text buffer) state tracking and commit shortcut
+    function wireTextInputBuffer() {
+      const textInput = document.getElementById('text');
+      if (!textInput || textInput._visterasWired) return;
+      textInput._visterasWired = true;
+      textInput.addEventListener('focus', () => {
+        window.__visterasIsTypingDirectly = true;
+      });
+      textInput.addEventListener('blur', () => {
+        window.__visterasIsTypingDirectly = false;
+      });
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (svgEditor?.svgCanvas?.textActions?.toSelectMode) {
+            svgEditor.svgCanvas.textActions.toSelectMode(true);
+          }
+          textInput.blur();
+        }
+      });
+    }
+    wireTextInputBuffer();
+    setTimeout(wireTextInputBuffer, 100);
+    setTimeout(wireTextInputBuffer, 500);
+
+    document.addEventListener('modeChange', () => {
+      const mode = svgEditor?.svgCanvas?.getMode?.();
+      if (mode !== 'textedit') {
+        window.__visterasIsTypingDirectly = false;
+      }
+    });
   </script>
 <script src="tool-free.js"></script>
 </body>

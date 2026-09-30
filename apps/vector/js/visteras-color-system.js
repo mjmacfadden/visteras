@@ -1155,6 +1155,7 @@ function createColorController(svgEditor) {
           }
           if (sc.curProperties) sc.curProperties[state.activeTarget] = val;
           if (sc.curShape) sc.curShape[state.activeTarget] = val;
+          if (sc.curText) sc.curText[state.activeTarget] = val;
           // Paint Selection + Direct Selection targets via safe DOM write.
           applyPaintAttribute(sc, state.activeTarget, val, { noUndo });
           if (!noUndo) {
