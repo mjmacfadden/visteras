@@ -2361,19 +2361,13 @@ function mountAppearanceColors(ctrl, svgEditor) {
     setAlignButtons(readStrokeAlign());
   }
 
-  const handleChipClick = (target, chip, e) => {
+  // Appearance chip click: single click does nothing; double click opens color picker popup
+  fillChip.addEventListener('click', (e) => {
     e.stopPropagation();
-    ctrl.setActiveTarget(target, { syncColor: true });
-    if (window.__visterasDock) {
-      const panel = e.shiftKey ? 'color' : 'swatches';
-      window.__visterasDock.open(panel, { anchor: chip });
-    } else {
-      ctrl.openPicker(target);
-    }
-  };
-
-  fillChip.addEventListener('click', (e) => handleChipClick('fill', fillChip, e));
-  strokeChip.addEventListener('click', (e) => handleChipClick('stroke', strokeChip, e));
+  });
+  strokeChip.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
 
   fillChip.addEventListener('dblclick', (e) => {
     e.stopPropagation();
