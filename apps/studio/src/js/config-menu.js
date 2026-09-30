@@ -84,21 +84,6 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Visteras Vector',
-				href: '../vector/'
-			},
-			{
-				name: 'Visteras Publish',
-				href: '../publish/'
-			},
-			{
-				name: 'Visteras Collage',
-				href: '../collage/'
-			},
-			{
-				divider: true
-			},
-			{
 				name: 'Quick Save',
 				shortcut: 'F9',
 				target: 'file/quicksave.quicksave'
@@ -1030,21 +1015,6 @@ const menuDefinition = [
 				name: 'About',
 				ellipsis: true,
 				target: 'help/about.about'
-			},
-			{
-				divider: true
-			},
-			{
-				name: 'Visteras Vector (Vector Editor)',
-				href: '../vector/'
-			},
-			{
-				name: 'Visteras Publish (Morning Newspaper)',
-				href: '../publish/'
-			},
-			{
-				name: 'Visteras Collage (Collage Fodder Generator)',
-				href: '../collage/'
 			}
 		]
 	}

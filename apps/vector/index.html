@@ -49,16 +49,15 @@
           <div class="menu_entry_title">File</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_new">New Document <span class="menu_dropdown_shortcut">⌘N</span></div>
-            <div class="menu_dropdown_item" id="action_open">Open Vector Document (.vvd, .svg)... <span class="menu_dropdown_shortcut">⌘O</span></div>
+            <div class="menu_dropdown_item" id="action_open">Open... <span class="menu_dropdown_shortcut">⌘O</span></div>
             <div class="menu_dropdown_item" id="action_place">Place... <span class="menu_dropdown_shortcut">⌘⇧P</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_save">Save Vector Document (.vvd) <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_item" id="action_save">Save <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_item" id="action_save_as">Save As... <span class="menu_dropdown_shortcut">⌘⇧S</span></div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_export_svg">Export SVG...</div>
             <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
             <div class="menu_dropdown_item" id="action_export_pdf">Export PDF...</div>
-            <a href="../studio/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Studio...</a>
-            <a href="../publish/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Publish...</a>
-            <a href="../collage/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Collage...</a>
           </div>
         </div>
 
@@ -156,8 +155,6 @@
             <div class="menu_dropdown_item" id="action_about">About Visteras Vector...</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_prefs">Preferences...</div>
-            <div class="menu_dropdown_separator"></div>
-            <a href="../studio/" class="menu_dropdown_item" style="text-decoration:none; color:inherit;">Open Visteras Studio...</a>
           </div>
         </div>
 
@@ -679,7 +676,7 @@
         window.__visterasOpenImagePicker?.();
       });
 
-      document.getElementById('action_save')?.addEventListener('click', async () => {
+      async function saveVectorDoc(forceSaveAs = false) {
         const shell = window.__visterasDocumentShell;
         const activeDoc = shell?.getActiveDoc?.();
         const res = (sc.getResolution && sc.getResolution()) || { w: activeDoc?.width || 800, h: activeDoc?.height || 600 };
@@ -732,6 +729,19 @@
         const vvdJson = JSON.stringify(vvdData, null, 2);
         const fileName = `${title}.vvd`;
 
+        if (!forceSaveAs && activeDoc?.fileHandle) {
+          try {
+            const writable = await activeDoc.fileHandle.createWritable();
+            await writable.write(vvdJson);
+            await writable.close();
+            shell?.clearActiveDirty?.();
+            if (svgEditor) svgEditor.showSaveWarning = false;
+            return;
+          } catch (err) {
+            console.warn('Direct fileHandle write failed, falling back to picker:', err);
+          }
+        }
+
         if (window.showSaveFilePicker) {
           try {
             const handle = await window.showSaveFilePicker({
@@ -745,7 +755,10 @@
             await writable.write(vvdJson);
             await writable.close();
             const savedBase = handle.name.replace(/\.(vvd|svg)$/i, '');
-            if (activeDoc) activeDoc.title = savedBase;
+            if (activeDoc) {
+              activeDoc.title = savedBase;
+              activeDoc.fileHandle = handle;
+            }
             svgEditor.title = savedBase;
             shell?.clearActiveDirty?.();
             if (svgEditor) svgEditor.showSaveWarning = false;
@@ -765,6 +778,14 @@
         // Download started — clear dirty like Studio after save.
         shell?.clearActiveDirty?.();
         if (svgEditor) svgEditor.showSaveWarning = false;
+      }
+
+      document.getElementById('action_save')?.addEventListener('click', () => {
+        void saveVectorDoc(false);
+      });
+
+      document.getElementById('action_save_as')?.addEventListener('click', () => {
+        void saveVectorDoc(true);
       });
 
       document.getElementById('action_export_svg')?.addEventListener('click', () => {
@@ -1250,7 +1271,15 @@
             return;
           }
 
-          // Command/Ctrl + S: Save SVG (clears dirty via action_save handler)
+          // Command/Ctrl + Shift + S: Save As
+          if (e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('action_save_as')?.click();
+            return;
+          }
+
+          // Command/Ctrl + S: Save (clears dirty via action_save handler)
           if (!e.shiftKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
             e.preventDefault();
             e.stopPropagation();

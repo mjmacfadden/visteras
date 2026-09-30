@@ -29,6 +29,7 @@ export interface PublishDocument {
   grokBrief: GrokBriefStore | null;
   editionDate: string;
   isDirty: boolean;
+  fileHandle?: any;
 }
 
 export interface PublishEditionBundle {
@@ -203,7 +204,7 @@ export class PublishDocumentManager {
     }
   }
 
-  public async exportEdition(doc?: PublishDocument): Promise<void> {
+  public async exportEdition(doc?: PublishDocument, forceSaveAs: boolean = false): Promise<void> {
     const target = doc || this.getActiveDocument();
     if (!target) return;
 
@@ -242,6 +243,19 @@ export class PublishDocumentManager {
     const dateStr = target.editionDate || new Date().toISOString().split('T')[0];
     const filename = `${safeName}-${dateStr}.vpd`;
 
+    if (!forceSaveAs && target.fileHandle) {
+      try {
+        const writable = await target.fileHandle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        target.isDirty = false;
+        this.renderTabs();
+        return;
+      } catch (err: any) {
+        console.warn('Direct fileHandle write failed, falling back to picker:', err);
+      }
+    }
+
     if (typeof (window as any).showSaveFilePicker === 'function') {
       try {
         const handle = await (window as any).showSaveFilePicker({
@@ -254,6 +268,7 @@ export class PublishDocumentManager {
         const writable = await handle.createWritable();
         await writable.write(json);
         await writable.close();
+        target.fileHandle = handle;
         target.isDirty = false;
         this.renderTabs();
         return;
