@@ -137,3 +137,61 @@ test('collectLeaves — groups expand to shapes, wraps map to bodies, helpers sk
   const leaves = collectLeaves([g, wrap, a, node('image')]);
   assert.deepEqual(leaves, [a, b2, body]);
 });
+
+// ── Offset copy keeps the original's stroke exactly (Illustrator) ──
+const { copyAppearance, offsetCopyStrokeAlign, stepOffsetValue } = await import('../js/visteras-offset-path.js');
+const fakeEl = (attrs = {}) => { const m = new Map(Object.entries(attrs)); return { m, getAttribute: (n) => (m.has(n) ? m.get(n) : null), setAttribute: (n, v) => m.set(n, String(v)) }; };
+const STROKE_KEYS = (m) => [...m.keys()].filter((k) => /stroke/.test(k)).sort();
+
+test('offset copy — stroke none / width 0 / no stroke attribute: copy gets no stroke', () => {
+  for (const src of [
+    { fill: '#88ccff', stroke: 'none' },
+    { fill: '#88ccff', stroke: '#000000', 'stroke-width': '0' },
+    { fill: '#88ccff' },
+    { fill: '#88ccff', stroke: 'none', 'stroke-width': '0', 'data-visteras-stroke-align': 'outside', 'data-visteras-stroke-weight': '0' },
+    { fill: '#88ccff', stroke: 'none', 'stroke-width': '0', 'data-visteras-stroke-align': 'inside', 'data-visteras-stroke-weight': '0' },
+    { fill: '#88ccff', stroke: 'none', 'stroke-width': '4', 'data-visteras-stroke-align': 'inside', 'data-visteras-stroke-weight': '4', 'data-visteras-stroke-paint': 'none' },
+  ]) {
+    const a = fakeEl(src), b = fakeEl();
+    copyAppearance(a, b);
+    assert.deepEqual(STROKE_KEYS(b.m), STROKE_KEYS(a.m), JSON.stringify(src));
+    for (const k of STROKE_KEYS(a.m)) assert.equal(b.getAttribute(k), a.getAttribute(k), k);
+    // No ring re-render (that is what painted a 1pt black stroke before).
+    assert.equal(offsetCopyStrokeAlign((n) => a.getAttribute(n)), null, JSON.stringify(src));
+  }
+});
+
+test('offset copy — coloured 3pt round-join dashed stroke is copied identically', () => {
+  const src = { fill: '#ffffff', stroke: '#cc3322', 'stroke-width': '3', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-miterlimit': '7', 'stroke-dasharray': '6 3', 'stroke-dashoffset': '1', 'stroke-opacity': '0.7' };
+  const a = fakeEl(src), b = fakeEl();
+  copyAppearance(a, b);
+  for (const [k, v] of Object.entries(src)) assert.equal(b.getAttribute(k), v, k);
+  assert.deepEqual(STROKE_KEYS(b.m), STROKE_KEYS(a.m));
+  assert.equal(offsetCopyStrokeAlign((n) => a.getAttribute(n)), null, 'centre stroke: attributes only');
+});
+
+test('offset copy — Inside/Outside keep alignment with the original weight (never 1 by default)', () => {
+  const out = fakeEl({ stroke: 'none', 'stroke-width': '8', 'data-visteras-stroke-align': 'outside', 'data-visteras-stroke-weight': '8', 'data-visteras-stroke-paint': '#ff7700' });
+  assert.deepEqual(offsetCopyStrokeAlign((n) => out.getAttribute(n)), { align: 'outside', weight: 8 });
+  const b = fakeEl(); copyAppearance(out, b);
+  for (const k of ['data-visteras-stroke-align', 'data-visteras-stroke-weight', 'data-visteras-stroke-paint', 'stroke', 'stroke-width']) assert.equal(b.getAttribute(k), out.getAttribute(k), k);
+  const inn = fakeEl({ stroke: 'none', 'stroke-width': '0.5', 'data-visteras-stroke-align': 'inside', 'data-visteras-stroke-weight': '0.5', 'data-visteras-stroke-paint': '#0099aa' });
+  assert.deepEqual(offsetCopyStrokeAlign((n) => inn.getAttribute(n)), { align: 'inside', weight: 0.5 });
+  // Missing stored weight falls back to stroke-width, never to 1.
+  const legacy = fakeEl({ stroke: '#123456', 'stroke-width': '2', 'data-visteras-stroke-align': 'outside' });
+  assert.deepEqual(offsetCopyStrokeAlign((n) => legacy.getAttribute(n)), { align: 'outside', weight: 2 });
+  const noWeight = fakeEl({ stroke: '#123456', 'data-visteras-stroke-align': 'outside' });
+  assert.equal(offsetCopyStrokeAlign((n) => noWeight.getAttribute(n)), null);
+  assert.equal(offsetCopyStrokeAlign((n) => ({ 'data-visteras-stroke-align': 'center', stroke: '#000', 'stroke-width': '3' })[n] ?? null), null);
+});
+
+test('offset stepper — whole-number steps (Shift = 10); typed decimals keep their fraction', () => {
+  assert.equal(stepOffsetValue('10', 1), 11);
+  assert.equal(stepOffsetValue('10', -1), 9);
+  assert.equal(stepOffsetValue('10', 1, true), 20);
+  assert.equal(stepOffsetValue('-3', -1, true), -13);
+  assert.equal(stepOffsetValue('2.5', 1), 3.5);
+  assert.equal(stepOffsetValue('0.1', 1), 1.1);
+  assert.equal(stepOffsetValue('', 1), 1);
+  assert.equal(stepOffsetValue('abc', -1), -1);
+});

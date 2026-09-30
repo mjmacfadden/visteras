@@ -92,7 +92,7 @@ function buildDialog() {
             Offset Distance
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input id="${DIALOG_ID}-offset" type="number" value="${DEFAULT_OFFSET_OPTIONS.offset}" step="0.5"
+            <input id="${DIALOG_ID}-offset" type="number" value="${DEFAULT_OFFSET_OPTIONS.offset}" step="any" inputmode="decimal"
               style="
                 flex:1;
                 background:#18181b;
@@ -201,6 +201,16 @@ function buildDialog() {
   });
   miterRow.style.display = joinsEl.value === 'miter' ? 'block' : 'none'; // Miter is the default
 
+  // Offset field: whole-number steps (↑/↓ = 1, Shift = 10) while typed
+  // decimals stay valid (step="any", so 2.5 is never flagged as invalid).
+  const offsetEl = overlay.querySelector(`#${DIALOG_ID}-offset`);
+  offsetEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault(); e.stopPropagation();
+    offsetEl.value = String(stepOffsetValue(offsetEl.value, e.key === 'ArrowUp' ? 1 : -1, e.shiftKey));
+    offsetEl.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
   // Keyboard: Enter = OK, Escape = cancel
   overlay.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') overlay.style.display = 'none';
@@ -211,6 +221,16 @@ function buildDialog() {
   overlay.addEventListener('mousedown', (e) => {
     if (e.target === overlay) overlay.style.display = 'none';
   });
+}
+
+/**
+ * Offset stepper: whole-number increments (1, or 10 with Shift) from the
+ * current value; a typed decimal keeps its fraction (2.5 → 3.5).
+ */
+export function stepOffsetValue(value, dir, shift = false) {
+  const v = Number.parseFloat(value);
+  const base = Number.isFinite(v) ? v : 0;
+  return Math.round((base + (dir < 0 ? -1 : 1) * (shift ? 10 : 1)) * 1e6) / 1e6;
 }
 
 function showDialog() {
@@ -326,9 +346,40 @@ export function computeOffsetPath(scope, sourceEl, opts) {
   return d.trim() ? { d, fillRule: fillRule || 'nonzero' } : null;
 }
 
+/**
+ * How the offset copy keeps Inside/Outside stroke alignment.
+ *
+ * Root cause of "the offset copy gets a stroke weight": the copy re-rendered
+ * alignment with `Number(weight) || Number(stroke-width) || 1`, so a stored
+ * weight of 0 became 1, and stroke-align then painted the missing stroke
+ * black (captureStrokePaint's fallback). Illustrator keeps the stroke exactly.
+ * The copy only re-renders a ring when the original draws one (aligned,
+ * weight > 0, a real paint) and uses the original's weight as-is; otherwise
+ * the copied attributes stand verbatim.
+ *
+ * @param {(name:string)=>string|null} get source attribute getter
+ * @returns {{align:'inside'|'outside', weight:number}|null}
+ */
+export function offsetCopyStrokeAlign(get) {
+  const align = String(get(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
+  if (align !== 'inside' && align !== 'outside') return null;
+  const num = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number.parseFloat(v); return Number.isFinite(n) ? n : null; };
+  const weight = num(get(STROKE_WEIGHT_ATTR)) ?? num(get('stroke-width'));
+  if (weight == null || weight <= 0) return null;
+  const paint = get(STROKE_PAINT_ATTR) ?? get('stroke');
+  const none = (v) => v == null || ['', 'none', 'transparent'].includes(String(v).trim().toLowerCase());
+  if (none(paint)) return null;
+  return { align, weight };
+}
+
 // ─── Shared DOM helpers ──────────────────────────────────────────────────────
-function copyAppearance(src, dst) {
-  for (const n of APPEARANCE_ATTRS) {
+/**
+ * Copy the original's appearance onto the offset copy verbatim: fill, the
+ * whole stroke (paint, weight — also 0/none/absent —, joins, caps, miter,
+ * dashes, opacity) and the Inside/Outside alignment state. Nothing is added.
+ */
+export function copyAppearance(src, dst) {
+  for (const n of [...APPEARANCE_ATTRS, STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR]) {
     const v = src.getAttribute(n);
     if (v != null) dst.setAttribute(n, v);
   }
@@ -398,13 +449,12 @@ function executeOffsetPath(editor, opts) {
       // Expanded copies go behind the original (both stay visible); shrunk
       // copies go in front.
       anchor.parentNode.insertBefore(newPath, opts.offset > 0 ? anchor : anchor.nextSibling);
-      // Keep Inside/Outside stroke alignment on the copy.
-      const align = String(el.getAttribute(STROKE_ALIGN_ATTR) || 'center').toLowerCase();
-      if (align !== 'center' && csApi()?.applyStrokeAlignToElement) {
-        for (const n of [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR]) {
-          const v = el.getAttribute(n); if (v != null) newPath.setAttribute(n, v);
-        }
-        const w = Number(el.getAttribute(STROKE_WEIGHT_ATTR)) || Number(el.getAttribute('stroke-width')) || 1;
+      // Keep the original's stroke exactly, Inside/Outside alignment included
+      // (the alignment state is copied verbatim; the ring is re-rendered only
+      // when the original draws one, with the original's own weight).
+      const plan = offsetCopyStrokeAlign((n) => el.getAttribute(n));
+      if (plan && csApi()?.applyStrokeAlignToElement) {
+        const { align, weight: w } = plan;
         // The ring's clip/mask lives in <defs>: record those inserts too so
         // undo leaves nothing behind.
         const defsBefore = new Set(document.querySelectorAll('#svgcontent defs > *'));
