@@ -774,48 +774,69 @@ function ImageTracer(){
 		// return if invalid seqend
 		if( (seqend>path.points.length) || (seqend<0) ){ return []; }
 		// variables
-		var errorpoint=seqstart, errorval=0, curvepass=true, px, py, dist2;
+		var errorpoint=seqstart, errorval=0, curvepass=true, dist2;
+		var p1 = path.points[seqstart], p2 = path.points[seqend];
+		var dx = p2.x - p1.x, dy = p2.y - p1.y;
+		var lineLen2 = dx * dx + dy * dy;
 		var tl = (seqend-seqstart); if(tl<0){ tl += path.points.length; }
-		var vx = (path.points[seqend].x-path.points[seqstart].x) / tl,
-			vy = (path.points[seqend].y-path.points[seqstart].y) / tl;
 		
-		// 5.2. Fit a straight line on the sequence
-		var pcnt = (seqstart+1) % path.points.length, pl;
+		// 5.2. Fit a straight line on the sequence using perpendicular point-to-segment distance
+		var pcnt = (seqstart+1) % path.points.length;
 		while(pcnt != seqend){
-			pl = pcnt-seqstart; if(pl<0){ pl += path.points.length; }
-			px = path.points[seqstart].x + vx * pl; py = path.points[seqstart].y + vy * pl;
-			dist2 = (path.points[pcnt].x-px)*(path.points[pcnt].x-px) + (path.points[pcnt].y-py)*(path.points[pcnt].y-py);
+			var pt = path.points[pcnt];
+			var wX = pt.x - p1.x, wY = pt.y - p1.y;
+			if(lineLen2 <= 1e-6){
+				dist2 = wX * wX + wY * wY;
+			} else {
+				var u = (wX * dx + wY * dy) / lineLen2;
+				if(u <= 0){
+					dist2 = wX * wX + wY * wY;
+				} else if(u >= 1){
+					var eX = pt.x - p2.x, eY = pt.y - p2.y;
+					dist2 = eX * eX + eY * eY;
+				} else {
+					var cross = dx * wY - dy * wX;
+					dist2 = (cross * cross) / lineLen2;
+				}
+			}
 			if(dist2>ltres){curvepass=false;}
 			if(dist2>errorval){ errorpoint=pcnt; errorval=dist2; }
 			pcnt = (pcnt+1)%path.points.length;
 		}
 		// return straight line if fits
-		if(curvepass){ return [{ type:'L', x1:path.points[seqstart].x, y1:path.points[seqstart].y, x2:path.points[seqend].x, y2:path.points[seqend].y }]; }
+		if(curvepass){ return [{ type:'L', x1:p1.x, y1:p1.y, x2:p2.x, y2:p2.y }]; }
 		
 		// 5.3. If the straight line fails (distance error>ltres), find the point with the biggest error
 		var fitpoint = errorpoint; curvepass = true; errorval = 0;
 		
 		// 5.4. Fit a quadratic spline through this point, measure errors on every point in the sequence
 		// helpers and projecting to get control point
-		var t=(fitpoint-seqstart)/tl, t1=(1-t)*(1-t), t2=2*(1-t)*t, t3=t*t;
-		var cpx = (t1*path.points[seqstart].x + t3*path.points[seqend].x - path.points[fitpoint].x)/-t2 ,
-			cpy = (t1*path.points[seqstart].y + t3*path.points[seqend].y - path.points[fitpoint].y)/-t2 ;
-		
-		// Check every point
-		pcnt = seqstart+1;
-		while(pcnt != seqend){
-			t=(pcnt-seqstart)/tl; t1=(1-t)*(1-t); t2=2*(1-t)*t; t3=t*t;
-			px = t1 * path.points[seqstart].x + t2 * cpx + t3 * path.points[seqend].x;
-			py = t1 * path.points[seqstart].y + t2 * cpy + t3 * path.points[seqend].y;
+		var pl_fit = fitpoint - seqstart; if(pl_fit < 0){ pl_fit += path.points.length; }
+		var t = pl_fit / tl, t1 = (1 - t) * (1 - t), t2 = 2 * (1 - t) * t, t3 = t * t;
+		if(Math.abs(t2) < 1e-4){
+			curvepass = false;
+		} else {
+			var cpx = (t1 * p1.x + t3 * p2.x - path.points[fitpoint].x) / -t2,
+				cpy = (t1 * p1.y + t3 * p2.y - path.points[fitpoint].y) / -t2;
 			
-			dist2 = (path.points[pcnt].x-px)*(path.points[pcnt].x-px) + (path.points[pcnt].y-py)*(path.points[pcnt].y-py);
-			
-			if(dist2>qtres){curvepass=false;}
-			if(dist2>errorval){ errorpoint=pcnt; errorval=dist2; }
-			pcnt = (pcnt+1)%path.points.length;
+			// Check every point
+			pcnt = (seqstart + 1) % path.points.length;
+			while(pcnt != seqend){
+				var pl_cnt = pcnt - seqstart; if(pl_cnt < 0){ pl_cnt += path.points.length; }
+				var pt_t = pl_cnt / tl;
+				var pt_t1 = (1 - pt_t) * (1 - pt_t), pt_t2 = 2 * (1 - pt_t) * pt_t, pt_t3 = pt_t * pt_t;
+				var px = pt_t1 * p1.x + pt_t2 * cpx + pt_t3 * p2.x;
+				var py = pt_t1 * p1.y + pt_t2 * cpy + pt_t3 * p2.y;
+				
+				dist2 = (path.points[pcnt].x-px)*(path.points[pcnt].x-px) + (path.points[pcnt].y-py)*(path.points[pcnt].y-py);
+				
+				if(dist2>qtres){curvepass=false;}
+				if(dist2>errorval){ errorpoint=pcnt; errorval=dist2; }
+				pcnt = (pcnt+1)%path.points.length;
+			}
+			// return spline if fits
+			if(curvepass){ return [{ type:'Q', x1:p1.x, y1:p1.y, x2:cpx, y2:cpy, x3:p2.x, y3:p2.y }]; }
 		}
-		// return spline if fits
-		if(curvepass){ return [{ type:'Q', x1:path.points[seqstart].x, y1:path.points[seqstart].y, x2:cpx, y2:cpy, x3:path.points[seqend].x, y3:path.points[seqend].y }]; }
 		// 5.5. If the spline fails (distance error>qtres), find the point with the biggest error
 		var splitpoint = fitpoint; // Earlier: Math.floor((fitpoint + errorpoint)/2);
 		
@@ -872,18 +893,28 @@ function ImageTracer(){
 		if( options.roundcoords === -1 ){
 			str += 'M '+ smp.segments[0].x1 * options.scale +' '+ smp.segments[0].y1 * options.scale +' ';
 			for(pcnt=0; pcnt<smp.segments.length; pcnt++){
-				str += smp.segments[pcnt].type +' '+ smp.segments[pcnt].x2 * options.scale +' '+ smp.segments[pcnt].y2 * options.scale +' ';
-				if(smp.segments[pcnt].hasOwnProperty('x3')){
-					str += smp.segments[pcnt].x3 * options.scale +' '+ smp.segments[pcnt].y3 * options.scale +' ';
+				var seg = smp.segments[pcnt];
+				if(seg.type === 'C'){
+					str += 'C '+ seg.x2 * options.scale +' '+ seg.y2 * options.scale +' '+ seg.x3 * options.scale +' '+ seg.y3 * options.scale +' '+ seg.x4 * options.scale +' '+ seg.y4 * options.scale +' ';
+				}else{
+					str += seg.type +' '+ seg.x2 * options.scale +' '+ seg.y2 * options.scale +' ';
+					if(seg.hasOwnProperty('x3')){
+						str += seg.x3 * options.scale +' '+ seg.y3 * options.scale +' ';
+					}
 				}
 			}
 			str += 'Z ';
 		}else{
 			str += 'M '+ _this.roundtodec( smp.segments[0].x1 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( smp.segments[0].y1 * options.scale, options.roundcoords ) +' ';
 			for(pcnt=0; pcnt<smp.segments.length; pcnt++){
-				str += smp.segments[pcnt].type +' '+ _this.roundtodec( smp.segments[pcnt].x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( smp.segments[pcnt].y2 * options.scale, options.roundcoords ) +' ';
-				if(smp.segments[pcnt].hasOwnProperty('x3')){
-					str += _this.roundtodec( smp.segments[pcnt].x3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( smp.segments[pcnt].y3 * options.scale, options.roundcoords ) +' ';
+				var seg = smp.segments[pcnt];
+				if(seg.type === 'C'){
+					str += 'C '+ _this.roundtodec( seg.x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.y2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.x3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.y3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.x4 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.y4 * options.scale, options.roundcoords ) +' ';
+				}else{
+					str += seg.type +' '+ _this.roundtodec( seg.x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.y2 * options.scale, options.roundcoords ) +' ';
+					if(seg.hasOwnProperty('x3')){
+						str += _this.roundtodec( seg.x3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( seg.y3 * options.scale, options.roundcoords ) +' ';
+					}
 				}
 			}
 			str += 'Z ';
@@ -894,43 +925,52 @@ function ImageTracer(){
 			var hsmp = layer[ smp.holechildren[hcnt] ];
 			// Creating hole path string
 			if( options.roundcoords === -1 ){
-				
-				if(hsmp.segments[ hsmp.segments.length-1 ].hasOwnProperty('x3')){
-					str += 'M '+ hsmp.segments[ hsmp.segments.length-1 ].x3 * options.scale +' '+ hsmp.segments[ hsmp.segments.length-1 ].y3 * options.scale +' ';
+				var lastH = hsmp.segments[ hsmp.segments.length-1 ];
+				if(lastH.type === 'C'){
+					str += 'M '+ lastH.x4 * options.scale +' '+ lastH.y4 * options.scale +' ';
+				}else if(lastH.hasOwnProperty('x3')){
+					str += 'M '+ lastH.x3 * options.scale +' '+ lastH.y3 * options.scale +' ';
 				}else{
-					str += 'M '+ hsmp.segments[ hsmp.segments.length-1 ].x2 * options.scale +' '+ hsmp.segments[ hsmp.segments.length-1 ].y2 * options.scale +' ';
+					str += 'M '+ lastH.x2 * options.scale +' '+ lastH.y2 * options.scale +' ';
 				}
 				
 				for(pcnt = hsmp.segments.length-1; pcnt >= 0; pcnt--){
-					str += hsmp.segments[pcnt].type +' ';
-					if(hsmp.segments[pcnt].hasOwnProperty('x3')){
-						str += hsmp.segments[pcnt].x2 * options.scale +' '+ hsmp.segments[pcnt].y2 * options.scale +' ';
+					var hseg = hsmp.segments[pcnt];
+					if(hseg.type === 'C'){
+						str += 'C '+ hseg.x3 * options.scale +' '+ hseg.y3 * options.scale +' '+ hseg.x2 * options.scale +' '+ hseg.y2 * options.scale +' '+ hseg.x1 * options.scale +' '+ hseg.y1 * options.scale +' ';
+					}else{
+						str += hseg.type +' ';
+						if(hseg.hasOwnProperty('x3')){
+							str += hseg.x2 * options.scale +' '+ hseg.y2 * options.scale +' ';
+						}
+						str += hseg.x1 * options.scale +' '+ hseg.y1 * options.scale +' ';
 					}
-					
-					str += hsmp.segments[pcnt].x1 * options.scale +' '+ hsmp.segments[pcnt].y1 * options.scale +' ';
 				}
-				
 			}else{
-				
-				if(hsmp.segments[ hsmp.segments.length-1 ].hasOwnProperty('x3')){
-					str += 'M '+ _this.roundtodec( hsmp.segments[ hsmp.segments.length-1 ].x3 * options.scale ) +' '+ _this.roundtodec( hsmp.segments[ hsmp.segments.length-1 ].y3 * options.scale ) +' ';
+				var lastH = hsmp.segments[ hsmp.segments.length-1 ];
+				if(lastH.type === 'C'){
+					str += 'M '+ _this.roundtodec( lastH.x4 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( lastH.y4 * options.scale, options.roundcoords ) +' ';
+				}else if(lastH.hasOwnProperty('x3')){
+					str += 'M '+ _this.roundtodec( lastH.x3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( lastH.y3 * options.scale, options.roundcoords ) +' ';
 				}else{
-					str += 'M '+ _this.roundtodec( hsmp.segments[ hsmp.segments.length-1 ].x2 * options.scale ) +' '+ _this.roundtodec( hsmp.segments[ hsmp.segments.length-1 ].y2 * options.scale ) +' ';
+					str += 'M '+ _this.roundtodec( lastH.x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( lastH.y2 * options.scale, options.roundcoords ) +' ';
 				}
 				
 				for(pcnt = hsmp.segments.length-1; pcnt >= 0; pcnt--){
-					str += hsmp.segments[pcnt].type +' ';
-					if(hsmp.segments[pcnt].hasOwnProperty('x3')){
-						str += _this.roundtodec( hsmp.segments[pcnt].x2 * options.scale ) +' '+ _this.roundtodec( hsmp.segments[pcnt].y2 * options.scale ) +' ';
+					var hseg = hsmp.segments[pcnt];
+					if(hseg.type === 'C'){
+						str += 'C '+ _this.roundtodec( hseg.x3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.y3 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.y2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.x1 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.y1 * options.scale, options.roundcoords ) +' ';
+					}else{
+						str += hseg.type +' ';
+						if(hseg.hasOwnProperty('x3')){
+							str += _this.roundtodec( hseg.x2 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.y2 * options.scale, options.roundcoords ) +' ';
+						}
+						str += _this.roundtodec( hseg.x1 * options.scale, options.roundcoords ) +' '+ _this.roundtodec( hseg.y1 * options.scale, options.roundcoords ) +' ';
 					}
-					str += _this.roundtodec( hsmp.segments[pcnt].x1 * options.scale ) +' '+ _this.roundtodec( hsmp.segments[pcnt].y1 * options.scale ) +' ';
 				}
-				
-				
 			}// End of creating hole path string
 			
 			str += 'Z '; // Close path
-			
 		}// End of holepath check
 		
 		// Closing path element

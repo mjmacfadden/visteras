@@ -287,12 +287,21 @@ export function mountDirectSelection(editor) {
     schedule();
     return result;
   };
+  const setZoom = sc.setZoom;
+  if (setZoom) {
+    sc.setZoom = function (zoom) {
+      const res = setZoom.call(this, zoom);
+      if (active) schedule();
+      return res;
+    };
+  }
   const call = sc.call;
   sc.call = function (event, ...args) {
     const result = call.call(this, event, ...args);
-    if (active && ['changed','selected','zoomed','sourcechanged'].includes(event)) schedule();
+    if (active && ['changed','selected','zoomed','sourcechanged','updateCanvas','zoomChanged'].includes(event)) schedule();
     return result;
   };
+  window.addEventListener('resize', () => { if (active) schedule(); });
   // Paint/appearance must reach Direct Selection targets even though we clear
   // SVG-Edit's selection (so Selection grips stay out of the way).
   function paintLeaves(elements) {

@@ -17,6 +17,7 @@ export function mountVectorWorkspace(editor) {
     if (editor.configObj.curConfig.showRulers) editor.rulers?.updateRulers?.(document.getElementById('svgcanvas'), zoom);
     editor.zoomDone?.();
     sc.runExtensions('zoomChanged', zoom);
+    sc.call('zoomed', { zoom });
   }
   area.addEventListener('wheel', event => {
     event.preventDefault(); event.stopImmediatePropagation();

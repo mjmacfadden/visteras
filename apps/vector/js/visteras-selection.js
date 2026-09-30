@@ -80,13 +80,22 @@ export function mountSelectionTools(editor) {
   function schedule() {
     if (!frame) frame = requestAnimationFrame(refresh);
   }
+  const setZoom = sc.setZoom;
+  if (setZoom) {
+    sc.setZoom = function (zoom) {
+      const res = setZoom.call(this, zoom);
+      schedule();
+      return res;
+    };
+  }
   // Preserve SVGEdit's event subscribers; render after all synchronous selection changes.
   const call = sc.call;
   sc.call = function (event, ...args) {
     const result = call.call(this, event, ...args);
-    if (['selected', 'changed', 'transition', 'zoomed', 'sourcechanged'].includes(event)) schedule();
+    if (['selected', 'changed', 'transition', 'zoomed', 'sourcechanged', 'updateCanvas', 'zoomChanged'].includes(event)) schedule();
     return result;
   };
+  window.addEventListener('resize', schedule);
   document.addEventListener('modeChange', schedule);
   sc.getSvgRoot().addEventListener('mouseup', schedule);
   new MutationObserver(schedule).observe(sc.getSvgContent(), { attributes: true, childList: true, subtree: true });
