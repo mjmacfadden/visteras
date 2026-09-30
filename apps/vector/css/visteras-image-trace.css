@@ -1,0 +1,204 @@
+/* Visteras Vector — Image Trace (live trace, panel, menu submenu) */
+
+/* ---- Object > Image Trace submenu ------------------------------------- */
+.menu_dropdown_item.menu_has_submenu { position: relative; }
+.menu_dropdown_item.menu_has_submenu::after { content: '▸'; color: #888; font-size: 10px; margin-left: 16px; }
+.menu_submenu_list {
+  display: none;
+  position: absolute;
+  top: -5px;
+  left: 100%;
+  background: #3c3c3c;
+  border: 1px solid #505050;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  min-width: 150px;
+  z-index: 3002;
+}
+.menu_dropdown_item.menu_has_submenu:hover > .menu_submenu_list { display: block; }
+.menu_submenu_list .menu_dropdown_item { color: #cccccc; }
+.menu_submenu_list .menu_dropdown_item.disabled { color: #666666; }
+.menu_submenu_list .menu_dropdown_item:not(.disabled):hover { background: var(--studio-blue-active); color: #fff; }
+
+/* ---- Live trace views (editor-only styling) ---------------------------- */
+g.visteras-live-trace[data-trace-view="result-outlines"] > g[data-trace-result] > path {
+  stroke: #000 !important;
+  stroke-width: 0.5px !important;
+  vector-effect: non-scaling-stroke;
+}
+g.visteras-live-trace[data-trace-view="outlines"] > g[data-trace-result] > path,
+g.visteras-live-trace[data-trace-view="outlines-source"] > g[data-trace-result] > path {
+  fill: none !important;
+  stroke: #000 !important;
+  stroke-width: 0.5px !important;
+  vector-effect: non-scaling-stroke;
+}
+g.visteras-live-trace[data-trace-peek="1"] > g[data-trace-result] { display: none !important; }
+
+/* ---- Tracing overlay ---------------------------------------------------- */
+.vit-overlay {
+  position: fixed;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(20, 20, 20, 0.38);
+  pointer-events: none;
+  z-index: 40;
+  color: #fff;
+  font: 600 11px/1.2 var(--ui-font, system-ui, sans-serif);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.vit-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: var(--studio-orange, #fa7c1b);
+  border-radius: 50%;
+  animation: vit-spin 0.8s linear infinite;
+}
+@keyframes vit-spin { to { transform: rotate(360deg); } }
+
+/* ---- Docked Image Trace panel ------------------------------------------- */
+#image_trace_panel { border-bottom: 1px solid #222; }
+#image_trace_panel .vit-header {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ccc;
+  background: #333;
+  padding: 5px 8px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#image_trace_panel .vit-close {
+  background: none;
+  border: 0;
+  color: #999;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+#image_trace_panel .vit-close:hover { color: #fff; }
+#image_trace_panel .vit-body {
+  padding: 8px 10px 10px;
+  font-size: 11px;
+  color: #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#image_trace_panel .vit-body.is-disabled > :not(.vit-info) { opacity: 0.45; pointer-events: none; }
+#image_trace_panel .vit-row { display: flex; align-items: center; gap: 6px; }
+#image_trace_panel .vit-row-top { align-items: flex-start; }
+#image_trace_panel .vit-row > label:first-child { width: 52px; flex: none; color: #aaa; }
+#image_trace_panel select {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  background: #2b2b2b;
+  color: #ddd;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  font-size: 11px;
+}
+#image_trace_panel .vit-eye {
+  width: 26px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  cursor: pointer;
+  touch-action: none;
+}
+#image_trace_panel .vit-eye.is-held { background: var(--studio-blue-active); color: #fff; }
+#image_trace_panel .vit-eye:disabled { opacity: 0.4; cursor: default; }
+#image_trace_panel .vit-slider { display: flex; flex-direction: column; gap: 2px; }
+#image_trace_panel .vit-slider-head { display: flex; justify-content: space-between; color: #aaa; }
+#image_trace_panel .vit-slider-head span:last-child { color: #ddd; font-variant-numeric: tabular-nums; }
+#image_trace_panel input[type="range"] { width: 100%; accent-color: var(--studio-orange, #fa7c1b); margin: 0; }
+#image_trace_panel .vit-advanced { border-top: 1px solid #4a4a4a; padding-top: 4px; }
+#image_trace_panel .vit-advanced > summary { cursor: pointer; color: #ddd; padding: 2px 0 4px; user-select: none; }
+#image_trace_panel .vit-advanced[open] { display: flex; flex-direction: column; gap: 6px; }
+#image_trace_panel .vit-seg, #image_trace_panel .vit-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+#image_trace_panel .vit-checks-col { flex-direction: column; gap: 4px; }
+#image_trace_panel .vit-seg label, #image_trace_panel .vit-checks label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#image_trace_panel .vit-info {
+  border-top: 1px solid #4a4a4a;
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#image_trace_panel .vit-info-row { display: grid; grid-template-columns: 52px 1fr 44px 1fr; gap: 2px 4px; color: #aaa; }
+#image_trace_panel .vit-info-row b { color: #ddd; font-weight: 600; font-variant-numeric: tabular-nums; }
+#image_trace_panel .vit-status { color: #999; min-height: 14px; }
+#image_trace_panel .vit-status.is-busy { color: var(--studio-orange, #fa7c1b); }
+#image_trace_panel .vit-warning { display: none; color: #e7c35a; line-height: 1.35; }
+#image_trace_panel .vit-error {
+  display: none;
+  color: #ffb4a8;
+  background: rgba(200, 60, 40, 0.18);
+  border: 1px solid rgba(220, 90, 70, 0.55);
+  border-radius: 3px;
+  padding: 5px 6px;
+  line-height: 1.35;
+}
+#image_trace_panel .vit-footer { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 4px; }
+#image_trace_panel .vit-preview { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#image_trace_panel .vit-buttons { display: flex; gap: 6px; }
+#image_trace_panel .vit-btn,
+.vit-prop-btn {
+  height: 24px;
+  padding: 0 10px;
+  background: #333;
+  color: #ddd;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+#image_trace_panel .vit-btn:hover:not(:disabled), .vit-prop-btn:hover { background: #444; border-color: #666; }
+#image_trace_panel .vit-btn:disabled { opacity: 0.45; cursor: default; }
+#image_trace_panel .vit-btn-primary { background: var(--studio-blue-active); border-color: var(--studio-blue-active); color: #fff; }
+#image_trace_panel .vit-btn-primary:hover:not(:disabled) { background: #3479c7; border-color: #3479c7; }
+
+/* ---- Properties bar ------------------------------------------------------ */
+.vit-prop-row { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.vit-prop-select {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  background: #2b2b2b;
+  color: #ddd;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  font-size: 11px;
+}
+.vit-prop-icon {
+  width: 26px;
+  height: 24px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #505050;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.vit-prop-icon:hover { background: #444; color: #fff; }
+.vit-prop-label { width: 40px; flex: none; font-size: 11px; color: #aaa; }
+.vit-prop-wide { flex: 1; }
+.vit-prop-section { padding: 6px 8px 8px; border-bottom: 1px solid #2a2a2a; }
+.vit-prop-title { font-size: 11px; font-weight: 700; color: #ccc; text-transform: uppercase; letter-spacing: 0.4px; }

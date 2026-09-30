@@ -386,14 +386,6 @@ function wireRefControls(svgEditor) {
     else clearDim(el);
   });
 
-  document.getElementById('ref_trace_image')?.addEventListener('click', () => {
-    if (typeof window.__visterasTraceSelectedImage === 'function') {
-      window.__visterasTraceSelectedImage();
-    } else {
-      alert('Trace Image is not loaded yet.');
-    }
-  });
-
   // Aspect-lock: when width/height spin inputs change on a locked-aspect reference
   ['image_width', 'image_height'].forEach((id) => {
     const input = document.getElementById(id);
@@ -450,10 +442,6 @@ function injectPropChrome() {
       <input type="checkbox" id="ref_dim_50_cb" />
       <span>Dim to 50%</span>
     </label>
-    <button type="button" id="ref_trace_image" class="prop_pathfinder_btn" style="width:100%;margin-top:4px;height:26px;font-size:11px;" title="Convert flat logo/icon to vector paths (not for photos)">
-      Trace to Paths…
-    </button>
-    <p id="ref_trace_hint" style="font-size:10px;color:#999;margin:6px 0 0;line-height:1.35;">Trace is for flat logos/icons with few colors — not photos.</p>
   `;
   if (imgGroup && imgGroup.parentNode) {
     imgGroup.parentNode.insertBefore(refGroup, imgGroup.nextSibling);
