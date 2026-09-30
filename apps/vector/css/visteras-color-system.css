@@ -1123,3 +1123,17 @@
 [data-visteras-stroke-align-helper] {
   pointer-events: none !important;
 }
+
+/* Mixed paint across the selection: the well shows the first object's paint
+   with a small "?" badge (Illustrator shows "?" for mixed). */
+.vcs-appearance-chip.is-mixed::after,
+.swatch-color-indicator.is-mixed::after {
+  content: '?';
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font: 700 9px/1 -apple-system, Helvetica, sans-serif;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 0 1px #000;
+  pointer-events: none;
+}

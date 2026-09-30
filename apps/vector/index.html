@@ -21,7 +21,7 @@
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css?v=hygiene-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-color-system.css?v=smoke-stroke-align-5" rel="stylesheet" media="all">
+  <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
@@ -103,6 +103,9 @@
             <div class="menu_dropdown_item" id="action_pathfinder_intersect">Pathfinder: Intersect</div>
             <div class="menu_dropdown_item" id="action_pathfinder_exclude">Pathfinder: Exclude</div>
             <div class="menu_dropdown_item" id="action_pathfinder_divide">Pathfinder: Divide</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_offset_path">Offset Path… <span class="menu_dropdown_shortcut">⌥⌘O</span></div>
+            <div class="menu_dropdown_item" id="action_outline_stroke">Outline Stroke</div>
           </div>
         </div>
 
@@ -172,21 +175,25 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=center-artboard-1';
+    import Editor from './Editor.js?v=select-style-1';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
-    import { mountPenTools } from './js/visteras-pen-tools.js?v=exact-snap-2';
+    import { mountPenTools } from './js/visteras-pen-tools.js?v=pen-auto-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
-    import { mountSelectionTools } from './js/visteras-selection.js?v=snap-point-direct-2';
+    import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
+    import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-5';
+    import { mountOffsetPath } from './js/visteras-offset-path.js?v=offset-path-5';
+    import { mountShapeBuilderTool } from './js/visteras-shape-builder.js?v=shape-builder-4';
+    import { mountSelectionTools } from './js/visteras-selection.js?v=ds-illustrator-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js';
-    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=smoke-69-3';
+    import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=clipboard-png-1';
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js?v=vtracer-controls-1';
-    import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js';
+    import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-png-1';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=smoke-stroke-align-5';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
 
     // Disable unwanted modal popups on initial load
     document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
@@ -1646,28 +1653,29 @@
         });
       });
 
-      // Enhance alignment buttons to align single elements to page and multi elements relative
-      ['left', 'center', 'right', 'top', 'middle', 'bottom'].forEach(dir => {
+      // Align & Distribute (Illustrator): one click = one align = one undo step.
+      // A single object aligns to the artboard ('page'); 2+ objects use the
+      // Align To dropdown. Distribute needs 2+ objects. SVG-Edit's TopPanel also
+      // binds these buttons (clickAlign, always using the dropdown), so this
+      // capture listener on the button runs first and stops the second align.
+      const alignTargets = () => (svgEditor.svgCanvas.getSelectedElements?.() || []).filter(Boolean);
+      ['left', 'center', 'right', 'top', 'middle', 'bottom', 'distrib_horiz', 'distrib_verti'].forEach(dir => {
         const btn = document.getElementById(`tool_align_${dir}`);
-        if (btn) {
-          btn.addEventListener('click', (e) => {
-            let rel = document.getElementById('tool_align_relative')?.value || 'selected';
-            if (!svgEditor.multiselected) {
-              rel = 'page';
-            }
-            svgEditor.svgCanvas.alignSelectedElements(dir, rel);
-          });
-        }
-      });
-
-      ['distrib_horiz', 'distrib_verti'].forEach(dir => {
-        const btn = document.getElementById(`tool_align_${dir}`);
-        if (btn) {
-          btn.addEventListener('click', (e) => {
-            const rel = document.getElementById('tool_align_relative')?.value || 'selected';
-            svgEditor.svgCanvas.alignSelectedElements(dir, rel);
-          });
-        }
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (btn.hasAttribute('disabled')) return;
+          const sel = alignTargets();
+          if (!sel.length) return;
+          const isDistrib = dir.startsWith('distrib');
+          if (isDistrib && sel.length < 2) return;
+          const rel = sel.length < 2
+            ? 'page'
+            : (document.getElementById('tool_align_relative')?.value || 'selected');
+          svgEditor.svgCanvas.alignSelectedElements(dir, rel);
+          window.__updatePropertiesVisibility?.();
+        }, true);
       });
 
       // Wire flip buttons
@@ -1888,9 +1896,40 @@
         if (pathSec) {
           pathSec.style.display = isPathEdit ? 'block' : 'none';
         }
+        // Align & Distribute: Illustrator shows it for any selection. One object
+        // aligns to the artboard (Align To locked to Page/Artboard) and the
+        // distribute buttons are disabled until 2+ objects are selected.
         const alignSec = document.getElementById('sec_align');
         if (alignSec) {
-          alignSec.style.display = (isPathEdit || selElems.length > 1) ? 'block' : 'none';
+          alignSec.style.display = (isPathEdit || selElems.length > 0) ? 'block' : 'none';
+          const single = selElems.length < 2;
+          ['distrib_horiz', 'distrib_verti'].forEach(dir => {
+            const b = document.getElementById(`tool_align_${dir}`);
+            if (!b) return;
+            if (single) b.setAttribute('disabled', 'true'); else b.removeAttribute('disabled');
+            b.style.opacity = single ? '0.35' : '';
+            b.style.pointerEvents = single ? 'none' : '';
+          });
+          const relSel = document.getElementById('tool_align_relative');
+          if (relSel) {
+            if (single) {
+              if (!relSel.hasAttribute('data-visteras-single')) {
+                relSel.setAttribute('data-visteras-single', relSel.value || 'selected');
+                relSel.value = 'page';
+              }
+              relSel.setAttribute('title', 'Single object: aligns to the artboard');
+              relSel.style.opacity = '0.6';
+              relSel.style.pointerEvents = 'none';
+            } else {
+              if (relSel.hasAttribute('data-visteras-single')) {
+                relSel.value = relSel.getAttribute('data-visteras-single') || 'selected';
+                relSel.removeAttribute('data-visteras-single');
+              }
+              relSel.removeAttribute('title');
+              relSel.style.opacity = '';
+              relSel.style.pointerEvents = '';
+            }
+          }
         }
 
         // Pathfinder section (strictly visible when 2 objects are selected)
@@ -1970,6 +2009,10 @@
     mountVectorWorkspace(svgEditor);
     mountPenTools(svgEditor);
     mountScissorsTool(svgEditor);
+    mountEraserTool(svgEditor);
+    mountEyedropperTool(svgEditor);
+    mountOffsetPath(svgEditor);
+    mountShapeBuilderTool(svgEditor);
     // Disarm SVG-Edit wireframe shortcut="F" so ⌘/Ctrl+F is paste-in-place only.
     // Bare F is handled in setupMenuBar's capture keydown (Outline Mode).
     const wireBtn = document.getElementById('tool_wireframe');

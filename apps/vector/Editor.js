@@ -40976,10 +40976,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					} else p = q.getMouseTarget(e), e.shiftKey && r !== p && q.removeFromSelection([p]);
 					q.dragStartTransforms = null, q.hasDragStartTransform = !1;
 					let n = t[0];
-					n && (n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
+					// Visteras: only drop the temporary pointer-events style; stock SVG-Edit removed the whole
+					// style="" attribute on select, wiping style-based stroke/fill (and mix-blend-mode).
+					n && (n.style.removeProperty("pointer-events"), n.getAttribute("style")?.trim() || n.removeAttribute("style"), n.localName === "foreignObject" ? og(n, (e) => {
 						e.style.removeProperty("pointer-events");
 					}) : og(n, (e) => {
-						e.removeAttribute("style");
+						e.style?.removeProperty("pointer-events"), e.getAttribute?.("style")?.trim() || e.removeAttribute?.("style");
 					}));
 				}
 				return;
@@ -68433,7 +68435,6 @@ var ez = function(e) {
 			layerView: !1
 		}, this.curPrefs = {}, this.urldata = {}, this.defaultExtensions = [
 			"ext-connector",
-			"ext-eyedropper",
 			"ext-grid",
 			"ext-markers",
 			"ext-panning",
@@ -68985,7 +68986,7 @@ var fz = () => {
 			"pathedit"
 		].includes(e) && this.leftPanel.clickSelect();
 	}
-}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"Selection Tool\" src=\"select.svg\" shortcut=\"V\"></se-button><se-button id=\"tool_direct_select\" title=\"Direct Selection Tool\" src=\"direct_select.svg\" shortcut=\"A\"></se-button><se-button id=\"tool_zoom\" title=\"Zoom Tool\" src=\"zoom.svg\" shortcut=\"Z\"></se-button><se-button id=\"tool_fhpath\" title=\"Pencil Tool\" src=\"pencil.svg\" shortcut=\"N\"></se-button><se-button id=\"tool_line\" title=\"Line Tool\" src=\"pen.svg\" shortcut=\"\\\"></se-button><se-button id=\"tool_path\" title=\"Pen Tool\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"Rectangle Tool\"><se-button id=\"tool_rect\" title=\"Rectangle Tool\" src=\"rect.svg\" shortcut=\"M\"></se-button><se-button id=\"tool_square\" title=\"Square Tool\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"Freehand Rectangle\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"Ellipse Tool\"><se-button id=\"tool_ellipse\" title=\"Ellipse Tool\" src=\"ellipse.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_circle\" title=\"Circle Tool\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"Freehand Ellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Type Tool\"><se-button id=\"tool_text\" title=\"Type Tool\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"Image Tool\" src=\"image.svg\"></se-button></div>";
+}, _z = "<div id=\"tools_left\"><se-button id=\"tool_select\" title=\"Selection Tool\" src=\"select.svg\" shortcut=\"V\"></se-button><se-button id=\"tool_direct_select\" title=\"Direct Selection Tool\" src=\"direct_select.svg\" shortcut=\"A\"></se-button><se-button id=\"tool_zoom\" title=\"Zoom Tool\" src=\"zoom.svg\" shortcut=\"Z\"></se-button><se-button id=\"tool_fhpath\" title=\"Pencil Tool\" src=\"pencil.svg\" shortcut=\"N\"></se-button><se-button id=\"tool_line\" title=\"Line Tool\" src=\"line.svg\" shortcut=\"\\\"></se-button><se-button id=\"tool_path\" title=\"Pen Tool\" src=\"path.svg\" shortcut=\"P\"></se-button><se-flyingbutton id=\"tools_rect\" title=\"Rectangle Tool\"><se-button id=\"tool_rect\" title=\"Rectangle Tool\" src=\"rect.svg\" shortcut=\"M\"></se-button><se-button id=\"tool_square\" title=\"Square Tool\" src=\"square.svg\"></se-button><se-button id=\"tool_fhrect\" title=\"Freehand Rectangle\" src=\"fh_rect.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_ellipse\" title=\"Ellipse Tool\"><se-button id=\"tool_ellipse\" title=\"Ellipse Tool\" src=\"ellipse.svg\" shortcut=\"L\"></se-button><se-button id=\"tool_circle\" title=\"Circle Tool\" src=\"circle.svg\"></se-button><se-button id=\"tool_fhellipse\" title=\"Freehand Ellipse\" src=\"fh_ellipse.svg\"></se-button></se-flyingbutton><se-flyingbutton id=\"tools_text\" title=\"Type Tool\"><se-button id=\"tool_text\" title=\"Type Tool\" src=\"text.svg\" shortcut=\"T\"></se-button><se-button id=\"tool_type_on_path\" title=\"Type on Path\" src=\"type_on_path.svg\"></se-button></se-flyingbutton><se-button id=\"tool_image\" title=\"Image Tool\" src=\"image.svg\"></se-button></div>";
 //#endregion
 //#region src/editor/panels/LeftPanel.js
 YI();

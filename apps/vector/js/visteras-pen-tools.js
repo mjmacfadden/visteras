@@ -1,6 +1,7 @@
-import { readSegments, serializeSegments, anchors, contours, deleteAnchors } from './visteras-anchor-model.js';
+import { readSegments, serializeSegments, anchors, contours } from './visteras-anchor-model.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
-import { hitSegment, splitSegment, simplifyStraightSegments, reverseOpenContour, evaluateSegment } from './visteras-pen-geometry.js';
+import { hitSegment, splitSegment, simplifyStraightSegments, reverseOpenContour, evaluateSegment, explicitClosing, deleteAnchorSmooth } from './visteras-pen-geometry.js?v=pen-auto-1';
+import { resolvePenHover, getDisableAutoAddDelete, setDisableAutoAddDelete } from './visteras-pen-auto.js?v=pen-auto-1';
 
 export function mountPenTools(editor) {
   const sc=editor.svgCanvas, ns='http://www.w3.org/2000/svg';
@@ -28,8 +29,17 @@ export function mountPenTools(editor) {
   }
   document.addEventListener('modeChange',sync);
   const style=document.createElement('style');
-  style.textContent=definitions.map(([, , , mode])=>`body[data-mode="${mode}"] #svgcanvas,body[data-mode="${mode}"] #svgcanvas * {cursor:url("./images/${mode==='path'?'pen':mode==='add_anchor'?'pen_add':'pen_delete'}_cursor.svg") 4 4, crosshair !important}`).join('\n');
+  // Hotspot = the nib tip: (4,4) in the 30-unit viewBox → (3.2,3.2) at 24px.
+  const applyPenCursor=(penCursor='pen')=>{
+    style.textContent=definitions.map(([, , , mode])=>`body[data-mode="${mode}"] #svgcanvas,body[data-mode="${mode}"] #svgcanvas * {cursor:url("./images/${mode==='path'?penCursor:mode==='add_anchor'?'pen_add':'pen_delete'}_cursor.svg") 3 3, crosshair !important}`).join('\n');
+  };
+  applyPenCursor('pen');
   document.head.append(style);
+  // Preference stub: Disable Auto Add/Delete (default off, localStorage).
+  window.__visterasPenPrefs={
+    get disableAutoAddDelete(){return getDisableAutoAddDelete();},
+    set disableAutoAddDelete(v){setDisableAutoAddDelete(!!v);},
+  };
   let continuation=null, extending=null;
   function finishPath(){
     continuation=null;extending=null;
@@ -57,11 +67,21 @@ export function mountPenTools(editor) {
     const id=e.key==='+'||e.key==='='?'tool_add_anchor':e.key==='-'?'tool_delete_anchor':null;
     if(id){e.preventDefault();e.stopImmediatePropagation();document.getElementById(id).click();}
   },true);
+  // Local geometry, cached per element by its geometry attributes (hover
+  // resolution runs on every mousemove). Closing edges are made explicit so
+  // they can be hit (add) and indices match deleteAnchorSmooth.
+  const geometryCache=new WeakMap();
+  const GEOM_ATTRS=['d','x','y','width','height','rx','ry','cx','cy','r','x1','y1','x2','y2','points'];
   function geometry(el){
+    const key=el.localName+'|'+GEOM_ATTRS.map(n=>el.getAttribute(n)??'').join('|');
+    const hit=geometryCache.get(el);
+    if(hit&&hit.key===key)return hit.data.map(s=>({...s}));
     const p=document.createElementNS(ns,'path');
     p.setAttribute('d',sc.getPathDataForElement(el)||'');
     normalizeEditablePath(p,p=>sc.pathActions.convertPath(p));
-    return simplifyStraightSegments(readSegments(p));
+    const data=explicitClosing(simplifyStraightSegments(readSegments(p)));
+    geometryCache.set(el,{key,data});
+    return data.map(s=>({...s}));
   }
   function candidates(){
     return [...sc.getSvgContent().querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')].filter(el=>!el.closest('defs,clipPath,mask')&&getComputedStyle(el).display!=='none'&&getComputedStyle(el).visibility!=='hidden'&&getComputedStyle(el).pointerEvents!=='none');
@@ -83,42 +103,74 @@ export function mountPenTools(editor) {
   snapMarker.className = 'visteras-snap-point-marker';
   snapMarker.style.cssText = 'position:fixed;width:8px;height:8px;border:1px solid #fa7c1b;pointer-events:none;z-index:99999;display:none;transform:translate(-50%,-50%)';
   document.body.append(snapMarker);
+  let hover=null;
+  window.__visterasPenHover=()=>hover;
+  const screenOf=(el,pt)=>{const m=el.getScreenCTM();return m?new DOMPoint(pt.x,pt.y).matrixTransform(m):null;};
+  function drawingState(){
+    const drawn=sc.getDrawnPath?.();
+    if(drawn){
+      const list=drawn.pathSegList;
+      if(!list?.numberOfItems)return {start:null,canClose:false};
+      const first=list.getItem(0);
+      return {start:screenOf(drawn,first),canClose:list.numberOfItems>=2};
+    }
+    if(continuation&&!extending){
+      const first=continuation.data[continuation.start];
+      return {start:screenOf(continuation.el,first),canClose:true};
+    }
+    return null;
+  }
   function preparePointer(event) {
     autoEdit = null;
     snapPoint = null;
     snapMarker.style.display = 'none';
-    if (sc.getMode() !== 'path' || !document.getElementById('workarea').contains(event.target)) return;
-    const drawing = sc.getDrawnPath() || continuation;
+    if (sc.getMode() !== 'path' || !document.getElementById('workarea').contains(event.target)) { hover=null; return; }
+    const drawing = drawingState();
     const selected = sc.getSelectedElements().filter(Boolean);
+    const pointer = {x:event.clientX,y:event.clientY};
+    const targets = [];
     let closest = null;
-    for (const el of [...sc.getSvgContent().querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')].filter(el => !el.closest('defs,clipPath,mask') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')) {
+    for (const el of [...sc.getSvgContent().querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')].filter(el => !el.closest('defs,clipPath,mask') && !el.getAttribute('data-visteras-stroke-align-helper') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden')) {
       if (el === sc.getDrawnPath()) continue;
       const matrix = el.getScreenCTM();
       if (!matrix) continue;
       const data = geometry(el);
+      const ends = new Set();
+      if (el.localName==='path') for (const c of contours(data)) if (!c.closed && c.indices.length>1) { ends.add(c.indices[0]); ends.add(c.indices.at(-1)); }
+      const anchorList = [];
       for (const anchor of anchors(data)) {
         const point = new DOMPoint(data[anchor.index].x, data[anchor.index].y).matrixTransform(matrix);
+        anchorList.push({index:anchor.index,x:point.x,y:point.y,endpoint:ends.has(anchor.index)});
         const distance = Math.hypot(point.x-event.clientX, point.y-event.clientY);
         if (distance <= 8 && (!closest || distance < closest.distance)) closest = {point,distance,el};
       }
-      if (!drawing && selected.includes(el)) {
-        const hit = hitSegment(data,{x:event.clientX,y:event.clientY},p=>new DOMPoint(p.x,p.y).matrixTransform(matrix));
-        if (hit) autoEdit = 'add_anchor';
-      }
+      const isSelected = selected.includes(el);
+      const segment = isSelected && !drawing ? hitSegment(data,pointer,p=>new DOMPoint(p.x,p.y).matrixTransform(matrix)) : null;
+      targets.push({ref:el,selected:isSelected,anchors:anchorList,segment});
     }
+    hover = resolvePenHover({pointer,shift:!!event.shiftKey,autoDisabled:getDisableAutoAddDelete(),drawing,targets});
+    autoEdit = hover.state === 'add' ? 'add_anchor' : hover.state === 'delete' ? 'delete_anchor' : null;
     snapMarker.dataset.target = closest ? `${closest.point.x},${closest.point.y}` : 'none';
-    if (closest && !drawing && selected.includes(closest.el)) autoEdit = 'delete_anchor';
-    // While drawing, another object's anchor is a coordinate target, never an edit command.
-    if (closest && snapEnabled) {
+    snapMarker.dataset.state = hover.state;
+    // While drawing, another object's anchor is a coordinate target, never an
+    // edit command. Shift while drawing constrains to 45°, so no point snap then.
+    if (closest && snapEnabled && !(event.shiftKey && drawing) && hover.state !== 'close') {
       snapPoint = closest.point;
       Object.assign(snapMarker.style,{display:'block',left:`${closest.point.x}px`,top:`${closest.point.y}px`});
       for (const [key,value] of Object.entries({clientX:closest.point.x,clientY:closest.point.y,pageX:closest.point.x+window.scrollX,pageY:closest.point.y+window.scrollY})) {
         Object.defineProperty(event,key,{value,configurable:true});
       }
     }
-    const cursor = autoEdit === 'delete_anchor' ? 'pen_delete' : autoEdit === 'add_anchor' ? 'pen_add' : 'pen';
-    style.textContent = definitions.map(([, , , mode])=>`body[data-mode="${mode}"] #svgcanvas,body[data-mode="${mode}"] #svgcanvas * {cursor:url("./images/${mode==='path'?cursor:mode==='add_anchor'?'pen_add':'pen_delete'}_cursor.svg") 4 4, crosshair !important}`).join('\n');
+    applyPenCursor(hover.cursor);
   }
+  // Shift pressed/released without moving still switches the cursor.
+  let lastPointer=null;
+  window.addEventListener('mousemove',e=>{lastPointer=e;},true);
+  for (const type of ['keydown','keyup']) window.addEventListener(type,e=>{
+    if (e.key!=='Shift'||sc.getMode()!=='path'||!lastPointer) return;
+    const synthetic={clientX:lastPointer.clientX,clientY:lastPointer.clientY,pageX:lastPointer.pageX,pageY:lastPointer.pageY,target:lastPointer.target,shiftKey:type==='keydown'};
+    try { preparePointer(synthetic); } catch { /* ignore */ }
+  },true);
   // Pass exact snapped coordinates at the drawing boundary. Native event
   // coordinates alone can be replaced or rounded by SVG-Edit's input pipeline.
   let pinnedAnchor = null;
@@ -293,17 +345,8 @@ export function mountPenTools(editor) {
         showContinuationPreview(continuation.el,endpoint,e);
         return;
       }
-      let found=null;
-      for(const el of candidates().filter(el=>el.localName==='path').reverse()) {
-        const data=geometry(el);
-        for(const c of contours(data)) if(!c.closed&&c.indices.length>1) for(const index of [c.indices[0],c.indices.at(-1)]) {
-          const p=new DOMPoint(data[index].x,data[index].y).matrixTransform(el.getScreenCTM());
-          // Keep the reconnect target forgiving at zoom levels where the
-          // endpoint marker is visually larger than the SVG hit area.
-          if(Math.hypot(p.x-e.clientX,p.y-e.clientY)<24){found={el,point:data[index]};break;}
-        }
-        if(found)break;
-      }
+      // Same decision as the cursor (resolvePenHover): an open end anchor, no Shift.
+      const found=hover?.state==='continue'&&hover.ref?.isConnected?{el:hover.ref,point:geometry(hover.ref)[hover.index]}:null;
       showContinuationPreview(found?.el,found?.point,e);
     } else if(sc.getMode()!=='path') { continuationHoverLayer?.replaceChildren(); continuationHoverLayer?.style.setProperty('display','none'); }
   },true);
@@ -329,8 +372,14 @@ export function mountPenTools(editor) {
       const {el,data,start,end}=continuation;
       const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(el.getScreenCTM().inverse());
       const first=data[start],screen=new DOMPoint(first.x,first.y).matrixTransform(el.getScreenCTM());
-      const close=Math.hypot(screen.x-e.clientX,screen.y-e.clientY)<7;
-      const prev=data[end],target=close?first:p;
+      const close=hover?.state==='close'||Math.hypot(screen.x-e.clientX,screen.y-e.clientY)<7;
+      const prev=data[end];
+      let target=close?first:p;
+      if(!close&&e.shiftKey){
+        // Shift constrains the new segment to 45° steps, like the stock Pen.
+        const dx=p.x-prev.x,dy=p.y-prev.y,len=Math.hypot(dx,dy),ang=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4);
+        target={x:prev.x+len*Math.cos(ang),y:prev.y+len*Math.sin(ang)};
+      }
       const segment=prev.type===6?{type:6,x1:2*prev.x-prev.x2,y1:2*prev.y-prev.y2,x2:target.x,y2:target.y,x:target.x,y:target.y}:{type:4,x:target.x,y:target.y};
       const next=[...data.slice(0,end+1),segment,...(close?[{type:1}]:[]),...data.slice(end+1)];
       extending={el,before:el.getAttribute('d'),next,index:end+1,point:target,close};
@@ -338,17 +387,12 @@ export function mountPenTools(editor) {
       showContinuationPreview(el,prev,e);
       showAnchors(el);return;
     }
-    let hit;
-    for(const el of candidates().filter(el=>el.localName==='path').reverse()){
-      const data=geometry(el);
-      for(const c of contours(data)){
-        if(c.closed||c.indices.length<2)continue;
-        for(const index of [c.indices[0],c.indices.at(-1)]){
-          const p=new DOMPoint(data[index].x,data[index].y).matrixTransform(el.getScreenCTM());
-          const distance=Math.hypot(p.x-e.clientX,p.y-e.clientY);
-          if(distance<7&&(!hit||distance<hit.distance))hit={el,data,c,index,distance};
-        }
-      }
+    // Continue only where the cursor says so (Shift = new path on top).
+    let hit=null;
+    if(hover?.state==='continue'&&hover.ref?.isConnected&&!e.shiftKey){
+      const el=hover.ref,data=geometry(el);
+      const c=contours(data).find(k=>!k.closed&&(k.indices[0]===hover.index||k.indices.at(-1)===hover.index));
+      if(c)hit={el,data,c,index:hover.index};
     }
     if(!hit)return;
     e.preventDefault();e.stopImmediatePropagation();consumed=true;
@@ -382,7 +426,13 @@ export function mountPenTools(editor) {
     if(!['add_anchor','delete_anchor'].includes(mode)||e.button!==0||!sc.getSvgRoot().contains(e.target))return;
     e.preventDefault();e.stopImmediatePropagation();consumed=true;
     let best;
-    for(const el of candidates().reverse()){
+    if(sc.getMode()==='path'){
+      // Pen Auto Add/Delete: act on exactly what the cursor showed (selected paths only).
+      if(!hover?.ref?.isConnected||e.shiftKey)return;
+      const segments=geometry(hover.ref);
+      best=mode==='add_anchor'?{el:hover.ref,segments,index:hover.index,t:hover.t}:{el:hover.ref,segments,index:hover.index};
+    }
+    else for(const el of candidates().reverse()){
       const matrix=el.getScreenCTM();if(!matrix)continue;
       const transform=p=>new DOMPoint(p.x,p.y).matrixTransform(matrix),segments=geometry(el);
       if(mode==='add_anchor'){
@@ -396,9 +446,11 @@ export function mountPenTools(editor) {
       }
     }
     if(!best)return;
-    const next=mode==='add_anchor'?splitSegment(best.segments,best.index,best.t):deleteAnchors(best.segments,new Set([best.index]));
+    // Delete joins the neighbours and keeps the shape (Illustrator); adding
+    // splits the bezier at t so the curve is unchanged.
+    const next=mode==='add_anchor'?splitSegment(best.segments,best.index,best.t):deleteAnchorSmooth(best.segments,best.index);
     // Do not destroy an entire contour by removing its final usable anchor.
-    if(!next.length)return;
+    if(!next||!next.length||(mode==='add_anchor'&&next===best.segments))return;
     const {BatchCommand,ChangeElementCommand,RemoveElementCommand,InsertElementCommand}=sc.history;
     const command=new BatchCommand(mode==='add_anchor'?'Add anchor point':'Delete anchor point');
     let el=best.el;
@@ -413,7 +465,12 @@ export function mountPenTools(editor) {
       const d=el.getAttribute('d');el.setAttribute('d',serializeSegments(next));command.addSubCommand(new ChangeElementCommand(el,{d}));
     }
     activeAnchorIndex=mode==='add_anchor'?best.index:null;
-    sc.addCommandToHistory(command);sc.clearSelection();sc.call('changed',[el]);
+    const penAuto=sc.getMode()==='path';
+    sc.addCommandToHistory(command);sc.clearSelection();
+    // Pen Auto Add/Delete keeps the path selected so the next hover works
+    // (only selected paths take auto add/delete, as in Illustrator).
+    if(penAuto){try{sc.addToSelection([el],true);}catch{}}
+    sc.call('changed',[el]);
     // Keep Add/Delete active; the Visteras overlay displays the edited
     // object's hollow anchors without switching into Direct Selection.
     activeAnchorIndex=mode==='add_anchor'?best.index:null;

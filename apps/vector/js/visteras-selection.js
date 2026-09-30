@@ -1,7 +1,9 @@
-import { mountDirectSelection } from './visteras-direct-selection.js?v=snap-point-direct-2';
+import { mountDirectSelection } from './visteras-direct-selection.js?v=ds-illustrator-1';
+import { mountNudge } from './visteras-nudge.js?v=nudge-1';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {
   mountDirectSelection(editor);
+  mountNudge(editor);
   const sc = editor.svgCanvas;
   const ns = 'http://www.w3.org/2000/svg';
   // SVGEdit still uses selectors internally for hit testing and geometry.
@@ -52,7 +54,10 @@ export function mountSelectionTools(editor) {
     overlay.replaceChildren();
     const elements = selected(), mode = sc.getMode();
     const shapeMode = shapeModes.has(mode);
-    const show = ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
+    // Eyedropper: keep the box + handles visible (display only, not
+    // interactive) so it's clear which objects receive the sampled paint.
+    const passive = mode === 'eyedropper';
+    const show = passive || ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
     for (const selector of manager.selectors) {
       selector.selectorGroup.setAttribute('display', 'none');
     }
@@ -61,6 +66,7 @@ export function mountSelectionTools(editor) {
       return;
     }
     manager.selectorGripsGroup.setAttribute('display', 'none');
+    if (passive) overlay.setAttribute('pointer-events', 'none'); else overlay.removeAttribute('pointer-events');
     const {b,m} = drag?.visualFrame || selectionFrame(elements), zoom = sc.getZoom();
     const x = b.x, y = b.y, w = b.width, h = b.height;
     const screen = (x,y) => { const p = point(x,y,m); return [p.x*zoom,p.y*zoom]; };
@@ -76,6 +82,7 @@ export function mountSelectionTools(editor) {
       const [cx,cy] = screen(...p);
       create('rect', { x: cx-4, y: cy-4, width: 8, height: 8, fill: 'white', stroke: '#3f8ff7', 'data-selection-handle': dir, style: `cursor:${dir}-resize` }, overlay);
     }
+    if (passive) for (const el of overlay.children) { el.setAttribute('pointer-events', 'none'); el.style.cursor = ''; }
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(refresh);
@@ -193,6 +200,8 @@ export function mountSelectionTools(editor) {
     if (command && !e.altKey && key === 'z') id = e.shiftKey ? 'tool_redo' : 'tool_undo';
     else if (!command && !e.altKey && !e.shiftKey) id = toolKeys[key] || (key === 'd' ? 'swatch_default_btn' : null);
     else if (!command && !e.altKey && e.shiftKey && key === 'x') id = 'swatch_swap_btn';
+    else if (!command && !e.altKey && e.shiftKey && key === 'e') id = 'tool_eraser';
+    else if (!command && !e.altKey && e.shiftKey && key === 'm') id = 'tool_shape_builder';
     const button = id && document.getElementById(id);
     if (button) {
       e.preventDefault(); e.stopImmediatePropagation();

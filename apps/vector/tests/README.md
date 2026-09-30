@@ -27,3 +27,34 @@ Remaining scope: SVGEdit still edits one path at a time; simultaneous anchor
 editing across separate objects and Illustrator's full live-shape/modifier
 behavior are not implemented by this change. The alternate iife-index.html
 entry point is not updated; the main Vector app loads Editor.js as an ES module.
+
+## Shape Builder, Eyedropper, Offset Path, Align (app/vector/feature/various)
+
+Unit tests: `node --test apps/vector/tests/*.test.mjs` (shape-builder and
+eyedropper suites cover the pure helpers with mocks; Paper.js booleans are
+exercised in the browser only).
+
+Browser checks (served statically from `apps/`, e.g. `python3 -m http.server 5180`
+then http://127.0.0.1:5180/vector/index.html):
+
+- Shape Builder (Shift+M or toolbar): rect+ellipse → 3 hover regions; drag-merge
+  = 1 undo step with the current fill; Alt-click/drag deletes; tool stays active;
+  works for rotated shapes, shapes in a transformed group, Outside-stroke
+  sources and at 150% zoom.
+- Eyedropper (I): with a selection, click a shape (incl. one inside a styled
+  group, one with style="", or the ring of an Outside stroke) → selection takes
+  its appearance in 1 undo step; nothing selected → fill/stroke wells, weight
+  and opacity load as defaults; Option-click applies the selection's appearance
+  to the clicked shape; hold Cmd → Selection tool until released; empty canvas
+  → no-op.
+- ⌥⌘O opens Offset Path on a Mac keyboard (matches `e.code === 'KeyO'`).
+- Align & Distribute shows for one object (aligns to the artboard, distribute
+  disabled) and for 2+ (Align To dropdown); each click = one undo step.
+
+### Eyedropper raster sampling
+
+`tests/eyedropper-raster.test.mjs` covers the preserveAspectRatio/CTM pixel
+mapping, the per-href image cache (data:, blob:, CORS retry), transparent
+pixels and the tainted-canvas fallback (vector paint → window.EyeDropper →
+toast). Browser: place a PNG, press I, click it (point sample) and Shift-click
+shapes (rendered pixel); colour goes to the active well, one undo step.

@@ -14,6 +14,8 @@
  */
 
 import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
+import { mountStrokeLink } from './visteras-stroke-link.js?v=stroke-link-2';
+import { resolveSelectionPaint } from './visteras-paint-resolver.js?v=paint-resolver-2';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
@@ -255,8 +257,25 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
   if (!elems.length) return false;
 
   const next = (value == null || value === '') ? null : String(value);
+  // Inside/Outside bodies always carry stroke="none" (the helper paints the
+  // ring), so writing none to the attr would be a no-op and the helper would
+  // keep its colour. Clear the stored paint instead; the stroke-link rule
+  // (visteras-stroke-link.js) then drops the align rendering and sets weight 0.
+  if (attr === 'stroke' && (next == null || next === 'none')) {
+    for (const el of elems) {
+      if (readElementStrokeAlign(el) !== 'center' && el.getAttribute(STROKE_PAINT_ATTR) !== 'none') {
+        el.setAttribute(STROKE_PAINT_ATTR, 'none');
+      }
+    }
+  }
   const inPathEdit = sc.getCurrentMode?.() === 'pathedit' || !!sc.directSelection?.active;
-  const canUseStock = !inPathEdit
+  // Inside/Outside bodies keep stroke="none"; their real paint is the stored
+  // data-visteras-stroke-paint. Writing `stroke` via the stock command and then
+  // re-capturing the paint outside history left undo unable to restore the old
+  // colour (the helper kept the new one). Record the stored paint directly.
+  const alignedPaint = attr === 'stroke' && next != null && next !== 'none'
+    && elems.some((el) => readElementStrokeAlign(el) !== 'center');
+  const canUseStock = !inPathEdit && !alignedPaint
     && typeof sc.changeSelectedAttribute === 'function'
     && (noUndo ? typeof sc.changeSelectedAttributeNoUndo === 'function' : true);
 
@@ -281,15 +300,29 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
     : null;
   const changed = [];
 
+  const alignedEls = [];
   for (const el of elems) {
     if (!el?.isConnected) continue;
-    const prev = el.getAttribute(attr);
+    const isAligned = alignedPaint && readElementStrokeAlign(el) !== 'center';
+    const key = isAligned ? STROKE_PAINT_ATTR : attr;
+    const prev = el.getAttribute(key);
     const prevNorm = prev == null ? null : String(prev);
     if (prevNorm === next) continue;
-    if (batch) batch.addSubCommand(new ChangeElementCommand(el, { [attr]: prev }));
-    if (next == null) el.removeAttribute(attr);
-    else el.setAttribute(attr, next);
+    if (next == null) el.removeAttribute(key);
+    else el.setAttribute(key, next);
+    // ChangeElementCommand snapshots newValues from the element at construction:
+    // build it AFTER the write or redo re-applies the old value.
+    if (batch) batch.addSubCommand(new ChangeElementCommand(el, { [key]: prev }));
     changed.push(el);
+    if (isAligned) alignedEls.push(el);
+  }
+  if (batch && alignedEls.length) {
+    // Re-render the helper ring from the restored stored paint on undo/redo.
+    const resync = () => { for (const el of alignedEls) { try { if (el.isConnected) syncStrokeAlignRendering(el, sc); } catch { /* ignore */ } } };
+    const origApply = batch.apply.bind(batch);
+    const origUnapply = batch.unapply.bind(batch);
+    batch.apply = (handler) => { origApply(handler); resync(); };
+    batch.unapply = (handler) => { origUnapply(handler); resync(); };
   }
 
   if (batch && changed.length) {
@@ -1068,6 +1101,15 @@ function createColorController(svgEditor) {
     getActiveTarget: () => state.activeTarget,
     getWorkingHex: () => (state.workingNone ? 'none' : state.workingHex),
 
+    // Stroke-align helpers shared with other tools (Eyedropper, Shape Builder).
+    readElementStrokeWeight,
+    readElementStrokeAlign,
+    applyStrokeAlignToTargets,
+    applyStrokeAlignToElement,
+    resolveStrokeAlignBody,
+    isStrokeAlignHelper,
+    isStrokeAlignWrap,
+
     subscribe(fn) {
       state.listeners.add(fn);
       return () => state.listeners.delete(fn);
@@ -1155,20 +1197,17 @@ function createColorController(svgEditor) {
       if (state.suppressSync) return;
       const sc = svgEditor.svgCanvas;
       if (!sc) return;
-      const raw = (typeof sc.getColor === 'function')
-        ? sc.getColor(state.activeTarget)
-        : null;
-      if (!raw || raw === 'none' || raw === 'transparent') {
+      // Effective paint of the selection (or the defaults), same resolver
+      // as the wells.
+      const paint = readCanvasPaint(svgEditor, state.activeTarget);
+      if (paint.none) {
         state.workingNone = true;
+      } else if (paint.gradient) {
+        // gradients / paints — keep previous solid working color
+        state.workingNone = false;
       } else {
-        const hex = normalizeHex(raw);
-        if (hex) {
-          state.workingNone = false;
-          state.workingHex = hex;
-        } else {
-          // gradients / paints — keep previous solid working color
-          state.workingNone = false;
-        }
+        state.workingNone = false;
+        state.workingHex = paint.hex;
       }
       if (typeof sc.getPaintOpacity === 'function') {
         const op = sc.getPaintOpacity(state.activeTarget);
@@ -1217,13 +1256,29 @@ function createColorController(svgEditor) {
     swapFillStroke() {
       const sc = svgEditor.svgCanvas;
       if (!sc) return;
-      const curFill = sc.getColor('fill') || '#cccccc';
-      const curStroke = sc.getColor('stroke') || '#000000';
+      const fp = readCanvasPaint(svgEditor, 'fill');
+      const sp = readCanvasPaint(svgEditor, 'stroke');
+      const curFill = fp.none ? 'none' : fp.hex;
+      const curStroke = sp.none ? 'none' : sp.hex;
       state.suppressSync = true;
+      // One gesture ⇒ one undo step (fill and stroke writes record separately).
+      const um = sc.undoMgr;
+      const start = um && Array.isArray(um.undoStack) ? um.undoStackPointer : null;
       sc.setColor('fill', curStroke);
       sc.setColor('stroke', curFill);
       applyPaintAttribute(sc, 'fill', curStroke);
       applyPaintAttribute(sc, 'stroke', curFill);
+      try {
+        const { BatchCommand } = sc.history || {};
+        const added = start == null ? [] : um.undoStack.slice(start, um.undoStackPointer);
+        if (BatchCommand && added.length > 1) {
+          um.undoStack.splice(start);
+          um.undoStackPointer = start;
+          const batch = new BatchCommand('Swap fill and stroke');
+          for (const c of added) batch.addSubCommand(c);
+          um.addCommandToHistory(batch);
+        }
+      } catch { /* ignore history grouping failures */ }
       svgEditor.bottomPanel?.updateColorpickers?.(true);
       applyPaintAttribute(sc, 'fill', curStroke, { noUndo: true });
       applyPaintAttribute(sc, 'stroke', curFill, { noUndo: true });
@@ -1514,31 +1569,14 @@ function mountToolbarColorSwatches(svgEditor, ctrl) {
   function updateToolbarFromCanvas() {
     const sc = svgEditor.svgCanvas;
     if (!sc) return;
-    let fill = (typeof sc.getColor === 'function') ? (sc.getColor('fill') || '#cccccc') : '#cccccc';
-    let stroke = (typeof sc.getColor === 'function') ? (sc.getColor('stroke') || '#000000') : '#000000';
+    // Same resolver as the Properties wells (selection's effective paint,
+    // or the defaults with nothing selected).
     const fillInd = document.getElementById('swatch_fill_indicator');
     const strokeInd = document.getElementById('swatch_stroke_indicator');
     const fillBox = document.getElementById('swatch_fill_box');
     const strokeBox = document.getElementById('swatch_stroke_box');
-
-    if (fillInd) {
-      if (!fill || fill === 'none' || fill === 'transparent') {
-        fillInd.classList.add('is-none');
-        fillInd.style.backgroundColor = '';
-      } else {
-        fillInd.classList.remove('is-none');
-        fillInd.style.backgroundColor = fill;
-      }
-    }
-    if (strokeInd) {
-      if (!stroke || stroke === 'none' || stroke === 'transparent') {
-        strokeInd.classList.add('is-none');
-        strokeInd.style.backgroundColor = '';
-      } else {
-        strokeInd.classList.remove('is-none');
-        strokeInd.style.backgroundColor = stroke;
-      }
-    }
+    paintWell(fillInd, readCanvasPaint(svgEditor, 'fill'), 'fill');
+    paintWell(strokeInd, readCanvasPaint(svgEditor, 'stroke'), 'stroke');
     const active = ctrl.getActiveTarget();
     if (fillBox && strokeBox) {
       fillBox.classList.toggle('active', active === 'fill');
@@ -1628,40 +1666,55 @@ function mountToolbarColorSwatches(svgEditor, ctrl) {
 
 const VCS_TAB_STORAGE = 'visteras-vector-color-tab';
 
+/**
+ * Effective paint for the colour wells (Properties/Appearance chips, toolbar
+ * swatches, Color panel). With a selection it resolves the objects' real
+ * rendered paint through visteras-paint-resolver.js (computed style: attr,
+ * style="", class, inherited group paint; Inside/Outside bodies: stored
+ * paint; helpers/wraps → body). With nothing selected it shows the defaults.
+ * Read-only.
+ * @returns {{none:boolean, hex:string, mixed?:boolean, gradient?:boolean, fromSelection:boolean}}
+ */
 function readCanvasPaint(svgEditor, which) {
   const sc = svgEditor?.svgCanvas;
   const fallbackHex = which === 'fill' ? '#cccccc' : '#000000';
 
-  // Prefer live DOM on the current paint targets (DS + outside-align helpers).
   try {
-    const targets = flattenPaintTargets(resolvePaintTargets(sc));
-    for (const el of targets) {
-      if (!el) continue;
-      let raw = el.getAttribute(which);
-      if (which === 'stroke') {
-        const align = (el.getAttribute(STROKE_ALIGN_ATTR) || '').toLowerCase();
-        if (align === 'outside') {
-          const stored = el.getAttribute(STROKE_PAINT_ATTR);
-          if (stored != null) raw = stored;
-        }
+    const targets = flattenPaintTargets(resolvePaintTargets(sc), { attr: which });
+    if (targets.length) {
+      const p = resolveSelectionPaint(targets, which, { resolveBody: resolveStrokeAlignBody });
+      if (p) {
+        return { none: p.none, hex: p.hex || fallbackHex, mixed: p.mixed, gradient: p.gradient, fromSelection: true };
       }
-      if (raw == null || raw === '') continue;
-      if (raw === 'none' || raw === 'transparent') return { none: true, hex: fallbackHex };
-      const hex = normalizeHex(raw);
-      if (hex && hex !== 'none') return { none: false, hex };
     }
   } catch { /* fall through */ }
 
   if (!sc || typeof sc.getColor !== 'function') {
-    return { none: false, hex: fallbackHex };
+    return { none: false, hex: fallbackHex, fromSelection: false };
   }
   const raw = sc.getColor(which);
   if (!raw || raw === 'none' || raw === 'transparent') {
-    return { none: true, hex: fallbackHex };
+    return { none: true, hex: fallbackHex, fromSelection: false };
   }
   const hex = normalizeHex(raw);
-  if (!hex || hex === 'none') return { none: true, hex: fallbackHex };
-  return { none: false, hex };
+  if (!hex || hex === 'none') return { none: true, hex: fallbackHex, fromSelection: false };
+  return { none: false, hex, fromSelection: false };
+}
+
+/** Paint a well element. Inline !important: the chip CSS uses !important backgrounds. */
+function paintWell(el, paint, which) {
+  if (!el || !paint) return;
+  if (paint.none) {
+    el.classList.add('is-none');
+    el.style.removeProperty('background-color');
+  } else {
+    el.classList.remove('is-none');
+    el.style.setProperty('background-color', paint.hex, 'important');
+  }
+  el.classList.toggle('is-mixed', !!paint.mixed);
+  el.dataset.paint = paint.none ? 'none' : paint.hex;
+  const label = which === 'fill' ? 'Fill' : 'Stroke';
+  el.title = paint.mixed ? `${label}: mixed (showing first object)` : `${label}: ${paint.none ? 'None' : paint.gradient ? 'Gradient' : paint.hex.toUpperCase()}`;
 }
 
 function activateVcsTab(tab) {
@@ -2124,14 +2177,11 @@ function mountAppearanceColors(ctrl, svgEditor) {
   const rowStroke = strokeChip.closest('.vcs-appearance-row');
   const sc = svgEditor?.svgCanvas;
 
-  function paintChip(el, paint) {
-    if (paint.none) {
-      el.classList.add('is-none');
-      el.style.backgroundColor = '';
-    } else {
-      el.classList.remove('is-none');
-      el.style.backgroundColor = paint.hex;
-    }
+  // .vcs-appearance-chip(-stroke) set `background: … !important`, which beat
+  // the old inline background-color: the stroke chip was always black and the
+  // fill chip always #ccc. paintWell writes it inline with !important.
+  function paintChip(el, paint, which) {
+    paintWell(el, paint, which);
   }
 
   function readStrokeWidth() {
@@ -2267,8 +2317,8 @@ function mountAppearanceColors(ctrl, svgEditor) {
   function refresh() {
     const fill = readCanvasPaint(svgEditor, 'fill');
     const stroke = readCanvasPaint(svgEditor, 'stroke');
-    paintChip(fillChip, fill);
-    paintChip(strokeChip, stroke);
+    paintChip(fillChip, fill, 'fill');
+    paintChip(strokeChip, stroke, 'stroke');
     const active = ctrl.getActiveTarget();
     rowFill?.classList.toggle('active', active === 'fill');
     rowStroke?.classList.toggle('active', active === 'stroke');
@@ -2699,6 +2749,10 @@ export function mountVisterasColorSystem({ svgEditor } = {}) {
   setTimeout(() => {
     ctrl.syncFromCanvas();
   }, 600);
+
+  // Linked stroke colour ↔ weight (none ⇒ 0, 0→>0 ⇒ black), one place for
+  // every source.
+  try { mountStrokeLink(svgEditor, ctrl); } catch (err) { console.warn('[visteras-color-system] stroke link failed', err); }
 
   window.__visterasColorSystemMounted = true;
   console.info('[visteras-color-system] mounted');
