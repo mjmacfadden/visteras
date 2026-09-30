@@ -228,7 +228,7 @@
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-5';
     import { mountOffsetPath } from './js/visteras-offset-path.js?v=offset-path-5';
-    import { mountShapeBuilderTool } from './js/visteras-shape-builder.js?v=shape-builder-4';
+    import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
     import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -347,9 +347,10 @@
       if (!sc) return;
 
       const selElems = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
-      if (operation === 'unite') {
+      if (operation === 'unite' || operation === 'divide') {
         if (selElems.length < 2) {
-          showStudioToast('Pathfinder Unite requires at least 2 selected objects.', 'error');
+          const opTitle = (operation === 'unite') ? 'Unite' : 'Divide';
+          showStudioToast(`Pathfinder ${opTitle} requires at least 2 selected objects.`, 'error');
           return;
         }
       } else {
@@ -504,26 +505,21 @@
           const newPath = createPathFromPaper(res, topElem);
           if (newPath) newElements.push(newPath);
         } else if (operation === 'divide') {
-          const overlap = itemBottom.intersect(itemTop);
-          const overlapExport = overlap ? overlap.exportSVG({ asString: false }) : null;
-          const overlapD = overlapExport ? overlapExport.getAttribute('d') : null;
-          if (!overlapD || !overlapD.trim()) {
+          const items = paperItems.map((p, idx) => ({ path: p, index: idx }));
+          const regions = partitionRegions(scope, items);
+
+          const hasOverlap = regions.some(r => r.members && r.members.length > 1) || regions.length > sortedElems.length;
+          if (!hasOverlap) {
             showStudioToast('The selected shapes do not overlap.', 'error');
             scope.project.clear();
             return;
           }
 
-          const pieceBottom = itemBottom.subtract(itemTop);
-          const pieceIntersect = itemBottom.intersect(itemTop);
-          const pieceTop = itemTop.subtract(itemBottom);
-
-          const pathBottom = createPathFromPaper(pieceBottom, bottomElem);
-          const pathIntersect = createPathFromPaper(pieceIntersect, topElem);
-          const pathTop = createPathFromPaper(pieceTop, topElem);
-
-          if (pathBottom) newElements.push(pathBottom);
-          if (pathIntersect) newElements.push(pathIntersect);
-          if (pathTop) newElements.push(pathTop);
+          for (const r of regions) {
+            const styleSource = sortedElems[r.top];
+            const newPath = createPathFromPaper(r.item, styleSource);
+            if (newPath) newElements.push(newPath);
+          }
 
           if (newElements.length === 0) {
             showStudioToast('Could not divide the selected shapes.', 'error');
@@ -544,7 +540,7 @@
         });
 
         // Add remove commands with sibling and parent references
-        const elemsToRemove = (operation === 'unite') ? sortedElems : [bottomElem, topElem];
+        const elemsToRemove = (operation === 'unite' || operation === 'divide') ? sortedElems : [bottomElem, topElem];
         elemsToRemove.forEach(el => {
           batchCmd.addSubCommand(new RemoveElementCommand(el, el.nextSibling, el.parentNode));
           el.remove();

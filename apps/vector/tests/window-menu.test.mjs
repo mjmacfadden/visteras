@@ -59,11 +59,11 @@ test('Pathfinder Popup: contains the same 5 options matching the properties pane
   assert.match(html, /id="btn_pathfinder_divide"/);
 });
 
-test('Pathfinder Unite: supports multi-selection (>= 2 objects) and sorts bottom-to-top', () => {
+test('Pathfinder Unite and Divide: support multi-selection (>= 2 objects) and sort bottom-to-top', () => {
   const html = fs.readFileSync(vectorHtmlPath, 'utf8');
 
-  // Verify executePathfinder allows selElems.length >= 2 for unite
-  assert.match(html, /if\s*\(operation\s*===\s*'unite'\)\s*\{\s*if\s*\(selElems\.length\s*<\s*2\)/);
+  // Verify executePathfinder allows selElems.length >= 2 for unite and divide
+  assert.match(html, /if\s*\(operation\s*===\s*'unite'\s*\|\|\s*operation\s*===\s*'divide'\)\s*\{\s*if\s*\(selElems\.length\s*<\s*2\)/);
 
   // Verify other operations enforce exactly 2 objects
   assert.match(html, /if\s*\(selElems\.length\s*!==\s*2\)\s*\{\s*showStudioToast\('This Pathfinder operation requires exactly 2 selected objects\.'/);
@@ -76,8 +76,12 @@ test('Pathfinder Unite: supports multi-selection (>= 2 objects) and sorts bottom
   assert.match(html, /let\s+united\s*=\s*paperItems\[0\];/);
   assert.match(html, /for\s*\(let\s+i\s*=\s*1;\s*i\s*<\s*paperItems\.length;\s*i\+\+\)\s*\{\s*united\s*=\s*united\.unite\(paperItems\[i\]\);/);
 
-  // Verify removal of all united elements
-  assert.match(html, /const\s+elemsToRemove\s*=\s*\(operation\s*===\s*'unite'\)\s*\?\s*sortedElems\s*:\s*\[bottomElem,\s*topElem\];/);
+  // Verify divide uses partitionRegions
+  assert.match(html, /const\s+regions\s*=\s*partitionRegions\(scope,\s*items\);/);
+  assert.match(html, /const\s+hasOverlap\s*=\s*regions\.some\(r\s*=>\s*r\.members/);
+
+  // Verify removal of all united or divided elements
+  assert.match(html, /const\s+elemsToRemove\s*=\s*\(operation\s*===\s*'unite'\s*\|\|\s*operation\s*===\s*'divide'\)\s*\?\s*sortedElems\s*:\s*\[bottomElem,\s*topElem\];/);
 
   // Verify properties panel visibility shows for >= 2 objects
   assert.match(html, /pathfinderSec\.style\.display\s*=\s*\(selElems\.length\s*>=\s*2\s*&&\s*!isPathEdit\)\s*\?\s*'block'\s*:\s*'none';/);
