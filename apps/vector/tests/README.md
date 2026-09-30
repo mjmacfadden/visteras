@@ -50,3 +50,11 @@ then http://127.0.0.1:5180/vector/index.html):
 - ⌥⌘O opens Offset Path on a Mac keyboard (matches `e.code === 'KeyO'`).
 - Align & Distribute shows for one object (aligns to the artboard, distribute
   disabled) and for 2+ (Align To dropdown); each click = one undo step.
+
+### Eyedropper raster sampling
+
+`tests/eyedropper-raster.test.mjs` covers the preserveAspectRatio/CTM pixel
+mapping, the per-href image cache (data:, blob:, CORS retry), transparent
+pixels and the tainted-canvas fallback (vector paint → window.EyeDropper →
+toast). Browser: place a PNG, press I, click it (point sample) and Shift-click
+shapes (rendered pixel); colour goes to the active well, one undo step.

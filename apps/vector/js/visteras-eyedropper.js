@@ -17,9 +17,21 @@
  * from a group, inline style="" and CSS classes are all honoured. Missing /
  * default values reset the corresponding property on the target.
  *
- * Not in the MVP: Shift pixel sampling, desktop sampling, Shift+Alt append,
+ * Raster sampling (visteras-eyedropper-raster.js):
+ * • Click a placed <image> → point-sample the pixel under the cursor.
+ * • Shift-click any object → sample the rendered pixel under the cursor.
+ *   The colour goes to the active fill/stroke well: onto the selection (one
+ *   undo step, selection kept) or, with nothing selected, into the default
+ *   well + recent colours. Transparent pixels (alpha 0) are a no-op.
+ *   Cross-origin (tainted) images fall back to window.EyeDropper, then a toast.
+ *
+ * Not yet: desktop sampling outside the canvas, Shift+Alt append,
  * character/paragraph styles, the Eyedropper Options dialog, a filled cursor.
  */
+
+import {
+  createImageSampler, sampleImageElementAt, sampleRenderedAt, sampleWithFallback, imageHref, imageGeometry,
+} from './visteras-eyedropper-raster.js?v=raster-1';
 
 const MODE = 'eyedropper';
 
@@ -312,8 +324,9 @@ export function applyStyleToElements(targets, style, history, env = {}) {
   const sc = env.sc || null;
   const elems = expandTargets(targets, api);
   if (!elems.length || !style || !Object.keys(style).length) return null;
-  const allowed = enabledProps('apply');
-  const keys = Object.keys(style).filter((k) => allowed.has(k));
+  // Pixel samples (env.ignoreOptions) always paint the active well.
+  const allowed = env.ignoreOptions ? null : enabledProps('apply');
+  const keys = Object.keys(style).filter((k) => !allowed || allowed.has(k));
   if (!keys.length) return null;
   const { ChangeElementCommand, BatchCommand } = history;
 
@@ -448,7 +461,7 @@ const EXCLUDE_ANCESTORS = '#selectorParentGroup, #canvasBackground, defs, clipPa
  * Topmost painted leaf under the pointer inside #svgcontent (never the
  * selection chrome, background, defs or hidden elements).
  */
-export function pickTargetAt(clientX, clientY, api = null) {
+export function pickTargetAt(clientX, clientY, api = null, opts = {}) {
   const content = document.getElementById('svgcontent');
   if (!content) return null;
   const list = document.elementsFromPoint(clientX, clientY) || [];
@@ -459,12 +472,62 @@ export function pickTargetAt(clientX, clientY, api = null) {
     if (el.nodeName === 'tspan' || el.nodeName === 'textPath') el = el.closest('text');
     if (!el) continue;
     el = resolveBody(el, api);
-    if (!el || !LEAF_TAGS.has(el.nodeName) || isStrokeHelper(el)) continue;
+    if (!el || isStrokeHelper(el)) continue;
+    if (!LEAF_TAGS.has(el.nodeName) && !(opts.images && el.nodeName === 'image')) continue;
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.pointerEvents === 'none') continue;
     return el;
   }
   return null;
+}
+
+/**
+ * Solid paint of a vector shape at a screen point (stroke wins over fill, as
+ * it is painted on top). Used when the rendered pixel can't be read.
+ * @returns {string|null} "#rrggbb"
+ */
+export function solidPaintAt(el, clientX, clientY, getCS = (e) => getComputedStyle(e)) {
+  if (!el || el.nodeName === 'image') return null;
+  const cs = getCS(el);
+  const paintOf = (prop) => {
+    const v = normalizePaint(cs?.getPropertyValue?.(prop));
+    return v && /^#[0-9a-f]{6}$/.test(v) ? v : (v && /^#[0-9a-f]{3}$/.test(v) ? `#${v[1]}${v[1]}${v[2]}${v[2]}${v[3]}${v[3]}` : null);
+  };
+  let onStroke = false;
+  let onFill = true;
+  const ctm = el.getScreenCTM?.();
+  if (ctm && typeof el.isPointInFill === 'function') {
+    const inv = ctm.inverse();
+    const x = inv.a * clientX + inv.c * clientY + inv.e;
+    const y = inv.b * clientX + inv.d * clientY + inv.f;
+    // Chromium still requires an SVGPoint here (DOMPoint throws a TypeError).
+    let pt = el.ownerSVGElement?.createSVGPoint?.();
+    if (pt) { pt.x = x; pt.y = y; } else pt = typeof DOMPoint === 'function' ? new DOMPoint(x, y) : { x, y };
+    try { onStroke = !!el.isPointInStroke?.(pt); } catch { onStroke = false; }
+    try { onFill = !!el.isPointInFill(pt); } catch { onFill = true; }
+  }
+  return (onStroke && paintOf('stroke')) || (onFill && paintOf('fill')) || null;
+}
+
+let _toastTimer = null;
+function toast(msg, ms = 3200) {
+  let el = document.getElementById('visteras_eyedropper_toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'visteras_eyedropper_toast';
+    el.style.cssText = [
+      'position:fixed', 'bottom:48px', 'left:50%', 'transform:translateX(-50%)',
+      'z-index:99999', 'padding:6px 12px', 'background:#1e1e1e', 'color:#fa7c1b',
+      'border:1px solid #fa7c1b', 'border-radius:4px', 'font-size:11px',
+      'font-weight:600', 'box-shadow:0 4px 16px rgba(0,0,0,0.5)', 'pointer-events:none',
+      'max-width:70vw', 'text-align:center',
+    ].join(';');
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.style.display = 'none'; }, ms);
 }
 
 // ─── Options panel ───────────────────────────────────────────────────────────
@@ -656,8 +719,72 @@ export function mountEyedropperTool(editor) {
     } catch { /* ignore */ }
   }, 0);
 
+  // ── Raster sampling ───────────────────────────────────────────────────────
+  const sampler = createImageSampler();
+  window.__visterasEyedropperSampler = sampler; // for smoke/debug
+
+  /** Apply a sampled pixel colour to the active fill/stroke well. */
+  const applySampledColor = (hex) => {
+    if (!hex) return; // transparent pixel: no-op
+    const ctrl = api();
+    const well = ctrl?.getActiveTarget?.() === 'stroke' ? 'stroke' : 'fill';
+    const sel = selection();
+    const style = { [well]: hex };
+    if (sel.length && expandTargets(sel, api()).length) {
+      const cmd = applyStyleToElements(sel, style, history, {
+        ...env(), ignoreOptions: true, name: 'Eyedropper Sample', afterHistory: keepSelection(sel),
+      });
+      if (cmd) afterApply(sel);
+      try { ctrl?.pushRecent?.(hex); ctrl?.emit?.(); } catch { /* ignore */ }
+    } else {
+      loadDefaults(style);
+    }
+    window.__visterasLastEyedropperSample = { hex, well, selection: sel.length };
+  };
+
+  let sampling = null; // in-flight pixel sample (one at a time)
+  const pixelSample = (e, hit) => {
+    const { clientX, clientY, shiftKey } = e;
+    const content = document.getElementById('svgcontent');
+    const primary = shiftKey
+      ? () => sampleRenderedAt(content, clientX, clientY, sampler)
+      : () => sampleImageElementAt(hit, clientX, clientY, sampler);
+    const fallback = async () => {
+      if (!hit) return null;
+      if (hit.nodeName !== 'image') return solidPaintAt(hit, clientX, clientY);
+      if (!shiftKey) return null; // the image itself failed
+      const r = await sampleImageElementAt(hit, clientX, clientY, sampler);
+      return r?.hex || null;
+    };
+    const run = sampleWithFallback(primary, { fallback, toast, onError: (err) => console.warn('[eyedropper]', err) })
+      .then((r) => { if (r) applySampledColor(r.hex); return r; })
+      .finally(() => { if (sampling === run) sampling = null; });
+    sampling = run;
+    window.__visterasEyedropperPending = run;
+    return run;
+  };
+
+  const preloadImages = () => {
+    const content = document.getElementById('svgcontent');
+    content?.querySelectorAll('image').forEach((img) => {
+      const href = imageHref(img);
+      if (href) sampler.load(href, imageGeometry(img)).catch(() => { /* reported on click */ });
+    });
+  };
+
   const handleClick = (e) => {
-    const target = pickTargetAt(e.clientX, e.clientY, api());
+    if (sampling) return; // previous pixel sample still resolving
+    const hit = pickTargetAt(e.clientX, e.clientY, api(), { images: true });
+    if (e.shiftKey && !e.altKey) {
+      if (!hit) return; // empty canvas: no-op
+      pixelSample(e, hit);
+      return;
+    }
+    if (hit?.nodeName === 'image' && !e.altKey) {
+      pixelSample(e, hit);
+      return;
+    }
+    const target = hit?.nodeName === 'image' ? null : hit;
     if (!target) return; // empty canvas: no-op
     const sel = selection();
     if (e.altKey) {
@@ -730,6 +857,7 @@ export function mountEyedropperTool(editor) {
     const mode = sc.getMode();
     const active = mode === MODE;
     _showOptionsPanel(active);
+    if (active) preloadImages();
     if (mode === 'select') {
       lastSelectTool = document.getElementById('tool_direct_select')?.pressed ? 'tool_direct_select' : 'tool_select';
     } else if (mode === 'pathedit') {
