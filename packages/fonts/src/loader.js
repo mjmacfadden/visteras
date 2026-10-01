@@ -68,41 +68,64 @@ function variantsToCss2Axis(variants) {
 async function loadGoogleViaStylesheet(family, variants) {
 	if (typeof document === 'undefined') return false;
 
-	const axis = variantsToCss2Axis(variants);
-	const familyParam = encodeURIComponent(family).replace(/%20/g, '+');
-	const href = `https://fonts.googleapis.com/css2?family=${familyParam}:${axis}&display=swap`;
+	const entry = findGoogleFontEntry(family);
+	const requestedList = (variants && variants.length)
+		? variants
+		: (entry && entry.variants && entry.variants.length ? entry.variants : ['regular']);
 
 	const esc = (typeof CSS !== 'undefined' && CSS.escape)
 		? CSS.escape(family)
 		: family.replace(/["\\]/g, '\\$&');
-	const existing = document.querySelector(`link[data-visteras-font="${esc}"]`);
+	let existing = document.querySelector(`link[data-visteras-font="${esc}"]`);
+
+	let combinedVariants = [...requestedList];
+	if (existing && existing.dataset.variants) {
+		const prev = existing.dataset.variants.split(',').filter(Boolean);
+		combinedVariants = [...new Set([...prev, ...combinedVariants])];
+	} else if (entry && entry.variants && entry.variants.length) {
+		combinedVariants = [...new Set([...entry.variants, ...combinedVariants])];
+	}
+
+	const axis = variantsToCss2Axis(combinedVariants);
+	const familyParam = encodeURIComponent(family).replace(/%20/g, '+');
+	const href = `https://fonts.googleapis.com/css2?family=${familyParam}:${axis}&display=swap`;
+
 	if (!existing) {
 		const link = document.createElement('link');
 		link.rel = 'stylesheet';
 		link.href = href;
 		link.dataset.visterasFont = family;
+		link.dataset.variants = combinedVariants.map((v) => String(v).toLowerCase()).join(',');
 		document.head.appendChild(link);
-		// Wait for stylesheet to apply (link.onload + fonts.load)
 		await new Promise((resolve) => {
 			link.onload = () => resolve();
 			link.onerror = () => resolve();
-			// Fallback if onload never fires (cached)
+			setTimeout(resolve, 1500);
+		});
+	} else if (existing.href !== href) {
+		existing.href = href;
+		existing.dataset.variants = combinedVariants.map((v) => String(v).toLowerCase()).join(',');
+		await new Promise((resolve) => {
+			existing.onload = () => resolve();
+			existing.onerror = () => resolve();
 			setTimeout(resolve, 1500);
 		});
 	}
 
 	if (document.fonts && typeof document.fonts.load === 'function') {
-		try {
-			await document.fonts.load(`16px "${family}"`);
-			if (typeof document.fonts.check === 'function' && document.fonts.check(`16px "${family}"`)) {
-				return true;
-			}
-			// Still resolve success — browser may substitute until paint
-			return true;
-		} catch (e) {
-			console.warn(`[visteras/fonts] document.fonts.load failed for ${family}`, e);
-			return true;
-		}
+		const weightsToLoad = (requestedList && requestedList.length)
+			? requestedList.map((v) => {
+				const isItalic = String(v).toLowerCase().includes('italic');
+				const w = styleNameToCssWeight(v);
+				return { weight: w, style: isItalic ? 'italic' : 'normal' };
+			})
+			: [{ weight: '400', style: 'normal' }];
+
+		await Promise.all(weightsToLoad.map(async ({ weight, style }) => {
+			try {
+				await document.fonts.load(`${style} ${weight} 16px "${family}"`);
+			} catch (_) {}
+		}));
 	}
 	return true;
 }

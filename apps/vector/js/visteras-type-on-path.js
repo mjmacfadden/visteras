@@ -1,3 +1,4 @@
+import { installPathTextBounds } from './visteras-path-text-bounds.js';
 import { beginTextEdit } from './visteras-text-editing.js';
 /**
  * Visteras Vector — Type on Path (Illustrator-style textPath).
@@ -100,13 +101,29 @@ function readTextStyle(svgEditor) {
   let family = 'sans-serif';
   let size = 24;
   let fill = '#000000';
+  let letterSpacing = null;
+  let wordSpacing = null;
+  let fontWeight = null;
+  let fontStyle = null;
   try { if (typeof sc.getFontFamily === 'function') family = sc.getFontFamily() || family; } catch (_) {}
   try { if (typeof sc.getFontSize === 'function') size = sc.getFontSize() || size; } catch (_) {}
   try { if (typeof sc.getColor === 'function') fill = sc.getColor('fill') || fill; } catch (_) {}
+  try {
+    if (typeof sc.getCurText === 'function') {
+      letterSpacing = sc.getCurText('letter_spacing') ?? sc.getCurText('letter-spacing');
+      wordSpacing = sc.getCurText('word_spacing') ?? sc.getCurText('word-spacing');
+      fontWeight = sc.getCurText('font_weight') ?? sc.getCurText('font-weight');
+      fontStyle = sc.getCurText('font_style') ?? sc.getCurText('font-style');
+    }
+  } catch (_) {}
   const fs = document.getElementById('font_size');
   if (fs?.value) size = parseFloat(fs.value) || size;
+  const lsInput = document.getElementById('tool_letter_spacing');
+  if (lsInput?.value && (letterSpacing == null || letterSpacing === '')) letterSpacing = lsInput.value;
+  const wsInput = document.getElementById('tool_word_spacing');
+  if (wsInput?.value && (wordSpacing == null || wordSpacing === '')) wordSpacing = wsInput.value;
   if (!fill || fill === 'none') fill = '#000000';
-  return { family, size, fill };
+  return { family, size, fill, letterSpacing, wordSpacing, fontWeight, fontStyle };
 }
 
 function ensureId(sc, el) {
@@ -286,29 +303,7 @@ function ensurePathElement(svgEditor, shapeEl) {
  * matches the exact bounding box of the underlying path (never larger).
  */
 function attachPathBBoxProxy(textEl, pathEl) {
-  if (!textEl || !pathEl) return;
-  const origGetBBox = textEl.getBBox.bind(textEl);
-  textEl._origGetBBox = origGetBBox;
-  textEl.getBBox = function() {
-    try {
-      if (pathEl && typeof pathEl.getBBox === 'function') {
-        const pb = pathEl.getBBox();
-        if (pb && pb.width > 0 && pb.height > 0) {
-          return {
-            x: pb.x,
-            y: pb.y,
-            width: pb.width,
-            height: pb.height,
-            top: pb.y,
-            bottom: pb.y + pb.height,
-            left: pb.x,
-            right: pb.x + pb.width,
-          };
-        }
-      }
-    } catch (_) {}
-    return origGetBBox();
-  };
+  installPathTextBounds(textEl.closest('#svgcontent') || textEl.ownerSVGElement);
 }
 
 /**
@@ -322,6 +317,8 @@ function setupPathHoverEffects(pathEl, textEl) {
 
   // Path loses stroke and fill; thin 1px line for clean hover outline
   pathEl.setAttribute('fill', 'none');
+  pathEl.style.setProperty('fill', 'none');
+  pathEl.style.setProperty('stroke', 'none');
   pathEl.setAttribute('stroke', 'transparent');
   pathEl.setAttribute('stroke-width', '1');
   pathEl.setAttribute('vector-effect', 'non-scaling-stroke');
@@ -396,7 +393,7 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
     batch.addSubCommand(new sc.history.InsertElementCommand(pathEl));
   }
   const sourceBefore = captureAttributes([pathEl]);
-  const { family, size, fill } = readTextStyle(svgEditor);
+  const { family, size, fill, letterSpacing, wordSpacing, fontWeight, fontStyle } = readTextStyle(svgEditor);
   const content = opts.content != null ? String(opts.content) : 'Lorem Ipsum';
   const align = opts.align || 'start';
   const reverse = !!opts.reverse;
@@ -414,6 +411,18 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   text.setAttribute('stroke', 'none');
   text.setAttribute('font-family', family);
   text.setAttribute('font-size', String(size));
+  if (letterSpacing != null && letterSpacing !== '' && letterSpacing !== '0' && letterSpacing !== 0) {
+    text.setAttribute('letter-spacing', String(letterSpacing));
+  }
+  if (wordSpacing != null && wordSpacing !== '' && wordSpacing !== '0' && wordSpacing !== 0) {
+    text.setAttribute('word-spacing', String(wordSpacing));
+  }
+  if (fontWeight != null && fontWeight !== '') {
+    text.setAttribute('font-weight', String(fontWeight));
+  }
+  if (fontStyle != null && fontStyle !== '') {
+    text.setAttribute('font-style', String(fontStyle));
+  }
   text.setAttribute('text-anchor', align === 'middle' ? 'middle' : (align === 'end' ? 'end' : 'start'));
   text.setAttribute('xml:space', 'preserve');
 
@@ -711,6 +720,9 @@ function wireOptionsPanel(svgEditor) {
     const v = e.target.value;
     if (trackingVal) trackingVal.textContent = v;
     textEl?.setAttribute('letter-spacing', v);
+    const lsInput = document.getElementById('tool_letter_spacing');
+    if (lsInput) lsInput.value = v;
+    svgEditor.svgCanvas?.setCurText?.('letter_spacing', v);
   });
   tracking?.addEventListener('change', () => {
     if (trackingBefore) recordAttributes(svgEditor.svgCanvas, trackingBefore, 'Track path text');
@@ -1048,20 +1060,9 @@ function hookSelectorManager(svgEditor) {
     const origRequestSelector = sm.requestSelector.bind(sm);
     sm.requestSelector = function(elem, bbox) {
       transformGripsToSquares();
-      if (elem && elem.nodeName === 'text' && (elem.hasAttribute(TOP_ATTR) || elem.querySelector('textPath'))) {
-        const tp = elem.querySelector('textPath');
-        if (tp) {
-          const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
-          const baseId = href.replace(/_rev$/, '');
-          const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
-          if (pathEl && typeof pathEl.getBBox === 'function') {
-            const pb = pathEl.getBBox();
-            if (pb && pb.width > 0 && pb.height > 0) {
-              bbox = { x: pb.x, y: pb.y, width: pb.width, height: pb.height };
-              attachPathBBoxProxy(elem, pathEl);
-            }
-          }
-        }
+      if (elem?.querySelector?.('textPath')) {
+        installPathTextBounds(sc.getSvgContent());
+        bbox = elem.getBBox();
       }
       const sel = origRequestSelector(elem, bbox);
       if (sel && bbox) {
@@ -1082,38 +1083,8 @@ function hookRemapAndDimensions(svgEditor) {
   const sc = svgEditor.svgCanvas;
   if (!sc) return;
 
-  if (typeof sc.remapElement === 'function' && !sc._topRemapHooked) {
-    sc._topRemapHooked = true;
-    const origRemap = sc.remapElement.bind(sc);
-
-    sc.remapElement = function(elem, attrs, matrix) {
-      const res = origRemap(elem, attrs, matrix);
-      if (elem && isTypeOnPathText(elem) && matrix) {
-        const tp = elem.querySelector('textPath');
-        if (tp) {
-          const href = (tp.getAttribute('href') || tp.getAttributeNS(XLINK_NS, 'href') || '').replace(/^#/, '');
-          const baseId = href.replace(/_rev$/, '');
-          const pathEl = (typeof sc.getElement === 'function' && sc.getElement(baseId)) || document.getElementById(baseId);
-          if (pathEl) {
-            const selected = (typeof sc.getSelectedElements === 'function') ? sc.getSelectedElements() : [];
-            if (!selected.includes(pathEl)) {
-              origRemap(pathEl, { d: pathEl.getAttribute('d') }, matrix);
-            }
-            const defs = getDefs(sc);
-            const revEl = defs?.querySelector(`#${CSS.escape(baseId)}_rev`);
-            if (revEl) {
-              const revD = buildReversedPathD(pathEl);
-              if (revD) revEl.setAttribute('d', revD);
-            }
-          }
-          elem.removeAttribute('x');
-          elem.removeAttribute('y');
-        }
-      }
-      return res;
-    };
-  }
-
+  // Text-on-path moves with its own transform. Rewriting source geometry here
+  // applied movement twice and left changes outside the native undo command.
   // Hook deleteSelectedElements to clean up bound paths
   if (typeof sc.deleteSelectedElements === 'function' && !sc._topDeleteHooked) {
     sc._topDeleteHooked = true;
@@ -1242,6 +1213,18 @@ export function mountVisterasTypeOnPath(opts = {}) {
   wireOptionsPanel(svgEditor);
   hookSelectorManager(svgEditor);
   hookRemapAndDimensions(svgEditor);
+  // Select All must not transform an invisible reference path alongside text.
+  for (const method of ['selectOnly', 'addToSelection']) {
+    const original = svgEditor.svgCanvas[method];
+    svgEditor.svgCanvas[method] = function(elements, ...args) {
+      return original.call(this, [...elements].filter(el => !el?.hasAttribute?.('data-visteras-top-source')), ...args);
+    };
+  }
+
+  const root = svgEditor.svgCanvas.getSvgContent();
+  installPathTextBounds(root);
+  new MutationObserver(() => installPathTextBounds(root)).observe(root, {childList:true,subtree:true});
+
 
   // The main menu delegates to this callback in index.html.
   window.__visterasTypeOnPath = () => armTypeOnPathMode(svgEditor);

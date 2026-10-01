@@ -492,11 +492,15 @@
 }
 
 /* Checkmarks occupy the gutter, never the menu label's text flow. */
-#action_snap_point { position: relative; }
-#action_snap_point[aria-checked="true"]::before {
+#action_snap_point, #action_scale_strokes { position: relative; }
+#action_snap_point[aria-checked="true"]::before,
+#action_scale_strokes[aria-checked="true"]::before,
+#action_scale_strokes[aria-checked="mixed"]::before {
   content: "✓";
   position: absolute;
   left: 4px;
   width: 12px;
   text-align: center;
 }
+
+#action_scale_strokes[aria-checked="mixed"]::before { content: "−"; }
