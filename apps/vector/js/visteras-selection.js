@@ -68,6 +68,13 @@ export function mountSelectionTools(editor) {
     manager.selectorGripsGroup.setAttribute('display', 'none');
     if (passive) overlay.setAttribute('pointer-events', 'none'); else overlay.removeAttribute('pointer-events');
     const {b,m} = drag?.visualFrame || selectionFrame(elements), zoom = sc.getZoom();
+    for (const el of elements) for (const tp of el.querySelectorAll('textPath')) {
+      const id=(tp.getAttribute('href')||tp.getAttributeNS('http://www.w3.org/1999/xlink','href')||'').slice(1);
+      const path=document.getElementById(id), text=tp.closest('text');
+      if(!path || !text) continue;
+      const guideMatrix=new DOMMatrix().scale(zoom).multiply(matrix(text)).multiply(localMatrix(path));
+      create('path',{d:path.getAttribute('d'),transform:guideMatrix.toString(),fill:'none',stroke:'#3f8ff7','stroke-width':1,'vector-effect':'non-scaling-stroke','pointer-events':'none'},overlay);
+    }
     const x = b.x, y = b.y, w = b.width, h = b.height;
     const screen = (x,y) => { const p = point(x,y,m); return [p.x*zoom,p.y*zoom]; };
     const corners = [[x,y],[x+w,y],[x+w,y+h],[x,y+h]].map(p=>screen(...p));

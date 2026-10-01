@@ -42253,7 +42253,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let c = Nb.getSvgRoot().createSVGTransform();
 		return c.setTranslate(t, n), o.appendItem(c), Ib(a), e;
 	}, Ib = (e) => {
-		if (!e || e.tagName === "g" || e.tagName === "a" || e.getAttribute?.("clip-path") && e.querySelector?.("[clip-path]")) return null;
+		// Keep path text in its local path coordinates; history records the transform.
+		if (!e || e.tagName === "g" || e.tagName === "a" || e.tagName === "text" && e.querySelector("textPath") || e.getAttribute?.("clip-path") && e.querySelector?.("[clip-path]")) return null;
 		let t = Nb.getSvgRoot(), n = Nb.getDataStorage(), r = Mh(e);
 		if (r?.numberOfItems > 0) {
 			let t = r.numberOfItems, n = t;

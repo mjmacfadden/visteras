@@ -22,6 +22,7 @@ function setup(mode='select', count=1) {
     replaceChildren(){this.children=[];}
     getScreenCTM(){return new Matrix();}
     getBBox(){return {x:0,y:0,width:100,height:50};}
+    querySelectorAll(){return [];}
     addEventListener(){}
   }
   const root=new Node(), overlay=new Node(), grips=new Node(), native=new Node();

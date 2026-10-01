@@ -1663,3 +1663,7 @@ elix-dialog {
 }
 
 
+
+/* A type-on-path source is geometry, not a separately painted/selected object.
+   Text and group bounds explicitly include this geometry. */
+.visteras-type-on-path-source { display: none !important; }
