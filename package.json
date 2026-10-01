@@ -13,6 +13,9 @@
     "build:publish": "npm run build --prefix apps/publish",
     "dev:collage": "npx --yes serve apps/collage -p 5174",
     "build:collage": "node -e \"console.log('Collage is a static app under apps/collage; nothing to compile.')\"",
+    "dev:inspire": "npx --yes serve apps/inspire -p 5175",
+    "build:inspire": "node -e \"console.log('Inspire is a static app under apps/inspire; nothing to compile.')\"",
+    "test:inspire": "node --test apps/inspire/tests/inspire.test.mjs",
     "build:site": "bash scripts/build-site.sh",
     "build:fonts": "npm run build:vector --prefix packages/fonts"
   },

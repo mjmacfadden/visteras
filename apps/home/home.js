@@ -6,7 +6,7 @@
   const buttons = [...hero.querySelectorAll('[data-slide]')];
   const pause = hero.querySelector('.pause');
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const colors = [['#32b8ff','#0648a9'],['#ffab40','#74330b'],['#2bd4c5','#075952'],['#b48aff','#47218c']];
+  const colors = [['#32b8ff','#0648a9'],['#ffab40','#74330b'],['#2bd4c5','#075952'],['#b48aff','#47218c'],['#f59e0b','#78350f']];
   let current = 0, paused = motion.matches, timer;
   function show(index) {
     index = (index + slides.length) % slides.length;

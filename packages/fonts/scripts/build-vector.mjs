@@ -12,6 +12,7 @@ const repoRoot = path.resolve(root, '../..');
 const outfiles = [
 	path.join(repoRoot, 'apps/vector/lib/visteras-fonts.js'),
 	path.join(repoRoot, 'apps/collage/lib/visteras-fonts.js'),
+	path.join(repoRoot, 'apps/inspire/lib/visteras-fonts.js'),
 ];
 const entry = path.join(root, 'src/index.js');
 

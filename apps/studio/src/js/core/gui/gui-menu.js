@@ -45,6 +45,9 @@ class GUI_menu_class {
 				<a href="../collage/" class="visteras_switch_btn" title="Visteras - Collage">
 					<span class="visteras_badge" style="color: #CCCCCC;">COLLAGE</span> ↗
 				</a>
+				<a href="../inspire/" class="visteras_switch_btn" title="Visteras - Inspire">
+					<span class="visteras_badge" style="color: #CCCCCC;">INSPIRE</span> ↗
+				</a>
 			</div>
 		`;
 
