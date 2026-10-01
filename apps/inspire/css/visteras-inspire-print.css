@@ -1,0 +1,92 @@
+/**
+ * Visteras Inspire — Print Stylesheet
+ * Ensures clean physical printout of moodboards at exact dimension and high DPI.
+ */
+
+@page {
+  size: auto;
+  margin: 0mm;
+}
+
+@media print {
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Hide Application Shell UI Chrome */
+  #tools_top,
+  #visteras_menu_bar,
+  #tools_left,
+  #sidepanels,
+  #tools_bottom,
+  .document_tabs,
+  .inspire-artboard-header,
+  .inspire-selection-overlay,
+  .inspire-guides-layer,
+  .inspire-marquee-box,
+  .visteras-modal-backdrop,
+  .alertify-notifier {
+    display: none !important;
+  }
+
+  #visteras_app_container {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+    position: static !important;
+    background: transparent !important;
+  }
+
+  #workarea {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    background-image: none !important;
+    overflow: visible !important;
+  }
+
+  .inspire-viewport {
+    position: static !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+  }
+
+  .inspire-canvas-world {
+    position: static !important;
+    transform: none !important;
+  }
+
+  .inspire-artboard-frame {
+    position: relative !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+  }
+
+  .inspire-artboard {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .inspire-element {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .swatch-copy-btn {
+    display: none !important;
+  }
+}

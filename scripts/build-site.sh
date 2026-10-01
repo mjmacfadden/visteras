@@ -9,6 +9,7 @@ STUDIO="$ROOT/apps/studio"
 VECTOR="$ROOT/apps/vector"
 PUBLISH="$ROOT/apps/publish"
 COLLAGE="$ROOT/apps/collage"
+INSPIRE="$ROOT/apps/inspire"
 
 copy_tree() {
   # copy_tree <src_dir> <dest_dir> [--exclude pattern ...]
@@ -42,12 +43,12 @@ copy_tree() {
   fi
 }
 
-for app in studio vector collage; do
+for app in studio vector collage inspire; do
   cp "$ROOT/packages/tool-free.js" "$ROOT/apps/$app/tool-free.js"
 done
 cp "$ROOT/packages/tool-free.js" "$PUBLISH/public/tool-free.js"
 
-echo "==> Building shared fonts bundle for Vector & Collage"
+echo "==> Building shared fonts bundle for Vector, Collage & Inspire"
 npm run build:vector --prefix "$ROOT/packages/fonts"
 
 echo "==> Building Studio (apps/studio → dist/)"
@@ -58,7 +59,7 @@ ASTRO_BASE="/publish/" npm run build --prefix "$PUBLISH"
 
 echo "==> Preparing site/"
 rm -rf "$SITE"
-mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage"
+mkdir -p "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage" "$SITE/inspire"
 
 # Apex CNAME for visteras.com (GitHub Pages custom domain)
 printf '%s\n' 'visteras.com' > "$SITE/CNAME"
@@ -98,7 +99,13 @@ copy_tree "$COLLAGE" "$SITE/collage" \
   --exclude '.git' \
   --exclude 'node_modules'
 
+echo "==> Copying Inspire static tree → site/inspire/"
+copy_tree "$INSPIRE" "$SITE/inspire" \
+  --exclude '.git' \
+  --exclude 'node_modules' \
+  --exclude 'tests'
+
 echo "==> site/ ready"
 echo "    Publish this folder to GitHub Pages (Actions or manual gh-pages)."
-echo "    Public URLs: https://visteras.com/studio/ , https://visteras.com/vector/ , https://visteras.com/publish/ , and https://visteras.com/collage/"
-du -sh "$SITE" "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage"
+echo "    Public URLs: https://visteras.com/studio/ , https://visteras.com/vector/ , https://visteras.com/publish/ , https://visteras.com/collage/ , and https://visteras.com/inspire/"
+du -sh "$SITE" "$SITE/studio" "$SITE/vector" "$SITE/publish" "$SITE/collage" "$SITE/inspire"

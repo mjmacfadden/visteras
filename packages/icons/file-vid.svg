@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Document shadow -->
+    <filter id="docShadow" x="-25%" y="-15%" width="150%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#000000" flood-opacity="0.16"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.07"/>
+    </filter>
+    <!-- Fold flap shadow -->
+    <filter id="foldShadow" x="-40%" y="-20%" width="160%" height="160%">
+      <feDropShadow dx="-3" dy="5" stdDeviation="5" flood-color="#000000" flood-opacity="0.16"/>
+    </filter>
+    <!-- Logo soft shadow -->
+    <filter id="logoShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#d97706" flood-opacity="0.28"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.08"/>
+    </filter>
+    <!-- Gradients -->
+    <linearGradient id="sheetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f5f7fa"/>
+    </linearGradient>
+    <linearGradient id="foldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#edf1f6"/>
+      <stop offset="100%" stop-color="#cad2dc"/>
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="50%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="bannerSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+    <clipPath id="sheetClip">
+      <path d="M 112 40
+               L 348 40
+               L 424 116
+               L 424 448
+               A 24 24 0 0 1 400 472
+               L 112 472
+               A 24 24 0 0 1 88 448
+               L 88 64
+               A 24 24 0 0 1 112 40 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Base Document Sheet -->
+  <g filter="url(#docShadow)">
+    <path d="M 112 40
+             L 348 40
+             L 424 116
+             L 424 448
+             A 24 24 0 0 1 400 472
+             L 112 472
+             A 24 24 0 0 1 88 448
+             L 88 64
+             A 24 24 0 0 1 112 40 Z"
+          fill="url(#sheetGrad)"
+          stroke="rgba(0,0,0,0.06)"
+          stroke-width="1.5"/>
+  </g>
+
+  <!-- Banner clipped to document bottom -->
+  <g clip-path="url(#sheetClip)">
+    <rect x="88" y="378" width="336" height="94" fill="url(#brandGrad)"/>
+    <rect x="88" y="378" width="336" height="47" fill="url(#bannerSheen)"/>
+    <line x1="88" y1="378" x2="424" y2="378" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+    <text x="256" y="426"
+          font-family="system-ui, -apple-system, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-size="32"
+          font-weight="800"
+          letter-spacing="4"
+          fill="#ffffff"
+          text-anchor="middle"
+          dominant-baseline="central">VID</text>
+  </g>
+
+  <!-- Fold Flap -->
+  <g filter="url(#foldShadow)">
+    <path d="M 348 40
+             L 348 102
+             A 14 14 0 0 0 362 116
+             L 424 116 Z"
+          fill="url(#foldGrad)"
+          stroke="rgba(0,0,0,0.05)"
+          stroke-width="1"/>
+  </g>
+
+  <!-- App Logo Glyph -->
+  <g filter="url(#logoShadow)" transform="translate(256, 210) scale(0.50) translate(-256, -256)">
+    <path d="M 37.4,83.7 L 36.4,84.8 L 36.4,87.7 L 37.8,90.2 L 251.7,426.2 L 256.4,426.2 L 294.8,368.6 L 458.2,114.9 L 475.3,88.1 L 475.6,85.5 L 474.2,83.7 L 382.9,83.7 L 380.0,86.3 L 329.2,163.1 L 273.8,242.1 L 269.4,242.1 L 169.0,86.3 L 166.5,83.7 Z"
+          fill="url(#brandGrad)"
+          fill-rule="evenodd"/>
+  </g>
+</svg>

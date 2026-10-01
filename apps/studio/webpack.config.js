@@ -116,6 +116,10 @@ module.exports = function (env, argv) {
 				directory: path.resolve(__dirname, "../collage"),
 				publicPath: "/collage",
 			},
+			{
+				directory: path.resolve(__dirname, "../inspire"),
+				publicPath: "/inspire",
+			},
 		],
 		setupMiddlewares: function (middlewares, devServer) {
 			if (!devServer || !devServer.app) {
@@ -136,6 +140,12 @@ module.exports = function (env, argv) {
 			devServer.app.get("/collage", function (req, res, next) {
 				if (req.path === "/collage") {
 					return res.redirect("/collage/");
+				}
+				next();
+			});
+			devServer.app.get("/inspire", function (req, res, next) {
+				if (req.path === "/inspire") {
+					return res.redirect("/inspire/");
 				}
 				next();
 			});

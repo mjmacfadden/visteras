@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <title>Visteras - Inspire</title>
+  <meta name="description" content="Visteras Inspire - Client-side Swipe File & Moodboard Composer. Capture quotes, copy, colors, photos, and reconstitute them into inspiring design boards." />
+  
+  <!-- Visteras Inspire Favicon & Theme -->
+  <link rel="icon" type="image/svg+xml" href="images/visteras_inspire_logo.svg">
+  <link rel="apple-touch-icon" href="images/visteras_inspire_logo.svg">
+  <meta name="theme-color" content="#f59e0b">
+
+  <!-- Shared Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Montserrat:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Core Theme & Print Stylesheets -->
+  <link rel="stylesheet" href="css/visteras-inspire-theme.css">
+  <link rel="stylesheet" href="css/visteras-inspire-print.css" media="print">
+  
+  <!-- Vendored Libraries -->
+  <script src="lib/html2canvas.min.js"></script>
+</head>
+
+<body>
+  <div id="visteras_app_container">
+    
+    <!-- ==================================================================
+         1. Top Options Bar (#tools_top)
+         ================================================================== -->
+    <header id="tools_top">
+      <a href="#" class="visteras_inspire_logo_wrap" title="Visteras - Inspire">
+        <img src="images/visteras_inspire_logo.svg" alt="Visteras Inspire">
+        <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">INSPIRE</span></span>
+      </a>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- Canvas Mode Toggle -->
+      <div class="options_btn_group">
+        <button type="button" class="options_toggle_btn active" id="opt_btn_fixed" title="Fixed Artboard with preset print/digital aspect ratios">Fixed Board</button>
+        <button type="button" class="options_toggle_btn" id="opt_btn_infinite" title="Infinite Canvas for boundless brainstorming">Infinite Canvas</button>
+      </div>
+
+      <!-- Preset Selector -->
+      <select id="opt_board_preset" class="options_select" title="Canvas Preset" style="width: 175px;">
+        <!-- Populated by JS -->
+      </select>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- 1-Click Auto-Layout Trigger -->
+      <button type="button" id="opt_btn_autolayout" class="btn_visteras_secondary" title="Reconstitute board items into structured moodboard layout">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        Auto-Layout
+      </button>
+
+      <select id="opt_select_autolayout" class="options_select" title="Auto-Layout Algorithm" style="width: 145px;">
+        <option value="custom" selected>📌 Custom Layout</option>
+        <option value="masonry">🧱 Masonry Grid</option>
+        <option value="editorial">📰 Editorial Hero</option>
+        <option value="colorFlow">🌈 Color Flow</option>
+        <option value="collage">✂️ Collage Cluster</option>
+      </select>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- Undo / Redo Buttons -->
+      <button type="button" id="opt_btn_undo" class="btn_visteras_secondary" title="Undo (⌘Z)" disabled>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7v6h6"></path>
+          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+        </svg>
+      </button>
+
+      <button type="button" id="opt_btn_redo" class="btn_visteras_secondary" title="Redo (⇧⌘Z)" disabled>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 7v6h-6"></path>
+          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+        </svg>
+      </button>
+
+      <!-- Right Action Controls -->
+      <div class="options_actions_right">
+        <button type="button" id="opt_btn_save_vid" class="btn_visteras_secondary" title="Save / Export 100% Client-Side .vid Document (⌘S)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          Save .VID
+        </button>
+
+        <button type="button" id="opt_btn_export_image" class="btn_visteras_secondary" title="Export High-Res PNG Moodboard">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export PNG
+        </button>
+
+        <button type="button" id="opt_btn_print" class="btn_visteras_amber" title="Print Moodboard (⌘P)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Board
+        </button>
+      </div>
+    </header>
+
+    <!-- ==================================================================
+         2. Main Top Menu Bar (#visteras_menu_bar) - Below Options Bar
+         ================================================================== -->
+    <nav id="visteras_menu_bar" aria-label="Main Menu">
+      <div class="menu_group">
+        
+        <!-- File Menu -->
+        <div class="menu_entry" id="menu_file">
+          <div class="menu_entry_title">File</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_new">New Moodboard <span class="menu_dropdown_shortcut">⌘N</span></div>
+            <div class="menu_dropdown_item" id="action_menu_open">Open .vid File... <span class="menu_dropdown_shortcut">⌘O</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_save">Save .vid <span class="menu_dropdown_shortcut">⌘S</span></div>
+            <div class="menu_dropdown_item" id="action_menu_save_as">Save As... <span class="menu_dropdown_shortcut">⇧⌘S</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_import_image">Import Image...</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_export_png">Export PNG...</div>
+            <div class="menu_dropdown_item" id="action_menu_export_jpg">Export JPG...</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_print">Print Board... <span class="menu_dropdown_shortcut">⌘P</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_close_tab">Close Tab <span class="menu_dropdown_shortcut">⌘W</span></div>
+          </div>
+        </div>
+
+        <!-- Edit Menu -->
+        <div class="menu_entry" id="menu_edit">
+          <div class="menu_entry_title">Edit</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_undo">Undo <span class="menu_dropdown_shortcut">⌘Z</span></div>
+            <div class="menu_dropdown_item" id="action_menu_redo">Redo <span class="menu_dropdown_shortcut">⇧⌘Z</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_cut">Cut <span class="menu_dropdown_shortcut">⌘X</span></div>
+            <div class="menu_dropdown_item" id="action_menu_copy">Copy <span class="menu_dropdown_shortcut">⌘C</span></div>
+            <div class="menu_dropdown_item" id="action_menu_paste">Paste <span class="menu_dropdown_shortcut">⌘V</span></div>
+            <div class="menu_dropdown_item" id="action_menu_duplicate">Duplicate <span class="menu_dropdown_shortcut">⌘D</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_select_all">Select All <span class="menu_dropdown_shortcut">⌘A</span></div>
+            <div class="menu_dropdown_item" id="action_menu_deselect">Deselect All</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_delete">Delete <span class="menu_dropdown_shortcut">⌫</span></div>
+          </div>
+        </div>
+
+        <!-- Board Menu -->
+        <div class="menu_entry" id="menu_board">
+          <div class="menu_entry_title">Board</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_layout_custom">Revert to Custom Layout</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_layout_masonry">Apply Masonry Grid</div>
+            <div class="menu_dropdown_item" id="action_menu_layout_editorial">Apply Editorial Hero</div>
+            <div class="menu_dropdown_item" id="action_menu_layout_colorflow">Apply Color Flow Harmony</div>
+            <div class="menu_dropdown_item" id="action_menu_layout_collage">Apply Collage Cluster</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_clear_board">Clear Board Elements</div>
+          </div>
+        </div>
+
+        <!-- Arrange Menu -->
+        <div class="menu_entry" id="menu_arrange">
+          <div class="menu_entry_title">Arrange</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_bring_front">Bring to Front <span class="menu_dropdown_shortcut">⌘⇧]</span></div>
+            <div class="menu_dropdown_item" id="action_menu_bring_forward">Bring Forward <span class="menu_dropdown_shortcut">⌘]</span></div>
+            <div class="menu_dropdown_item" id="action_menu_send_backward">Send Backward <span class="menu_dropdown_shortcut">⌘[</span></div>
+            <div class="menu_dropdown_item" id="action_menu_send_back">Send to Back <span class="menu_dropdown_shortcut">⌘⇧[</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_align_left">Align Left</div>
+            <div class="menu_dropdown_item" id="action_menu_align_center">Align Center</div>
+            <div class="menu_dropdown_item" id="action_menu_align_right">Align Right</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_align_top">Align Top</div>
+            <div class="menu_dropdown_item" id="action_menu_align_middle">Align Middle</div>
+            <div class="menu_dropdown_item" id="action_menu_align_bottom">Align Bottom</div>
+          </div>
+        </div>
+
+        <!-- View Menu -->
+        <div class="menu_entry" id="menu_view">
+          <div class="menu_entry_title">View</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_mode_fixed">Fixed Artboard Mode</div>
+            <div class="menu_dropdown_item" id="action_menu_mode_infinite">Infinite Canvas Mode</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_fit">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_menu_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_menu_zoomin">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
+            <div class="menu_dropdown_item" id="action_menu_zoomout">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
+          </div>
+        </div>
+
+        <!-- Window Menu -->
+        <div class="menu_entry" id="menu_window">
+          <div class="menu_entry_title">Window</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_win_swipe">Swipe File Library</div>
+            <div class="menu_dropdown_item" id="action_menu_win_inspector">Properties Inspector</div>
+            <div class="menu_dropdown_item" id="action_menu_win_templates">Templates & Layouts</div>
+            <div class="menu_dropdown_item" id="action_menu_win_layers">Layers & Outliner</div>
+          </div>
+        </div>
+
+        <!-- Help Menu -->
+        <div class="menu_entry" id="menu_help">
+          <div class="menu_entry_title">Help</div>
+          <div class="menu_dropdown_list">
+            <div class="menu_dropdown_item" id="action_menu_about">About Visteras Inspire...</div>
+            <div class="menu_dropdown_item" id="action_menu_shortcuts">Keyboard Shortcuts...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Menu Bar Cross-App Switchers -->
+      <div class="menu_right_controls">
+        <a href="../studio/" class="visteras_switch_btn" title="Visteras - Studio">
+          <span class="visteras_badge" style="color: #CCCCCC;">STUDIO</span> ↗
+        </a>
+        <a href="../vector/" class="visteras_switch_btn" title="Visteras - Vector">
+          <span class="visteras_badge" style="color: #CCCCCC;">VECTOR</span> ↗
+        </a>
+        <a href="../publish/" class="visteras_switch_btn" title="Visteras - Publish">
+          <span class="visteras_badge" style="color: #CCCCCC;">PUBLISH</span> ↗
+        </a>
+        <a href="../collage/" class="visteras_switch_btn" title="Visteras - Collage">
+          <span class="visteras_badge" style="color: #CCCCCC;">COLLAGE</span> ↗
+        </a>
+      </div>
+    </nav>
+
+    <!-- ==================================================================
+         3. Left Toolbar (#tools_left)
+         ================================================================== -->
+    <aside id="tools_left" aria-label="Tools">
+      <button type="button" class="tool_btn active" id="tool_select" data-tool="select" title="Selection Tool (V)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <path d="M4 0l16 12.279-6.951 1.17 4.325 8.817-3.596 1.734-4.35-8.879-5.428 5.428z"/>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_hand" data-tool="hand" title="Hand / Pan Tool (H / Space)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+          <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path>
+          <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path>
+          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path>
+        </svg>
+      </button>
+
+      <div class="tool_separator"></div>
+
+      <button type="button" class="tool_btn" id="tool_image" data-tool="image" title="Add Image / Photo (I)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <circle cx="8.5" cy="8.5" r="1.5"></circle>
+          <polyline points="21 15 16 10 5 21"></polyline>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_quote" data-tool="quote" title="Add Quote (Q)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path>
+          <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_text" data-tool="text" title="Add Headline / Text (T)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 7 4 4 20 4 20 7"></polyline>
+          <line x1="12" y1="4" x2="12" y2="20"></line>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_sticky" data-tool="sticky" title="Add Sticky Note (S)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_swatch" data-tool="swatch" title="Add Color Swatch / Palette (C)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"></path>
+          <circle cx="12" cy="8" r="1.5" fill="currentColor"></circle>
+          <circle cx="8" cy="13" r="1.5" fill="currentColor"></circle>
+          <circle cx="16" cy="13" r="1.5" fill="currentColor"></circle>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_shape" data-tool="shape" title="Add Shape (R)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_connector" data-tool="connector" title="Add Connector Arrow (A)">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+
+      <div class="tool_separator"></div>
+
+      <button type="button" class="tool_btn" id="tool_library" data-tool="library" title="Swipe File Library">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+      </button>
+
+      <button type="button" class="tool_btn" id="tool_templates" data-tool="templates" title="Moodboard Layouts">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </button>
+    </aside>
+
+    <!-- ==================================================================
+         4. Middle Workarea (#workarea)
+         ================================================================== -->
+    <main id="workarea" aria-label="Moodboard Workspace">
+      <!-- Document Tabs Bar for Multiple Open Documents -->
+      <div id="document_tabs" class="document_tabs" role="tablist"></div>
+
+      <!-- Canvas Mount Container -->
+      <div id="inspire_canvas_container" class="inspire_canvas_container"></div>
+    </main>
+
+    <!-- ==================================================================
+         5. Right Sidepanels (#sidepanels)
+         ================================================================== -->
+    <aside id="sidepanels" aria-label="Panels">
+      
+      <!-- Sidepanel Navigation Tabs -->
+      <nav class="sidepanel_tabs" aria-label="Panel Selector">
+        <button type="button" class="sidepanel_tab active" data-panel="swipe_file">Swipe File</button>
+        <button type="button" class="sidepanel_tab" data-panel="inspector">Inspector</button>
+        <button type="button" class="sidepanel_tab" data-panel="templates">Layouts</button>
+        <button type="button" class="sidepanel_tab" data-panel="layers">Layers</button>
+      </nav>
+
+      <!-- Panes Container -->
+      <div class="sidepanel_panes">
+        
+        <!-- Pane 1: Swipe File Library -->
+        <div id="panel_swipe_file" class="sidepanel_pane active">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Pane 2: Properties Inspector -->
+        <div id="panel_inspector" class="sidepanel_pane">
+          <!-- Populated by InspectorPanel -->
+        </div>
+
+        <!-- Pane 3: Templates & Layouts -->
+        <div id="panel_templates" class="sidepanel_pane">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Pane 4: Layers / Outliner -->
+        <div id="panel_layers" class="sidepanel_pane">
+          <!-- Populated by JS -->
+        </div>
+
+      </div>
+
+    </aside>
+
+    <!-- ==================================================================
+         6. Bottom Status Bar (#tools_bottom)
+         ================================================================== -->
+    <footer id="tools_bottom">
+      <div class="status_info_left">
+        <span class="status_tag">Mode: <span id="status-mode-text" class="status_tag_val">Fixed Artboard</span></span>
+        <span class="status_tag">Canvas: <span id="status-dims-text" class="status_tag_val">1920 × 1080px</span></span>
+        <span class="status_tag">Counts: <span id="status-items-text" class="status_tag_val">0 on board · 0 in library</span></span>
+        <span class="status_tag">Status: <span id="status-bar-text" class="status_tag_val">Ready</span></span>
+      </div>
+      <div class="status_info_right">
+        <span class="status_tag">Zoom: <button type="button" id="status-zoom-btn" class="status_zoom_badge" title="Click to fit workspace (⌘0)">Fit</button></span>
+        <span class="status_tag">Visteras Inspire (.vid)</span>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- App Bootstrap -->
+  <script type="module" src="js/app.js"></script>
+  <script src="tool-free.js?v=tab-icon-2"></script>
+</body>
+</html>
