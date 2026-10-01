@@ -713,7 +713,6 @@ class GUI_properties_class {
 
 		// Font
 		html += `<div class="properties_row" data-prop="font">
-			<label class="trn properties_label" for="prop_text_font">Font</label>
 			<select class="properties_select" id="prop_text_font" data-text-key="font">`;
 		for (const f of fontOptions) {
 			const sel = String(f) === String(fontVal) ? ' selected' : '';

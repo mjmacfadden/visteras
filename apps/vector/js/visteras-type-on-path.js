@@ -101,13 +101,29 @@ function readTextStyle(svgEditor) {
   let family = 'sans-serif';
   let size = 24;
   let fill = '#000000';
+  let letterSpacing = null;
+  let wordSpacing = null;
+  let fontWeight = null;
+  let fontStyle = null;
   try { if (typeof sc.getFontFamily === 'function') family = sc.getFontFamily() || family; } catch (_) {}
   try { if (typeof sc.getFontSize === 'function') size = sc.getFontSize() || size; } catch (_) {}
   try { if (typeof sc.getColor === 'function') fill = sc.getColor('fill') || fill; } catch (_) {}
+  try {
+    if (typeof sc.getCurText === 'function') {
+      letterSpacing = sc.getCurText('letter_spacing') ?? sc.getCurText('letter-spacing');
+      wordSpacing = sc.getCurText('word_spacing') ?? sc.getCurText('word-spacing');
+      fontWeight = sc.getCurText('font_weight') ?? sc.getCurText('font-weight');
+      fontStyle = sc.getCurText('font_style') ?? sc.getCurText('font-style');
+    }
+  } catch (_) {}
   const fs = document.getElementById('font_size');
   if (fs?.value) size = parseFloat(fs.value) || size;
+  const lsInput = document.getElementById('tool_letter_spacing');
+  if (lsInput?.value && (letterSpacing == null || letterSpacing === '')) letterSpacing = lsInput.value;
+  const wsInput = document.getElementById('tool_word_spacing');
+  if (wsInput?.value && (wordSpacing == null || wordSpacing === '')) wordSpacing = wsInput.value;
   if (!fill || fill === 'none') fill = '#000000';
-  return { family, size, fill };
+  return { family, size, fill, letterSpacing, wordSpacing, fontWeight, fontStyle };
 }
 
 function ensureId(sc, el) {
@@ -377,7 +393,7 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
     batch.addSubCommand(new sc.history.InsertElementCommand(pathEl));
   }
   const sourceBefore = captureAttributes([pathEl]);
-  const { family, size, fill } = readTextStyle(svgEditor);
+  const { family, size, fill, letterSpacing, wordSpacing, fontWeight, fontStyle } = readTextStyle(svgEditor);
   const content = opts.content != null ? String(opts.content) : 'Lorem Ipsum';
   const align = opts.align || 'start';
   const reverse = !!opts.reverse;
@@ -395,6 +411,18 @@ function createTypeOnPath(svgEditor, shapeEl, opts = {}) {
   text.setAttribute('stroke', 'none');
   text.setAttribute('font-family', family);
   text.setAttribute('font-size', String(size));
+  if (letterSpacing != null && letterSpacing !== '' && letterSpacing !== '0' && letterSpacing !== 0) {
+    text.setAttribute('letter-spacing', String(letterSpacing));
+  }
+  if (wordSpacing != null && wordSpacing !== '' && wordSpacing !== '0' && wordSpacing !== 0) {
+    text.setAttribute('word-spacing', String(wordSpacing));
+  }
+  if (fontWeight != null && fontWeight !== '') {
+    text.setAttribute('font-weight', String(fontWeight));
+  }
+  if (fontStyle != null && fontStyle !== '') {
+    text.setAttribute('font-style', String(fontStyle));
+  }
   text.setAttribute('text-anchor', align === 'middle' ? 'middle' : (align === 'end' ? 'end' : 'start'));
   text.setAttribute('xml:space', 'preserve');
 
@@ -692,6 +720,9 @@ function wireOptionsPanel(svgEditor) {
     const v = e.target.value;
     if (trackingVal) trackingVal.textContent = v;
     textEl?.setAttribute('letter-spacing', v);
+    const lsInput = document.getElementById('tool_letter_spacing');
+    if (lsInput) lsInput.value = v;
+    svgEditor.svgCanvas?.setCurText?.('letter_spacing', v);
   });
   tracking?.addEventListener('change', () => {
     if (trackingBefore) recordAttributes(svgEditor.svgCanvas, trackingBefore, 'Track path text');

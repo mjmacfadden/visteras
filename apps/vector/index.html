@@ -951,6 +951,48 @@
         sc.moveUpDownSelected('Down');
       });
 
+      // Actions panel buttons wiring
+      document.getElementById('tool_move_top')?.addEventListener('click', () => {
+        sc.moveToTopSelectedElement();
+      });
+      document.getElementById('tool_move_up')?.addEventListener('click', () => {
+        sc.moveUpDownSelected('Up');
+      });
+      document.getElementById('tool_move_down')?.addEventListener('click', () => {
+        sc.moveUpDownSelected('Down');
+      });
+      document.getElementById('tool_move_bottom')?.addEventListener('click', () => {
+        sc.moveToBottomSelectedElement();
+      });
+
+      // Typography text alignment buttons wiring
+      ['start', 'middle', 'end'].forEach((align) => {
+        document.getElementById(`text_align_${align}`)?.addEventListener('click', () => {
+          sc.setTextAnchor?.(align);
+          ['start', 'middle', 'end'].forEach((a) => {
+            const btn = document.getElementById(`text_align_${a}`);
+            if (btn) {
+              const isMatch = (a === align);
+              btn.classList.toggle('active', isMatch);
+              btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+            }
+          });
+          const legacyAnchor = document.getElementById('tool_text_anchor');
+          if (legacyAnchor) {
+            legacyAnchor.setAttribute('value', align);
+          }
+          const topAlignInput = document.getElementById('top_align');
+          if (topAlignInput) {
+            topAlignInput.value = align;
+            document.querySelectorAll('#top_align_group .top-align-btn').forEach((b) => {
+              const isMatch = b.getAttribute('data-align') === align;
+              b.classList.toggle('active', isMatch);
+              b.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
+            });
+          }
+        });
+      });
+
       document.getElementById('action_flip_h')?.addEventListener('click', () => {
         sc.flipSelectedElements(-1, 1);
       });
@@ -1592,9 +1634,29 @@
               <div class="prop_section_body" id="sec_typography_body">
                 <div class="prop_row">
                   <div id="slot_font_family" style="flex:1;"></div>
+                </div>
+                <div class="prop_row">
+                  <div id="slot_font_weight" style="flex:1;"></div>
                   <div id="slot_font_size" style="width:70px;"></div>
                 </div>
-                <div class="prop_row" id="slot_text_styles"></div>
+                <div class="prop_row" style="flex-direction:column;align-items:flex-start;gap:3px;margin:2px 0 4px 0;">
+                  <span style="font-size:11px;color:#cccccc;user-select:none;">Style</span>
+                  <div class="prop_row" id="slot_text_styles" style="display:flex;align-items:center;gap:2px;"></div>
+                </div>
+                <div class="prop_row" style="flex-direction:column;align-items:flex-start;gap:3px;margin:2px 0 4px 0;">
+                  <span style="font-size:11px;color:#cccccc;user-select:none;">Alignment</span>
+                  <div class="prop_row" id="slot_text_align" role="group" aria-label="Text alignment">
+                    <button type="button" class="visteras_text_align_btn active" id="text_align_start" data-align="start" title="Left Align" aria-label="Left Align" aria-pressed="true">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                    <button type="button" class="visteras_text_align_btn" id="text_align_middle" data-align="middle" title="Center Align" aria-label="Center Align" aria-pressed="false">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M4 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm2-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-2-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                    <button type="button" class="visteras_text_align_btn" id="text_align_end" data-align="end" title="Right Align" aria-label="Right Align" aria-pressed="false">
+                      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M6 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-4-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm4-3a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm-4-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
+                  </div>
+                </div>
                 <div class="prop_row">
                   <div id="slot_letter_spacing" style="flex:1;"></div>
                   <div id="slot_word_spacing" style="flex:1;"></div>
@@ -1746,14 +1808,12 @@
       moveEl('tool_align_relative', 'slot_align_rel');
 
       // Relocate Typography controls
-      moveEl('tool_font_family', 'slot_font_family');
       moveEl('font_size', 'slot_font_size');
       moveEl('tool_bold', 'slot_text_styles');
       moveEl('tool_italic', 'slot_text_styles');
       moveEl('tool_text_decoration_underline', 'slot_text_styles');
       moveEl('tool_text_decoration_linethrough', 'slot_text_styles');
       moveEl('tool_text_decoration_overline', 'slot_text_styles');
-      moveEl('tool_text_anchor', 'slot_text_styles');
 
       // Left toolbar: orange icon tint when tool is pressed (shadow DOM <img>; mirrors News active stroke).
       (function styleToolsLeftAccent() {
@@ -1905,29 +1965,72 @@
         }
       })();
 
-      // Match Studio adjustment icons (#cccccc); no hover effect on type-style buttons.
+      // Studio-standard type style button chrome: #3c3c3c, 1px #505050 border, 2px radius,
+      // and when pressed/active: #383838 with 0 -1px 0 0 #ffffff inset bottom line and bright white glyph.
       (function styleTextStyleIcons() {
         const ids = [
           'tool_bold', 'tool_italic',
-          'tool_text_decoration_underline', 'tool_text_decoration_linethrough',
-          'tool_text_decoration_overline', 'tool_text_anchor'
+          'tool_text_decoration_underline', 'tool_text_decoration_linethrough'
         ];
-        // invert(0.8) ≈ #cccccc from black glyphs; keep identical on hover (no brightening).
-        const iconFilter = 'brightness(0) invert(0.8)';
+        const normalFilter = 'brightness(0) invert(0.8)';
+        const activeFilter = 'brightness(0) invert(1)';
         const shadowCss = `
-          :host(:hover) :not(.disabled) { animation: none !important; }
-          div, div.pressed { transition: none !important; }
-          :host(:hover) div:not(.disabled):not(.pressed) {
-            background-color: var(--icon-bg-color, #3c3c3c) !important;
-            filter: none !important;
+          :host {
+            display: inline-block !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
-          :host(:hover) img,
+          :host(:hover) :not(.disabled) {
+            animation: none !important;
+          }
+          .btn-box {
+            width: 26px !important;
+            height: 26px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border-radius: 2px !important;
+            border: 1px solid #505050 !important;
+            background-color: #3c3c3c !important;
+            box-sizing: border-box !important;
+            box-shadow: none !important;
+            transition: none !important;
+            cursor: pointer !important;
+          }
+          :host(:hover) .btn-box:not(.disabled):not(.pressed) {
+            background-color: #505050 !important;
+            border-color: #606060 !important;
+          }
+          :host([pressed]) .btn-box,
+          .btn-box.pressed {
+            background-color: var(--button-background-color-active, #383838) !important;
+            border-color: #505050 !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 1px 1.5px rgba(58, 40, 40, 0.1) inset, 0 -1px 0 0 #ffffff inset !important;
+          }
+          :host([pressed]:hover) .btn-box,
+          :host(:hover) .btn-box.pressed {
+            background-color: #505050 !important;
+            border-color: #606060 !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 1px 1.5px rgba(58, 40, 40, 0.1) inset, 0 -1px 0 0 #ffffff inset !important;
+          }
           img {
-            filter: ${iconFilter} !important;
+            width: 14px !important;
+            height: 14px !important;
+            filter: ${normalFilter} !important;
             opacity: 1 !important;
+            display: block !important;
+          }
+          :host([pressed]) img,
+          .btn-box.pressed img {
+            filter: ${activeFilter} !important;
           }
         `;
         const apply = () => {
+          const overline = document.getElementById('tool_text_decoration_overline');
+          if (overline) overline.style.display = 'none';
+
           ids.forEach((id) => {
             const host = document.getElementById(id);
             if (!host || !host.shadowRoot) return;
@@ -1939,11 +2042,25 @@
             }
             style.textContent = shadowCss;
             const img = host.shadowRoot.querySelector('img');
-            if (img) img.style.filter = iconFilter;
+            const isPressed = host.hasAttribute('pressed') || host.pressed;
+            if (img) img.style.filter = isPressed ? activeFilter : normalFilter;
+
+            if (!host._visterasChromeObserved) {
+              host._visterasChromeObserved = true;
+              const obs = new MutationObserver(() => {
+                const pressedNow = host.hasAttribute('pressed') || host.pressed;
+                if (img) img.style.filter = pressedNow ? activeFilter : normalFilter;
+                const div = host.shadowRoot?.querySelector('.btn-box');
+                if (div) {
+                  if (pressedNow) div.classList.add('pressed');
+                  else div.classList.remove('pressed');
+                }
+              });
+              obs.observe(host, { attributes: true, attributeFilter: ['pressed'] });
+            }
           });
         };
         apply();
-        // SVG-Edit sometimes rebuilds button shadows after panel moves.
         setTimeout(apply, 0);
         setTimeout(apply, 250);
       })();
@@ -1960,6 +2077,8 @@
 
       // Relocate Actions controls
       moveEl('tool_move_top', 'slot_action_btns');
+      moveEl('tool_move_up', 'slot_action_btns');
+      moveEl('tool_move_down', 'slot_action_btns');
       moveEl('tool_move_bottom', 'slot_action_btns');
       moveEl('tool_group_elements', 'slot_action_btns');
       moveEl('tool_ungroup', 'slot_action_btns');
@@ -2210,6 +2329,9 @@
         if (typoSec) {
           const isText = (tagName === 'text');
           typoSec.style.display = isText ? 'block' : 'none';
+          if (isText && typeof window.__visterasSyncTypography === 'function') {
+            window.__visterasSyncTypography(curElem);
+          }
         }
 
         // Type on Path section
