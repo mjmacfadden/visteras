@@ -613,7 +613,7 @@ test('Direct File Reading & Clean Startup: App starts with fresh blank document,
   const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
 
   // 1. Verify app.js always starts fresh with a blank document and does not load old storage boards
-  assert.match(appJs, /InspireDocument\.createBlank\('Untitled Inspiration Board'\)/, 'app.js must create a fresh blank document on init');
+  assert.match(appJs, /InspireDocument\.createBlank\('Untitled-1'\)/, 'app.js must create a fresh blank document on init');
 
   // 2. Verify stale persistent storage keys are removed on startup so nothing is resurrected
   assert.match(appJs, /localStorage\.removeItem\(LOCAL_STORAGE_DOCS_KEY\)/, 'app.js must remove stale LOCAL_STORAGE_DOCS_KEY on init');
@@ -944,6 +944,105 @@ test('Studio-Style Text Tool UX: Pre-filled highlighted Lorem Ipsum, dashed text
   assert.match(themeCss, /\.inspire-transform-box\.is-textbox[^{]*\{[^}]*border:\s*1px dashed #000000/s, 'transform-box for textbox must have dashed black border');
   assert.match(themeCss, /\.inspire-inline-text-editor\.is-textbox[^{]*\{[^}]*border:\s*1px dashed #000000/s, 'inline editor for textbox must have dashed black border');
   assert.match(themeCss, /\.inspire-element\.el-type-text\.selected[^{]*\{[^}]*box-shadow:\s*none/s, 'text element cards must not display card drop-shadow when selected');
+});
+
+test('Document Naming: New documents are titled Untitled-# and increment up, never Untitled Inspiration Board', () => {
+  // 1. Verify InspireDocument defaults
+  const doc = new InspireDocument();
+  assert.equal(doc.title, 'Untitled-1', 'Default document title must be Untitled-1');
+  const blank = InspireDocument.createBlank();
+  assert.equal(blank.meta.title, 'Untitled-1', 'createBlank must default title to Untitled-1');
+  const starter = InspireDocument.createDefaultStarter();
+  assert.equal(starter.meta.title, 'Untitled-1', 'createDefaultStarter must default title to Untitled-1');
+
+  // 2. Verify no references to "Untitled Inspiration Board" exist in source code
+  const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
+  const docJs = fs.readFileSync(path.join(inspireRoot, 'js/document.js'), 'utf8');
+  assert.doesNotMatch(appJs, /'Untitled Inspiration Board'/, 'app.js must not contain Untitled Inspiration Board string literals');
+  assert.doesNotMatch(docJs, /'Untitled Inspiration Board'/, 'document.js must not contain Untitled Inspiration Board');
+
+  // 3. Verify mock app document creation increments Untitled-#
+  const mockApp = {
+    autoDocCounter: 1,
+    documents: [],
+    activeDocId: null,
+    renderDocumentTabs() {},
+    updateStatus() {},
+    renderLibraryGrid() {},
+    renderLibraryTags() {}
+  };
+
+  // Bind createDocumentModel logic from app.js
+  const createModel = (opts = {}) => {
+    const data = opts.initialData || InspireDocument.createBlank();
+    const docId = data.meta?.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+    let resolvedFileName = opts.fileName || (opts.initialData ? data.meta?.fileName : null) || null;
+    let resolvedTitle = opts.title || (opts.initialData ? data.meta?.title : null) || null;
+
+    const isGenericUntitled = (val) => !val || val === 'Untitled' || /^Untitled\s+Inspiration\s+Board$/i.test(val);
+
+    if ((!opts.fileName && !opts.title) || (!resolvedFileName && (!resolvedTitle || isGenericUntitled(resolvedTitle)))) {
+      const num = mockApp.autoDocCounter++;
+      resolvedTitle = `Untitled-${num}`;
+      resolvedFileName = `Untitled-${num}.vid`;
+    } else if (resolvedFileName && (!resolvedTitle || isGenericUntitled(resolvedTitle))) {
+      resolvedTitle = resolvedFileName.replace(/\.vid$/i, '');
+    } else if (resolvedFileName && !resolvedTitle) {
+      resolvedTitle = resolvedFileName.replace(/\.vid$/i, '');
+    } else if (!resolvedFileName && resolvedTitle) {
+      resolvedFileName = resolvedTitle.toLowerCase().endsWith('.vid') ? resolvedTitle : `${resolvedTitle}.vid`;
+      resolvedTitle = resolvedTitle.replace(/\.vid$/i, '');
+    }
+
+    if (data.meta) {
+      data.meta.title = resolvedTitle;
+    }
+
+    const docInstance = new InspireDocument(data.board);
+    docInstance.id = docId;
+    docInstance.title = resolvedTitle;
+
+    return {
+      id: docId,
+      title: resolvedTitle,
+      fileName: resolvedFileName,
+      doc: docInstance
+    };
+  };
+
+  // Document 1 (Initial)
+  const doc1 = createModel();
+  assert.equal(doc1.title, 'Untitled-1');
+  assert.equal(doc1.fileName, 'Untitled-1.vid');
+  assert.equal(doc1.doc.title, 'Untitled-1');
+
+  // Document 2 (New Document increment)
+  const doc2 = createModel();
+  assert.equal(doc2.title, 'Untitled-2');
+  assert.equal(doc2.fileName, 'Untitled-2.vid');
+  assert.equal(doc2.doc.title, 'Untitled-2');
+
+  // Document 3 (New Document increment)
+  const doc3 = createModel();
+  assert.equal(doc3.title, 'Untitled-3');
+  assert.equal(doc3.fileName, 'Untitled-3.vid');
+  assert.equal(doc3.doc.title, 'Untitled-3');
+
+  // Document with custom title is preserved
+  const docCustom = createModel({ title: 'Nordic Architecture' });
+  assert.equal(docCustom.title, 'Nordic Architecture');
+  assert.equal(docCustom.fileName, 'Nordic Architecture.vid');
+  assert.equal(docCustom.doc.title, 'Nordic Architecture');
+
+  // Document with custom fileName is preserved
+  const docCustomFile = createModel({ fileName: 'Moodboard_2026.vid' });
+  assert.equal(docCustomFile.title, 'Moodboard_2026');
+  assert.equal(docCustomFile.fileName, 'Moodboard_2026.vid');
+
+  // 4. Verify File > New menu label in index.html is "New" (not "New Moodboard")
+  const indexHtml = fs.readFileSync(path.join(inspireRoot, 'index.html'), 'utf8');
+  assert.match(indexHtml, /<div class="menu_dropdown_item" id="action_menu_new">\s*New\s*<span class="menu_dropdown_shortcut">⌘N<\/span><\/div>/, 'File menu item must say "New"');
+  assert.doesNotMatch(indexHtml, /New Moodboard/, 'index.html must not contain "New Moodboard"');
 });
 
 

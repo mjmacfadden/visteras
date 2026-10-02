@@ -21,7 +21,8 @@ export const CANVAS_PRESETS = {
 
 export class InspireDocument {
   constructor({
-    title = 'Untitled Inspiration Board',
+    title = 'Untitled-1',
+    fileName = null,
     mode = 'fixed', // 'fixed' or 'infinite'
     preset = '16:9',
     width = 1920,
@@ -33,6 +34,7 @@ export class InspireDocument {
   } = {}) {
     this.id = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     this.title = title;
+    this.fileName = fileName || (title.endsWith('.vid') ? title : `${title}.vid`);
     this.mode = mode;
     this.preset = preset;
     this.width = width;
@@ -53,6 +55,7 @@ export class InspireDocument {
       meta: {
         id: this.id,
         title: this.title,
+        fileName: this.fileName || (this.title.endsWith('.vid') ? this.title : `${this.title}.vid`),
         created: this.created,
         modified: this.modified
       },
@@ -146,16 +149,19 @@ export class InspireDocument {
    * Default board color is white (#ffffff).
    */
   static createDefaultStarter() {
-    return this.createBlank('Untitled Inspiration Board');
+    return this.createBlank('Untitled-1');
   }
 
-  static createBlank(title = 'Untitled Inspiration Board') {
+  static createBlank(title = 'Untitled-1', fileName = null) {
+    const resolvedTitle = title || 'Untitled-1';
+    const resolvedFileName = fileName || (resolvedTitle.endsWith('.vid') ? resolvedTitle : `${resolvedTitle}.vid`);
     return {
       format: VID_FORMAT_IDENTIFIER,
       version: VID_CURRENT_VERSION,
       meta: {
         id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-        title,
+        title: resolvedTitle,
+        fileName: resolvedFileName,
         created: new Date().toISOString(),
         modified: new Date().toISOString()
       },
