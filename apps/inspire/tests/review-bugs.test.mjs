@@ -48,3 +48,35 @@ test('Bug 4: opening a .vid keeps its created date through re-save', async () =>
   assert.equal(fresh.created, before);
   assert.match(read('js/app.js'), /applyFileMeta\(docInstance, data\.meta\)/);
 });
+
+test('Bug 6: tab name and downloaded .vid name are the same (spaces kept, only illegal chars replaced)', async () => {
+  assert.equal(utils.safeVidFileName('My Board.vid'), 'My Board.vid');
+  assert.equal(utils.safeVidFileName('My Board'), 'My Board.vid');
+  assert.equal(utils.safeVidFileName('Brand v2.1 – Café'), 'Brand v2.1 – Café.vid');
+  assert.equal(utils.safeVidFileName('a/b:c*?"<>|d'), 'a_b_c______d.vid');
+  assert.equal(utils.safeVidFileName('   '), 'Untitled.vid');
+  assert.equal(utils.safeVidFileName('.hidden..'), 'hidden.vid');
+  assert.equal(utils.safeFileBase('Mood Board.vid'), 'Mood Board');
+
+  const { InspireDocument } = await import('../js/document.js');
+  const created = [];
+  const prevDoc = globalThis.document, prevURL = globalThis.URL.createObjectURL, prevRevoke = globalThis.URL.revokeObjectURL;
+  globalThis.document = {
+    createElement: () => { const a = { click() {}, set download(v) { created.push(v); } }; return a; },
+    body: { appendChild() {}, removeChild() {} }
+  };
+  globalThis.URL.createObjectURL = () => 'blob:x';
+  globalThis.URL.revokeObjectURL = () => {};
+  try {
+    const returned = InspireDocument.downloadAsFile(InspireDocument.createBlank('x'), 'Summer Mood Board.vid');
+    assert.equal(returned, 'Summer Mood Board.vid');
+    assert.deepEqual(created, ['Summer Mood Board.vid'], 'download keeps spaces, matches tab');
+    await new Promise((r) => setTimeout(r, 150)); // let the anchor cleanup timer run
+  } finally {
+    globalThis.document = prevDoc; globalThis.URL.createObjectURL = prevURL; globalThis.URL.revokeObjectURL = prevRevoke;
+  }
+  const app = read('js/app.js');
+  assert.match(app, /const fileName = safeVidFileName\(active\.fileName \|\| active\.doc\.title\);/);
+  assert.match(app, /active\.fileName = fileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
+  assert.match(app, /val = safeVidFileName\(val\);/, 'renaming a tab uses the same rule');
+});

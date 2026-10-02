@@ -16,7 +16,7 @@ import { BoardComposer } from './board-composer.js';
 import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
-import { zoomPercent, applyFileMeta } from './inspire-utils.js';
+import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -418,9 +418,7 @@ class InspireApp {
           const commitRename = () => {
             let val = input.value.trim();
             if (val && val !== currentFileName) {
-              if (!val.toLowerCase().endsWith('.vid')) {
-                val = `${val}.vid`;
-              }
+              val = safeVidFileName(val);
               docModel.fileName = val;
               const cleanTitle = val.replace(/\.vid$/i, '');
               docModel.title = cleanTitle;
@@ -905,16 +903,22 @@ class InspireApp {
       const active = this.getActiveDocument();
       if (!active) return;
 
-      const fileName = active.fileName || (active.doc.title.endsWith('.vid') ? active.doc.title : `${active.doc.title}.vid`);
+      // The tab name and the downloaded file name are always the same string
+      const fileName = safeVidFileName(active.fileName || active.doc.title);
       if (typeof active.doc.downloadVidFile === 'function') {
         active.doc.downloadVidFile(active.board, active.swipeFile, fileName);
       } else {
         const data = active.doc.serialize(active.board, active.swipeFile);
         InspireDocument.downloadAsFile(data, fileName);
       }
+      const savedTitle = fileName.replace(/\.vid$/i, '');
       active.fileName = fileName;
+      active.title = savedTitle;
+      active.doc.fileName = fileName;
+      active.doc.title = savedTitle;
       markSaved(active);
       this.renderDocumentTabs();
+      if (active.id === this.activeDocId) this.canvas?.renderArtboardMeta();
       this.showToast(`Saved "${fileName}"`, 'success');
     } catch (err) {
       this.showToast(`Export failed: ${err.message}`, 'error');
@@ -947,7 +951,7 @@ class InspireApp {
 
         const a = document.createElement('a');
         a.href = dataUrl;
-        a.download = `${this.doc.title.replace(/[^a-z0-9_-]/gi, '_')}.${format}`;
+        a.download = `${safeFileBase(this.doc.title)}.${format}`;
         a.click();
 
         this.showToast(`Exported ${format.toUpperCase()} moodboard!`, 'success');

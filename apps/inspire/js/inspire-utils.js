@@ -21,3 +21,24 @@ export function applyFileMeta(docInstance, meta) {
   if (isValidDate(meta.modified)) docInstance.modified = meta.modified;
   return docInstance;
 }
+
+/**
+ * Download-safe base name: keeps spaces, dots and Unicode like Studio does, and only
+ * replaces characters that are illegal in macOS/Windows/Linux file names.
+ */
+export function safeFileBase(name, fallback = 'Untitled') {
+  let base = String(name ?? '')
+    .replace(/\.vid$/i, '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\.+/, '')
+    .replace(/[. ]+$/, '');
+  if (!base) base = fallback;
+  return base.slice(0, 200);
+}
+
+/** The exact .vid file name a save will download. The tab shows this same name. */
+export function safeVidFileName(name, fallback = 'Untitled') {
+  return `${safeFileBase(name, fallback)}.vid`;
+}
