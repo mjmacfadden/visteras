@@ -46,6 +46,9 @@ html {
     background-color: var(--studio-chassis-bg);
     color: var(--studio-text);
     color-scheme: dark;
+    font-family: var(--ui-font);
+    font-size: 11px;
+    font-weight: 400;
   }
 
   #visteras_app_container {
@@ -62,6 +65,9 @@ html {
     height: 100vh;
     overflow: hidden;
     background-color: var(--studio-chassis-bg);
+    font-family: var(--ui-font);
+    font-size: 11px;
+    font-weight: 400;
   }
 }
 
@@ -73,6 +79,9 @@ html {
 #tools_bottom {
   font-family: var(--ui-font);
   font-size: 11px;
+  font-weight: 400;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 /* ==========================================================================
@@ -88,6 +97,11 @@ html {
   padding: 0 8px;
   z-index: 3000;
   user-select: none;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 400;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 .menu_group {
@@ -100,6 +114,9 @@ html {
   height: 100%;
   display: inline-flex;
   align-items: stretch;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 400;
 }
 
 .menu_entry_title {
@@ -116,6 +133,8 @@ html {
   align-items: center;
   border-radius: 0;
   box-sizing: border-box;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 .menu_entry_title:hover {
@@ -136,10 +155,16 @@ html {
   left: 0;
   background: #3c3c3c;
   border: 1px solid #505050;
+  border-radius: 0;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   padding: 4px 0;
   min-width: 180px;
   z-index: 3001;
+  font-family: var(--ui-font);
+  font-size: 11px;
+  font-weight: 400;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 .menu_entry.open > .menu_dropdown_list,
@@ -148,7 +173,9 @@ html {
 }
 
 .menu_dropdown_item {
+  font-family: var(--ui-font);
   font-size: 11px;
+  font-weight: 400;
   color: #cccccc;
   padding: 4px 16px;
   line-height: 18px;
@@ -158,6 +185,8 @@ html {
   cursor: pointer;
   user-select: none;
   text-decoration: none;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 .menu_dropdown_item:hover:not(.disabled) {
@@ -178,6 +207,8 @@ html {
 }
 
 .menu_dropdown_shortcut {
+  font-family: var(--ui-font);
+  font-weight: 400;
   color: #888888;
   font-size: 10px;
   margin-left: 20px;
