@@ -695,7 +695,23 @@ class Base_selection_class {
 		config.need_render = true;
 	}
 
+	// Selection previews and committed masks must use the same document dimensions.
+	// Preserve existing pixels for add/subtract gestures when the board has resized.
+	ensure_mask_size() {
+		const width = Math.max(1, config.WIDTH || 800);
+		const height = Math.max(1, config.HEIGHT || 600);
+		if (this.mask_canvas.width === width && this.mask_canvas.height === height) return;
+		const previous = document.createElement('canvas');
+		previous.width = this.mask_canvas.width;
+		previous.height = this.mask_canvas.height;
+		previous.getContext('2d').drawImage(this.mask_canvas, 0, 0);
+		this.mask_canvas.width = width;
+		this.mask_canvas.height = height;
+		this.mask_ctx.drawImage(previous, 0, 0);
+	}
+
 	apply_shape_to_mask(shape, x, y, width, height, path, mode = null, targetCtx = this.mask_ctx, anti_alias = true) {
+		if (targetCtx === this.mask_ctx) this.ensure_mask_size();
 		var W = targetCtx.canvas.width;
 		var H = targetCtx.canvas.height;
 
@@ -1061,6 +1077,7 @@ class Base_selection_class {
 	}
 
 	clone_mask_canvas() {
+		this.ensure_mask_size();
 		var c = document.createElement('canvas');
 		c.width = this.mask_canvas.width;
 		c.height = this.mask_canvas.height;
@@ -1085,6 +1102,7 @@ class Base_selection_class {
 	}
 
 	select_all() {
+		this.ensure_mask_size();
 		this.mask_ctx.fillStyle = '#ffffff';
 		this.mask_ctx.fillRect(0, 0, this.mask_canvas.width, this.mask_canvas.height);
 		this.update_mask_state();

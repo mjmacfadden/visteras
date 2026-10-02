@@ -293,8 +293,9 @@ class Base_tools_class {
 		}
 
 		var mouse_coords = this.get_mouse_coordinates_from_event(event);
-		var mouse_x = mouse_coords.x;
-		var mouse_y = mouse_coords.y;
+		// Blur/capture-loss can end a gesture without pointer coordinates.
+		var mouse_x = Number.isFinite(mouse_coords.x) ? mouse_coords.x : config.mouse?.x;
+		var mouse_y = Number.isFinite(mouse_coords.y) ? mouse_coords.y : config.mouse?.y;
 
 		var start_pos = this.Base_layers.get_world_coords(0, 0);
 		var x_rel = mouse_x - start_pos.x;

@@ -200,6 +200,8 @@ class Lasso_tool_class extends Base_tools_class {
 	mousedown_freehand(mouse, mode, e) {
 		this.mode = mode;
 		this.old_mask_snapshot = this.Base_selection.clone_mask_canvas();
+		this.reposition_selection = false;
+		this.selection_pointer = { x: Math.round(mouse.x), y: Math.round(mouse.y) };
 
 		if (mode == null && this.Base_selection.has_selection && this.Base_selection.point_inside_selection(mouse.x, mouse.y)) {
 			// Move selection mask
@@ -262,9 +264,9 @@ class Lasso_tool_class extends Base_tools_class {
 		}
 	}
 
-	mousemove_freehand(e) {
+	mousemove_freehand(e, finishing = false) {
 		var mouse = this.get_mouse_info(e);
-		if (mouse.is_drag === false || this.type == null) return;
+		if ((!mouse.is_drag && !finishing) || this.type == null) return;
 
 		if (this.type === 'move') {
 			var dx = Math.round(mouse.x - this.move_last.x);
@@ -274,6 +276,20 @@ class Lasso_tool_class extends Base_tools_class {
 				this.move_last = { x: mouse.x, y: mouse.y };
 			}
 			return;
+		}
+
+		if (this.type === 'create' && this.selection_pointer) {
+			const x = Math.round(mouse.x), y = Math.round(mouse.y);
+			if (this.reposition_selection) {
+				const dx = x - this.selection_pointer.x, dy = y - this.selection_pointer.y;
+				if (this.selection_coords_from) {
+					this.selection_coords_from.x += dx;
+					this.selection_coords_from.y += dy;
+				}
+				this.lasso_path?.forEach(point => { point[0] += dx; point[1] += dy; });
+				config.need_render = true;
+			}
+			this.selection_pointer = { x, y };
 		}
 
 		if (this.type === 'create' && this.is_drawing && this.lasso_path) {
@@ -314,6 +330,10 @@ class Lasso_tool_class extends Base_tools_class {
 	}
 
 	mouseup_freehand(e) {
+		// Consume the release position too; it may follow the last move event.
+		if (this.type && Number.isFinite(this.get_mouse_info(e).x) && Number.isFinite(this.get_mouse_info(e).y)) this.mousemove_freehand(e, true);
+		this.reposition_selection = false;
+		this.selection_pointer = null;
 		if (this.type === 'move') {
 			this.type = null;
 			this.move_last = null;

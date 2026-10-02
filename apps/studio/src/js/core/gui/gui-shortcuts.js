@@ -126,6 +126,8 @@ class GUI_shortcuts_class {
 			}
 		});
 		window.addEventListener('blur', () => {
+			if (this.space_selection_tool) this.space_selection_tool.reposition_selection = false;
+			this.space_selection_tool = null;
 			this.is_meta_down = false;
 			this.is_ctrl_down = false;
 			this.is_alt_down = false;
@@ -389,6 +391,12 @@ class GUI_shortcuts_class {
 			if (event.code === 'Space' && !event.ctrlKey && !event.metaKey && !event.altKey) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
+				const tool = app.GUI?.GUI_tools?.tools_modules[config.TOOL?.name]?.object;
+				if (['selection', 'lasso'].includes(config.TOOL?.name) && tool?.type === 'create' && config.mouse?.is_drag) {
+					tool.reposition_selection = true;
+					this.space_selection_tool = tool;
+					return;
+				}
 				if (app.GUI && app.GUI.GUI_timeline && app.GUI.GUI_timeline.is_visible) {
 					app.GUI.GUI_timeline.toggle_play();
 					return;
@@ -622,6 +630,13 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			if (event.code === 'Space' && this.space_selection_tool) {
+				this.space_selection_tool.reposition_selection = false;
+				this.space_selection_tool = null;
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				return;
+			}
 			if (event.code !== 'Space' || this.space_pan_tool == null) {
 				return;
 			}
