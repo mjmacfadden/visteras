@@ -3,6 +3,72 @@
  * Manages board items, selection, transformations, history undo/redo, and rendering.
  */
 
+export const LOREM_IPSUM = 'Lorem Ipsum';
+export const LOREM_PARAGRAPH = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.';
+
+export function getLoremIpsumForBox(width, height, { fontFamily = 'Montserrat', fontSize = 32, fontWeight = '700', letterSpacing = 0, lineHeight = 1.2 } = {}) {
+  const lineH = Math.max(14, fontSize * (lineHeight || 1.2));
+  const maxLines = Math.max(1, Math.floor(Math.max(20, height) / lineH));
+  const maxW = Math.max(30, width - 16);
+  const words = LOREM_PARAGRAPH.split(/\s+/);
+
+  let ctx = null;
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = `${fontWeight || '700'} ${fontSize || 32}px "${fontFamily || 'Montserrat'}", sans-serif`;
+      }
+    } catch (_) {}
+  }
+
+  const measureWordW = (str) => {
+    if (ctx) {
+      const m = ctx.measureText(str);
+      const extraSpacing = (str.length > 1 && letterSpacing) ? (str.length - 1) * letterSpacing : 0;
+      return (m.width || (fontSize * 0.6 * str.length)) + extraSpacing;
+    }
+    return str.length * (fontSize * 0.6);
+  };
+
+  const spaceW = measureWordW(' ');
+  const lines = [];
+  let currentLine = '';
+  let currentLineW = 0;
+  let wordIdx = 0;
+  const maxWords = 500;
+  let added = 0;
+
+  while (added < maxWords && lines.length < maxLines) {
+    const word = words[wordIdx % words.length];
+    const wordW = measureWordW(word);
+
+    if (!currentLine) {
+      currentLine = word;
+      currentLineW = wordW;
+      wordIdx++;
+      added++;
+    } else if (currentLineW + spaceW + wordW <= maxW) {
+      currentLine += ' ' + word;
+      currentLineW += spaceW + wordW;
+      wordIdx++;
+      added++;
+    } else {
+      lines.push(currentLine);
+      currentLine = '';
+      currentLineW = 0;
+      if (lines.length >= maxLines) break;
+    }
+  }
+
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine);
+  }
+
+  return lines.length ? lines.join(' ') : LOREM_IPSUM;
+}
+
 export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 32, fontWeight = '700', letterSpacing = 0, lineHeight = 1.2 } = {}) {
   const str = text !== undefined && text !== null ? String(text) : '';
   const lines = str.length ? str.split('\n') : [' '];
@@ -12,7 +78,7 @@ export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.font = `${fontWeight || '400'} ${fontSize || 32}px "${fontFamily || 'Montserrat'}", sans-serif`;
+        ctx.font = `${fontWeight || '700'} ${fontSize || 32}px "${fontFamily || 'Montserrat'}", sans-serif`;
         let maxLineWidth = 0;
         for (const line of lines) {
           const metrics = ctx.measureText(line.length ? line : ' ');
@@ -23,8 +89,8 @@ export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 
         const lineH = fontSize * (lineHeight || 1.2);
         const totalH = Math.max(lineH, lines.length * lineH);
         return {
-          width: Math.ceil(Math.max(40, maxLineWidth + 12)),
-          height: Math.ceil(Math.max(fontSize, totalH + 6))
+          width: Math.ceil(Math.max(20, maxLineWidth + 4)),
+          height: Math.ceil(Math.max(fontSize, totalH))
         };
       }
     } catch (_) {}
@@ -36,13 +102,13 @@ export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 
     if (line.length > maxLen) maxLen = line.length;
   }
   return {
-    width: Math.ceil(Math.max(40, maxLen * (fontSize * 0.62) + 16)),
-    height: Math.ceil(Math.max(fontSize, lines.length * (fontSize * 1.25) + 8))
+    width: Math.ceil(Math.max(20, maxLen * (fontSize * 0.62) + 4)),
+    height: Math.ceil(Math.max(fontSize, lines.length * (fontSize * (lineHeight || 1.2))))
   };
 }
 
 export class BoardComposer {
-  constructor(initialElements = [], customLayoutSnapshot = null) {
+  constructor(initialElements = [], customLayoutSnapshot = null, docOrSlides = null) {
     this.elements = initialElements ? [...initialElements] : [];
     this.customLayoutSnapshot = customLayoutSnapshot ? [...customLayoutSnapshot] : null;
     this.activeLayout = 'custom';
@@ -52,7 +118,47 @@ export class BoardComposer {
     this.maxHistory = 50;
     this.listeners = new Set();
 
-    this.saveHistory('Initial state');
+    this.doc = null;
+    this._slides = [];
+    if (docOrSlides) {
+      this.attachDoc(docOrSlides);
+    } else {
+      this.saveHistory('Initial state');
+    }
+  }
+
+  attachDoc(docOrSlides) {
+    if (docOrSlides && Array.isArray(docOrSlides.slides)) {
+      this.doc = docOrSlides;
+      this._slides = docOrSlides.slides;
+    } else if (Array.isArray(docOrSlides)) {
+      this._slides = [...docOrSlides];
+    }
+    // Refresh initial history snapshot if only initial state has been recorded
+    if (this.history.length <= 1) {
+      this.history = [];
+      this.historyIndex = -1;
+      this.saveHistory('Initial state');
+    }
+  }
+
+  get slides() {
+    if (this.doc && Array.isArray(this.doc.slides)) {
+      return this.doc.slides;
+    }
+    return this._slides || [];
+  }
+
+  set slides(val) {
+    const list = Array.isArray(val) ? val : [];
+    if (this.doc) {
+      this.doc.slides = list;
+    }
+    this._slides = list;
+  }
+
+  getSlidesSnapshot() {
+    return (this.slides || []).map(s => ({ ...s }));
   }
 
   snapshotCustomLayout() {
@@ -115,7 +221,10 @@ export class BoardComposer {
       this.history = this.history.slice(0, this.historyIndex + 1);
     }
 
-    const snapshot = JSON.stringify(this.elements);
+    const snapshot = JSON.stringify({
+      elements: this.elements,
+      slides: this.getSlidesSnapshot()
+    });
     this.history.push({ snapshot, label });
     if (this.history.length > this.maxHistory) {
       this.history.shift();
@@ -123,6 +232,32 @@ export class BoardComposer {
       this.historyIndex++;
     }
     this.notify({ type: 'history' });
+  }
+
+  restoreSnapshot(snapshotStr) {
+    try {
+      const data = JSON.parse(snapshotStr);
+      if (Array.isArray(data)) {
+        this.elements = data;
+      } else if (data && typeof data === 'object') {
+        this.elements = Array.isArray(data.elements) ? data.elements : [];
+        if (Array.isArray(data.slides)) {
+          const restoredSlides = data.slides.map(s => ({ ...s }));
+          if (this.doc) {
+            this.doc.slides = restoredSlides;
+          }
+          this._slides = restoredSlides;
+        }
+      }
+    } catch (err) {
+      console.error('[BoardComposer] restoreSnapshot error', err);
+    }
+
+    // Prune selection of missing elements
+    const validIds = new Set(this.elements.map(e => e.id));
+    for (const id of this.selectedIds) {
+      if (!validIds.has(id)) this.selectedIds.delete(id);
+    }
   }
 
   canUndo() {
@@ -137,13 +272,8 @@ export class BoardComposer {
     if (!this.canUndo()) return false;
     this.historyIndex--;
     const state = this.history[this.historyIndex];
-    this.elements = JSON.parse(state.snapshot);
-    // Prune selection of missing elements
-    const validIds = new Set(this.elements.map(e => e.id));
-    for (const id of this.selectedIds) {
-      if (!validIds.has(id)) this.selectedIds.delete(id);
-    }
-    this.notify({ type: 'undo' });
+    this.restoreSnapshot(state.snapshot);
+    this.notify({ type: 'undo', label: state.label });
     return true;
   }
 
@@ -151,12 +281,8 @@ export class BoardComposer {
     if (!this.canRedo()) return false;
     this.historyIndex++;
     const state = this.history[this.historyIndex];
-    this.elements = JSON.parse(state.snapshot);
-    const validIds = new Set(this.elements.map(e => e.id));
-    for (const id of this.selectedIds) {
-      if (!validIds.has(id)) this.selectedIds.delete(id);
-    }
-    this.notify({ type: 'redo' });
+    this.restoreSnapshot(state.snapshot);
+    this.notify({ type: 'redo', label: state.label });
     return true;
   }
 
@@ -230,13 +356,22 @@ export class BoardComposer {
     });
   }
 
-  addTextElement({ text = 'CREATIVE DIRECTION', x = 100, y = 100, width = null, height = null, fontSize = 32, fontFamily = 'Montserrat', fontWeight = '700', color = '#ffffff', boundary = 'dynamic', align = 'left', letterSpacing = 1, lineHeight = 1.2 } = {}) {
+  addTextElement({ text = null, x = 100, y = 100, width = null, height = null, fontSize = 32, fontFamily = 'Montserrat', fontWeight = '700', color = '#111827', boundary = 'dynamic', align = 'left', letterSpacing = 0, lineHeight = 1.2 } = {}) {
     const isBox = boundary === 'box';
     let calcW = width;
     let calcH = height;
 
+    let initialText = text;
+    if (initialText === null || initialText === undefined) {
+      if (isBox && calcW && calcH) {
+        initialText = getLoremIpsumForBox(calcW, calcH, { fontFamily, fontSize, fontWeight, letterSpacing, lineHeight });
+      } else {
+        initialText = LOREM_IPSUM;
+      }
+    }
+
     if (!isBox || !calcW || !calcH) {
-      const measured = measureTextBounds(text, { fontFamily, fontSize, fontWeight, letterSpacing, lineHeight });
+      const measured = measureTextBounds(initialText, { fontFamily, fontSize, fontWeight, letterSpacing, lineHeight });
       if (!calcW) calcW = measured.width;
       if (!calcH) calcH = measured.height;
     }
@@ -248,11 +383,11 @@ export class BoardComposer {
       width: calcW,
       height: calcH,
       data: {
-        text: text || '',
+        text: initialText,
         fontFamily,
         fontSize,
         fontWeight,
-        color,
+        color: color || '#111827',
         boundary: isBox ? 'box' : 'dynamic',
         align,
         letterSpacing,

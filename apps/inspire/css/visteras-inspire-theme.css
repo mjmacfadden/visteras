@@ -608,12 +608,31 @@ html {
   outline: none;
 }
 
+.inspire-viewport.tool-hand,
 .inspire-viewport.panning {
-  cursor: grab;
+  cursor: grab !important;
 }
 
-.inspire-viewport.panning:active {
-  cursor: grabbing;
+.inspire-viewport.tool-hand:active,
+.inspire-viewport.panning:active,
+.inspire-viewport.is-dragging-pan {
+  cursor: grabbing !important;
+}
+
+.inspire-viewport.tool-hand .inspire-element,
+.inspire-viewport.panning .inspire-element {
+  cursor: grab !important;
+}
+
+.inspire-viewport.tool-hand:active .inspire-element,
+.inspire-viewport.panning:active .inspire-element,
+.inspire-viewport.is-dragging-pan .inspire-element {
+  cursor: grabbing !important;
+}
+
+.inspire-viewport.tool-text,
+.inspire-viewport.tool-text .inspire-element {
+  cursor: text !important;
 }
 
 .inspire-canvas-world {
@@ -758,6 +777,20 @@ html {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
 
+.inspire-element.el-type-text {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.inspire-element.el-type-text:hover {
+  outline: none !important;
+}
+
+.inspire-element.el-type-text.selected {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* 5.1 Image Element & Polaroid */
 .el-inner-image {
   width: 100%;
@@ -884,14 +917,19 @@ html {
   font-size: inherit;
   font-weight: inherit;
   color: inherit;
-  background: rgba(26, 28, 35, 0.95);
-  border: 2px solid var(--inspire-amber);
-  border-radius: 4px;
-  padding: 4px 6px;
+  background: transparent !important;
+  border: 1px solid rgba(63, 143, 247, 0.5);
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
   box-sizing: border-box;
   outline: none;
   resize: none;
   overflow: hidden;
+}
+
+.inspire-inline-text-editor.is-textbox {
+  border: 1px dashed #000000 !important;
 }
 
 /* 5.4 Sticky Note */
@@ -1064,6 +1102,24 @@ html {
   pointer-events: none;
   box-sizing: border-box;
   z-index: 10001;
+}
+
+.inspire-transform-box.is-textbox {
+  border: 1px dashed #000000 !important;
+}
+
+.inspire-transform-box.is-textbox .transform-handle {
+  border: 1px solid #000000 !important;
+  background: #ffffff !important;
+}
+
+.inspire-element.is-textbox {
+  border: 1px dashed rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+}
+
+.inspire-element.is-textbox.selected {
+  border-color: transparent;
 }
 
 .transform-handle {

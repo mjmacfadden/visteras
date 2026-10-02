@@ -4,7 +4,9 @@
  */
 
 import { CANVAS_PRESETS } from './document.js';
-import { measureTextBounds } from './board-composer.js';
+import { measureTextBounds, LOREM_IPSUM, getLoremIpsumForBox } from './board-composer.js';
+import { isDarkColor } from './color-extractor.js';
+import { SpatialPresentation } from './presentation.js';
 
 export class WorkspaceCanvas {
   constructor({
@@ -20,6 +22,9 @@ export class WorkspaceCanvas {
     this.container = container;
     this.doc = doc;
     this.board = boardComposer;
+    if (this.board && this.doc) {
+      this.board.attachDoc?.(this.doc);
+    }
     this.swipeFile = swipeFileManager;
     this.onSelectionChange = onSelectionChange;
     this.onStatusChange = onStatusChange;
@@ -51,10 +56,18 @@ export class WorkspaceCanvas {
     this.fitToScreen();
     this.render();
 
+    this.presentation = new SpatialPresentation(this);
+
     // Subscribe to board updates
     this.boardUnsubscribe = this.board.subscribe((evt) => {
       this.renderElements();
       this.updateSelectionHandles();
+      if (this.presentation) {
+        if (this.presentation.index >= this.presentation.slides.length) {
+          this.presentation.index = Math.max(0, this.presentation.slides.length - 1);
+        }
+        this.presentation.refresh?.();
+      }
       if (this.onStatusChange) {
         this.onStatusChange({
           itemCount: this.board.elements.length,
@@ -65,8 +78,12 @@ export class WorkspaceCanvas {
   }
 
   switchDocument({ doc, board, swipeFile, viewportState } = {}) {
+    this.presentation?.exit();
     if (doc) this.doc = doc;
-    if (board) this.board = board;
+    if (board) {
+      this.board = board;
+      if (this.doc) this.board.attachDoc?.(this.doc);
+    }
     if (swipeFile) this.swipeFile = swipeFile;
 
     if (this.boardUnsubscribe) {
@@ -75,6 +92,12 @@ export class WorkspaceCanvas {
     this.boardUnsubscribe = this.board.subscribe((evt) => {
       this.renderElements();
       this.updateSelectionHandles();
+      if (this.presentation) {
+        if (this.presentation.index >= this.presentation.slides.length) {
+          this.presentation.index = Math.max(0, this.presentation.slides.length - 1);
+        }
+        this.presentation.refresh?.();
+      }
       if (this.onStatusChange) {
         this.onStatusChange({
           itemCount: this.board.elements.length,
@@ -96,6 +119,15 @@ export class WorkspaceCanvas {
     }
 
     this.render();
+    this.presentation?.refresh();
+  }
+
+  setTool(tool) {
+    this.activeTool = tool;
+    if (this.viewport) {
+      this.viewport.classList.toggle('tool-hand', tool === 'hand');
+      this.viewport.classList.toggle('tool-text', tool === 'text');
+    }
   }
 
   initDOM() {
@@ -170,11 +202,13 @@ export class WorkspaceCanvas {
       this.artboard.style.transform = 'none';
       this.artboard.style.backgroundColor = 'transparent';
       this.artboard.className = 'inspire-artboard pattern-blank mode-infinite';
-      this.viewport.className = `inspire-viewport pattern-${pattern} mode-infinite`;
+      const isPlaying = this.viewport.classList?.contains('spatial-playing');
+      this.viewport.className = `inspire-viewport pattern-${pattern} mode-infinite${isPlaying ? ' spatial-playing' : ''}`;
     } else {
+      const isPlaying = this.viewport.classList?.contains('spatial-playing');
       this.viewport.classList.remove('mode-infinite');
       this.viewport.style.backgroundColor = '';
-      this.viewport.className = 'inspire-viewport';
+      this.viewport.className = `inspire-viewport${isPlaying ? ' spatial-playing' : ''}`;
       this.artboardFrame.classList.remove('infinite-mode');
       this.artboard.style.width = `${this.doc.width}px`;
       this.artboard.style.height = `${this.doc.height}px`;
@@ -380,6 +414,9 @@ export class WorkspaceCanvas {
   createDomElement(el) {
     const card = document.createElement('div');
     card.className = `inspire-element el-type-${el.type}`;
+    if (el.type === 'text' && el.data?.boundary === 'box') {
+      card.classList.add('is-textbox');
+    }
     card.id = `dom_${el.id}`;
     card.dataset.id = el.id;
 
@@ -429,11 +466,8 @@ export class WorkspaceCanvas {
       case 'text': {
         const d = el.data || {};
         const isBox = d.boundary === 'box';
-        contentHtml = `
-          <div class="el-inner-text ${isBox ? 'text-box-mode' : 'text-point-mode'}" style="font-family:${d.fontFamily || 'Montserrat'}, sans-serif; font-size:${d.fontSize || 32}px; font-weight:${d.fontWeight || '700'}; color:${d.color || '#ffffff'}; text-align:${d.align || 'left'}; letter-spacing:${d.letterSpacing || 0}px; line-height:${d.lineHeight || 1.2}; ${isBox ? 'white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; width: 100%; height: 100%;' : 'white-space: pre; word-break: normal; width: 100%; height: 100%; overflow: visible;'}">
-            ${this.escapeHtml(d.text || '')}
-          </div>
-        `;
+        const textColor = d.color || ((this.doc?.background && isDarkColor(this.doc.background)) ? '#ffffff' : '#111827');
+        contentHtml = `<div class="el-inner-text ${isBox ? 'text-box-mode' : 'text-point-mode'}" style="font-family:${d.fontFamily || 'Montserrat'}, sans-serif; font-size:${d.fontSize || 32}px; font-weight:${d.fontWeight || '700'}; color:${textColor}; text-align:${d.align || 'left'}; letter-spacing:${d.letterSpacing || 0}px; line-height:${d.lineHeight || 1.2}; ${isBox ? 'white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; width: 100%; height: 100%;' : 'white-space: pre; word-break: normal; width: 100%; height: 100%; overflow: visible;'}">${this.escapeHtml(d.text || '')}</div>`;
         break;
       }
 
@@ -663,6 +697,9 @@ export class WorkspaceCanvas {
       const el = selected[0];
       const box = document.createElement('div');
       box.className = 'inspire-transform-box single-selection';
+      if (el.type === 'text' && el.data?.boundary === 'box') {
+        box.classList.add('is-textbox');
+      }
       box.dataset.id = el.id;
       box.style.left = `${el.x}px`;
       box.style.top = `${el.y}px`;
@@ -746,14 +783,25 @@ export class WorkspaceCanvas {
         this.panStartX = e.clientX - this.panX;
         this.panStartY = e.clientY - this.panY;
         vp.setPointerCapture(e.pointerId);
-        vp.classList.add('panning');
+        vp.classList.add('panning', 'is-dragging-pan');
         return;
       }
 
       if (e.button !== 0) return;
 
-      // Text tool interaction (Point Text on click, Textbox on drag)
+      // Text tool interaction (Point Text on click, Textbox on drag, or edit clicked text)
       if (this.activeTool === 'text') {
+        const clickedEl = e.target.closest('.inspire-element');
+        if (clickedEl) {
+          const id = clickedEl.dataset.id;
+          const el = this.board.getElementById(id);
+          if (el && el.type === 'text') {
+            this.board.selectElement(id);
+            this.openInlineEditor(el, clickedEl);
+            return;
+          }
+        }
+
         const canvasPt = this.screenToCanvas(e.clientX, e.clientY);
         this.isTextCreating = true;
         this.textCreateStart = canvasPt;
@@ -762,7 +810,7 @@ export class WorkspaceCanvas {
         this.marqueeBox.style.top = `${canvasPt.y}px`;
         this.marqueeBox.style.width = '0px';
         this.marqueeBox.style.height = '0px';
-        this.marqueeBox.style.border = '1px dashed #f59e0b';
+        this.marqueeBox.style.border = '1px dashed #000000';
         vp.setPointerCapture(e.pointerId);
         return;
       }
@@ -893,7 +941,7 @@ export class WorkspaceCanvas {
     const pointerUpHandler = (e) => {
       if (this.isPanning) {
         this.isPanning = false;
-        vp.classList.remove('panning');
+        vp.classList.remove('panning', 'is-dragging-pan');
       }
 
       if (this.isTransforming) {
@@ -914,23 +962,35 @@ export class WorkspaceCanvas {
         const threshold = 8; // Studio drag threshold
         const isBox = w >= threshold && h >= threshold;
 
+        const defaultTextColor = (this.doc?.background && isDarkColor(this.doc.background)) ? '#ffffff' : '#111827';
+
         let el;
         if (isBox) {
           const x = Math.min(start.x, cur.x);
           const y = Math.min(start.y, cur.y);
+          const boxW = Math.max(w, 80);
+          const boxH = Math.max(h, 40);
+          const loremText = getLoremIpsumForBox(boxW, boxH, {
+            fontFamily: 'Montserrat',
+            fontSize: 32,
+            fontWeight: '700',
+            lineHeight: 1.2
+          });
           el = this.board.addTextElement({
-            text: 'Type text here...',
+            text: loremText,
             x,
             y,
-            width: Math.max(w, 80),
-            height: Math.max(h, 40),
+            width: boxW,
+            height: boxH,
+            color: defaultTextColor,
             boundary: 'box'
           });
         } else {
           el = this.board.addTextElement({
-            text: 'Type text here...',
+            text: LOREM_IPSUM,
             x: start.x,
             y: start.y,
+            color: defaultTextColor,
             boundary: 'dynamic'
           });
         }
@@ -940,11 +1000,6 @@ export class WorkspaceCanvas {
         if (cardDom) {
           this.openInlineEditor(el, cardDom);
         }
-
-        // Switch tool back to select
-        this.activeTool = 'select';
-        document.querySelectorAll('#tools_left .tool_btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('tool_select')?.classList.add('active');
         return;
       }
 
@@ -1204,26 +1259,29 @@ export class WorkspaceCanvas {
     } else if (isText) {
       const d = el.data || {};
       const isBox = d.boundary === 'box';
+      const defaultTextColor = (this.doc?.background && isDarkColor(this.doc.background)) ? '#ffffff' : '#111827';
       textarea.classList.add('inspire-inline-text-editor');
+      if (isBox) textarea.classList.add('is-textbox');
       textarea.style.left = '0';
       textarea.style.top = '0';
       textarea.style.width = '100%';
       textarea.style.height = '100%';
-      textarea.style.background = 'rgba(26, 28, 35, 0.95)';
-      textarea.style.color = d.color || '#ffffff';
+      textarea.style.background = 'transparent';
+      textarea.style.color = d.color || defaultTextColor;
       textarea.style.fontFamily = `${d.fontFamily || 'Montserrat'}, sans-serif`;
       textarea.style.fontSize = `${d.fontSize || 32}px`;
       textarea.style.fontWeight = d.fontWeight || '700';
       textarea.style.textAlign = d.align || 'left';
       textarea.style.letterSpacing = `${d.letterSpacing || 0}px`;
       textarea.style.lineHeight = String(d.lineHeight || 1.2);
-      textarea.style.border = '2px solid #f59e0b';
-      textarea.style.borderRadius = '4px';
-      textarea.style.padding = '4px 6px';
+      textarea.style.border = isBox ? '1px dashed #000000' : '1px solid rgba(63, 143, 247, 0.5)';
+      textarea.style.borderRadius = '0';
+      textarea.style.padding = '0';
+      textarea.style.margin = '0';
       textarea.style.boxSizing = 'border-box';
       textarea.style.outline = 'none';
       textarea.style.resize = 'none';
-      textarea.style.overflow = 'hidden';
+      textarea.style.overflow = isBox ? 'hidden' : 'visible';
       textarea.style.whiteSpace = isBox ? 'pre-wrap' : 'pre';
       textarea.style.wordBreak = isBox ? 'break-word' : 'normal';
     } else {
@@ -1239,6 +1297,9 @@ export class WorkspaceCanvas {
       textarea.style.fontSize = '20px';
       textarea.style.fontFamily = 'inherit';
     }
+
+    const innerText = dom.querySelector('.el-inner-text');
+    if (innerText) innerText.style.visibility = 'hidden';
 
     dom.appendChild(textarea);
     textarea.focus();
@@ -1286,6 +1347,12 @@ export class WorkspaceCanvas {
           });
           el.width = measured.width;
           el.height = measured.height;
+          dom.style.width = `${el.width}px`;
+          dom.style.height = `${el.height}px`;
+        }
+        if (innerText) {
+          innerText.textContent = val;
+          innerText.style.visibility = '';
         }
         const inspContent = document.querySelector('#inp_text_content');
         if (inspContent && inspContent.value !== val) {
@@ -1552,4 +1619,3 @@ export class WorkspaceCanvas {
       .replace(/"/g, '&quot;');
   }
 }
-

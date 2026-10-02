@@ -102,6 +102,13 @@ export class InspectorPanel {
   }
 
   render() {
+    if (this.canvas.presentation?.editing) {
+      if (!this.content.contains(this.canvas.presentation.panel)) {
+        this.content.replaceChildren(this.canvas.presentation.panel);
+      }
+      return;
+    }
+
     // If the user is currently typing in an input or textarea inside this inspector,
     // do not destroy and rebuild the DOM under their cursor.
     if (document.activeElement && this.container?.contains(document.activeElement)) {

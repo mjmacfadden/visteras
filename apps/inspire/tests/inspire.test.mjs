@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { InspireDocument, VID_FORMAT_IDENTIFIER, VID_CURRENT_VERSION, CANVAS_PRESETS } from '../js/document.js';
 import { SwipeFileManager } from '../js/swipe-file.js';
-import { BoardComposer } from '../js/board-composer.js';
+import { BoardComposer, LOREM_IPSUM, LOREM_PARAGRAPH, getLoremIpsumForBox } from '../js/board-composer.js';
 import { MoodboardLayouts } from '../js/moodboard-layouts.js';
 import { hexToRgb, getNearestColorName } from '../js/color-extractor.js';
 
@@ -851,3 +851,99 @@ test('Point Text & Textbox Architecture: Editable point text with dynamic bounds
   assert.match(themeCss, /\.text-box-mode\s*\{/, 'Theme CSS must style .text-box-mode');
   assert.match(themeCss, /\.inspire-inline-text-editor\s*\{/, 'Theme CSS must style .inspire-inline-text-editor');
 });
+
+test('Spacebar Hand/Pan Tool Hot-Swap UX: Spacebar hot-swaps to hand tool and restores previous tool on release', () => {
+  const canvasJs = fs.readFileSync(path.join(inspireRoot, 'js/canvas.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
+  const themeCss = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
+
+  // 1. Verify setTool exists in canvas.js and toggles .tool-hand
+  assert.match(canvasJs, /setTool\s*\(\s*tool\s*\)\s*\{/, 'canvas.js must define setTool method');
+  assert.match(canvasJs, /classList\.toggle\(\s*['"]tool-hand['"]\s*,\s*tool\s*===\s*['"]hand['"]\s*\)/, 'setTool must toggle tool-hand class on viewport');
+
+  // 2. Verify CSS defines grab and grabbing cursors for tool-hand and panning
+  assert.match(themeCss, /\.inspire-viewport\.tool-hand[^{]*\{[^}]*cursor:\s*grab\s*!important/s, 'tool-hand must have grab cursor');
+  assert.match(themeCss, /\.inspire-viewport\.is-dragging-pan[^{]*\{[^}]*cursor:\s*grabbing\s*!important/s, 'is-dragging-pan must have grabbing cursor');
+  assert.match(themeCss, /\.inspire-viewport\.tool-hand\s+\.inspire-element[^{]*\{[^}]*cursor:\s*grab\s*!important/s, 'elements in tool-hand mode must have grab cursor');
+  assert.match(themeCss, /\.inspire-viewport\.is-dragging-pan\s+\.inspire-element[^{]*\{[^}]*cursor:\s*grabbing\s*!important/s, 'elements during pan drag must have grabbing cursor');
+
+  // 3. Verify Spacebar hot swap on keydown in app.js
+  assert.match(appJs, /spacePanPrevTool\s*=\s*null/, 'app.js must initialize spacePanPrevTool state');
+  assert.match(appJs, /\(e\.code\s*===\s*['"]Space['"]\s*\|\|\s*e\.key\s*===\s*['"]\s*['"]\)/, 'app.js must detect Spacebar key events');
+  assert.match(appJs, /handleToolAction\(\s*['"]hand['"]/, 'app.js must hot swap to hand tool on Space keydown');
+
+  // 4. Verify previous tool restoration on keyup and blur
+  assert.match(appJs, /window\.addEventListener\(\s*['"]keyup['"]/, 'app.js must listen for keyup to restore previous tool');
+  assert.match(appJs, /window\.addEventListener\(\s*['"]blur['"]/, 'app.js must listen for blur to restore previous tool if focus lost');
+
+  // 5. Verify text inputs and presentation playback are isolated
+  assert.match(appJs, /isTextInput\(target\)\s*\|\|\s*isTextInput\(activeEl\)/, 'Shortcuts must guard text inputs');
+  assert.match(appJs, /!this\.canvas\?\.presentation\?\.playing/, 'Spacebar hot swap must not interfere with presentation playback');
+});
+
+test('Studio-Style Text Tool UX: Pre-filled highlighted Lorem Ipsum, dashed textbox boundaries, and on-board editing', () => {
+  const composer = new BoardComposer();
+
+  // 1. Point text defaults to LOREM_IPSUM ('Lorem Ipsum') when no text is provided
+  const pointEl = composer.addTextElement({ x: 200, y: 150 });
+  assert.equal(pointEl.data.text, LOREM_IPSUM, 'Point text must default to Lorem Ipsum');
+  assert.equal(pointEl.data.boundary, 'dynamic', 'Point text must default to dynamic boundary');
+  assert.ok(pointEl.width > 0, 'Point text width must be measured');
+  assert.ok(pointEl.height > 0, 'Point text height must be measured');
+
+  // 2. Textbox with boundary 'box' auto-fills with Lorem Ipsum sized to the box
+  const smallBoxEl = composer.addTextElement({
+    x: 100,
+    y: 100,
+    width: 200,
+    height: 60,
+    boundary: 'box',
+    fontSize: 24
+  });
+  assert.ok(smallBoxEl.data.text.startsWith('Lorem ipsum'), 'Textbox text must start with Lorem ipsum');
+
+  const largeBoxEl = composer.addTextElement({
+    x: 100,
+    y: 100,
+    width: 800,
+    height: 400,
+    boundary: 'box',
+    fontSize: 18
+  });
+  assert.ok(largeBoxEl.data.text.length > smallBoxEl.data.text.length, 'Large textbox must fit more lorem ipsum text than small textbox');
+
+  // 3. getLoremIpsumForBox helper verification
+  const loremSample = getLoremIpsumForBox(300, 100, { fontSize: 20 });
+  assert.ok(typeof loremSample === 'string' && loremSample.length > 0, 'getLoremIpsumForBox must return non-empty string');
+  assert.ok(loremSample.startsWith('Lorem ipsum'), 'getLoremIpsumForBox output must start with Lorem ipsum');
+
+  // 4. Verify canvas.js creates textbox elements with .is-textbox and manages tool-text cursor
+  const canvasJs = fs.readFileSync(path.join(inspireRoot, 'js/canvas.js'), 'utf8');
+  assert.match(canvasJs, /el\.type === 'text' && el\.data\?\.boundary === 'box'/, 'canvas.js must check for textbox element');
+  assert.match(canvasJs, /card\.classList\.add\('is-textbox'\)/, 'canvas.js must apply is-textbox class to textbox elements');
+  assert.match(canvasJs, /classList\.toggle\('tool-text', tool === 'text'\)/, 'canvas.js must toggle tool-text class on viewport');
+  assert.match(canvasJs, /textarea\.select\(\)/, 'canvas.js openInlineEditor must select/highlight text for immediate editing');
+  assert.match(canvasJs, /textarea\.style\.background = 'transparent'/, 'canvas.js openInlineEditor must be transparent on board');
+  assert.match(canvasJs, /1px dashed #000000/, 'canvas.js openInlineEditor must display dashed black border for textboxes');
+  assert.match(canvasJs, /<div class="el-inner-text \$\{isBox \? 'text-box-mode' : 'text-point-mode'}"[^>]*>\$\{this\.escapeHtml\(d\.text/, 'Text element innerHTML must directly enclose text without leading whitespace/newlines');
+
+  // 5. Verify text tool does not forcefully switch back to 'select' after creating text
+  assert.match(canvasJs, /this\.activeTool === 'text'[\s\S]*?openInlineEditor/, 'canvas.js must open inline editor without resetting tool to select');
+
+  // 6. Verify clicking on existing text element with text tool active immediately opens inline editor
+  assert.match(canvasJs, /if\s*\(this\.activeTool === 'text'\)[\s\S]*?this\.openInlineEditor\(el,\s*clickedEl\)/, 'Clicking text element with text tool must immediately open editor');
+
+  // 7. Verify Enter key opens inline editor for selected text, sticky, and quote elements in app.js
+  const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
+  assert.match(appJs, /if\s*\(e\.key === 'Enter'\)[\s\S]*?openInlineEditor/, 'app.js Enter key shortcut must open inline editor');
+
+  // 8. Verify CSS rules for dashed black textboxes and text tool cursor
+  const themeCss = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
+  assert.match(themeCss, /\.inspire-viewport\.tool-text[^{]*\{[^}]*cursor:\s*text\s*!important/s, 'tool-text must have text cursor');
+  assert.match(themeCss, /\.inspire-element\.is-textbox[^{]*\{[^}]*border:\s*1px dashed rgba\(0,\s*0,\s*0/s, 'is-textbox must have dashed border');
+  assert.match(themeCss, /\.inspire-transform-box\.is-textbox[^{]*\{[^}]*border:\s*1px dashed #000000/s, 'transform-box for textbox must have dashed black border');
+  assert.match(themeCss, /\.inspire-inline-text-editor\.is-textbox[^{]*\{[^}]*border:\s*1px dashed #000000/s, 'inline editor for textbox must have dashed black border');
+  assert.match(themeCss, /\.inspire-element\.el-type-text\.selected[^{]*\{[^}]*box-shadow:\s*none/s, 'text element cards must not display card drop-shadow when selected');
+});
+
+

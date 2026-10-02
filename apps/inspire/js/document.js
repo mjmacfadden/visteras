@@ -28,7 +28,8 @@ export class InspireDocument {
     height = 1080,
     background = '#ffffff',
     bgPattern = 'blank', // 'blank' | 'dots' | 'grid'
-    gridSnap = true
+    gridSnap = true,
+    slides = []
   } = {}) {
     this.id = 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     this.title = title;
@@ -39,6 +40,7 @@ export class InspireDocument {
     this.background = background;
     this.bgPattern = bgPattern;
     this.gridSnap = gridSnap;
+    this.slides = (Array.isArray(slides) ? slides : []).filter(s => s && [s.x, s.y, s.width, s.height].every(Number.isFinite) && s.width > 0 && s.height > 0).map(s => ({ ...s, id: s.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'slide_' + Math.random().toString(36).substr(2, 9)) }));
     this.created = new Date().toISOString();
     this.modified = new Date().toISOString();
   }
@@ -62,6 +64,7 @@ export class InspireDocument {
         background: this.background,
         bgPattern: this.bgPattern,
         gridSnap: this.gridSnap,
+        slides: this.slides,
         elements: boardComposer ? boardComposer.elements : [],
         customLayoutSnapshot: boardComposer ? boardComposer.customLayoutSnapshot : null
       },

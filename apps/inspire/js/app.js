@@ -37,6 +37,7 @@ class InspireApp {
     this.activeTagFilter = null;
     this.searchQuery = '';
     this.internalClipboard = null;
+    this.spacePanPrevTool = null;
 
     this.init();
   }
@@ -101,7 +102,7 @@ class InspireApp {
     docInstance.id = docId;
     docInstance.title = resolvedTitle;
 
-    const boardInstance = new BoardComposer(data.board?.elements || [], data.board?.customLayoutSnapshot || null);
+    const boardInstance = new BoardComposer(data.board?.elements || [], data.board?.customLayoutSnapshot || null, docInstance);
     const swipeInstance = new SwipeFileManager(data.swipeFile || null);
 
     const model = {
@@ -455,6 +456,10 @@ class InspireApp {
       boardComposer: this.board,
       swipeFileManager: this.swipeFile,
       onSelectionChange: (selected) => {
+        if (selected.length && this.inspector) {
+          if (this.canvas.presentation.editing) this.handleToolAction('select', document.getElementById('tool_select'));
+          this.switchSidepanel('inspector');
+        }
         this.syncSelectionUI(selected);
         this.renderLayersList();
       },
@@ -507,6 +512,10 @@ class InspireApp {
   /* -------------------------------------------------------------------------- */
 
   initUI() {
+    this.canvas.presentation.onEditingChange = () => {
+      this.inspector.activeView = null;
+      this.switchSidepanel('inspector');
+    };
     // 3.1 Options Bar Controls
     const presetSelect = document.getElementById('opt_board_preset');
     if (presetSelect) {
@@ -675,57 +684,66 @@ class InspireApp {
   }
 
   handleToolAction(tool, btnEl) {
+    if (!btnEl && tool) {
+      btnEl = document.querySelector(`#tools_left .tool_btn[data-tool="${tool}"]`) || document.getElementById(`tool_${tool}`);
+    }
+    this.canvas.presentation.setEditing(tool === 'slide');
     document.querySelectorAll('#tools_left .tool_btn').forEach(b => b.classList.remove('active'));
 
     switch (tool) {
+      case 'slide':
+        this.canvas.setTool('slide');
+        btnEl?.classList.add('active');
+        break;
+
       case 'select':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         btnEl?.classList.add('active');
         break;
 
       case 'hand':
-        this.canvas.activeTool = 'hand';
+        this.canvas.setTool('hand');
         btnEl?.classList.add('active');
         break;
 
       case 'image':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.promptAddImage();
         break;
 
       case 'quote':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.promptAddQuote();
         break;
 
       case 'text':
-        this.canvas.activeTool = 'text';
+        this.canvas.setTool('text');
         btnEl?.classList.add('active');
         this.showToast('Text Tool: Click on canvas for Point Text, or drag to draw a Textbox', 'info');
         break;
 
       case 'sticky':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.addStickyNote();
         break;
 
       case 'swatch':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.promptAddSwatch();
         break;
 
       case 'shape':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.addShape('rect');
         break;
 
       case 'connector':
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         this.addConnector();
         break;
@@ -739,7 +757,7 @@ class InspireApp {
         break;
 
       default:
-        this.canvas.activeTool = 'select';
+        this.canvas.setTool('select');
         document.getElementById('tool_select')?.classList.add('active');
         break;
     }
@@ -1694,13 +1712,15 @@ class InspireApp {
         return;
       }
 
-      if (isCmdOrCtrl && e.key === 'z') {
+      if (isCmdOrCtrl && (e.key === 'y' || (e.key === 'z' && e.shiftKey) || (e.key === 'Z' && e.shiftKey))) {
         e.preventDefault();
-        if (e.shiftKey) {
-          this.board.redo();
-        } else {
-          this.board.undo();
-        }
+        this.board.redo();
+        return;
+      }
+
+      if (isCmdOrCtrl && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault();
+        this.board.undo();
         return;
       }
 
@@ -1735,6 +1755,13 @@ class InspireApp {
       }
 
       if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (this.canvas?.presentation?.editing && this.canvas.presentation.slides.length > 0) {
+          if (this.board.selectedIds.size === 0) {
+            e.preventDefault();
+            this.canvas.presentation.deleteSlide(this.canvas.presentation.index);
+            return;
+          }
+        }
         if (this.board.selectedIds.size > 0) {
           e.preventDefault();
           this.board.deleteSelected();
@@ -1745,6 +1772,18 @@ class InspireApp {
       if (e.key === 'Escape') {
         this.board.clearSelection();
         return;
+      }
+
+      if (e.key === 'Enter') {
+        const selected = this.board.getSelectedElements();
+        if (selected.length === 1 && (selected[0].type === 'text' || selected[0].type === 'sticky' || selected[0].type === 'quote' || (selected[0].type === 'image' && selected[0].data?.polaroid))) {
+          const dom = document.getElementById(`dom_${selected[0].id}`);
+          if (dom) {
+            e.preventDefault();
+            this.canvas.openInlineEditor(selected[0], dom);
+            return;
+          }
+        }
       }
 
       if (isCmdOrCtrl && (e.key === '=' || e.key === '+')) {
@@ -1763,6 +1802,20 @@ class InspireApp {
         e.preventDefault();
         this.canvas.fitToScreen();
         return;
+      }
+
+      // Spacebar: Hot swap to hand/pan tool
+      if ((e.code === 'Space' || e.key === ' ') && !isCmdOrCtrl && !e.altKey) {
+        if (!this.canvas?.presentation?.playing) {
+          e.preventDefault();
+          if (!e.repeat && this.spacePanPrevTool === null) {
+            this.spacePanPrevTool = this.canvas?.activeTool || 'select';
+            if (this.canvas?.activeTool !== 'hand') {
+              this.handleToolAction('hand', document.getElementById('tool_hand'));
+            }
+          }
+          return;
+        }
       }
 
       // Quick Tools Keys: V (Select), H (Hand), T (Text), Q (Quote), S (Sticky), C (Swatch), I (Image)
@@ -1793,6 +1846,32 @@ class InspireApp {
           this.canvas.renderElements();
           this.canvas.updateSelectionHandles();
         }
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if ((e.code === 'Space' || e.key === ' ') && this.spacePanPrevTool !== null) {
+        if (this.canvas?.isPanning) {
+          this.canvas.isPanning = false;
+          this.canvas.viewport?.classList.remove('panning', 'is-dragging-pan');
+        }
+        const prev = this.spacePanPrevTool;
+        this.spacePanPrevTool = null;
+        const targetBtn = document.querySelector(`#tools_left .tool_btn[data-tool="${prev}"]`) || document.getElementById(`tool_${prev}`) || document.getElementById('tool_select');
+        this.handleToolAction(prev, targetBtn);
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (this.spacePanPrevTool !== null) {
+        if (this.canvas?.isPanning) {
+          this.canvas.isPanning = false;
+          this.canvas.viewport?.classList.remove('panning', 'is-dragging-pan');
+        }
+        const prev = this.spacePanPrevTool;
+        this.spacePanPrevTool = null;
+        const targetBtn = document.querySelector(`#tools_left .tool_btn[data-tool="${prev}"]`) || document.getElementById(`tool_${prev}`) || document.getElementById('tool_select');
+        this.handleToolAction(prev, targetBtn);
       }
     });
   }
