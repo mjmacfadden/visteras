@@ -23,7 +23,7 @@ test('storage check: flags new writes, aliases and assignments; allows listed pr
 
 test('storage check: exclusions cover vendored/built code but not app sources', () => {
   for (const f of ['apps/vector/lib/paper-core.min.js', 'apps/studio/node_modules/x/index.js', 'apps/studio/dist/bundle.js',
-    'apps/studio/src/js/libs/hokusai/engine.js', 'apps/vector/iife-Editor.js', 'apps/inspire/tests/inspire.test.mjs']) assert.ok(isExcluded(f), f);
+    'apps/studio/src/js/libs/hokusai/engine.js', 'apps/inspire/tests/inspire.test.mjs']) assert.ok(isExcluded(f), f);
   for (const f of ['apps/publish/src/lib/settings.ts', 'apps/vector/Editor.js', 'apps/inspire/js/app.js']) assert.ok(!isExcluded(f), f);
 });
 

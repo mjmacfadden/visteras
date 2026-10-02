@@ -25,8 +25,9 @@ Browser checks performed against localhost:8081/vector:
 
 Remaining scope: SVGEdit still edits one path at a time; simultaneous anchor
 editing across separate objects and Illustrator's full live-shape/modifier
-behavior are not implemented by this change. The alternate iife-index.html
-entry point is not updated; the main Vector app loads Editor.js as an ES module.
+behavior are not implemented by this change. Vector loads Editor.js as an ES
+module from index.html (the old iife-index.html / iife-Editor.js entry point was
+removed).
 
 ## Shape Builder, Eyedropper, Offset Path, Align (app/vector/feature/various)
 

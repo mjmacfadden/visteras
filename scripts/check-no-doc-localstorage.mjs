@@ -9,7 +9,7 @@
  *
  * Scope: git-tracked app sources under apps/, packages/, src/, functions/.
  * Excluded: node_modules, dist, archived, vendor, apps/<app>/lib (vendored), any /libs/,
- * *.min.js, apps/vector/iife-Editor.js (legacy generated bundle, not loaded), tests.
+ * *.min.js, tests.
  *
  *   node scripts/check-no-doc-localstorage.mjs          check (exit 1 on violations)
  *   node scripts/check-no-doc-localstorage.mjs --list   print every storage write found
@@ -87,7 +87,6 @@ export function isExcluded(file) {
     || /^apps\/[^/]+\/lib\//.test(file)
     || /\/libs\//.test(file)
     || /\.min\.js$/.test(file)
-    || /(^|\/)iife-Editor\.js$/.test(file)
     || /(^|\/)tests?\//.test(file)
     || /\.test\.[cm]?[jt]s$/.test(file);
 }
