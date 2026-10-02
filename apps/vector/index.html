@@ -20,7 +20,7 @@
 
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css?v=path-text-transforms-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-document-shell.css?v=hygiene-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-document-shell.css?v=unsaved-1" rel="stylesheet" media="all">
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
@@ -328,6 +328,9 @@
       noDefaultExtensions: true,
       extensions: VECTOR_EXTENSIONS,
       noStorageOnLoad: true,
+      // The document shell owns the leave warning (dirty tabs only); SVG-Edit's
+      // undo-stack-based beforeunload kept firing after a .vvd save.
+      no_save_warning: true,
       showRulers: true,
       canvas_expansion: 3,
       dimensions: [800, 600],

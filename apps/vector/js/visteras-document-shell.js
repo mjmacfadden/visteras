@@ -6,7 +6,8 @@
  * ruler right-click unit menu (Studio parity), unit switching.
  *
  * In-memory documents only (v1). Does not import Studio modules.
- * Leave/refresh uses Studio-style beforeunload when any tab is dirty.
+ * Leave/refresh uses Studio-style beforeunload when any tab is dirty; closing a
+ * dirty tab asks with the Unsaved Changes dialog (visteras-unsaved-changes.js).
  */
 
 import {
@@ -20,6 +21,7 @@ import {
   formatPresetDimensions,
   formatSize,
 } from './visteras-document-presets.js';
+import { confirmCloseIfDirty, handleBeforeUnload } from './visteras-unsaved-changes.js';
 
 const RECENT_KEY = 'visteras_vector_recent_document_presets';
 const LAST_PRESET_KEY = 'visteras_vector_last_new_preset';
@@ -348,18 +350,12 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   }
 
   /**
-   * Studio-parity leave/refresh warning.
-   * SVG-Edit's built-in beforeunload is often disabled by ext-storage
-   * (no_save_warning) when prefsAndContent is auto-persisted; Mike wants
-   * an explicit dirty-document warning instead of relying on that restore.
+   * Studio-parity leave/refresh warning: prompt only when any tab is dirty.
+   * This is the single leave warning — SVG-Edit's undo-stack-based one is off
+   * (no_save_warning: true in index.html) and ext-storage autosave is gone.
    */
   function bindLeaveWarning() {
-    window.addEventListener('beforeunload', (e) => {
-      if (!hasAnyDirty()) return undefined;
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    });
+    window.addEventListener('beforeunload', (e) => handleBeforeUnload(e, state.documents));
   }
 
   // ----- tabs -----
@@ -430,14 +426,15 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     updateStatusBar();
   }
 
-  function closeDocument(id) {
-    const idx = state.documents.findIndex((d) => d.id === id);
+  async function closeDocument(id) {
+    let idx = state.documents.findIndex((d) => d.id === id);
     if (idx < 0) return;
     const doc = state.documents[idx];
-    if (doc.dirty) {
-      const ok = window.confirm(`Close "${doc.title}"? Unsaved changes will be lost.`);
-      if (!ok) return;
-    }
+    // Studio's Unsaved Changes dialog (Cancel focused) for dirty tabs only.
+    if (!(await confirmCloseIfDirty(doc))) return;
+    // The tab list may have changed while the dialog was open.
+    idx = state.documents.indexOf(doc);
+    if (idx < 0) return;
     if (state.documents.length === 1) {
       const { w, h } = computePaddedWorkspaceSize();
       state.suppressDirty = true;
