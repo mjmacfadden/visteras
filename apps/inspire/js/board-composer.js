@@ -107,6 +107,12 @@ export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 
   };
 }
 
+/** Embedded images large enough to be worth de-duplicating across undo snapshots. */
+export const ASSET_MIN_LENGTH = 256;
+export function isEmbeddedAsset(value) {
+  return typeof value === 'string' && value.length >= ASSET_MIN_LENGTH && value.startsWith('data:');
+}
+
 export class BoardComposer {
   constructor(initialElements = [], customLayoutSnapshot = null, docOrSlides = null) {
     this.elements = initialElements ? [...initialElements] : [];
@@ -117,6 +123,10 @@ export class BoardComposer {
     this.historyIndex = -1;
     this.maxHistory = 50;
     this.listeners = new Set();
+    // Undo asset store: each embedded image (data: URL) is kept once and snapshots hold a
+    // small { $asset: id } reference instead of a full copy per undo step.
+    this.assetIdByData = new Map();
+    this.assetDataById = new Map();
 
     this.doc = null;
     this._slides = [];
@@ -224,7 +234,7 @@ export class BoardComposer {
     const snapshot = JSON.stringify({
       elements: this.elements,
       slides: this.getSlidesSnapshot()
-    });
+    }, (key, value) => (isEmbeddedAsset(value) ? { $asset: this.internAsset(value) } : value));
     this.history.push({ snapshot, label });
     if (this.history.length > this.maxHistory) {
       this.history.shift();
@@ -234,9 +244,27 @@ export class BoardComposer {
     this.notify({ type: 'history', label });
   }
 
+  internAsset(dataUrl) {
+    let id = this.assetIdByData.get(dataUrl);
+    if (!id) {
+      id = `a${this.assetIdByData.size + 1}`;
+      this.assetIdByData.set(dataUrl, id);
+      this.assetDataById.set(id, dataUrl);
+    }
+    return id;
+  }
+
+  resolveAssetRef(value) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && typeof value.$asset === 'string' && Object.keys(value).length === 1) {
+      const dataUrl = this.assetDataById.get(value.$asset);
+      if (dataUrl !== undefined) return dataUrl;
+    }
+    return value;
+  }
+
   restoreSnapshot(snapshotStr) {
     try {
-      const data = JSON.parse(snapshotStr);
+      const data = JSON.parse(snapshotStr, (key, value) => this.resolveAssetRef(value));
       if (Array.isArray(data)) {
         this.elements = data;
       } else if (data && typeof data === 'object') {

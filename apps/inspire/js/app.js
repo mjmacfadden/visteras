@@ -16,6 +16,9 @@ import { BoardComposer } from './board-composer.js';
 import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
+import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
+import { resolveOpenTarget } from './open-match.js';
+import { exportRegion, computeSafeExportScale, prepareExportClone, EXPORT_DEFAULT_SCALE } from './export-utils.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -118,6 +121,7 @@ class InspireApp {
     docInstance.id = docId;
     docInstance.title = resolvedTitle;
     docInstance.fileName = resolvedFileName;
+    applyFileMeta(docInstance, data.meta); // keep the board's original created date
 
     const boardInstance = new BoardComposer(data.board?.elements || [], data.board?.customLayoutSnapshot || null, docInstance);
     const swipeInstance = new SwipeFileManager(data.swipeFile || null);
@@ -273,12 +277,17 @@ class InspireApp {
       return;
     }
 
-    // Check if doc with this fileName or title is already open
-    const existing = this.documents.find(d => d.fileName === resolvedFileName || d.title === title || d.id === docData.meta?.id);
-    if (existing) {
-      this.activateDocument(existing.id);
-      this.showToast(`Switched to open document "${existing.fileName || existing.title}"`, 'info');
+    // Same name/title/id already open: switch only if the content is identical; otherwise open a
+    // new tab (Studio always opens into a new tab), so a different file is never hidden.
+    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title });
+    if (target.action === 'switch') {
+      this.activateDocument(target.model.id);
+      this.showToast(`"${target.model.fileName || target.model.title}" is already open`, 'info');
       return;
+    }
+    // Tab ids must stay unique when the same board (same meta.id) is opened again
+    if (docData.meta?.id && this.documents.some(d => d.id === docData.meta.id)) {
+      docData = { ...docData, meta: { ...docData.meta, id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5) } };
     }
 
     // Open as new tab
@@ -291,7 +300,9 @@ class InspireApp {
 
     this.documents.push(newModel);
     this.activateDocument(newModel.id);
-    this.showToast(`Opened "${resolvedFileName}" in new tab`, 'success');
+    this.showToast(target.sameNameOpen
+      ? `Opened "${resolvedFileName}" in a new tab (an open tab with that name has different content)`
+      : `Opened "${resolvedFileName}" in new tab`, 'success');
   }
 
   initUnsavedChangesGuard() {
@@ -416,9 +427,7 @@ class InspireApp {
           const commitRename = () => {
             let val = input.value.trim();
             if (val && val !== currentFileName) {
-              if (!val.toLowerCase().endsWith('.vid')) {
-                val = `${val}.vid`;
-              }
+              val = safeVidFileName(val);
               docModel.fileName = val;
               const cleanTitle = val.replace(/\.vid$/i, '');
               docModel.title = cleanTitle;
@@ -903,16 +912,22 @@ class InspireApp {
       const active = this.getActiveDocument();
       if (!active) return;
 
-      const fileName = active.fileName || (active.doc.title.endsWith('.vid') ? active.doc.title : `${active.doc.title}.vid`);
+      // The tab name and the downloaded file name are always the same string
+      const fileName = safeVidFileName(active.fileName || active.doc.title);
       if (typeof active.doc.downloadVidFile === 'function') {
         active.doc.downloadVidFile(active.board, active.swipeFile, fileName);
       } else {
         const data = active.doc.serialize(active.board, active.swipeFile);
         InspireDocument.downloadAsFile(data, fileName);
       }
+      const savedTitle = fileName.replace(/\.vid$/i, '');
       active.fileName = fileName;
+      active.title = savedTitle;
+      active.doc.fileName = fileName;
+      active.doc.title = savedTitle;
       markSaved(active);
       this.renderDocumentTabs();
+      if (active.id === this.activeDocId) this.canvas?.renderArtboardMeta();
       this.showToast(`Saved "${fileName}"`, 'success');
     } catch (err) {
       this.showToast(`Export failed: ${err.message}`, 'error');
@@ -922,6 +937,15 @@ class InspireApp {
   async exportHighResImage(format = 'png') {
     const artboard = document.getElementById('inspire_artboard');
     if (!artboard) return;
+
+    // Fixed: the artboard. Infinite: bounds of all elements + padding (the artboard is 0×0 there).
+    const region = exportRegion(this.doc, this.board.elements);
+    if (!region) {
+      this.showToast('Nothing to export yet. Add something to the board first.', 'info');
+      return;
+    }
+    // Stay inside browser canvas limits (Safari ~16.7M px); downscale instead of failing
+    const sizing = computeSafeExportScale(region.width, region.height, EXPORT_DEFAULT_SCALE);
 
     this.showToast('Rendering high-resolution moodboard...', 'info');
 
@@ -934,21 +958,40 @@ class InspireApp {
       try {
         const canvas = await window.html2canvas(artboard, {
           backgroundColor: this.doc.background,
-          scale: 2, // 2x retina clarity
+          scale: sizing.scale,
+          width: region.width,
+          height: region.height,
           useCORS: true,
-          logging: false
+          logging: false,
+          onclone: (clonedDoc) => prepareExportClone(clonedDoc, {
+            region,
+            mode: this.doc.mode,
+            background: this.doc.background,
+            pattern: this.doc.bgPattern
+          })
         });
+        if (!canvas || !canvas.width || !canvas.height) throw new Error('the rendered image was empty');
 
         const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
         const quality = format === 'jpg' ? 0.92 : undefined;
-        const dataUrl = canvas.toDataURL(mime, quality);
+        const blob = await new Promise((resolve) => {
+          try { canvas.toBlob(resolve, mime, quality); } catch (_) { resolve(null); }
+        });
+        if (!blob) throw new Error('the browser could not encode the image');
+        const url = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `${this.doc.title.replace(/[^a-z0-9_-]/gi, '_')}.${format}`;
+        a.href = url;
+        a.download = `${safeFileBase(this.doc.title)}.${format}`;
+        document.body.appendChild(a);
         a.click();
+        setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1000);
 
-        this.showToast(`Exported ${format.toUpperCase()} moodboard!`, 'success');
+        this.lastExport = { width: canvas.width, height: canvas.height, scale: sizing.scale, reduced: sizing.reduced, region };
+        const sizeNote = `${canvas.width} × ${canvas.height}px`;
+        this.showToast(sizing.reduced
+          ? `Exported ${format.toUpperCase()} at ${sizeNote} (scale reduced to ${sizing.scale}× to stay within browser image limits)`
+          : `Exported ${format.toUpperCase()} moodboard (${sizeNote})`, 'success', sizing.reduced ? 6000 : 3000);
       } catch (err) {
         console.error('[Export Image Error]', err);
         this.showToast(`Failed to render image: ${err.message}`, 'error');
@@ -2162,7 +2205,7 @@ class InspireApp {
     }
 
     if (zoomEl) {
-      const z = extra.zoom ?? Math.round(this.canvas.zoom * 100);
+      const z = zoomPercent(extra, this.canvas);
       zoomEl.textContent = `${z}%`;
     }
 

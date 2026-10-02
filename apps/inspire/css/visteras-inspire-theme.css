@@ -647,6 +647,7 @@ html {
 .inspire-artboard-frame {
   position: relative;
   display: inline-block;
+  vertical-align: top; /* keep the artboard at world (0,0) regardless of line-box baseline */
 }
 
 .inspire-artboard-header {
@@ -676,7 +677,8 @@ html {
   position: relative;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.15);
   border-radius: 4px;
-  transition: width 0.2s, height 0.2s;
+  /* Width/height are never animated; the artboard's size drives hit-testing and snapping,
+     so it must be correct the instant the mode or preset changes. */
 }
 
 .inspire-artboard-frame.infinite-mode .inspire-artboard-header {

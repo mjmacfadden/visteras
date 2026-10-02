@@ -4,6 +4,8 @@
  * Documents are saved only as .vid files (like Studio's .vsd); nothing is autosaved to browser storage.
  */
 
+import { safeVidFileName } from './inspire-utils.js';
+
 export const VID_FORMAT_IDENTIFIER = 'visteras-inspire';
 export const VID_CURRENT_VERSION = '1.0.0';
 
@@ -86,7 +88,8 @@ export class InspireDocument {
 
   static downloadAsFile(docData, filename = null) {
     const title = docData?.meta?.title || 'inspiration_board';
-    const cleanName = (filename || title).replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_') + '.vid';
+    // Same name the tab shows (spaces kept, only illegal characters replaced), like Studio
+    const cleanName = safeVidFileName(filename || title);
     const jsonStr = JSON.stringify(docData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -100,6 +103,7 @@ export class InspireDocument {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 100);
+    return cleanName;
   }
 
   static async parseVidFile(file) {
