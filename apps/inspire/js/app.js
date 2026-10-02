@@ -18,6 +18,7 @@ import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
+import { exportRegion, computeSafeExportScale, prepareExportClone, EXPORT_DEFAULT_SCALE } from './export-utils.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -937,6 +938,15 @@ class InspireApp {
     const artboard = document.getElementById('inspire_artboard');
     if (!artboard) return;
 
+    // Fixed: the artboard. Infinite: bounds of all elements + padding (the artboard is 0×0 there).
+    const region = exportRegion(this.doc, this.board.elements);
+    if (!region) {
+      this.showToast('Nothing to export yet. Add something to the board first.', 'info');
+      return;
+    }
+    // Stay inside browser canvas limits (Safari ~16.7M px); downscale instead of failing
+    const sizing = computeSafeExportScale(region.width, region.height, EXPORT_DEFAULT_SCALE);
+
     this.showToast('Rendering high-resolution moodboard...', 'info');
 
     // Deselect elements temporarily for clean output
@@ -948,21 +958,40 @@ class InspireApp {
       try {
         const canvas = await window.html2canvas(artboard, {
           backgroundColor: this.doc.background,
-          scale: 2, // 2x retina clarity
+          scale: sizing.scale,
+          width: region.width,
+          height: region.height,
           useCORS: true,
-          logging: false
+          logging: false,
+          onclone: (clonedDoc) => prepareExportClone(clonedDoc, {
+            region,
+            mode: this.doc.mode,
+            background: this.doc.background,
+            pattern: this.doc.bgPattern
+          })
         });
+        if (!canvas || !canvas.width || !canvas.height) throw new Error('the rendered image was empty');
 
         const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
         const quality = format === 'jpg' ? 0.92 : undefined;
-        const dataUrl = canvas.toDataURL(mime, quality);
+        const blob = await new Promise((resolve) => {
+          try { canvas.toBlob(resolve, mime, quality); } catch (_) { resolve(null); }
+        });
+        if (!blob) throw new Error('the browser could not encode the image');
+        const url = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
-        a.href = dataUrl;
+        a.href = url;
         a.download = `${safeFileBase(this.doc.title)}.${format}`;
+        document.body.appendChild(a);
         a.click();
+        setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 1000);
 
-        this.showToast(`Exported ${format.toUpperCase()} moodboard!`, 'success');
+        this.lastExport = { width: canvas.width, height: canvas.height, scale: sizing.scale, reduced: sizing.reduced, region };
+        const sizeNote = `${canvas.width} × ${canvas.height}px`;
+        this.showToast(sizing.reduced
+          ? `Exported ${format.toUpperCase()} at ${sizeNote} (scale reduced to ${sizing.scale}× to stay within browser image limits)`
+          : `Exported ${format.toUpperCase()} moodboard (${sizeNote})`, 'success', sizing.reduced ? 6000 : 3000);
       } catch (err) {
         console.error('[Export Image Error]', err);
         this.showToast(`Failed to render image: ${err.message}`, 'error');

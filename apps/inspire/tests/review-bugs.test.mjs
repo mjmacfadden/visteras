@@ -157,3 +157,66 @@ test('Bug 5: undo snapshots store each embedded image once and undo/redo restore
   assert.equal(t.data.text, 'data:short');
   assert.deepEqual(t.data.meta, { $asset: 'zzz', extra: 1 });
 });
+
+test('Bug 1: Infinite-mode export uses the content bounds of all elements plus padding', async () => {
+  const ex = await import('../js/export-utils.js');
+  const els = [
+    { x: -300, y: -120, width: 200, height: 100 },
+    { x: 500, y: 400, width: 100, height: 50 },
+    { x: 0, y: 0, width: 100, height: 100, rotation: 45 }
+  ];
+  const b = ex.computeContentBounds(els, 40);
+  assert.deepEqual(b, { x: -340, y: -160, width: 980, height: 650 });
+  assert.equal(ex.computeContentBounds([], 40), null);
+  assert.deepEqual(ex.exportRegion({ mode: 'infinite' }, els), ex.computeContentBounds(els));
+  assert.equal(ex.exportRegion({ mode: 'infinite' }, []), null, 'empty infinite board: nothing to export');
+  assert.deepEqual(ex.exportRegion({ mode: 'fixed', width: 1920, height: 1080 }, els), { x: 0, y: 0, width: 1920, height: 1080 });
+
+  // onclone lays the 0×0 infinite artboard out as the region, shifted, with the board background
+  const mk = () => ({ style: {}, className: '' });
+  const world = mk(), viewport = mk(), artboard = mk(), elLayer = mk(), connLayer = mk(), svg = mk(), guides = mk();
+  artboard.className = 'inspire-artboard pattern-blank mode-infinite';
+  artboard.querySelectorAll = (sel) => (sel.includes('svg') ? [svg] : [elLayer, connLayer]);
+  const doc = {
+    querySelector: (s) => ({ '.inspire-canvas-world': world, '.inspire-viewport': viewport }[s] || null),
+    querySelectorAll: (s) => (s === '.inspire-guides-layer' ? [guides] : []),
+    getElementById: () => artboard
+  };
+  ex.prepareExportClone(doc, { region: { x: -340, y: -160, width: 980, height: 650 }, mode: 'infinite', background: '#123456', pattern: 'dots' });
+  assert.equal(world.style.transform, 'none');
+  assert.equal(artboard.style.width, '980px');
+  assert.equal(artboard.style.height, '650px');
+  assert.equal(artboard.style.backgroundColor, '#123456');
+  assert.doesNotMatch(artboard.className, /mode-infinite/, 'drop the class that forces a transparent background');
+  assert.match(artboard.style.backgroundImage, /radial-gradient/, 'pattern carried into the export');
+  assert.equal(elLayer.style.transform, 'translate(340px, 160px)');
+  assert.equal(connLayer.style.transform, 'translate(340px, 160px)');
+  assert.equal(guides.style.display, 'none');
+
+  const app = read('js/app.js');
+  assert.match(app, /const region = exportRegion\(this\.doc, this\.board\.elements\);/);
+  assert.match(app, /onclone: \(clonedDoc\) => prepareExportClone\(clonedDoc,/);
+  assert.match(app, /Nothing to export yet/);
+});
+
+test('Bug 2: export scale is clamped to safe canvas limits and reports when reduced', async () => {
+  const ex = await import('../js/export-utils.js');
+  const within = (r) => r.width <= 8192 && r.height <= 8192 && r.width * r.height <= 16_777_216;
+  // 16:9 board: full 2x fits
+  assert.deepEqual(ex.computeSafeExportScale(1920, 1080), { scale: 2, reduced: false, width: 3840, height: 2160 });
+  // US Letter print at 2x would be 33.7M px -> reduced
+  const letter = ex.computeSafeExportScale(3300, 2550);
+  assert.ok(letter.reduced && within(letter) && letter.scale > 1.4, JSON.stringify(letter));
+  // Poster 18x24 (5400x7200) at 2x = 10800x14400 -> capped
+  const poster = ex.computeSafeExportScale(5400, 7200);
+  assert.ok(poster.reduced && within(poster), JSON.stringify(poster));
+  assert.ok(poster.scale > 0.6 && poster.width > 3000, 'downscale gracefully, not to a thumbnail');
+  // Very wide content hits the per-side limit first
+  const wide = ex.computeSafeExportScale(20000, 300);
+  assert.ok(wide.width <= 8192 && wide.reduced);
+  // Every preset stays within limits
+  const { CANVAS_PRESETS } = await import('../js/document.js');
+  for (const p of Object.values(CANVAS_PRESETS)) assert.ok(within(ex.computeSafeExportScale(p.width, p.height)), p.name);
+  assert.match(read('js/app.js'), /scale reduced to \$\{sizing\.scale\}×/);
+  assert.doesNotMatch(read('js/app.js'), /scale: 2, \/\/ 2x retina clarity/);
+});
