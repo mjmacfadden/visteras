@@ -220,27 +220,32 @@ export class InspectorPanel {
 
     this.content.querySelector('#btn_mode_fixed')?.addEventListener('click', () => {
       this.canvas.setMode('fixed');
+      this.onDocChange?.();
       this.render();
     });
 
     this.content.querySelector('#btn_mode_infinite')?.addEventListener('click', () => {
       this.canvas.setMode('infinite');
+      this.onDocChange?.();
       this.render();
     });
 
     this.content.querySelector('#inp_board_preset')?.addEventListener('change', (e) => {
       this.canvas.setPreset(e.target.value);
+      this.onDocChange?.();
       this.render();
     });
 
     this.content.querySelector('#inp_board_w')?.addEventListener('change', (e) => {
       this.doc.width = parseInt(e.target.value, 10) || 1920;
       this.canvas.renderArtboardMeta();
+      this.onDocChange?.();
     });
 
     this.content.querySelector('#inp_board_h')?.addEventListener('change', (e) => {
       this.doc.height = parseInt(e.target.value, 10) || 1080;
       this.canvas.renderArtboardMeta();
+      this.onDocChange?.();
     });
 
     const bgPicker = this.content.querySelector('#inp_board_bg');
@@ -249,20 +254,24 @@ export class InspectorPanel {
       this.doc.background = e.target.value;
       if (bgHex) bgHex.value = e.target.value;
       this.canvas.renderArtboardMeta();
+      this.onDocChange?.();
     });
     bgHex?.addEventListener('change', (e) => {
       this.doc.background = e.target.value;
       if (bgPicker) bgPicker.value = e.target.value;
       this.canvas.renderArtboardMeta();
+      this.onDocChange?.();
     });
 
     this.content.querySelector('#inp_board_pattern')?.addEventListener('change', (e) => {
       this.doc.bgPattern = e.target.value;
       this.canvas.renderArtboardMeta();
+      this.onDocChange?.();
     });
 
     this.content.querySelector('#chk_grid_snap')?.addEventListener('change', (e) => {
       this.doc.gridSnap = e.target.checked;
+      this.onDocChange?.();
     });
 
     this.content.querySelector('#action_fit_view')?.addEventListener('click', () => {

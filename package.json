@@ -15,7 +15,7 @@
     "build:collage": "node -e \"console.log('Collage is a static app under apps/collage; nothing to compile.')\"",
     "dev:inspire": "npx --yes serve apps/inspire -p 5175",
     "build:inspire": "node -e \"console.log('Inspire is a static app under apps/inspire; nothing to compile.')\"",
-    "test:inspire": "node --test apps/inspire/tests/inspire.test.mjs apps/inspire/tests/presentation.test.mjs",
+    "test:inspire": "node --test apps/inspire/tests/inspire.test.mjs apps/inspire/tests/presentation.test.mjs apps/inspire/tests/unsaved-changes.test.mjs apps/inspire/tests/grid-config.test.mjs",
     "build:site": "bash scripts/build-site.sh",
     "build:fonts": "npm run build:vector --prefix packages/fonts"
   },

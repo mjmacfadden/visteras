@@ -7,6 +7,7 @@ import { CANVAS_PRESETS } from './document.js';
 import { measureTextBounds, LOREM_IPSUM, getLoremIpsumForBox } from './board-composer.js';
 import { isDarkColor } from './color-extractor.js';
 import { SpatialPresentation } from './presentation.js';
+import { gridStylesForMode } from './grid-config.js';
 
 export class WorkspaceCanvas {
   constructor({
@@ -219,6 +220,15 @@ export class WorkspaceCanvas {
       this.artboardDims.textContent = `${this.doc.width} × ${this.doc.height} px`;
       this.artboard.className = `inspire-artboard pattern-${pattern}`;
     }
+    this.applyGridBackground();
+  }
+
+  // Both modes read GRID_CONFIG (grid-config.js) so spacing and dot size match at any zoom
+  applyGridBackground() {
+    if (!this.artboard?.style || !this.viewport?.style) return;
+    const styles = gridStylesForMode(this.doc.mode, this.doc.bgPattern || 'blank', this.zoom, this.panX, this.panY);
+    Object.assign(this.artboard.style, styles.artboard);
+    Object.assign(this.viewport.style, styles.viewport);
   }
 
   screenToCanvas(clientX, clientY) {
@@ -383,9 +393,7 @@ export class WorkspaceCanvas {
     this.world.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
 
     if (this.doc.mode === 'infinite' && this.viewport) {
-      const scaledSize = 24 * this.zoom;
-      this.viewport.style.backgroundPosition = `${this.panX}px ${this.panY}px`;
-      this.viewport.style.backgroundSize = `${scaledSize}px ${scaledSize}px`;
+      this.applyGridBackground();
     }
   }
 

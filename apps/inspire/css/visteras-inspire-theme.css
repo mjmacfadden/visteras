@@ -696,18 +696,8 @@ html {
   background-color: #ffffff;
 }
 
-.inspire-viewport.mode-infinite.pattern-dots,
-.inspire-artboard.pattern-dots {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.12) 1.5px, transparent 1.5px);
-  background-size: 24px 24px;
-}
-
-.inspire-viewport.mode-infinite.pattern-grid,
-.inspire-artboard.pattern-grid {
-  background-image: linear-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0, 0, 0, 0.06) 1px, transparent 1px);
-  background-size: 24px 24px;
-}
+/* Dots / blueprint grid are painted inline from js/grid-config.js (GRID_CONFIG),
+   shared by fixed and infinite modes so spacing and dot size always match. */
 
 .inspire-viewport.mode-infinite.pattern-blank,
 .inspire-artboard.pattern-blank {

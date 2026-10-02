@@ -7,8 +7,6 @@
 
 import {
   InspireDocument,
-  LOCAL_STORAGE_KEY,
-  LOCAL_STORAGE_DOCS_KEY,
   CANVAS_PRESETS,
   VID_FORMAT_IDENTIFIER,
   VID_CURRENT_VERSION
@@ -18,6 +16,13 @@ import { BoardComposer } from './board-composer.js';
 import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
+import {
+  clearStaleDocumentStorage,
+  trackDirty,
+  markSaved,
+  handleBeforeUnload,
+  confirmCloseIfDirty
+} from './unsaved-changes.js';
 
 class InspireApp {
   constructor() {
@@ -53,6 +58,7 @@ class InspireApp {
     this.initKeyboardShortcuts();
     this.initClipboardBridge();
     this.initWindowDropZone();
+    this.initUnsavedChangesGuard();
     this.syncOptionsBar();
     this.updateStatus();
 
@@ -127,39 +133,28 @@ class InspireApp {
       viewportState: data.viewportState || null
     };
 
-    // Track dirty state on modifications
-    boardInstance.subscribe(() => {
-      model.isDirty = true;
-      this.renderDocumentTabs();
-      this.updateStatus();
-    });
-
-    swipeInstance.subscribe(() => {
-      model.isDirty = true;
-      if (model.id === this.activeDocId) {
-        this.renderLibraryGrid();
-        this.renderLibraryTags();
+    // Track dirty state on real edits (selection-only changes don't count), like Studio's is_dirty
+    trackDirty(model, {
+      onChange: () => {
+        if (model.id === this.activeDocId) {
+          this.renderLibraryGrid();
+          this.renderLibraryTags();
+        }
+        this.renderDocumentTabs();
+        this.updateStatus();
       }
-      this.renderDocumentTabs();
-      this.updateStatus();
     });
 
     return model;
   }
 
   initDocuments() {
-    // Clear any stale persistent storage keys so old boards never linger
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(LOCAL_STORAGE_DOCS_KEY);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-      }
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.removeItem('visteras_inspire_session_state');
-      }
-    } catch (_) {
-      // Ignore storage errors
-    }
+    // Documents are saved only as .vid files. Clear document snapshots left by the old autosave.
+    let local = null;
+    let session = null;
+    try { local = typeof localStorage !== 'undefined' ? localStorage : null; } catch (_) { /* storage disabled */ }
+    try { session = typeof sessionStorage !== 'undefined' ? sessionStorage : null; } catch (_) { /* storage disabled */ }
+    clearStaleDocumentStorage(local, session);
 
     // Always start with a clean blank document (empty board, empty swipe file, white background)
     this.autoDocCounter = 2;
@@ -299,18 +294,28 @@ class InspireApp {
     this.showToast(`Opened "${resolvedFileName}" in new tab`, 'success');
   }
 
-  closeDocument(id) {
+  initUnsavedChangesGuard() {
+    // Studio parity: warn before leaving the page only when a document has unsaved changes
+    window.addEventListener('beforeunload', (e) => handleBeforeUnload(e, this.documents));
+  }
+
+  async closeDocument(id) {
+    if (this.closingDocId) return;
+    const docToClose = this.documents.find(d => d.id === id);
+    if (!docToClose) return;
+
+    // Confirm close if unsaved changes (Studio-style "Unsaved Changes" dialog, Cancel focused)
+    this.closingDocId = id;
+    let ok;
+    try {
+      ok = await confirmCloseIfDirty(docToClose);
+    } finally {
+      this.closingDocId = null;
+    }
+    if (!ok) return;
+
     const idx = this.documents.findIndex(d => d.id === id);
     if (idx === -1) return;
-
-    const docToClose = this.documents[idx];
-
-    // Confirm close if unsaved changes
-    if (docToClose.isDirty) {
-      const confirmClose = confirm(`"${docToClose.fileName || docToClose.title}" has unsaved changes. Close anyway?`);
-      if (!confirmClose) return;
-    }
-
     this.documents.splice(idx, 1);
 
     // If no documents left, automatically create a fresh one
@@ -358,7 +363,7 @@ class InspireApp {
              data-id="${d.id}"
              role="tab"
              aria-selected="${isActive ? 'true' : 'false'}"
-             title="${this.escapeHtml(tabFileName)}${d.isDirty ? ' (unsaved changes)' : ''}">
+             title="${this.escapeHtml(tabFileName)}${d.isDirty ? ' — unsaved' : ''}">
           <span class="tab_title">${this.escapeHtml(tabFileName)}${dirtyBullet}</span>
           <span class="tab_zoom">${zoomLabel}</span>
           <span class="tab_close" data-id="${d.id}" title="Close Tab (⌘W)">✕</span>
@@ -906,7 +911,7 @@ class InspireApp {
         InspireDocument.downloadAsFile(data, fileName);
       }
       active.fileName = fileName;
-      active.isDirty = false;
+      markSaved(active);
       this.renderDocumentTabs();
       this.showToast(`Saved "${fileName}"`, 'success');
     } catch (err) {

@@ -616,9 +616,11 @@ test('Direct File Reading & Clean Startup: App starts with fresh blank document,
   assert.match(appJs, /InspireDocument\.createBlank\('Untitled-1'\)/, 'app.js must create a fresh blank document on init');
 
   // 2. Verify stale persistent storage keys are removed on startup so nothing is resurrected
-  assert.match(appJs, /localStorage\.removeItem\(LOCAL_STORAGE_DOCS_KEY\)/, 'app.js must remove stale LOCAL_STORAGE_DOCS_KEY on init');
-  assert.match(appJs, /localStorage\.removeItem\(LOCAL_STORAGE_KEY\)/, 'app.js must remove stale LOCAL_STORAGE_KEY on init');
-  assert.match(appJs, /sessionStorage\.removeItem\('visteras_inspire_session_state'\)/, 'app.js must remove stale session state on init');
+  assert.match(appJs, /clearStaleDocumentStorage\(local, session\)/, 'app.js must remove stale document storage keys on init');
+  const unsavedJs = fs.readFileSync(path.join(inspireRoot, 'js/unsaved-changes.js'), 'utf8');
+  for (const key of ['visteras_inspire_current_doc', 'visteras_inspire_open_docs', 'visteras_inspire_session_state']) {
+    assert.ok(unsavedJs.includes(`'${key}'`), `stale key ${key} must be cleared on init`);
+  }
 
   // 3. Verify auto-save to browser storage is removed in favor of reading and writing .vid files directly
   assert.doesNotMatch(appJs, /saveAllToLocalStorage\(\)/, 'app.js must not auto-save documents to localStorage/sessionStorage');
