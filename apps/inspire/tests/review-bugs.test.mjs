@@ -80,3 +80,43 @@ test('Bug 6: tab name and downloaded .vid name are the same (spaces kept, only i
   assert.match(app, /active\.fileName = fileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
   assert.match(app, /val = safeVidFileName\(val\);/, 'renaming a tab uses the same rule');
 });
+
+test('Bug 3: opening a same-name .vid switches only when content is identical, otherwise opens a new tab', async () => {
+  const { InspireDocument } = await import('../js/document.js');
+  const { BoardComposer } = await import('../js/board-composer.js');
+  const { SwipeFileManager } = await import('../js/swipe-file.js');
+  const { resolveOpenTarget } = await import('../js/open-match.js');
+  const toModel = (data, fileName) => {
+    const doc = new InspireDocument(data.board);
+    return { id: data.meta.id, title: fileName.replace(/\.vid$/, ''), fileName, doc,
+      board: new BoardComposer(data.board.elements, null, doc), swipeFile: new SwipeFileManager(data.swipeFile) };
+  };
+  const fileA = InspireDocument.createBlank('Board');
+  fileA.board.elements = [{ id: 'e1', type: 'text', x: 10, y: 10, width: 100, height: 20, data: { text: 'A' } }];
+  const open = [toModel(JSON.parse(JSON.stringify(fileA)), 'Board.vid')];
+
+  // identical bytes (re-open same file) -> switch
+  let r = resolveOpenTarget(open, JSON.parse(JSON.stringify(fileA)), { fileName: 'Board.vid', title: 'Board' });
+  assert.equal(r.action, 'switch');
+  // same id, same content, different timestamps -> switch
+  const sameNewerMeta = JSON.parse(JSON.stringify(fileA)); sameNewerMeta.meta.modified = '2030-01-01T00:00:00.000Z';
+  assert.equal(resolveOpenTarget(open, sameNewerMeta, { fileName: 'Board.vid', title: 'Board' }).action, 'switch');
+  // different file, same name -> new tab
+  const fileB = InspireDocument.createBlank('Board');
+  fileB.board.elements = [{ id: 'e9', type: 'text', x: 0, y: 0, width: 50, height: 20, data: { text: 'B' } }];
+  r = resolveOpenTarget(open, fileB, { fileName: 'Board.vid', title: 'Board' });
+  assert.deepEqual(r, { action: 'new', sameNameOpen: true });
+  // same id but the file on disk is newer (different content) -> new tab
+  const newer = JSON.parse(JSON.stringify(fileA)); newer.board.elements[0].x = 400;
+  assert.equal(resolveOpenTarget(open, newer, { fileName: 'Other.vid', title: 'Other' }).action, 'new');
+  // the open tab has unsaved edits -> reopening the file opens it fresh in a new tab
+  open[0].board.updateElement('e1', { x: 999 });
+  assert.equal(resolveOpenTarget(open, JSON.parse(JSON.stringify(fileA)), { fileName: 'Board.vid', title: 'Board' }).action, 'new');
+  // unrelated name -> new tab, no collision note
+  assert.deepEqual(resolveOpenTarget(open, fileB, { fileName: 'Else.vid', title: 'Else' }), { action: 'new', sameNameOpen: false });
+
+  const app = read('js/app.js');
+  assert.match(app, /resolveOpenTarget\(this\.documents, docData,/);
+  assert.match(app, /Tab ids must stay unique/);
+  assert.doesNotMatch(app, /Switched to open document/);
+});

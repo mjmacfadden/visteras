@@ -17,6 +17,7 @@ import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
+import { resolveOpenTarget } from './open-match.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -275,12 +276,17 @@ class InspireApp {
       return;
     }
 
-    // Check if doc with this fileName or title is already open
-    const existing = this.documents.find(d => d.fileName === resolvedFileName || d.title === title || d.id === docData.meta?.id);
-    if (existing) {
-      this.activateDocument(existing.id);
-      this.showToast(`Switched to open document "${existing.fileName || existing.title}"`, 'info');
+    // Same name/title/id already open: switch only if the content is identical; otherwise open a
+    // new tab (Studio always opens into a new tab), so a different file is never hidden.
+    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title });
+    if (target.action === 'switch') {
+      this.activateDocument(target.model.id);
+      this.showToast(`"${target.model.fileName || target.model.title}" is already open`, 'info');
       return;
+    }
+    // Tab ids must stay unique when the same board (same meta.id) is opened again
+    if (docData.meta?.id && this.documents.some(d => d.id === docData.meta.id)) {
+      docData = { ...docData, meta: { ...docData.meta, id: 'doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5) } };
     }
 
     // Open as new tab
@@ -293,7 +299,9 @@ class InspireApp {
 
     this.documents.push(newModel);
     this.activateDocument(newModel.id);
-    this.showToast(`Opened "${resolvedFileName}" in new tab`, 'success');
+    this.showToast(target.sameNameOpen
+      ? `Opened "${resolvedFileName}" in a new tab (an open tab with that name has different content)`
+      : `Opened "${resolvedFileName}" in new tab`, 'success');
   }
 
   initUnsavedChangesGuard() {
