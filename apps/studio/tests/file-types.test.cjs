@@ -28,9 +28,10 @@ test('File Types: Studio supports .vsd documents', () => {
 test('File Types: Vector supports .vvd documents', () => {
 	const vectorHtml = fs.readFileSync(path.join(rootDir, 'apps/vector/index.html'), 'utf8');
 
-	// Menu items reflect .vvd
-	assert.match(vectorHtml, /Save Vector Document \(\.vvd\)/);
-	assert.match(vectorHtml, /Open Vector Document \(\.vvd, \.svg\)\.\.\./);
+	// Standardized File menu (49c010fb): plain Open... / Save / Save As..., format lives in the file code
+	assert.match(vectorHtml, /id="action_open">Open\.\.\. </);
+	assert.match(vectorHtml, /id="action_save">Save </);
+	assert.match(vectorHtml, /id="action_save_as">Save As\.\.\. </);
 	assert.match(vectorHtml, /Export SVG\.\.\./);
 
 	// File input accepts .vvd
@@ -50,9 +51,10 @@ test('File Types: Publish supports .vpd documents', () => {
 	assert.match(docManagerTs, /\$\{safeName\}-\$\{dateStr\}\.vpd/);
 	assert.match(docManagerTs, /Visteras Publish Document \(\.vpd\)/);
 
-	// Menu and file input in Publish page
-	assert.match(publishAstro, /Save Edition \(\.vpd\)/);
-	assert.match(publishAstro, /Open Edition \(\.vpd\)\.\.\./);
+	// Standardized File menu (49c010fb) and the .vpd file input
+	assert.match(publishAstro, /id="action_open_edition">Open\.\.\. </);
+	assert.match(publishAstro, /id="action_save_edition">Save </);
+	assert.match(publishAstro, /id="action_save_as_edition">Save As\.\.\. </);
 	assert.match(publishAstro, /accept="\.vpd,/);
 });
 
@@ -60,10 +62,10 @@ test('File Types: Collage supports .vcd documents', () => {
 	const collageHtml = fs.readFileSync(path.join(rootDir, 'apps/collage/index.html'), 'utf8');
 	const collageAppJs = fs.readFileSync(path.join(rootDir, 'apps/collage/js/app.js'), 'utf8');
 
-	// Menu items in Collage reflect .vcd
-	assert.match(collageHtml, /Save Collage \(\.vcd\)/);
-	assert.match(collageHtml, /Open Collage \(\.vcd\)\.\.\./);
-	assert.match(collageHtml, /Save As \(\.vcd\)\.\.\./);
+	// Standardized File menu (49c010fb)
+	assert.match(collageHtml, /id="action_menu_open">Open\.\.\. </);
+	assert.match(collageHtml, /id="action_save_set">Save </);
+	assert.match(collageHtml, /id="action_save_as">Save As\.\.\. </);
 
 	// Hidden input accepts .vcd
 	assert.match(collageHtml, /accept="\.vcd,/);
