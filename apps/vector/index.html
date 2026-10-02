@@ -306,9 +306,24 @@
     const container = document.getElementById('container');
     const svgEditor = new Editor(container);
 
+    // Explicit extension list = SVG-Edit's built-in defaults minus ext-storage
+    // (browser-storage autosave; Visteras saves documents as .vvd files) and
+    // ext-opensave (superseded by visteras-document-shell File > Open/Save; it
+    // also 404'd on its browser-fs-access import and never loaded).
+    const VECTOR_EXTENSIONS = [
+      'ext-connector',
+      'ext-grid',
+      'ext-markers',
+      'ext-panning',
+      'ext-shapes',
+      'ext-polystar',
+      'ext-layer_view'
+    ];
+
     svgEditor.setConfig({
       allowInitialUserOverride: false,
-      noDefaultExtensions: false,
+      noDefaultExtensions: true,
+      extensions: VECTOR_EXTENSIONS,
       noStorageOnLoad: true,
       forceStorage: true,
       storagePrompt: false,
