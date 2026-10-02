@@ -231,7 +231,7 @@ export class BoardComposer {
     } else {
       this.historyIndex++;
     }
-    this.notify({ type: 'history' });
+    this.notify({ type: 'history', label });
   }
 
   restoreSnapshot(snapshotStr) {

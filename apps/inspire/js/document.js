@@ -1,12 +1,11 @@
 /**
  * Visteras Inspire — Document (.vid) & Storage Manager
- * Reads and writes 100% client-side .vid files, handles autosave, export, and templates.
+ * Reads and writes 100% client-side .vid files, export, and templates.
+ * Documents are saved only as .vid files (like Studio's .vsd); nothing is autosaved to browser storage.
  */
 
 export const VID_FORMAT_IDENTIFIER = 'visteras-inspire';
 export const VID_CURRENT_VERSION = '1.0.0';
-export const LOCAL_STORAGE_KEY = 'visteras_inspire_current_doc';
-export const LOCAL_STORAGE_DOCS_KEY = 'visteras_inspire_open_docs';
 
 export const CANVAS_PRESETS = {
   '16:9': { name: 'Moodboard 16:9 (Landscape)', width: 1920, height: 1080, printDpi: 150 },
@@ -75,17 +74,6 @@ export class InspireDocument {
     };
   }
 
-  saveToLocalStorage(boardComposer, swipeFileManager) {
-    try {
-      const data = this.serialize(boardComposer, swipeFileManager);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-      return true;
-    } catch (err) {
-      console.warn('[InspireDocument] Auto-save to localStorage failed', err);
-      return false;
-    }
-  }
-
   downloadVidFile(boardComposer, swipeFileManager, filename = null) {
     const data = this.serialize(boardComposer, swipeFileManager);
     InspireDocument.downloadAsFile(data, filename || this.title);
@@ -94,20 +82,6 @@ export class InspireDocument {
 
   exportVidFile(boardComposer, swipeFileManager, filename = null) {
     return this.downloadVidFile(boardComposer, swipeFileManager, filename);
-  }
-
-  static loadFromLocalStorage() {
-    try {
-      const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed?.format === VID_FORMAT_IDENTIFIER) {
-        return parsed;
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
   }
 
   static downloadAsFile(docData, filename = null) {
