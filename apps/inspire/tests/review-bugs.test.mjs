@@ -26,3 +26,25 @@ test('Bug 7: artboard size changes apply instantly (no layout transition) so hit
   assert.doesNotMatch(css, /transition:\s*width[^;]*height/, 'no width/height transitions on canvas layout');
   assert.match(/\.inspire-artboard-frame \{([^}]*)\}/.exec(css)[1], /vertical-align: top/);
 });
+
+test('Bug 4: opening a .vid keeps its created date through re-save', async () => {
+  const { InspireDocument } = await import('../js/document.js');
+  const { BoardComposer } = await import('../js/board-composer.js');
+  const { SwipeFileManager } = await import('../js/swipe-file.js');
+  const file = InspireDocument.createBlank('Old Board');
+  file.meta.created = '2024-03-01T10:00:00.000Z';
+  file.meta.modified = '2024-03-02T10:00:00.000Z';
+  // Same steps as app.createDocumentModel()
+  const doc = new InspireDocument(file.board);
+  utils.applyFileMeta(doc, file.meta);
+  const resaved = doc.serialize(new BoardComposer([], null, doc), new SwipeFileManager(null));
+  assert.equal(resaved.meta.created, '2024-03-01T10:00:00.000Z', 'created survives re-save');
+  assert.notEqual(resaved.meta.modified, '2024-03-02T10:00:00.000Z', 'modified refreshes on save');
+  // Garbage / missing meta leaves fresh timestamps alone
+  const fresh = new InspireDocument();
+  const before = fresh.created;
+  utils.applyFileMeta(fresh, { created: 'not a date' });
+  utils.applyFileMeta(fresh, null);
+  assert.equal(fresh.created, before);
+  assert.match(read('js/app.js'), /applyFileMeta\(docInstance, data\.meta\)/);
+});

@@ -16,7 +16,7 @@ import { BoardComposer } from './board-composer.js';
 import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
-import { zoomPercent } from './inspire-utils.js';
+import { zoomPercent, applyFileMeta } from './inspire-utils.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -119,6 +119,7 @@ class InspireApp {
     docInstance.id = docId;
     docInstance.title = resolvedTitle;
     docInstance.fileName = resolvedFileName;
+    applyFileMeta(docInstance, data.meta); // keep the board's original created date
 
     const boardInstance = new BoardComposer(data.board?.elements || [], data.board?.customLayoutSnapshot || null, docInstance);
     const swipeInstance = new SwipeFileManager(data.swipeFile || null);
