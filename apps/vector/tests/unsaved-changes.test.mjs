@@ -43,71 +43,16 @@ test('unsaved: closing a clean tab never asks; a dirty tab asks with its title',
   assert.equal(await confirmCloseIfDirty(null, ask), true);
 });
 
-function fakeDom() {
-  const body = { children: [], appendChild(el) { this.children.push(el); el.parent = this; } };
-  const docListeners = {};
-  const doc = {
-    body,
-    activeElement: null,
-    addEventListener(type, fn) { (docListeners[type] ||= []).push(fn); },
-    removeEventListener(type, fn) { docListeners[type] = (docListeners[type] || []).filter((f) => f !== fn); },
-    createElement() {
-      const listeners = {};
-      const el = {
-        className: '', attrs: {}, innerHTML: '',
-        setAttribute(k, v) { this.attrs[k] = v; },
-        addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
-        fire(type, evt) { (listeners[type] || []).forEach((fn) => fn(evt)); },
-        remove() { body.children = body.children.filter((c) => c !== el); },
-        querySelector(sel) {
-          if (sel === '.vector_unsaved_btn_cancel') {
-            return { dataset: { action: 'cancel' }, focus() { doc.activeElement = this; } };
-          }
-          return null;
-        },
-      };
-      return el;
-    },
-    key(key) {
-      const evt = { key, preventDefault() {}, stopPropagation() {} };
-      (docListeners.keydown || []).forEach((fn) => fn(evt));
-    },
-    listenerCount: () => (docListeners.keydown || []).length,
-  };
-  return doc;
-}
-
-const clickAction = (action) => ({ target: { closest: () => ({ dataset: { action } }) } });
-
-test('unsaved dialog: Studio wording, Cancel focused, Close/Cancel/Escape resolve and clean up', async () => {
-  let doc = fakeDom();
-  let p = showUnsavedChangesDialog('A <b>&', doc);
-  const modal = doc.body.children.find((c) => c.className === 'vector_unsaved_dialog');
-  assert.ok(modal, 'dialog mounted');
-  assert.match(modal.innerHTML, /Unsaved Changes/);
-  assert.match(modal.innerHTML, /Close <b>A &lt;b&gt;&amp;<\/b>\? Unsaved changes will be lost\./);
-  assert.match(modal.innerHTML, />Cancel</);
-  assert.match(modal.innerHTML, />Close</);
-  assert.equal(doc.activeElement?.dataset?.action, 'cancel', 'Cancel is the default focus');
-  doc.key('Enter'); // Enter on focused Cancel → keep the tab
-  assert.equal(await p, false);
-  assert.equal(doc.body.children.length, 0, 'overlay + dialog removed');
-  assert.equal(doc.listenerCount(), 0, 'key listener removed');
-
-  doc = fakeDom();
-  p = showUnsavedChangesDialog('Poster', doc);
-  doc.body.children.find((c) => c.className === 'vector_unsaved_dialog').fire('click', clickAction('close'));
-  assert.equal(await p, true);
-
-  doc = fakeDom();
-  p = showUnsavedChangesDialog('Poster', doc);
-  doc.key('Escape');
-  assert.equal(await p, false);
-
-  doc = fakeDom();
-  p = showUnsavedChangesDialog('Poster', doc);
-  doc.body.children.find((c) => c.className === 'vector_unsaved_overlay').fire('click', {});
-  assert.equal(await p, false, 'backdrop click cancels');
+test('unsaved dialog: Vector uses the shared @visteras/ui dialog with its orange accent', () => {
+  // Behaviour (wording, Cancel focus, Enter/Escape/backdrop) is covered by packages/ui tests.
+  assert.equal(typeof showUnsavedChangesDialog, 'function');
+  const mod = read('../js/visteras-unsaved-changes.js');
+  assert.match(mod, /import \{ showUnsavedChangesDialog \} from '\.\.\/lib\/visteras-ui\/dialog\.js';/);
+  assert.ok(!/vector_unsaved_/.test(mod), 'local dialog copy removed');
+  assert.ok(!/vector_unsaved_/.test(read('../css/visteras-document-shell.css')), 'local dialog CSS removed');
+  assert.match(read('../css/visteras-theme.css'), /--visteras-accent: var\(--studio-orange\);/);
+  assert.match(read('../index.html'), /href="\.\/lib\/visteras-ui\/ui\.css\?v=ui-1"/);
+  assert.match(read('../lib/visteras-ui/dialog.js'), /title: 'Unsaved Changes'/);
 });
 
 test('unsaved: shell and index.html wiring', () => {

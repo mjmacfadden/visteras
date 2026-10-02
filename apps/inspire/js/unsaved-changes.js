@@ -90,62 +90,9 @@ export function handleBeforeUnload(e, documents) {
   return '';
 }
 
-export function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/**
- * Studio-style "Unsaved Changes" confirm using Inspire's modal chrome.
- * Resolves true for Close, false for Cancel / Escape / backdrop. Cancel has default focus.
- */
-export function showUnsavedChangesDialog(title, doc = (typeof document !== 'undefined' ? document : null)) {
-  if (!doc) return Promise.resolve(true);
-  return new Promise((resolve) => {
-    const modal = doc.createElement('div');
-    modal.className = 'visteras-modal-backdrop inspire-modal-overlay unsaved-changes-dialog';
-    modal.setAttribute('role', 'alertdialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.innerHTML = `
-      <div class="visteras-modal-card" style="max-width: 420px;">
-        <div class="modal-header">
-          <h3>Unsaved Changes</h3>
-          <button type="button" class="modal-close-btn" data-action="cancel">✕</button>
-        </div>
-        <div class="modal-body">
-          <p>Close <b>${escapeHtml(title || 'Untitled')}</b>? Unsaved changes will be lost.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn_visteras_secondary" data-action="cancel">Cancel</button>
-          <button type="button" class="btn_visteras_amber" data-action="close">Close</button>
-        </div>
-      </div>`;
-    let done = false;
-    const finish = (result) => {
-      if (done) return;
-      done = true;
-      doc.removeEventListener('keydown', onKey, true);
-      modal.remove();
-      resolve(result);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
-      else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(doc.activeElement?.dataset?.action === 'close'); }
-    };
-    modal.addEventListener('click', (e) => {
-      const action = e.target?.closest?.('[data-action]')?.dataset?.action;
-      if (action) finish(action === 'close');
-      else if (e.target === modal) finish(false);
-    });
-    doc.addEventListener('keydown', onKey, true);
-    doc.body.appendChild(modal);
-    modal.querySelector('.modal-footer [data-action="cancel"]')?.focus();
-  });
-}
+// Dialog + escaping come from the shared kit (packages/ui → lib/visteras-ui).
+export { escapeHtml, showUnsavedChangesDialog } from '../lib/visteras-ui/dialog.js';
+import { showUnsavedChangesDialog } from '../lib/visteras-ui/dialog.js';
 
 /** Returns true when the tab may close: clean tabs close immediately, dirty ones ask first. */
 export async function confirmCloseIfDirty(model, ask = showUnsavedChangesDialog) {

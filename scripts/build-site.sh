@@ -51,6 +51,9 @@ cp "$ROOT/packages/tool-free.js" "$PUBLISH/public/tool-free.js"
 echo "==> Building shared fonts bundle for Vector, Collage & Inspire"
 npm run build:vector --prefix "$ROOT/packages/fonts"
 
+echo "==> Copying shared UI kit (packages/ui → apps/*/lib/visteras-ui/)"
+node "$ROOT/packages/ui/scripts/build-static.mjs"
+
 echo "==> Building Studio (apps/studio → dist/)"
 npm run build --prefix "$STUDIO"
 

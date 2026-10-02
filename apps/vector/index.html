@@ -20,6 +20,7 @@
 
   <!-- Visteras Studio Companion Theme -->
   <link href="./css/visteras-theme.css?v=path-text-transforms-1" rel="stylesheet" media="all">
+  <link href="./lib/visteras-ui/ui.css?v=ui-1" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css?v=unsaved-1" rel="stylesheet" media="all">
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
@@ -252,45 +253,14 @@
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-png-1';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
+    import { showToast } from './lib/visteras-ui/toast.js';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
 
-    // Studio-style Toast Notification System (replaces standard browser alert() modals)
-    function showStudioToast(message, type = 'error', duration = 3500) {
-      if (typeof document === 'undefined') return null;
-      let notifier = document.getElementById('visteras_notifier');
-      if (!notifier) {
-        notifier = document.createElement('div');
-        notifier.id = 'visteras_notifier';
-        notifier.className = 'alertify-notifier ajs-top ajs-center';
-        document.body.appendChild(notifier);
-      }
-
-      const msgEl = document.createElement('div');
-      msgEl.className = `ajs-message ajs-${type}`;
-      msgEl.textContent = message;
-      notifier.appendChild(msgEl);
-
-      requestAnimationFrame(() => {
-        msgEl.classList.add('ajs-visible');
-      });
-
-      let timer = null;
-      const dismiss = () => {
-        if (timer) clearTimeout(timer);
-        msgEl.classList.remove('ajs-visible');
-        setTimeout(() => {
-          msgEl.remove();
-        }, 250);
-      };
-
-      msgEl.addEventListener('click', dismiss);
-      if (duration > 0) {
-        timer = setTimeout(dismiss, duration);
-      }
-      return msgEl;
-    }
+    // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
+    // Vector's default is the red error toast for 3.5 s, as before.
+    const showStudioToast = (message, type = 'error', duration = 3500) => showToast(message, type, duration);
 
     window.showStudioToast = showStudioToast;
     window.showToast = showStudioToast;

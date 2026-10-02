@@ -1,0 +1,23 @@
+{
+  "name": "@visteras/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared UI kit for Visteras apps: toast, confirm/Unsaved Changes dialog, file helper, menu/tab tokens.",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./toast": "./src/toast.js",
+    "./dialog": "./src/dialog.js",
+    "./ui.css": "./src/ui.css"
+  },
+  "scripts": {
+    "build:static": "node ./scripts/build-static.mjs",
+    "check:static": "node ./scripts/build-static.mjs --check"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "license": "MIT"
+}

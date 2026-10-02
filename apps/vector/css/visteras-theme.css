@@ -19,6 +19,10 @@
   --studio-border-light: #505050;
   --studio-blue-active: #2a6bb5;
   --studio-orange: #fa7c1b;
+  /* @visteras/ui accent hooks (packages/ui never hardcodes an accent) */
+  --visteras-accent: var(--studio-orange);
+  --visteras-accent-hover: #ff8f3a;
+  --visteras-on-accent: #ffffff;
   --studio-text: #cccccc;
   --studio-text-muted: #888888;
   

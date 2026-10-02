@@ -35,6 +35,8 @@
   .inspire-guides-layer,
   .inspire-marquee-box,
   .visteras-modal-backdrop,
+  .vui-overlay,
+  .vui-dialog,
   .alertify-notifier {
     display: none !important;
   }

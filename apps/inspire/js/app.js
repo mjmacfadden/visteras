@@ -18,6 +18,7 @@ import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
+import { showToast } from '../lib/visteras-ui/toast.js';
 import { exportRegion, computeSafeExportScale, prepareExportClone, EXPORT_DEFAULT_SCALE } from './export-utils.js';
 import {
   clearStaleDocumentStorage,
@@ -2215,25 +2216,7 @@ class InspireApp {
   }
 
   showToast(message, type = 'info', duration = 3000) {
-    let notifier = document.getElementById('visteras_notifier');
-    if (!notifier) {
-      notifier = document.createElement('div');
-      notifier.id = 'visteras_notifier';
-      notifier.className = 'alertify-notifier ajs-top ajs-center';
-      document.body.appendChild(notifier);
-    }
-
-    const msg = document.createElement('div');
-    msg.className = `ajs-message ajs-${type}`;
-    msg.textContent = message;
-    notifier.appendChild(msg);
-
-    requestAnimationFrame(() => msg.classList.add('ajs-visible'));
-
-    setTimeout(() => {
-      msg.classList.remove('ajs-visible');
-      setTimeout(() => msg.remove(), 250);
-    }, duration);
+    return showToast(message, type, duration); // shared kit (lib/visteras-ui/toast.js)
   }
 }
 

@@ -18,6 +18,10 @@
 
   /* Inspire Warm Amber / Gold Brand Accent */
   --inspire-amber: #f59e0b;
+  /* @visteras/ui accent hooks (packages/ui never hardcodes an accent) */
+  --visteras-accent: var(--inspire-amber);
+  --visteras-accent-hover: var(--inspire-amber-light);
+  --visteras-on-accent: #111111;
   --inspire-amber-light: #fbbf24;
   --inspire-amber-dark: #d97706;
   --inspire-amber-glow: rgba(245, 158, 11, 0.28);
