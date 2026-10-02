@@ -84,13 +84,18 @@ class InspireApp {
     const data = initialData || InspireDocument.createBlank();
     const docId = data.meta?.id || ('doc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
 
-    let resolvedFileName = fileName || data.meta?.fileName || null;
-    let resolvedTitle = title || data.meta?.title || null;
+    let resolvedFileName = fileName || (initialData ? data.meta?.fileName : null) || null;
+    let resolvedTitle = title || (initialData ? data.meta?.title : null) || null;
 
-    if (!resolvedFileName && !resolvedTitle) {
+    const isGenericUntitled = (val) => !val || val === 'Untitled' || /^Untitled\s+Inspiration\s+Board$/i.test(val);
+
+    // If no explicit title or fileName was provided, or if the title is generic/untitled, generate the incrementing Untitled-# title
+    if ((!fileName && !title) || (!resolvedFileName && (!resolvedTitle || isGenericUntitled(resolvedTitle)))) {
       const num = this.autoDocCounter++;
       resolvedTitle = `Untitled-${num}`;
       resolvedFileName = `Untitled-${num}.vid`;
+    } else if (resolvedFileName && (!resolvedTitle || isGenericUntitled(resolvedTitle))) {
+      resolvedTitle = resolvedFileName.replace(/\.vid$/i, '');
     } else if (resolvedFileName && !resolvedTitle) {
       resolvedTitle = resolvedFileName.replace(/\.vid$/i, '');
     } else if (!resolvedFileName && resolvedTitle) {
@@ -98,9 +103,15 @@ class InspireApp {
       resolvedTitle = resolvedTitle.replace(/\.vid$/i, '');
     }
 
+    if (data.meta) {
+      data.meta.title = resolvedTitle;
+      data.meta.fileName = resolvedFileName;
+    }
+
     const docInstance = new InspireDocument(data.board);
     docInstance.id = docId;
     docInstance.title = resolvedTitle;
+    docInstance.fileName = resolvedFileName;
 
     const boardInstance = new BoardComposer(data.board?.elements || [], data.board?.customLayoutSnapshot || null, docInstance);
     const swipeInstance = new SwipeFileManager(data.swipeFile || null);
@@ -153,7 +164,7 @@ class InspireApp {
     // Always start with a clean blank document (empty board, empty swipe file, white background)
     this.autoDocCounter = 2;
     const initialDoc = this.createDocumentModel({
-      initialData: InspireDocument.createBlank('Untitled Inspiration Board'),
+      initialData: InspireDocument.createBlank('Untitled-1'),
       title: 'Untitled-1',
       fileName: 'Untitled-1.vid',
       isDirty: false
@@ -340,7 +351,7 @@ class InspireApp {
 
       const zoomLabel = zoomVal !== null ? `@ ${zoomVal}%` : '@ Fit';
       const dirtyBullet = d.isDirty ? '<span class="tab_dirty">•</span>' : '';
-      const tabFileName = d.fileName || (d.title ? (d.title.endsWith('.vid') ? d.title : `${d.title}.vid`) : 'Untitled.vid');
+      const tabFileName = d.fileName || (d.title ? (d.title.endsWith('.vid') ? d.title : `${d.title}.vid`) : 'Untitled-1.vid');
 
       tabsHtml += `
         <div class="document_tab ${isActive ? 'active' : ''}${d.isDirty ? ' dirty' : ''}"
@@ -355,7 +366,7 @@ class InspireApp {
       `;
     }
 
-    tabsHtml += `<button type="button" class="new_tab_btn" id="new_tab_btn" title="New Moodboard Tab (⌘N)">+</button>`;
+    tabsHtml += `<button type="button" class="new_tab_btn" id="new_tab_btn" title="New Tab (⌘N)">+</button>`;
     container.innerHTML = tabsHtml;
 
     // Attach tab event handlers
@@ -2072,7 +2083,7 @@ class InspireApp {
   }
 
   showShortcutsModal() {
-    alert('Keyboard Shortcuts:\n• ⌘N: New Moodboard Tab\n• ⌘W: Close Current Tab\n• ⌘Z: Undo\n• ⇧⌘Z: Redo\n• ⌘S: Save .vid file\n• ⌘O: Open .vid file\n• ⌘P: Print Board\n• ⌘A: Select All\n• ⌘D: Duplicate\n• ⌫: Delete selected\n• V: Select tool\n• H: Hand/Pan tool\n• Space: Pan canvas\n• Arrow keys: Nudge elements');
+    alert('Keyboard Shortcuts:\n• ⌘N: New Tab\n• ⌘W: Close Current Tab\n• ⌘Z: Undo\n• ⇧⌘Z: Redo\n• ⌘S: Save .vid file\n• ⌘O: Open .vid file\n• ⌘P: Print Board\n• ⌘A: Select All\n• ⌘D: Duplicate\n• ⌫: Delete selected\n• V: Select tool\n• H: Hand/Pan tool\n• Space: Pan canvas\n• Arrow keys: Nudge elements');
   }
 
   /* -------------------------------------------------------------------------- */
