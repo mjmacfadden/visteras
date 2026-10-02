@@ -74,9 +74,6 @@ export const ALLOWLIST = [
  * reported as a warning on every run and should be removed (then deleted from this list).
  */
 export const KNOWN_DOCUMENT_STORES = [
-  { file: 'apps/vector/extensions/ext-storage/ext-storage.js', key: 'name', note: "SVG-Edit ext-storage saves the whole SVG ('svgedit-<canvas>') on unload when opted in (Phase 2 item B removes it)" },
-  { file: 'apps/vector/extensions/ext-storage/ext-storage.js', key: '`title-${name}`', note: 'title saved alongside the SVG above (item B)' },
-  { file: 'apps/vector/extensions/ext-storage/ext-storage.js', key: 'key', note: "SVG-Edit prefs ('svg-edit-*'); goes with ext-storage (item B)" },
   { file: 'apps/studio/src/js/modules/file/quicksave.js', key: "'quicksave_data'", note: 'Studio Quick Save writes the full document JSON (up to 5 MB) to localStorage' },
   { file: 'apps/collage/js/app.js', key: "'visteras_collage_saves'", note: 'Collage saved-collages library is stored in localStorage' },
   { file: 'apps/publish/src/lib/settings.ts', key: 'GROK_BRIEF_STORAGE_KEY', note: "Publish keeps the pasted Grok brief text (edition source content) in localStorage" }

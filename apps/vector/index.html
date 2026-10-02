@@ -251,6 +251,7 @@
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js?v=trace-dialog-2';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-png-1';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
+    import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
@@ -300,8 +301,10 @@
       showStudioToast(String(msg), 'error');
     };
 
-    // Disable unwanted modal popups on initial load
-    document.cookie = 'svgeditstore=prefsAndContent; path=/; max-age=31536000';
+    // Documents are saved only as .vvd/.svg files (ext-storage is no longer
+    // loaded). Expire the old svgeditstore cookie and drop SVG-Edit's
+    // 'svgedit-*' / 'svg-edit-*' localStorage leftovers once on load.
+    clearLegacySvgEditStorage();
 
     const container = document.getElementById('container');
     const svgEditor = new Editor(container);
@@ -325,8 +328,6 @@
       noDefaultExtensions: true,
       extensions: VECTOR_EXTENSIONS,
       noStorageOnLoad: true,
-      forceStorage: true,
-      storagePrompt: false,
       showRulers: true,
       canvas_expansion: 3,
       dimensions: [800, 600],
