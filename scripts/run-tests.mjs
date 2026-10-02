@@ -10,7 +10,8 @@ import { spawnSync } from 'node:child_process';
 const SUITES = [
   ['vector', 'test:vector'],
   ['inspire', 'test:inspire'],
-  ['studio', 'test:studio']
+  ['studio', 'test:studio'],
+  ['storage-check', 'check:storage']
 ];
 
 const only = process.argv.slice(2);
