@@ -16,6 +16,7 @@ import { BoardComposer } from './board-composer.js';
 import { WorkspaceCanvas } from './canvas.js';
 import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
+import { zoomPercent } from './inspire-utils.js';
 import {
   clearStaleDocumentStorage,
   trackDirty,
@@ -2162,7 +2163,7 @@ class InspireApp {
     }
 
     if (zoomEl) {
-      const z = extra.zoom ?? Math.round(this.canvas.zoom * 100);
+      const z = zoomPercent(extra, this.canvas);
       zoomEl.textContent = `${z}%`;
     }
 
