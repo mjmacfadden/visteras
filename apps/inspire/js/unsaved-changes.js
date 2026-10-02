@@ -10,6 +10,9 @@
  * Inspire saves documents only as .vid files. Nothing is written to browser storage.
  */
 
+import { showUnsavedChangesDialog } from '../lib/visteras-ui/dialog.js';
+import { markClean, confirmCloseIfDirty as sharedConfirmCloseIfDirty } from '../lib/visteras-ui/dirty.js';
+
 /** Keys older Inspire builds used to persist whole documents. Cleared on every load. */
 export const STALE_DOCUMENT_STORAGE_KEYS = Object.freeze({
   local: Object.freeze(['visteras_inspire_current_doc', 'visteras_inspire_open_docs']),
@@ -73,29 +76,22 @@ export function trackDirty(model, { onChange } = {}) {
   return () => unsubs.forEach((u) => u && u());
 }
 
+/** A successful .vid save clears the flag (shared kit, Inspire's `isDirty` field). */
 export function markSaved(model) {
-  if (model) model.isDirty = false;
-  return model;
+  return markClean(model, 'isDirty');
 }
 
-export function hasAnyDirty(documents) {
-  return Array.isArray(documents) && documents.some((d) => d && d.isDirty);
-}
-
-/** Same contract as Studio's beforeunload handler: only prompt when a document is dirty. */
-export function handleBeforeUnload(e, documents) {
-  if (!hasAnyDirty(documents)) return undefined;
-  e.preventDefault();
-  e.returnValue = '';
-  return '';
-}
+// Any-dirty + beforeunload come from the shared kit (lib/visteras-ui/dirty.js); its
+// default reader understands Inspire's `isDirty` flag.
+export { hasAnyDirty, handleBeforeUnload } from '../lib/visteras-ui/dirty.js';
 
 // Dialog + escaping come from the shared kit (packages/ui → lib/visteras-ui).
 export { escapeHtml, showUnsavedChangesDialog } from '../lib/visteras-ui/dialog.js';
-import { showUnsavedChangesDialog } from '../lib/visteras-ui/dialog.js';
 
-/** Returns true when the tab may close: clean tabs close immediately, dirty ones ask first. */
+/**
+ * Returns true when the tab may close: clean tabs close immediately, dirty ones ask first.
+ * Shared kit; the dialog shows the tab's file name (fileName, else title).
+ */
 export async function confirmCloseIfDirty(model, ask = showUnsavedChangesDialog) {
-  if (!model || !model.isDirty) return true;
-  return !!(await ask(model.fileName || model.title || 'Untitled'));
+  return sharedConfirmCloseIfDirty(model, ask);
 }

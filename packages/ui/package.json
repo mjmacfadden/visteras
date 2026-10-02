@@ -9,6 +9,8 @@
     ".": "./src/index.js",
     "./toast": "./src/toast.js",
     "./dialog": "./src/dialog.js",
+    "./file": "./src/file.js",
+    "./dirty": "./src/dirty.js",
     "./ui.css": "./src/ui.css"
   },
   "scripts": {

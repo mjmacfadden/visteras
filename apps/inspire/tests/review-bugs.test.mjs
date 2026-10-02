@@ -77,7 +77,8 @@ test('Bug 6: tab name and downloaded .vid name are the same (spaces kept, only i
   }
   const app = read('js/app.js');
   assert.match(app, /const fileName = safeVidFileName\(active\.fileName \|\| active\.doc\.title\);/);
-  assert.match(app, /active\.fileName = fileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
+  assert.match(app, /const savedFileName = safeVidFileName\(result\.name \|\| fileName\);/, 'name chosen in the save picker goes through the same rule');
+  assert.match(app, /active\.fileName = savedFileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
   assert.match(app, /val = safeVidFileName\(val\);/, 'renaming a tab uses the same rule');
 });
 

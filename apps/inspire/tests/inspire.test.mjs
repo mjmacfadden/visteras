@@ -603,10 +603,14 @@ test('Save & Export (.vid) UX: InspireDocument defines downloadVidFile and expor
     InspireDocument.downloadAsFile = originalDownload;
   }
 
-  // 3. Verify app.js exportVidFile uses downloadVidFile with fallback
+  // 3. Verify app.js saves through the shared @visteras/ui file helper:
+  //    existing handle → save picker → download fallback (Studio behaviour)
   const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
-  assert.match(appJs, /active\.doc\.downloadVidFile\(/, 'app.js must call active.doc.downloadVidFile');
-  assert.match(appJs, /InspireDocument\.downloadAsFile\(/, 'app.js must have fallback to InspireDocument.downloadAsFile');
+  assert.match(appJs, /import \{ saveFile \} from '\.\.\/lib\/visteras-ui\/file\.js';/);
+  assert.match(appJs, /await saveFile\(\{[\s\S]*?types: VID_SAVE_TYPES,[\s\S]*?handle: saveAs \? null : \(active\.fileHandle \|\| null\)/, 'Save reuses the file handle; Save As always asks');
+  assert.match(appJs, /if \(result\.cancelled\) return;/, 'cancelling the picker changes nothing');
+  assert.match(appJs, /'\.vid'/, '.vid stays the Inspire file type');
+  assert.match(appJs, /action_menu_save_as'\)\?\.addEventListener\('click', \(\) => this\.exportVidFile\(\{ saveAs: true \}\)\)/);
 });
 
 test('Direct File Reading & Clean Startup: App starts with fresh blank document, prunes stale storage, and reads/writes files directly', () => {

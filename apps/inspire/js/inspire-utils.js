@@ -2,6 +2,8 @@
  * Visteras Inspire — small pure helpers shared by the app (kept DOM-free so they are unit-testable).
  */
 
+import { safeFileBase as sharedSafeFileBase } from '../lib/visteras-ui/file.js';
+
 /** Status-bar zoom % that never touches a canvas that hasn't been created yet. */
 export function zoomPercent(extra = {}, canvas = null) {
   if (extra && Number.isFinite(extra.zoom)) return extra.zoom;
@@ -25,17 +27,10 @@ export function applyFileMeta(docInstance, meta) {
 /**
  * Download-safe base name: keeps spaces, dots and Unicode like Studio does, and only
  * replaces characters that are illegal in macOS/Windows/Linux file names.
+ * Shared rule from @visteras/ui (lib/visteras-ui/file.js), minus a trailing .vid.
  */
 export function safeFileBase(name, fallback = 'Untitled') {
-  let base = String(name ?? '')
-    .replace(/\.vid$/i, '')
-    .replace(/[\\/:*?"<>|\u0000-\u001f\u007f]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/^\.+/, '')
-    .replace(/[. ]+$/, '');
-  if (!base) base = fallback;
-  return base.slice(0, 200);
+  return sharedSafeFileBase(name, fallback, { stripExtensions: ['vid'] });
 }
 
 /** The exact .vid file name a save will download. The tab shows this same name. */

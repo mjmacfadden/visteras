@@ -22,6 +22,8 @@ hardcodes an accent colour.
 | `toast.js` | `showToast(message, type, duration)` with alertify-compatible markup, so each app's existing toast CSS still applies |
 | `dialog.js` | `showConfirmDialog(opts)`, `showUnsavedChangesDialog(title)` (Studio wording, Cancel focused) |
 | `escape.js` | `escapeHtml` |
+| `file.js` | Studio filename rules (`safeFileBase`, `safeFileName`: keep spaces, replace only illegal chars), `saveFile()` (existing handle → `showSaveFilePicker` → download fallback; cancel = no-op), `downloadBlob` |
+| `dirty.js` | `hasAnyDirty`, `handleBeforeUnload`, `installBeforeUnloadGuard`, `markDirty`/`markClean`, `confirmCloseIfDirty` (reads `dirty`/`isDirty`/`is_dirty`, or a custom reader) |
 | `ui.css` | dialog styles (tokens + `--visteras-accent`) |
 
 ## How apps get it (copy-at-build, same as `tool-free.js` / `@visteras/fonts`)

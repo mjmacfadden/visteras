@@ -19,6 +19,13 @@ import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
 import { showToast } from '../lib/visteras-ui/toast.js';
+import { saveFile } from '../lib/visteras-ui/file.js';
+
+/** showSaveFilePicker types for Inspire documents (.vid stays Inspire's own type). */
+const VID_SAVE_TYPES = [{
+  description: 'Visteras Inspire Document (.vid)',
+  accept: { 'application/json': ['.vid'], 'application/x-visteras-inspire': ['.vid'] }
+}];
 import { exportRegion, computeSafeExportScale, prepareExportClone, EXPORT_DEFAULT_SCALE } from './export-utils.js';
 import {
   clearStaleDocumentStorage,
@@ -822,7 +829,7 @@ class InspireApp {
     document.getElementById('action_menu_new')?.addEventListener('click', () => this.newDocument());
     document.getElementById('action_menu_open')?.addEventListener('click', () => this.openVidFile());
     document.getElementById('action_menu_save')?.addEventListener('click', () => this.exportVidFile());
-    document.getElementById('action_menu_save_as')?.addEventListener('click', () => this.exportVidFile());
+    document.getElementById('action_menu_save_as')?.addEventListener('click', () => this.exportVidFile({ saveAs: true }));
     document.getElementById('action_menu_import_image')?.addEventListener('click', () => this.promptAddImage());
     document.getElementById('action_menu_export_png')?.addEventListener('click', () => this.exportHighResImage('png'));
     document.getElementById('action_menu_export_jpg')?.addEventListener('click', () => this.exportHighResImage('jpg'));
@@ -908,28 +915,38 @@ class InspireApp {
     input.click();
   }
 
-  exportVidFile() {
+  /**
+   * Save the active board as .vid (shared @visteras/ui file helper, Studio behaviour):
+   * Save writes back to the file chosen earlier; otherwise (and always for Save As)
+   * the save picker opens with the tab's name; browsers without the picker download.
+   * The tab takes the name that was actually saved. Cancelling changes nothing.
+   */
+  async exportVidFile({ saveAs = false } = {}) {
+    const active = this.getActiveDocument();
+    if (!active) return;
     try {
-      const active = this.getActiveDocument();
-      if (!active) return;
-
-      // The tab name and the downloaded file name are always the same string
+      // The tab name and the saved file name are always the same string
       const fileName = safeVidFileName(active.fileName || active.doc.title);
-      if (typeof active.doc.downloadVidFile === 'function') {
-        active.doc.downloadVidFile(active.board, active.swipeFile, fileName);
-      } else {
-        const data = active.doc.serialize(active.board, active.swipeFile);
-        InspireDocument.downloadAsFile(data, fileName);
-      }
-      const savedTitle = fileName.replace(/\.vid$/i, '');
-      active.fileName = fileName;
+      const data = active.doc.serialize(active.board, active.swipeFile);
+      const result = await saveFile({
+        data: JSON.stringify(data, null, 2),
+        fileName,
+        mimeType: 'application/json;charset=utf-8',
+        types: VID_SAVE_TYPES,
+        handle: saveAs ? null : (active.fileHandle || null)
+      });
+      if (result.cancelled) return;
+      const savedFileName = safeVidFileName(result.name || fileName);
+      const savedTitle = savedFileName.replace(/\.vid$/i, '');
+      active.fileHandle = result.handle || null;
+      active.fileName = savedFileName;
       active.title = savedTitle;
-      active.doc.fileName = fileName;
+      active.doc.fileName = savedFileName;
       active.doc.title = savedTitle;
       markSaved(active);
       this.renderDocumentTabs();
       if (active.id === this.activeDocId) this.canvas?.renderArtboardMeta();
-      this.showToast(`Saved "${fileName}"`, 'success');
+      this.showToast(`Saved "${savedFileName}"`, 'success');
     } catch (err) {
       this.showToast(`Export failed: ${err.message}`, 'error');
     }
@@ -1784,9 +1801,9 @@ class InspireApp {
         return;
       }
 
-      if (isCmdOrCtrl && e.key === 's') {
+      if (isCmdOrCtrl && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        this.exportVidFile();
+        this.exportVidFile({ saveAs: e.shiftKey }); // ⌘S Save, ⇧⌘S Save As
         return;
       }
 
