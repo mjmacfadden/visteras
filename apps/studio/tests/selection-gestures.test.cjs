@@ -95,3 +95,70 @@ test('resizing a mask preserves existing selection pixels for compound selection
   assert.equal(alpha(mask, 5, 5), 255);
   assert.equal(alpha(mask, 110, 110), 255);
 });
+
+for (const name of ['lasso', 'selection']) {
+  test(`${name} move restores the complete selection after dragging outside every canvas edge`, () => {
+    const { tool, mask } = setup(name);
+    mask.ensure_mask_size();
+    mask.mask_ctx.fillStyle = 'white';
+    mask.mask_ctx.fillRect(30, 30, 100, 90);
+    mask.has_selection = true;
+    mask.point_inside_selection = () => true;
+    tool.mousedown(point(50, 50));
+    // Cross all four edges; even a fully off-canvas intermediate mask must recover.
+    for (const [x, y] of [[-300, 50], [400, 50], [50, -300], [50, 400]]) {
+      tool.mousemove(point(x, y));
+      mask.has_selection = false;
+      tool.mousemove(point(50, 50));
+      assert.equal(alpha(mask, 30, 30), 255);
+      assert.equal(alpha(mask, 129, 119), 255);
+    }
+    tool.mouseup(point(70, 60, false));
+    assert.equal(alpha(mask, 50, 40), 255);
+    assert.equal(alpha(mask, 149, 129), 255);
+    assert.equal(alpha(mask, 49, 40), 0);
+  });
+}
+
+test('freehand lasso follows canvas edges during drawing and commits that outline', () => {
+  const { tool, mask } = setup('lasso');
+  tool.mousedown(point(20, 20));
+  for (const [x, y, expected] of [
+    [250, 20, [200, 20]], [250, 200, [200, 160]],
+    [-30, 200, [0, 160]], [-30, -40, [0, 0]], [40, -40, [40, 0]],
+  ]) {
+    tool.mousemove(point(x, y));
+    assert.deepEqual(Array.from(mask._preview_lasso_path.at(-1)), expected);
+  }
+  tool.mousemove(point(40, 20));
+  const preview = tool.lasso_path.map(p => Array.from(p));
+  let committed;
+  const apply = mask.apply_shape_to_mask.bind(mask);
+  mask.apply_shape_to_mask = (...args) => { committed = args[5].map(p => Array.from(p)); apply(...args); };
+  tool.mouseup(point(40, 20, false));
+  assert.deepEqual(committed, preview);
+});
+
+test('polygonal lasso clamps both the live endpoint and clicked vertices', () => {
+  const { tool, mask } = setup('lasso');
+  tool.get_shape = () => 'polygonal_lasso';
+  tool.mousedown(point(30, 30));
+  tool.mousemove(point(250, -10));
+  assert.deepEqual(Array.from(mask._preview_lasso_path.at(-1)), [200, 0]);
+  tool.mousedown(point(250, -10));
+  assert.deepEqual(Array.from(tool.poly_path.at(-1)), [200, 0]);
+});
+
+test('Space repositioning keeps unfinished lasso inside canvas without changing its shape', () => {
+  const { tool } = setup('lasso');
+  tool.mousedown(point(10, 10));
+  tool.mousemove(point(60, 10));
+  tool.mousemove(point(60, 50));
+  tool.reposition_selection = true;
+  tool.mousemove(point(400, 400));
+  assert.equal(tool.lasso_path.length, 3);
+  assert.deepEqual(Array.from(tool.lasso_path[0]), [150, 120]);
+  assert.deepEqual(Array.from(tool.lasso_path[2]), [200, 160]);
+  tool.mousemove(point(390, 390));
+  assert.deepEqual(Array.from(tool.lasso_path[0]), [140, 110]);
+});

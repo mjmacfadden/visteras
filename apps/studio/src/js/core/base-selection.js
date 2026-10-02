@@ -680,14 +680,15 @@ class Base_selection_class {
 		return pixel[3] >= 128;
 	}
 
-	translate_selection(dx, dy) {
-		if (!this.has_selection) return;
+	translate_selection(dx, dy, source = null) {
+		if (!source && !this.has_selection) return;
+		this.ensure_mask_size();
 		var W = this.mask_canvas.width;
 		var H = this.mask_canvas.height;
 		var temp = document.createElement('canvas');
 		temp.width = W;
 		temp.height = H;
-		temp.getContext('2d').drawImage(this.mask_canvas, 0, 0);
+		temp.getContext('2d').drawImage(source || this.mask_canvas, 0, 0);
 
 		this.mask_ctx.clearRect(0, 0, W, H);
 		this.mask_ctx.drawImage(temp, dx, dy);

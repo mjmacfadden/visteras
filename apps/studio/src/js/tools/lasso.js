@@ -197,6 +197,13 @@ class Lasso_tool_class extends Base_tools_class {
 		}
 	}
 
+	canvas_point(mouse) {
+		return {
+			x: Math.max(0, Math.min(config.WIDTH, Math.round(mouse.x))),
+			y: Math.max(0, Math.min(config.HEIGHT, Math.round(mouse.y))),
+		};
+	}
+
 	mousedown_freehand(mouse, mode, e) {
 		this.mode = mode;
 		this.old_mask_snapshot = this.Base_selection.clone_mask_canvas();
@@ -211,8 +218,8 @@ class Lasso_tool_class extends Base_tools_class {
 			// Create new freehand lasso
 			this.type = 'create';
 			this.is_drawing = true;
-			var start_x = Math.round(mouse.x);
-			var start_y = Math.round(mouse.y);
+			var start_x = this.canvas_point(mouse).x;
+			var start_y = this.canvas_point(mouse).y;
 			this.lasso_path = [[start_x, start_y]];
 			this.Base_selection._preview_lasso_path = this.lasso_path;
 			this.Base_selection.start_marching_ants();
@@ -221,8 +228,8 @@ class Lasso_tool_class extends Base_tools_class {
 	}
 
 	mousedown_polygonal(mouse, mode, e) {
-		var cur_x = Math.round(mouse.x);
-		var cur_y = Math.round(mouse.y);
+		var cur_x = this.canvas_point(mouse).x;
+		var cur_y = this.canvas_point(mouse).y;
 
 		if (this.poly_path == null) {
 			// Starting a new polygonal lasso
@@ -271,30 +278,31 @@ class Lasso_tool_class extends Base_tools_class {
 		if (this.type === 'move') {
 			var dx = Math.round(mouse.x - this.move_last.x);
 			var dy = Math.round(mouse.y - this.move_last.y);
-			if (dx !== 0 || dy !== 0) {
-				this.Base_selection.translate_selection(dx, dy);
-				this.move_last = { x: mouse.x, y: mouse.y };
-			}
+			this.Base_selection.translate_selection(dx, dy, this.old_mask_snapshot);
 			return;
 		}
 
 		if (this.type === 'create' && this.selection_pointer) {
 			const x = Math.round(mouse.x), y = Math.round(mouse.y);
 			if (this.reposition_selection) {
-				const dx = x - this.selection_pointer.x, dy = y - this.selection_pointer.y;
-				if (this.selection_coords_from) {
-					this.selection_coords_from.x += dx;
-					this.selection_coords_from.y += dy;
+				// Move the unfinished outline as a whole, stopping at the canvas edges.
+				let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+				for (const [px, py] of this.lasso_path) {
+					minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+					minY = Math.min(minY, py); maxY = Math.max(maxY, py);
 				}
-				this.lasso_path?.forEach(point => { point[0] += dx; point[1] += dy; });
+				const dx = Math.max(-minX, Math.min(config.WIDTH - maxX, x - this.selection_pointer.x));
+				const dy = Math.max(-minY, Math.min(config.HEIGHT - maxY, y - this.selection_pointer.y));
+				this.lasso_path.forEach(point => { point[0] += dx; point[1] += dy; });
 				config.need_render = true;
 			}
 			this.selection_pointer = { x, y };
+			if (this.reposition_selection) return;
 		}
 
 		if (this.type === 'create' && this.is_drawing && this.lasso_path) {
-			var cur_x = Math.round(mouse.x);
-			var cur_y = Math.round(mouse.y);
+			var cur_x = this.canvas_point(mouse).x;
+			var cur_y = this.canvas_point(mouse).y;
 			var last = this.lasso_path[this.lasso_path.length - 1];
 			if (Math.hypot(cur_x - last[0], cur_y - last[1]) >= 2) {
 				this.lasso_path.push([cur_x, cur_y]);
@@ -308,8 +316,8 @@ class Lasso_tool_class extends Base_tools_class {
 		if (!this.poly_path || this.poly_path.length === 0) return;
 
 		var mouse = this.get_mouse_info(e);
-		var cur_x = Math.round(mouse.x);
-		var cur_y = Math.round(mouse.y);
+		var cur_x = this.canvas_point(mouse).x;
+		var cur_y = this.canvas_point(mouse).y;
 
 		// Snap to start point if hovering near it
 		var dx = cur_x - this.poly_path[0][0];
@@ -335,6 +343,9 @@ class Lasso_tool_class extends Base_tools_class {
 		this.reposition_selection = false;
 		this.selection_pointer = null;
 		if (this.type === 'move') {
+			app.State.do_action(new app.Actions.Set_selection_action(
+				this.Base_selection.clone_mask_canvas(), this.old_mask_snapshot
+			));
 			this.type = null;
 			this.move_last = null;
 			return;

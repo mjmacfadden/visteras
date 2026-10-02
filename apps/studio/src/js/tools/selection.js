@@ -235,10 +235,7 @@ class Selection_class extends Base_tools_class {
 		if (this.type === 'move') {
 			var dx = Math.round(mouse.x - this.move_last.x);
 			var dy = Math.round(mouse.y - this.move_last.y);
-			if (dx !== 0 || dy !== 0) {
-				this.Base_selection.translate_selection(dx, dy);
-				this.move_last = { x: mouse.x, y: mouse.y };
-			}
+			this.Base_selection.translate_selection(dx, dy, this.old_mask_snapshot);
 			return;
 		}
 
