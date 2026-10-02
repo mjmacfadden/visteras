@@ -120,3 +120,40 @@ test('Bug 3: opening a same-name .vid switches only when content is identical, o
   assert.match(app, /Tab ids must stay unique/);
   assert.doesNotMatch(app, /Switched to open document/);
 });
+
+test('Bug 5: undo snapshots store each embedded image once and undo/redo restore it', async () => {
+  const { BoardComposer } = await import('../js/board-composer.js');
+  const big = 'data:image/png;base64,' + 'A'.repeat(200_000);
+  const big2 = 'data:image/png;base64,' + 'B'.repeat(150_000);
+  const board = new BoardComposer();
+  board.elements.push({ id: 'img1', type: 'image', x: 0, y: 0, width: 100, height: 100, zIndex: 1, data: { src: big, title: 'Photo' } });
+  board.saveHistory('Add image');
+  for (let i = 0; i < 40; i++) board.updateElement('img1', { x: i * 5 });
+  board.elements.push({ id: 'img2', type: 'image', x: 0, y: 0, width: 50, height: 50, zIndex: 2, data: { src: big2 } });
+  board.saveHistory('Add image 2');
+
+  const total = board.history.reduce((n, h) => n + h.snapshot.length, 0);
+  assert.ok(total < 100_000, `history must not copy images per step (was ${total} chars)`);
+  assert.equal(board.assetDataById.size, 2, 'each image stored exactly once');
+  assert.ok(board.history.every((h) => !h.snapshot.includes('AAAAAAAAAA')), 'no raw image data in snapshots');
+
+  // Undo past image 2, then back to the first image state, then redo everything
+  board.undo();
+  assert.equal(board.elements.length, 1);
+  assert.equal(board.elements[0].data.src, big, 'image data restored on undo');
+  while (board.canUndo()) board.undo();
+  assert.equal(board.elements.length, 0);
+  while (board.canRedo()) board.redo();
+  assert.equal(board.elements.length, 2);
+  assert.equal(board.elements[0].data.src, big);
+  assert.equal(board.elements[1].data.src, big2);
+  assert.equal(board.elements[0].x, 195);
+
+  // Small strings and lookalike objects are untouched
+  board.elements.push({ id: 't', type: 'text', x: 0, y: 0, width: 10, height: 10, data: { text: 'data:short', meta: { $asset: 'zzz', extra: 1 } } });
+  board.saveHistory('t');
+  board.undo(); board.redo();
+  const t = board.elements.find((e) => e.id === 't');
+  assert.equal(t.data.text, 'data:short');
+  assert.deepEqual(t.data.meta, { $asset: 'zzz', extra: 1 });
+});
