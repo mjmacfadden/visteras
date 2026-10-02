@@ -203,6 +203,8 @@ class Selection_class extends Base_tools_class {
 		this.Base_selection._preview_contours = null;
 		this.Base_selection._preview_lasso_path = null;
 		this.old_mask_snapshot = this.Base_selection.clone_mask_canvas();
+		this.reposition_selection = false;
+		this.selection_pointer = { x: Math.round(mouse.x), y: Math.round(mouse.y) };
 
 		if (mode == null && has_selection && this.Base_selection.point_inside_selection(mouse.x, mouse.y)) {
 			//move selection mask
@@ -223,9 +225,9 @@ class Selection_class extends Base_tools_class {
 		}
 	}
 
-	mousemove(e) {
+	mousemove(e, finishing = false) {
 		var mouse = this.get_mouse_info(e);
-		if (mouse.is_drag == false)
+		if (mouse.is_drag == false && !finishing)
 			return;
 		if (this.type == null)
 			return;
@@ -233,11 +235,22 @@ class Selection_class extends Base_tools_class {
 		if (this.type === 'move') {
 			var dx = Math.round(mouse.x - this.move_last.x);
 			var dy = Math.round(mouse.y - this.move_last.y);
-			if (dx !== 0 || dy !== 0) {
-				this.Base_selection.translate_selection(dx, dy);
-				this.move_last = { x: mouse.x, y: mouse.y };
-			}
+			this.Base_selection.translate_selection(dx, dy, this.old_mask_snapshot);
 			return;
+		}
+
+		if (this.type === 'create' && this.selection_pointer) {
+			const x = Math.round(mouse.x), y = Math.round(mouse.y);
+			if (this.reposition_selection) {
+				const dx = x - this.selection_pointer.x, dy = y - this.selection_pointer.y;
+				if (this.selection_coords_from) {
+					this.selection_coords_from.x += dx;
+					this.selection_coords_from.y += dy;
+				}
+				this.lasso_path?.forEach(point => { point[0] += dx; point[1] += dy; });
+				config.need_render = true;
+			}
+			this.selection_pointer = { x, y };
 		}
 
 		if (this.type === 'create') {
@@ -288,6 +301,10 @@ class Selection_class extends Base_tools_class {
 	}
 
 	mouseup(e) {
+		// Consume the release position too; it may follow the last move event.
+		if (this.type && Number.isFinite(this.get_mouse_info(e).x) && Number.isFinite(this.get_mouse_info(e).y)) this.mousemove(e, true);
+		this.reposition_selection = false;
+		this.selection_pointer = null;
 		var mouse = this.get_mouse_info(e);
 
 		var type = this.type;
