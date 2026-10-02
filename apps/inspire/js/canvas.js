@@ -4,6 +4,7 @@
  */
 
 import { CANVAS_PRESETS } from './document.js';
+import { measureTextBounds } from './board-composer.js';
 
 export class WorkspaceCanvas {
   constructor({
@@ -40,6 +41,8 @@ export class WorkspaceCanvas {
 
     this.isMarquee = false;
     this.marqueeStart = null;
+    this.isTextCreating = false;
+    this.textCreateStart = null;
     this.snapGuides = [];
     this.hasInitialFitted = false;
 
@@ -425,9 +428,10 @@ export class WorkspaceCanvas {
 
       case 'text': {
         const d = el.data || {};
+        const isBox = d.boundary === 'box';
         contentHtml = `
-          <div class="el-inner-text" style="font-family:${d.fontFamily || 'Montserrat'}, sans-serif; font-size:${d.fontSize || 32}px; font-weight:${d.fontWeight || '700'}; color:${d.color || '#ffffff'}; text-align:${d.align || 'left'}; letter-spacing:${d.letterSpacing || 1}px;">
-            ${d.text || ''}
+          <div class="el-inner-text ${isBox ? 'text-box-mode' : 'text-point-mode'}" style="font-family:${d.fontFamily || 'Montserrat'}, sans-serif; font-size:${d.fontSize || 32}px; font-weight:${d.fontWeight || '700'}; color:${d.color || '#ffffff'}; text-align:${d.align || 'left'}; letter-spacing:${d.letterSpacing || 0}px; line-height:${d.lineHeight || 1.2}; ${isBox ? 'white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word; width: 100%; height: 100%;' : 'white-space: pre; word-break: normal; width: 100%; height: 100%; overflow: visible;'}">
+            ${this.escapeHtml(d.text || '')}
           </div>
         `;
         break;
@@ -748,6 +752,21 @@ export class WorkspaceCanvas {
 
       if (e.button !== 0) return;
 
+      // Text tool interaction (Point Text on click, Textbox on drag)
+      if (this.activeTool === 'text') {
+        const canvasPt = this.screenToCanvas(e.clientX, e.clientY);
+        this.isTextCreating = true;
+        this.textCreateStart = canvasPt;
+        this.marqueeBox.style.display = 'block';
+        this.marqueeBox.style.left = `${canvasPt.x}px`;
+        this.marqueeBox.style.top = `${canvasPt.y}px`;
+        this.marqueeBox.style.width = '0px';
+        this.marqueeBox.style.height = '0px';
+        this.marqueeBox.style.border = '1px dashed #f59e0b';
+        vp.setPointerCapture(e.pointerId);
+        return;
+      }
+
       const handle = e.target.closest('.transform-handle');
       if (handle) {
         this.startTransform(e, handle.dataset.handle);
@@ -815,6 +834,7 @@ export class WorkspaceCanvas {
       this.marqueeBox.style.top = `${canvasPt.y}px`;
       this.marqueeBox.style.width = '0px';
       this.marqueeBox.style.height = '0px';
+      this.marqueeBox.style.border = '';
       vp.setPointerCapture(e.pointerId);
     });
 
@@ -829,6 +849,20 @@ export class WorkspaceCanvas {
 
       if (this.isTransforming) {
         this.handleTransformMove(e);
+        return;
+      }
+
+      if (this.isTextCreating && this.textCreateStart) {
+        const cur = this.screenToCanvas(e.clientX, e.clientY);
+        const x = Math.min(this.textCreateStart.x, cur.x);
+        const y = Math.min(this.textCreateStart.y, cur.y);
+        const w = Math.abs(cur.x - this.textCreateStart.x);
+        const h = Math.abs(cur.y - this.textCreateStart.y);
+
+        this.marqueeBox.style.left = `${x}px`;
+        this.marqueeBox.style.top = `${y}px`;
+        this.marqueeBox.style.width = `${w}px`;
+        this.marqueeBox.style.height = `${h}px`;
         return;
       }
 
@@ -864,6 +898,54 @@ export class WorkspaceCanvas {
 
       if (this.isTransforming) {
         this.endTransform();
+      }
+
+      if (this.isTextCreating && this.textCreateStart) {
+        const cur = this.screenToCanvas(e.clientX, e.clientY);
+        const start = this.textCreateStart;
+        const w = Math.abs(cur.x - start.x);
+        const h = Math.abs(cur.y - start.y);
+
+        this.isTextCreating = false;
+        this.textCreateStart = null;
+        this.marqueeBox.style.display = 'none';
+        this.marqueeBox.style.border = '';
+
+        const threshold = 8; // Studio drag threshold
+        const isBox = w >= threshold && h >= threshold;
+
+        let el;
+        if (isBox) {
+          const x = Math.min(start.x, cur.x);
+          const y = Math.min(start.y, cur.y);
+          el = this.board.addTextElement({
+            text: 'Type text here...',
+            x,
+            y,
+            width: Math.max(w, 80),
+            height: Math.max(h, 40),
+            boundary: 'box'
+          });
+        } else {
+          el = this.board.addTextElement({
+            text: 'Type text here...',
+            x: start.x,
+            y: start.y,
+            boundary: 'dynamic'
+          });
+        }
+
+        this.board.selectElement(el.id);
+        const cardDom = document.getElementById(`dom_${el.id}`);
+        if (cardDom) {
+          this.openInlineEditor(el, cardDom);
+        }
+
+        // Switch tool back to select
+        this.activeTool = 'select';
+        document.querySelectorAll('#tools_left .tool_btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tool_select')?.classList.add('active');
+        return;
       }
 
       if (this.isMarquee) {
@@ -1082,11 +1164,18 @@ export class WorkspaceCanvas {
       }
     }
 
+    // Dismiss any existing inline editor
+    const existing = document.querySelector('.inspire-inline-editor');
+    if (existing) {
+      existing.blur();
+    }
+
     const isQuote = el.type === 'quote';
     const isPolaroid = el.type === 'image' && el.data?.polaroid;
+    const isText = el.type === 'text';
 
     let currentText = '';
-    if (el.type === 'text') currentText = el.data?.text || '';
+    if (isText) currentText = el.data?.text || '';
     else if (isQuote) currentText = el.data?.quote || '';
     else if (isPolaroid) currentText = el.data?.caption || el.data?.title || '';
 
@@ -1112,6 +1201,31 @@ export class WorkspaceCanvas {
       textarea.style.textAlign = 'center';
       textarea.style.resize = 'none';
       textarea.style.boxSizing = 'border-box';
+    } else if (isText) {
+      const d = el.data || {};
+      const isBox = d.boundary === 'box';
+      textarea.classList.add('inspire-inline-text-editor');
+      textarea.style.left = '0';
+      textarea.style.top = '0';
+      textarea.style.width = '100%';
+      textarea.style.height = '100%';
+      textarea.style.background = 'rgba(26, 28, 35, 0.95)';
+      textarea.style.color = d.color || '#ffffff';
+      textarea.style.fontFamily = `${d.fontFamily || 'Montserrat'}, sans-serif`;
+      textarea.style.fontSize = `${d.fontSize || 32}px`;
+      textarea.style.fontWeight = d.fontWeight || '700';
+      textarea.style.textAlign = d.align || 'left';
+      textarea.style.letterSpacing = `${d.letterSpacing || 0}px`;
+      textarea.style.lineHeight = String(d.lineHeight || 1.2);
+      textarea.style.border = '2px solid #f59e0b';
+      textarea.style.borderRadius = '4px';
+      textarea.style.padding = '4px 6px';
+      textarea.style.boxSizing = 'border-box';
+      textarea.style.outline = 'none';
+      textarea.style.resize = 'none';
+      textarea.style.overflow = 'hidden';
+      textarea.style.whiteSpace = isBox ? 'pre-wrap' : 'pre';
+      textarea.style.wordBreak = isBox ? 'break-word' : 'normal';
     } else {
       textarea.style.left = '0';
       textarea.style.top = '0';
@@ -1130,11 +1244,56 @@ export class WorkspaceCanvas {
     textarea.focus();
     textarea.select();
 
+    // Live measurement for point text during typing
+    if (isText) {
+      const d = el.data || {};
+      const isBox = d.boundary === 'box';
+      textarea.addEventListener('input', () => {
+        el.data.text = textarea.value;
+        if (!isBox) {
+          const measured = measureTextBounds(textarea.value || ' ', {
+            fontFamily: d.fontFamily,
+            fontSize: d.fontSize,
+            fontWeight: d.fontWeight,
+            letterSpacing: d.letterSpacing,
+            lineHeight: d.lineHeight
+          });
+          el.width = measured.width;
+          el.height = measured.height;
+          dom.style.width = `${el.width}px`;
+          dom.style.height = `${el.height}px`;
+          this.updateSelectionHandles();
+        }
+        const inspContent = document.querySelector('#inp_text_content');
+        if (inspContent && inspContent.value !== textarea.value) {
+          inspContent.value = textarea.value;
+        }
+      });
+    }
+
     const commit = () => {
       const val = textarea.value;
-      if (el.type === 'text') el.data.text = val;
-      else if (isQuote) el.data.quote = val;
-      else if (isPolaroid) {
+      if (isText) {
+        el.data.text = val;
+        const d = el.data || {};
+        if (d.boundary !== 'box') {
+          const measured = measureTextBounds(val || ' ', {
+            fontFamily: d.fontFamily,
+            fontSize: d.fontSize,
+            fontWeight: d.fontWeight,
+            letterSpacing: d.letterSpacing,
+            lineHeight: d.lineHeight
+          });
+          el.width = measured.width;
+          el.height = measured.height;
+        }
+        const inspContent = document.querySelector('#inp_text_content');
+        if (inspContent && inspContent.value !== val) {
+          inspContent.value = val;
+        }
+      } else if (isQuote) {
+        el.data.quote = val;
+      } else if (isPolaroid) {
         el.data.caption = val;
         // Live sync with inspector if active
         const inspCap = document.querySelector('#inp_img_caption');

@@ -953,7 +953,7 @@ function hookSelectorManager(svgEditor) {
       sm.rotateCornerGrips = {};
     }
 
-    const ROT_ZONE_SIZE = 26;
+    const ROT_ZONE_SIZE = 28;
 
     cornerKeys.forEach((k) => {
       let rotGrip = sm.rotateCornerGrips[k];
@@ -980,8 +980,8 @@ function hookSelectorManager(svgEditor) {
     const updateCornerRotatePos = (k, cx, cy) => {
       const rotGrip = sm.rotateCornerGrips && sm.rotateCornerGrips[k];
       if (!rotGrip) return;
-      const offX = k.includes('w') ? -4 : 4;
-      const offY = k.includes('n') ? -4 : 4;
+      const offX = k.includes('w') ? -14 : 14;
+      const offY = k.includes('n') ? -14 : 14;
       rotGrip.setAttribute('x', String(cx - ROT_ZONE_SIZE / 2 + offX));
       rotGrip.setAttribute('y', String(cy - ROT_ZONE_SIZE / 2 + offY));
     };

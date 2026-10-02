@@ -217,6 +217,56 @@ test('MoodboardLayouts: Collage Cluster applies organic paper-like rotations', (
   assert.ok(hasRotation, 'Collage layout should assign artistic rotations');
 });
 
+test('MoodboardLayouts: All layout options auto-fit all items onto board bounds without clipping', () => {
+  const layouts = ['masonry', 'editorial', 'colorFlow', 'collage'];
+  const testCounts = [1, 2, 5, 12, 24];
+  const testBounds = [
+    { x: 60, y: 60, width: 1800, height: 960 }, // Landscape
+    { x: 40, y: 40, width: 1000, height: 1840 }, // Portrait
+    { x: 50, y: 50, width: 980, height: 980 }    // Square
+  ];
+
+  for (const layoutName of layouts) {
+    const layoutFn = MoodboardLayouts[layoutName];
+    for (const bounds of testBounds) {
+      for (const count of testCounts) {
+        const elements = Array.from({ length: count }, (_, i) => ({
+          id: `el_${i}`,
+          width: 300 + (i % 3) * 50,
+          height: 200 + (i % 4) * 80,
+          data: { hex: `#${((i * 123456) % 0xffffff).toString(16).padStart(6, '0')}` }
+        }));
+
+        const updates = layoutFn(elements, { bounds });
+        assert.equal(updates.length, count, `${layoutName} returned updates for all ${count} elements`);
+
+        for (const u of updates) {
+          const rot = u.rotation || 0;
+          const rad = (rot * Math.PI) / 180;
+          const cos = Math.abs(Math.cos(rad));
+          const sin = Math.abs(Math.sin(rad));
+          const bbW = u.width * cos + u.height * sin;
+          const bbH = u.width * sin + u.height * cos;
+          const cx = u.x + u.width / 2;
+          const cy = u.y + u.height / 2;
+
+          const minX = cx - bbW / 2;
+          const minY = cy - bbH / 2;
+          const maxX = cx + bbW / 2;
+          const maxY = cy + bbH / 2;
+
+          assert.ok(minX >= bounds.x - 2, `${layoutName} item ${u.id} minX (${minX}) >= bounds.x (${bounds.x}) for count ${count}`);
+          assert.ok(minY >= bounds.y - 2, `${layoutName} item ${u.id} minY (${minY}) >= bounds.y (${bounds.y}) for count ${count}`);
+          assert.ok(maxX <= bounds.x + bounds.width + 2, `${layoutName} item ${u.id} maxX (${maxX}) <= bounds maxX (${bounds.x + bounds.width}) for count ${count}`);
+          assert.ok(maxY <= bounds.y + bounds.height + 2, `${layoutName} item ${u.id} maxY (${maxY}) <= bounds maxY (${bounds.y + bounds.height}) for count ${count}`);
+          assert.ok(u.width > 0, `${layoutName} item ${u.id} width > 0`);
+          assert.ok(u.height > 0, `${layoutName} item ${u.id} height > 0`);
+        }
+      }
+    }
+  }
+});
+
 /* -------------------------------------------------------------------------- */
 /* 4. Board Composer Operations & Z-Ordering Tests                            */
 /* -------------------------------------------------------------------------- */
@@ -298,11 +348,14 @@ test('ColorExtractor: Accurately converts hex to RGB and calculates perceptual n
 test('HTML Structure: Strictly adheres to user requested Visteras layout hierarchy', () => {
   const html = fs.readFileSync(path.join(inspireRoot, 'index.html'), 'utf8');
 
-  // Verify Options bar across top
+  // Verify File menu bar across top
+  assert.match(html, /<nav\s+id="visteras_menu_bar"/, 'HTML must contain #visteras_menu_bar nav');
+
+  // Verify Options bar below menu bar
   assert.match(html, /<header\s+id="tools_top"/, 'HTML must contain #tools_top header');
 
-  // Verify File menu bar below options bar
-  assert.match(html, /<nav\s+id="visteras_menu_bar"/, 'HTML must contain #visteras_menu_bar nav');
+  // Verify PNG logo is used in options bar
+  assert.match(html, /visteras_inspire_logo\.png/, 'HTML must use visteras_inspire_logo.png');
 
   // Verify Left toolbar
   assert.match(html, /<aside\s+id="tools_left"/, 'HTML must contain #tools_left aside');
@@ -316,16 +369,16 @@ test('HTML Structure: Strictly adheres to user requested Visteras layout hierarc
   // Verify Bottom status bar
   assert.match(html, /<footer\s+id="tools_bottom"/, 'HTML must contain #tools_bottom footer');
 
-  // Verify options bar appears before menu bar in DOM
-  const toolsTopIdx = html.indexOf('id="tools_top"');
+  // Verify menu bar appears before options bar in DOM
   const menuBarIdx = html.indexOf('id="visteras_menu_bar"');
+  const toolsTopIdx = html.indexOf('id="tools_top"');
   const toolsLeftIdx = html.indexOf('id="tools_left"');
   const workareaIdx = html.indexOf('id="workarea"');
   const sidepanelsIdx = html.indexOf('id="sidepanels"');
   const toolsBottomIdx = html.indexOf('id="tools_bottom"');
 
-  assert.ok(toolsTopIdx < menuBarIdx, 'Options bar (#tools_top) must precede Menu bar (#visteras_menu_bar)');
-  assert.ok(menuBarIdx < toolsLeftIdx, 'Menu bar must precede Left tools');
+  assert.ok(menuBarIdx < toolsTopIdx, 'Menu bar (#visteras_menu_bar) must precede Options bar (#tools_top)');
+  assert.ok(toolsTopIdx < toolsLeftIdx, 'Options bar must precede Left tools');
   assert.ok(toolsLeftIdx < workareaIdx, 'Left tools must precede Workarea');
   assert.ok(workareaIdx < sidepanelsIdx, 'Workarea must precede Sidepanels');
   assert.ok(sidepanelsIdx < toolsBottomIdx, 'Sidepanels must precede Bottom status bar');
@@ -334,8 +387,8 @@ test('HTML Structure: Strictly adheres to user requested Visteras layout hierarc
   const css = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
   assert.match(
     css,
-    /grid-template:\s*"options\s+options\s+options"[\s\S]*?"menu\s+menu\s+menu"[\s\S]*?"tools\s+workarea\s+panels"[\s\S]*?"status\s+status\s+status"/,
-    'CSS grid must specify options bar on top, menu below it, tools-workarea-panels in middle, and status at bottom'
+    /grid-template:\s*"menu\s+menu\s+menu"\s+28px\s+"options\s+options\s+options"\s+45px[\s\S]*?"tools\s+workarea\s+panels"[\s\S]*?"status\s+status\s+status"/,
+    'CSS grid must specify menu bar on top, 45px options bar below it, tools-workarea-panels in middle, and status at bottom'
   );
 });
 
@@ -601,6 +654,11 @@ test('Bounding Box & Corner Rotation Zone UX: Blue lines with square handles and
 
   // 6. Verify 15-degree shift-snapping parity
   assert.match(canvasJs, /Math\.round\(baseRot \/ 15\) \* 15/, 'canvas.js must snap rotation to 15 degrees when Shift is held');
+
+  // 7. Verify transform controls and handles render on top of selected objects (high z-index)
+  assert.match(themeCss, /\.inspire-selection-overlay\s*\{[^}]*z-index:\s*10000/s, 'Selection overlay must have z-index: 10000 to sit on top of board elements');
+  assert.match(themeCss, /\.inspire-transform-box\s*\{[^}]*z-index:\s*10001/s, 'Transform box must have z-index: 10001');
+  assert.match(themeCss, /\.transform-handle\s*\{[^}]*z-index:\s*10002/s, 'Transform handles must have z-index: 10002');
 });
 
 test('Layouts UX: Custom element positioning can be reverted to after applying auto-layouts', () => {
@@ -744,4 +802,52 @@ test('Swipe View Tagging UX: Items support adding, removing, and filtering by ta
   assert.match(themeCss, /\.card-tags-row\s*\{/, 'theme.css must style .card-tags-row');
   assert.match(themeCss, /\.btn-add-tag-trigger\s*\{/, 'theme.css must style .btn-add-tag-trigger');
   assert.match(themeCss, /\.card-tag-input\s*\{/, 'theme.css must style .card-tag-input');
+});
+
+test('Point Text & Textbox Architecture: Editable point text with dynamic bounds auto-measurement and textbox wrapping', () => {
+  const composer = new BoardComposer();
+
+  // 1. Point text creation has dynamic boundary and automatically measured width/height
+  const pointEl = composer.addTextElement({
+    text: 'HEADLINE TEXT',
+    x: 50,
+    y: 50,
+    boundary: 'dynamic',
+    fontSize: 32
+  });
+  assert.equal(pointEl.data.boundary, 'dynamic', 'Point text should have boundary=dynamic');
+  assert.ok(pointEl.width > 0, 'Point text should have measured positive width');
+  assert.ok(pointEl.height > 0, 'Point text should have measured positive height');
+
+  // 2. Textbox creation has fixed box boundary and specified bounds
+  const boxEl = composer.addTextElement({
+    text: 'Paragraph text content that wraps inside fixed boundaries.',
+    x: 100,
+    y: 100,
+    width: 250,
+    height: 120,
+    boundary: 'box'
+  });
+  assert.equal(boxEl.data.boundary, 'box', 'Textbox should have boundary=box');
+  assert.equal(boxEl.width, 250, 'Textbox should maintain specified width');
+  assert.equal(boxEl.height, 120, 'Textbox should maintain specified height');
+
+  // 3. Verify canvas.js provides live text inline editing and Point vs Box text rendering
+  const canvasJs = fs.readFileSync(path.join(inspireRoot, 'js/canvas.js'), 'utf8');
+  assert.match(canvasJs, /text-point-mode/, 'canvas.js must support text-point-mode CSS class');
+  assert.match(canvasJs, /text-box-mode/, 'canvas.js must support text-box-mode CSS class');
+  assert.match(canvasJs, /inspire-inline-text-editor/, 'canvas.js must style live on-canvas text editor');
+  assert.match(canvasJs, /measureTextBounds\(/, 'canvas.js must use measureTextBounds for dynamic point text sizing');
+
+  // 4. Verify Inspector provides Text Content, Boundary Mode, and Letter Spacing controls
+  const inspectorJs = fs.readFileSync(path.join(inspireRoot, 'js/inspector.js'), 'utf8');
+  assert.match(inspectorJs, /id="inp_text_content"/, 'Inspector must provide text content textarea');
+  assert.match(inspectorJs, /id="inp_text_boundary"/, 'Inspector must provide boundary mode selector');
+  assert.match(inspectorJs, /id="inp_text_spacing"/, 'Inspector must provide letter spacing slider');
+
+  // 5. Verify CSS styles for Point Text vs Textbox
+  const themeCss = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
+  assert.match(themeCss, /\.text-point-mode\s*\{/, 'Theme CSS must style .text-point-mode');
+  assert.match(themeCss, /\.text-box-mode\s*\{/, 'Theme CSS must style .text-box-mode');
+  assert.match(themeCss, /\.inspire-inline-text-editor\s*\{/, 'Theme CSS must style .inspire-inline-text-editor');
 });

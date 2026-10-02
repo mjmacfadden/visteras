@@ -701,9 +701,9 @@ class InspireApp {
         break;
 
       case 'text':
-        this.canvas.activeTool = 'select';
-        document.getElementById('tool_select')?.classList.add('active');
-        this.promptAddText();
+        this.canvas.activeTool = 'text';
+        btnEl?.classList.add('active');
+        this.showToast('Text Tool: Click on canvas for Point Text, or drag to draw a Textbox', 'info');
         break;
 
       case 'sticky':
@@ -1471,17 +1471,19 @@ class InspireApp {
       this.board.snapshotCustomLayout();
     }
 
+    const marginX = Math.min(60, Math.round((this.doc.width || 1920) * 0.04));
+    const marginY = Math.min(60, Math.round((this.doc.height || 1080) * 0.04));
     const bounds = {
-      x: 80,
-      y: 80,
-      width: Math.max(800, (this.doc.width || 1920) - 160),
-      height: Math.max(600, (this.doc.height || 1080) - 160)
+      x: marginX,
+      y: marginY,
+      width: Math.max(200, (this.doc.width || 1920) - 2 * marginX),
+      height: Math.max(200, (this.doc.height || 1080) - 2 * marginY)
     };
 
     let updates = [];
     switch (layoutType) {
       case 'masonry':
-        updates = MoodboardLayouts.masonry(this.board.elements, { bounds, columns: 3, gap: 24 });
+        updates = MoodboardLayouts.masonry(this.board.elements, { bounds, gap: 24 });
         break;
       case 'editorial':
         updates = MoodboardLayouts.editorial(this.board.elements, { bounds, gap: 24 });
@@ -1554,8 +1556,12 @@ class InspireApp {
         <span class="layer-icon">${icon}</span>
         <span class="layer-title">${this.escapeHtml(title)}</span>
         <div class="layer-controls">
-          <button type="button" class="layer-btn-up" title="Bring Forward">▲</button>
-          <button type="button" class="layer-btn-down" title="Send Backward">▼</button>
+          <button type="button" class="layer-btn-up" title="Bring Forward">
+            <img src="images/go_up.svg" alt="Bring Forward" class="layer-ctrl-icon" />
+          </button>
+          <button type="button" class="layer-btn-down" title="Send Backward">
+            <img src="images/go_down.svg" alt="Send Backward" class="layer-ctrl-icon" />
+          </button>
         </div>
       `;
 
@@ -1763,7 +1769,7 @@ class InspireApp {
       if (!isCmdOrCtrl && !e.altKey) {
         if (e.key.toLowerCase() === 'v') this.handleToolAction('select', document.getElementById('tool_select'));
         if (e.key.toLowerCase() === 'h') this.handleToolAction('hand', document.getElementById('tool_hand'));
-        if (e.key.toLowerCase() === 't') this.promptAddText();
+        if (e.key.toLowerCase() === 't') this.handleToolAction('text', document.getElementById('tool_text'));
         if (e.key.toLowerCase() === 'q') this.promptAddQuote();
         if (e.key.toLowerCase() === 's') this.addStickyNote();
         if (e.key.toLowerCase() === 'c') this.promptAddSwatch();

@@ -1,20 +1,20 @@
 :root {
-  --ui-font: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --ui-font: "Segoe UI", "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
   
   /* Visteras Dark Studio Foundations */
-  --studio-header-bg: #2d2d2d;
-  --studio-options-bg: #333333;
+  --studio-header-bg: #333333;
+  --studio-options-bg: #2d2d2d;
   --studio-toolbar-bg: #3c3c3c;
-  --studio-panel-bg: #383838;
+  --studio-panel-bg: #3c3c3c;
   --studio-panel-bg-darker: #2d2d2d;
-  --studio-workspace-bg: #1e2024;
-  --studio-chassis-bg: #4a4a4a;
-  --studio-border-dark: #1e1e1e;
+  --studio-workspace-bg: #606060;
+  --studio-chassis-bg: #535353;
+  --studio-border-dark: #1a1a1a;
   --studio-border-med: #2a2a2a;
-  --studio-border-light: #525252;
-  --studio-text: #e2e8f0;
-  --studio-text-muted: #94a3b8;
+  --studio-border-light: #505050;
+  --studio-text: #cccccc;
+  --studio-text-muted: #888888;
 
   /* Inspire Warm Amber / Gold Brand Accent */
   --inspire-amber: #f59e0b;
@@ -56,8 +56,8 @@ html {
   #visteras_app_container {
     display: grid;
     grid-template:
-      "options options options" 44px
       "menu menu menu" 28px
+      "options options options" 45px
       "tools workarea panels" 1fr
       "status status status" 24px
       / 42px 1fr 340px;
@@ -74,55 +74,71 @@ html {
 }
 
 /* ==========================================================================
-   1. Top Options Bar (#tools_top)
+   1. Top Options Bar (#tools_top) - Studio & Vector 45px Parity
    ========================================================================== */
 #tools_top {
   grid-area: options;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--studio-options-bg);
-  border-bottom: 1px solid var(--studio-border-med);
-  padding: 0 12px;
-  z-index: 2000;
+  height: 45px;
+  min-height: 45px;
+  max-height: 45px;
+  background-color: var(--studio-options-bg);
+  border-bottom: 1px solid var(--studio-border-dark);
+  padding: 0 12px 0 0;
+  z-index: 500;
   user-select: none;
+  box-sizing: border-box;
 }
 
 .visteras_inspire_logo_wrap {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  text-decoration: none;
+  height: 36px;
+  margin: 4px;
+  padding: 1px 8px;
+  font-size: 13px;
+  font-weight: 700;
   color: #ffffff;
-  padding-right: 6px;
+  text-decoration: none;
+  letter-spacing: 1px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .visteras_inspire_logo_wrap img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
+  height: 28px;
+  width: auto;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
-.logo_text {
-  font-size: 12px;
-  letter-spacing: 0.5px;
-}
-
-.logo_bold {
-  font-weight: 700;
+.visteras_inspire_logo_wrap .logo_text {
+  font-size: 14px;
   color: #ffffff;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1;
 }
 
-.logo_light {
-  font-weight: 400;
-  color: var(--inspire-amber);
+.visteras_inspire_logo_wrap .logo_bold {
+  font-weight: 700;
+}
+
+.visteras_inspire_logo_wrap .logo_light {
+  font-weight: 100;
+  opacity: 0.7;
+  color: #ffffff;
 }
 
 .visteras_top_divider {
   width: 1px;
-  height: 20px;
-  background-color: var(--studio-border-light);
-  margin: 0 4px;
+  height: 22px;
+  background: #3c3c3c;
+  margin: 0 8px;
+  flex-shrink: 0;
 }
 
 .options_btn_group {
@@ -228,7 +244,7 @@ html {
   align-items: stretch;
   height: 28px;
   background: var(--studio-header-bg);
-  border-bottom: 1px solid var(--studio-border-dark);
+  border-bottom: 1px solid #222222;
   padding: 0 8px;
   user-select: none;
   z-index: 3000;
@@ -241,25 +257,35 @@ html {
 
 .menu_entry {
   position: relative;
-  display: flex;
-  align-items: center;
+  display: inline-flex;
+  align-items: stretch;
+  height: 100%;
 }
 
 .menu_entry_title {
-  padding: 0 10px;
-  height: 100%;
   display: flex;
   align-items: center;
-  color: var(--studio-text);
+  padding: 0 8px 1.4px 8px;
+  font-family: var(--ui-font);
   font-size: 11px;
+  font-weight: 400;
+  line-height: normal;
+  color: #cccccc;
   cursor: pointer;
-  border-radius: 2px;
+  border-radius: 0;
+  box-sizing: border-box;
+  height: 100%;
+  transition: background 0.12s, color 0.12s;
 }
 
-.menu_entry:hover .menu_entry_title,
-.menu_entry.open .menu_entry_title {
-  background-color: #444444;
+.menu_entry:hover .menu_entry_title {
+  background: #505050;
   color: #ffffff;
+}
+
+.menu_entry.open .menu_entry_title {
+  background: var(--inspire-amber);
+  color: #111111;
 }
 
 .menu_dropdown_list {
@@ -321,24 +347,28 @@ html {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .visteras_switch_btn {
-  color: #888888;
-  text-decoration: none;
-  font-size: 10px;
-  padding: 3px 6px;
-  border-radius: 3px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  transition: all 0.15s ease;
+  gap: 4px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #aaaaaa;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: #242424;
+  border: 1px solid #383838;
+  transition: all 0.15s;
 }
 
 .visteras_switch_btn:hover {
-  background: #3e3e3e;
+  background: #333333;
   color: #ffffff;
+  border-color: #555555;
 }
 
 /* ==========================================================================
@@ -832,9 +862,36 @@ html {
 .el-inner-text {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
+  display: block;
+  box-sizing: border-box;
   line-height: 1.2;
+}
+
+.el-inner-text.text-point-mode {
+  white-space: pre;
+  word-break: normal;
+  overflow: visible;
+}
+
+.el-inner-text.text-box-mode {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.inspire-inline-text-editor {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background: rgba(26, 28, 35, 0.95);
+  border: 2px solid var(--inspire-amber);
+  border-radius: 4px;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  outline: none;
+  resize: none;
+  overflow: hidden;
 }
 
 /* 5.4 Sticky Note */
@@ -998,6 +1055,7 @@ html {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  z-index: 10000;
 }
 
 .inspire-transform-box {
@@ -1005,6 +1063,7 @@ html {
   border: 1px solid #3f8ff7;
   pointer-events: none;
   box-sizing: border-box;
+  z-index: 10001;
 }
 
 .transform-handle {
@@ -1016,7 +1075,7 @@ html {
   border-radius: 0;
   box-sizing: border-box;
   pointer-events: auto;
-  z-index: 2;
+  z-index: 10002;
 }
 
 .handle-nw { top: -4px; left: -4px; cursor: nwse-resize; }
@@ -1031,18 +1090,18 @@ html {
 /* Studio and Vector Parity: Corner Rotation Zones (replaces old stem handle) */
 .transform-rotate-zone {
   position: absolute;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   background: transparent;
   pointer-events: auto;
-  z-index: 1;
+  z-index: 10001;
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="%23ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" d="M 17 5.9 A 8 8 0 1 0 18.9 17.1"/><path fill="%23ffffff" stroke="%23ffffff" stroke-width="2.8" stroke-linejoin="round" d="M 19 18.5 L 21.6 13.6 L 16 16.1 Z"/><path fill="none" stroke="%23000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M 17 5.9 A 8 8 0 1 0 18.9 17.1"/><path fill="%23000000" stroke="%23000000" stroke-width="0.9" stroke-linejoin="round" d="M 19 18.5 L 21.6 13.6 L 16 16.1 Z"/></svg>') 12 12, url('../images/rotate.svg') 12 12, crosshair;
 }
 
-.rot-zone-nw { top: -17px; left: -17px; }
-.rot-zone-ne { top: -17px; right: -17px; }
-.rot-zone-se { bottom: -17px; right: -17px; }
-.rot-zone-sw { bottom: -17px; left: -17px; }
+.rot-zone-nw { top: -26px; left: -26px; }
+.rot-zone-ne { top: -26px; right: -26px; }
+.rot-zone-se { bottom: -26px; right: -26px; }
+.rot-zone-sw { bottom: -26px; left: -26px; }
 
 .inspire-marquee-box {
   display: none;
@@ -1726,6 +1785,61 @@ html {
   border-radius: 3px;
 }
 
+/* Card Tint Color Chips (Square & Borderless) */
+.sticky-color-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.sticky-color-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: transform 0.12s ease, outline 0.1s ease;
+  box-sizing: border-box;
+}
+
+.sticky-color-chip:hover {
+  transform: scale(1.12);
+}
+
+.sticky-color-chip.active {
+  outline: 2px solid #ffffff;
+  outline-offset: 1px;
+}
+
+/* Inline Checkbox Rows */
+.inspector-checkbox-row {
+  flex-direction: row !important;
+  align-items: center !important;
+  margin-bottom: 8px;
+}
+
+.inspector-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--studio-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.inspector-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--inspire-amber);
+  cursor: pointer;
+  margin: 0;
+}
+
 .slider-with-val {
   display: flex;
   align-items: center;
@@ -1780,6 +1894,49 @@ html {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.inspector-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.inspector-arrange-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.btn_visteras_arrange {
+  background: #383838;
+  border: 1px solid var(--studio-border-light);
+  color: #cccccc;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.btn_visteras_arrange:hover {
+  background: #4a4a4a;
+  border-color: #666666;
+  color: #ffffff;
+}
+
+.visteras_arrange_icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .btn_visteras_text {
@@ -1900,20 +2057,34 @@ html {
 
 .layer-controls {
   display: flex;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
 }
 
 .layer-controls button {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: #888888;
-  font-size: 9px;
   padding: 2px 4px;
+  border-radius: 2px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
 }
 
 .layer-controls button:hover {
+  background: #383838;
+  border-color: #505050;
   color: #ffffff;
+}
+
+.layer-ctrl-icon {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .empty-layers {
