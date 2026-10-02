@@ -18,3 +18,11 @@ test('Bug 8: status-bar zoom never reads a missing canvas', () => {
   assert.match(read('js/app.js'), /const z = zoomPercent\(extra, this\.canvas\);/);
   assert.doesNotMatch(read('js/app.js'), /Math\.round\(this\.canvas\.zoom \* 100\)\);\n\s*zoomEl/);
 });
+
+test('Bug 7: artboard size changes apply instantly (no layout transition) so hit-testing is right immediately', () => {
+  const css = read('css/visteras-inspire-theme.css');
+  const artboardRule = /\.inspire-artboard \{([^}]*)\}/.exec(css)[1];
+  assert.doesNotMatch(artboardRule, /transition\s*:/, '.inspire-artboard must not transition width/height');
+  assert.doesNotMatch(css, /transition:\s*width[^;]*height/, 'no width/height transitions on canvas layout');
+  assert.match(/\.inspire-artboard-frame \{([^}]*)\}/.exec(css)[1], /vertical-align: top/);
+});
