@@ -45,9 +45,15 @@ temp/
 *.tmp
 
 # dist/ policy:
-# Keep committing dist/ for now so Live Server / static hosting works without
-# CI-published artifacts. Do NOT add dist/ here and do NOT untrack dist/.
-# Revisit when CI builds and deploys bundle.js.
+# Studio's dist/ is a build output. CI builds it (deploy-pages.yml runs
+# npm run build:site → npm run build --prefix apps/studio) and deploys the
+# generated site/ artifact, so it is no longer committed. For local serving
+# (Live Server etc.) run: npm run build --prefix apps/studio
+apps/studio/dist/
+
+# Studio's archived/ (old v1/v2 trees) is local reference only; it is excluded
+# from build:site and never served. It stays in git history.
+apps/studio/archived/
 
 # Local API keys (copy from config.keys.local.example.js)
 apps/studio/src/js/config.keys.local.js
