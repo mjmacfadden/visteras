@@ -10,8 +10,8 @@
 	height: auto;
 	overflow: hidden;
 
-	-ms-grid-rows: 42px 1fr;
-	grid-template-rows: 42px 1fr;
+	-ms-grid-rows: 45px 1fr;
+	grid-template-rows: 45px 1fr;
 	-ms-grid-columns: auto 1fr auto;
 	grid-template-columns: auto 1fr auto;
 
@@ -265,10 +265,10 @@ body .sp-preview{
 	position: relative;
 	display: inline-flex;
 	align-items: center;
-	height: 34px;
+	height: 36px;
 	width: auto;
 	padding: 1px 8px;
-	margin: 0 4px;
+	margin: 4px;
 	font-size: 13px;
 	text-decoration: none;
 	font-weight: bold;
@@ -276,6 +276,7 @@ body .sp-preview{
 	letter-spacing: 1px;
 	gap: 8px;
 	flex-shrink: 0;
+	cursor: pointer;
 }
 .logo img{
 	height: 28px;
@@ -300,7 +301,14 @@ body .sp-preview{
 }
 .logo .logo_light{
 	font-weight: 100;
-	opacity: 0.6;
+	opacity: 0.7;
+}
+.visteras_top_divider{
+	width: 1px;
+	height: 22px;
+	background: #3c3c3c;
+	margin: 0 8px;
+	flex-shrink: 0;
 }
 .logo:after{
 	display: none;
@@ -350,9 +358,9 @@ body .sp-preview{
 	background-color: #2d2d2d;
 	overflow: hidden;
 	border-bottom: 1px solid #1a1a1a;
-	height: 42px;
-	min-height: 42px;
-	max-height: 42px;
+	height: 45px;
+	min-height: 45px;
+	max-height: 45px;
 	box-sizing: border-box;
 }
 .attributes{
@@ -362,9 +370,9 @@ body .sp-preview{
 	background-color: #2d2d2d;
 	flex: 1 1 auto;
 	width: calc(100% - 130px);
-	height: 42px;
-	min-height: 42px;
-	max-height: 42px;
+	height: 45px;
+	min-height: 45px;
+	max-height: 45px;
 	margin: 0;
 	padding: 0 8px;
 	border: 0;

@@ -3,6 +3,44 @@
  * Manages board items, selection, transformations, history undo/redo, and rendering.
  */
 
+export function measureTextBounds(text, { fontFamily = 'Montserrat', fontSize = 32, fontWeight = '700', letterSpacing = 0, lineHeight = 1.2 } = {}) {
+  const str = text !== undefined && text !== null ? String(text) : '';
+  const lines = str.length ? str.split('\n') : [' '];
+
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.font = `${fontWeight || '400'} ${fontSize || 32}px "${fontFamily || 'Montserrat'}", sans-serif`;
+        let maxLineWidth = 0;
+        for (const line of lines) {
+          const metrics = ctx.measureText(line.length ? line : ' ');
+          const extraSpacing = (line.length > 1 && letterSpacing) ? (line.length - 1) * letterSpacing : 0;
+          const lineW = (metrics.width || (fontSize * 0.6 * (line.length || 1))) + extraSpacing;
+          if (lineW > maxLineWidth) maxLineWidth = lineW;
+        }
+        const lineH = fontSize * (lineHeight || 1.2);
+        const totalH = Math.max(lineH, lines.length * lineH);
+        return {
+          width: Math.ceil(Math.max(40, maxLineWidth + 12)),
+          height: Math.ceil(Math.max(fontSize, totalH + 6))
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Fallback measurement calculation
+  let maxLen = 1;
+  for (const line of lines) {
+    if (line.length > maxLen) maxLen = line.length;
+  }
+  return {
+    width: Math.ceil(Math.max(40, maxLen * (fontSize * 0.62) + 16)),
+    height: Math.ceil(Math.max(fontSize, lines.length * (fontSize * 1.25) + 8))
+  };
+}
+
 export class BoardComposer {
   constructor(initialElements = [], customLayoutSnapshot = null) {
     this.elements = initialElements ? [...initialElements] : [];
@@ -192,23 +230,35 @@ export class BoardComposer {
     });
   }
 
-  addTextElement({ text, x, y, width = 320, height = 80, fontSize = 32, fontFamily = 'Montserrat', fontWeight = '700', color = '#ffffff' }) {
+  addTextElement({ text = 'CREATIVE DIRECTION', x = 100, y = 100, width = null, height = null, fontSize = 32, fontFamily = 'Montserrat', fontWeight = '700', color = '#ffffff', boundary = 'dynamic', align = 'left', letterSpacing = 1, lineHeight = 1.2 } = {}) {
+    const isBox = boundary === 'box';
+    let calcW = width;
+    let calcH = height;
+
+    if (!isBox || !calcW || !calcH) {
+      const measured = measureTextBounds(text, { fontFamily, fontSize, fontWeight, letterSpacing, lineHeight });
+      if (!calcW) calcW = measured.width;
+      if (!calcH) calcH = measured.height;
+    }
+
     return this.createElement({
       type: 'text',
       x,
       y,
-      width,
-      height,
+      width: calcW,
+      height: calcH,
       data: {
-        text: text || 'CREATIVE DIRECTION',
+        text: text || '',
         fontFamily,
         fontSize,
         fontWeight,
         color,
-        align: 'left',
-        letterSpacing: 2
+        boundary: isBox ? 'box' : 'dynamic',
+        align,
+        letterSpacing,
+        lineHeight
       },
-      tags: ['text']
+      tags: ['text', 'typography']
     });
   }
 

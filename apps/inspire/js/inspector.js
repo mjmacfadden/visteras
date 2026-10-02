@@ -6,6 +6,7 @@
 import { CANVAS_PRESETS } from './document.js';
 import { DEFAULT_FONTS, loadFontFamily } from '../lib/visteras-fonts.js';
 import { extractPaletteFromImage } from './color-extractor.js';
+import { measureTextBounds } from './board-composer.js';
 
 export class InspectorPanel {
   constructor({ container, doc, boardComposer, canvas, onDocChange, onSaveLibrary }) {
@@ -179,9 +180,11 @@ export class InspectorPanel {
           </select>
         </div>
 
-        <div class="inspector-row">
-          <label class="inspector-label">Smart Snapping</label>
-          <input type="checkbox" id="chk_grid_snap" ${this.doc.gridSnap ? 'checked' : ''} />
+        <div class="inspector-row inspector-checkbox-row">
+          <label class="inspector-checkbox-label" for="chk_grid_snap">
+            <input type="checkbox" id="chk_grid_snap" class="inspector-checkbox" ${this.doc.gridSnap ? 'checked' : ''} />
+            <span>Smart Snapping</span>
+          </label>
         </div>
       </div>
 
@@ -439,9 +442,11 @@ export class InspectorPanel {
         <div class="inspector-section">
           <div class="inspector-section-title">Image Styling</div>
 
-          <div class="inspector-row">
-            <label class="inspector-label">Polaroid Frame</label>
-            <input type="checkbox" id="inp_img_polaroid" ${d.polaroid ? 'checked' : ''} />
+          <div class="inspector-row inspector-checkbox-row">
+            <label class="inspector-checkbox-label" for="inp_img_polaroid">
+              <input type="checkbox" id="inp_img_polaroid" class="inspector-checkbox" ${d.polaroid ? 'checked' : ''} />
+              <span>Polaroid Frame</span>
+            </label>
           </div>
 
           ${d.polaroid ? `
@@ -566,7 +571,26 @@ export class InspectorPanel {
 
       typeSpecificHtml = `
         <div class="inspector-section">
-          <div class="inspector-section-title">Typography</div>
+          <div class="inspector-section-title">Text Content</div>
+          <div class="inspector-row">
+            <label class="inspector-label" for="inp_text_content">Text Content</label>
+            <textarea class="inspector-textarea" id="inp_text_content" rows="3" placeholder="Enter text...">${d.text || ''}</textarea>
+          </div>
+        </div>
+
+        <div class="inspector-section">
+          <div class="inspector-section-title">Text Boundary & Layout</div>
+          <div class="inspector-row">
+            <label class="inspector-label">Boundary Mode</label>
+            <select class="inspector-select" id="inp_text_boundary">
+              <option value="dynamic" ${(!d.boundary || d.boundary === 'dynamic' || d.boundary === 'point') ? 'selected' : ''}>Point Text (Auto-fit Content)</option>
+              <option value="box" ${d.boundary === 'box' ? 'selected' : ''}>Textbox (Wrap in Box)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="inspector-section">
+          <div class="inspector-section-title">Typography & Style</div>
 
           <div class="inspector-row">
             <label class="inspector-label">Typeface</label>
@@ -577,8 +601,8 @@ export class InspectorPanel {
 
           <div class="inspector-row">
             <label class="inspector-label">Size</label>
-            <input type="range" class="inspector-slider" id="inp_text_size" min="12" max="96" value="${d.fontSize || 32}" />
-            <span class="slider-val">${d.fontSize || 32}px</span>
+            <input type="range" class="inspector-slider" id="inp_text_size" min="12" max="120" value="${d.fontSize || 32}" />
+            <span class="slider-val" id="val_text_size">${d.fontSize || 32}px</span>
           </div>
 
           <div class="inspector-row">
@@ -586,10 +610,18 @@ export class InspectorPanel {
             <select class="inspector-select" id="inp_text_weight">
               <option value="300" ${d.fontWeight === '300' ? 'selected' : ''}>Light (300)</option>
               <option value="400" ${d.fontWeight === '400' ? 'selected' : ''}>Regular (400)</option>
+              <option value="500" ${d.fontWeight === '500' ? 'selected' : ''}>Medium (500)</option>
               <option value="600" ${d.fontWeight === '600' ? 'selected' : ''}>Semi-Bold (600)</option>
               <option value="700" ${d.fontWeight === '700' ? 'selected' : ''}>Bold (700)</option>
+              <option value="800" ${d.fontWeight === '800' ? 'selected' : ''}>Extra-Bold (800)</option>
               <option value="900" ${d.fontWeight === '900' ? 'selected' : ''}>Black (900)</option>
             </select>
+          </div>
+
+          <div class="inspector-row">
+            <label class="inspector-label">Letter Spacing (px)</label>
+            <input type="range" class="inspector-slider" id="inp_text_spacing" min="-2" max="20" value="${d.letterSpacing || 0}" />
+            <span class="slider-val" id="val_text_spacing">${d.letterSpacing || 0}px</span>
           </div>
 
           <div class="inspector-row">
@@ -603,7 +635,7 @@ export class InspectorPanel {
           <div class="inspector-row">
             <label class="inspector-label">Alignment</label>
             <div class="inspector-btn-group">
-              <button type="button" class="inspector-toggle-btn ${d.align === 'left' ? 'active' : ''}" id="btn_align_left">Left</button>
+              <button type="button" class="inspector-toggle-btn ${d.align === 'left' || !d.align ? 'active' : ''}" id="btn_align_left">Left</button>
               <button type="button" class="inspector-toggle-btn ${d.align === 'center' ? 'active' : ''}" id="btn_align_center">Center</button>
               <button type="button" class="inspector-toggle-btn ${d.align === 'right' ? 'active' : ''}" id="btn_align_right">Right</button>
             </div>
@@ -642,14 +674,18 @@ export class InspectorPanel {
             <div class="sticky-color-chips-row">${colorChips}</div>
           </div>
 
-          <div class="inspector-row">
-            <label class="inspector-label">Washi Tape</label>
-            <input type="checkbox" id="inp_sticky_tape" ${d.tape ? 'checked' : ''} />
+          <div class="inspector-row inspector-checkbox-row">
+            <label class="inspector-checkbox-label" for="inp_sticky_tape">
+              <input type="checkbox" id="inp_sticky_tape" class="inspector-checkbox" ${d.tape ? 'checked' : ''} />
+              <span>Washi Tape</span>
+            </label>
           </div>
 
-          <div class="inspector-row">
-            <label class="inspector-label">Pushpin</label>
-            <input type="checkbox" id="inp_sticky_pin" ${d.pin ? 'checked' : ''} />
+          <div class="inspector-row inspector-checkbox-row">
+            <label class="inspector-checkbox-label" for="inp_sticky_pin">
+              <input type="checkbox" id="inp_sticky_pin" class="inspector-checkbox" ${d.pin ? 'checked' : ''} />
+              <span>Pushpin</span>
+            </label>
           </div>
 
           <div class="inspector-row">
@@ -723,11 +759,23 @@ export class InspectorPanel {
 
       <div class="inspector-section">
         <div class="inspector-section-title">Layer Arrange</div>
-        <div class="inspector-actions-grid">
-          <button type="button" class="btn_visteras_secondary" id="btn_bring_front">Bring to Front</button>
-          <button type="button" class="btn_visteras_secondary" id="btn_send_back">Send to Back</button>
-          <button type="button" class="btn_visteras_secondary" id="btn_bring_forward">Forward</button>
-          <button type="button" class="btn_visteras_secondary" id="btn_send_backward">Backward</button>
+        <div class="inspector-arrange-grid">
+          <button type="button" class="btn_visteras_arrange" id="btn_bring_front" title="Bring to Front">
+            <img src="images/move_top.svg" alt="Bring to Front" class="visteras_arrange_icon" />
+            <span>To Front</span>
+          </button>
+          <button type="button" class="btn_visteras_arrange" id="btn_bring_forward" title="Bring Forward">
+            <img src="images/go_up.svg" alt="Bring Forward" class="visteras_arrange_icon" />
+            <span>Forward</span>
+          </button>
+          <button type="button" class="btn_visteras_arrange" id="btn_send_backward" title="Send Backward">
+            <img src="images/go_down.svg" alt="Send Backward" class="visteras_arrange_icon" />
+            <span>Backward</span>
+          </button>
+          <button type="button" class="btn_visteras_arrange" id="btn_send_back" title="Send to Back">
+            <img src="images/move_bottom.svg" alt="Send to Back" class="visteras_arrange_icon" />
+            <span>To Back</span>
+          </button>
         </div>
         <button type="button" class="btn_visteras_danger w-100 mt-2" id="btn_delete_el">Delete Element</button>
       </div>
@@ -870,20 +918,125 @@ export class InspectorPanel {
         }
       });
     } else if (el.type === 'text') {
+      const d = el.data || {};
+
+      this.content.querySelector('#inp_text_content')?.addEventListener('input', (e) => {
+        const textVal = e.target.value;
+        const updates = { data: { text: textVal } };
+        if (el.data?.boundary !== 'box') {
+          const measured = measureTextBounds(textVal || ' ', {
+            fontFamily: el.data?.fontFamily || 'Montserrat',
+            fontSize: el.data?.fontSize || 32,
+            fontWeight: el.data?.fontWeight || '700',
+            letterSpacing: el.data?.letterSpacing || 0
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates, false);
+      });
+
+      this.content.querySelector('#inp_text_content')?.addEventListener('change', () => {
+        this.board.saveHistory('Edit text content');
+      });
+
+      this.content.querySelector('#inp_text_boundary')?.addEventListener('change', (e) => {
+        const boundVal = e.target.value;
+        const updates = { data: { boundary: boundVal } };
+        if (boundVal !== 'box') {
+          const measured = measureTextBounds(el.data?.text || ' ', {
+            fontFamily: el.data?.fontFamily || 'Montserrat',
+            fontSize: el.data?.fontSize || 32,
+            fontWeight: el.data?.fontWeight || '700',
+            letterSpacing: el.data?.letterSpacing || 0
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates);
+        this.render();
+      });
+
       this.content.querySelector('#inp_text_font')?.addEventListener('change', (e) => {
         const font = e.target.value;
         loadFontFamily({ family: font }).catch(() => {});
-        this.board.updateElement(el.id, { data: { fontFamily: font } });
+        const updates = { data: { fontFamily: font } };
+        if (el.data?.boundary !== 'box') {
+          const measured = measureTextBounds(el.data?.text || ' ', {
+            fontFamily: font,
+            fontSize: el.data?.fontSize || 32,
+            fontWeight: el.data?.fontWeight || '700',
+            letterSpacing: el.data?.letterSpacing || 0
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates);
       });
+
       this.content.querySelector('#inp_text_size')?.addEventListener('input', (e) => {
-        this.board.updateElement(el.id, { data: { fontSize: parseInt(e.target.value, 10) } });
+        const sz = parseInt(e.target.value, 10) || 32;
+        const valSpan = this.content.querySelector('#val_text_size');
+        if (valSpan) valSpan.textContent = `${sz}px`;
+        const updates = { data: { fontSize: sz } };
+        if (el.data?.boundary !== 'box') {
+          const measured = measureTextBounds(el.data?.text || ' ', {
+            fontFamily: el.data?.fontFamily || 'Montserrat',
+            fontSize: sz,
+            fontWeight: el.data?.fontWeight || '700',
+            letterSpacing: el.data?.letterSpacing || 0
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates);
       });
+
       this.content.querySelector('#inp_text_weight')?.addEventListener('change', (e) => {
-        this.board.updateElement(el.id, { data: { fontWeight: e.target.value } });
+        const wt = e.target.value;
+        const updates = { data: { fontWeight: wt } };
+        if (el.data?.boundary !== 'box') {
+          const measured = measureTextBounds(el.data?.text || ' ', {
+            fontFamily: el.data?.fontFamily || 'Montserrat',
+            fontSize: el.data?.fontSize || 32,
+            fontWeight: wt,
+            letterSpacing: el.data?.letterSpacing || 0
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates);
       });
-      this.content.querySelector('#inp_text_color')?.addEventListener('input', (e) => {
+
+      this.content.querySelector('#inp_text_spacing')?.addEventListener('input', (e) => {
+        const sp = parseInt(e.target.value, 10) || 0;
+        const valSpan = this.content.querySelector('#val_text_spacing');
+        if (valSpan) valSpan.textContent = `${sp}px`;
+        const updates = { data: { letterSpacing: sp } };
+        if (el.data?.boundary !== 'box') {
+          const measured = measureTextBounds(el.data?.text || ' ', {
+            fontFamily: el.data?.fontFamily || 'Montserrat',
+            fontSize: el.data?.fontSize || 32,
+            fontWeight: el.data?.fontWeight || '700',
+            letterSpacing: sp
+          });
+          updates.width = measured.width;
+          updates.height = measured.height;
+        }
+        this.board.updateElement(el.id, updates);
+      });
+
+      const tColPicker = this.content.querySelector('#inp_text_color');
+      const tColHex = this.content.querySelector('#inp_text_color_hex');
+      tColPicker?.addEventListener('input', (e) => {
+        if (tColHex) tColHex.value = e.target.value;
         this.board.updateElement(el.id, { data: { color: e.target.value } });
       });
+      tColHex?.addEventListener('change', (e) => {
+        if (tColPicker) tColPicker.value = e.target.value;
+        this.board.updateElement(el.id, { data: { color: e.target.value } });
+      });
+
       this.content.querySelector('#btn_align_left')?.addEventListener('click', () => {
         this.board.updateElement(el.id, { data: { align: 'left' } });
         this.render();
@@ -979,10 +1132,18 @@ export class InspectorPanel {
 
       <div class="inspector-section">
         <div class="inspector-section-title">Batch Actions</div>
-        <div class="inspector-actions-grid">
-          <button type="button" class="btn_visteras_secondary" id="btn_dup_selected">Duplicate Selection (⌘D)</button>
-          <button type="button" class="btn_visteras_secondary" id="btn_bring_front_multi">Bring to Front</button>
-          <button type="button" class="btn_visteras_secondary" id="btn_send_back_multi">Send to Back</button>
+        <div class="inspector-actions-grid mb-2">
+          <button type="button" class="btn_visteras_secondary w-100" id="btn_dup_selected">Duplicate Selection (⌘D)</button>
+        </div>
+        <div class="inspector-arrange-grid">
+          <button type="button" class="btn_visteras_arrange" id="btn_bring_front_multi" title="Bring to Front">
+            <img src="images/move_top.svg" alt="Bring to Front" class="visteras_arrange_icon" />
+            <span>To Front</span>
+          </button>
+          <button type="button" class="btn_visteras_arrange" id="btn_send_back_multi" title="Send to Back">
+            <img src="images/move_bottom.svg" alt="Send to Back" class="visteras_arrange_icon" />
+            <span>To Back</span>
+          </button>
         </div>
         <button type="button" class="btn_visteras_danger w-100 mt-2" id="btn_del_multi">Delete All ${selected.length} Items</button>
       </div>

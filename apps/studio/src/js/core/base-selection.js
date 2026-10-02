@@ -18,8 +18,8 @@ const handle_size = 8;
 const ROTATE_CURSOR = "url('images/icons/rotate.svg') 12 12, default";
 
 // Inner and outer offset (in screen px) of the rotation ring outside the layer bounds and handles.
-const rotate_inner_zone = 16;
-const rotate_outer_zone = 34;
+const rotate_inner_zone = 24;
+const rotate_outer_zone = 46;
 
 const DRAG_TYPE_TOP = 1;
 const DRAG_TYPE_BOTTOM = 2;

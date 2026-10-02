@@ -9,8 +9,8 @@
   <meta name="description" content="Visteras Inspire - Client-side Swipe File & Moodboard Composer. Capture quotes, copy, colors, photos, and reconstitute them into inspiring design boards." />
   
   <!-- Visteras Inspire Favicon & Theme -->
-  <link rel="icon" type="image/svg+xml" href="images/visteras_inspire_logo.svg">
-  <link rel="apple-touch-icon" href="images/visteras_inspire_logo.svg">
+  <link rel="icon" type="image/png" href="images/visteras_inspire_logo.png">
+  <link rel="apple-touch-icon" href="images/visteras_inspire_logo.png">
   <meta name="theme-color" content="#f59e0b">
 
   <!-- Shared Google Fonts -->
@@ -30,98 +30,7 @@
   <div id="visteras_app_container">
     
     <!-- ==================================================================
-         1. Top Options Bar (#tools_top)
-         ================================================================== -->
-    <header id="tools_top">
-      <a href="#" class="visteras_inspire_logo_wrap" title="Visteras - Inspire">
-        <img src="images/visteras_inspire_logo.svg" alt="Visteras Inspire">
-        <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">INSPIRE</span></span>
-      </a>
-
-      <div class="visteras_top_divider"></div>
-
-      <!-- Canvas Mode Toggle -->
-      <div class="options_btn_group">
-        <button type="button" class="options_toggle_btn active" id="opt_btn_fixed" title="Fixed Artboard with preset print/digital aspect ratios">Fixed Board</button>
-        <button type="button" class="options_toggle_btn" id="opt_btn_infinite" title="Infinite Canvas for boundless brainstorming">Infinite Canvas</button>
-      </div>
-
-      <!-- Preset Selector -->
-      <select id="opt_board_preset" class="options_select" title="Canvas Preset" style="width: 175px;">
-        <!-- Populated by JS -->
-      </select>
-
-      <div class="visteras_top_divider"></div>
-
-      <!-- 1-Click Auto-Layout Trigger -->
-      <button type="button" id="opt_btn_autolayout" class="btn_visteras_secondary" title="Reconstitute board items into structured moodboard layout">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-        Auto-Layout
-      </button>
-
-      <select id="opt_select_autolayout" class="options_select" title="Auto-Layout Algorithm" style="width: 145px;">
-        <option value="custom" selected>📌 Custom Layout</option>
-        <option value="masonry">🧱 Masonry Grid</option>
-        <option value="editorial">📰 Editorial Hero</option>
-        <option value="colorFlow">🌈 Color Flow</option>
-        <option value="collage">✂️ Collage Cluster</option>
-      </select>
-
-      <div class="visteras_top_divider"></div>
-
-      <!-- Undo / Redo Buttons -->
-      <button type="button" id="opt_btn_undo" class="btn_visteras_secondary" title="Undo (⌘Z)" disabled>
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7v6h6"></path>
-          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
-        </svg>
-      </button>
-
-      <button type="button" id="opt_btn_redo" class="btn_visteras_secondary" title="Redo (⇧⌘Z)" disabled>
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 7v6h-6"></path>
-          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
-        </svg>
-      </button>
-
-      <!-- Right Action Controls -->
-      <div class="options_actions_right">
-        <button type="button" id="opt_btn_save_vid" class="btn_visteras_secondary" title="Save / Export 100% Client-Side .vid Document (⌘S)">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-          </svg>
-          Save .VID
-        </button>
-
-        <button type="button" id="opt_btn_export_image" class="btn_visteras_secondary" title="Export High-Res PNG Moodboard">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          Export PNG
-        </button>
-
-        <button type="button" id="opt_btn_print" class="btn_visteras_amber" title="Print Moodboard (⌘P)">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-          </svg>
-          Print Board
-        </button>
-      </div>
-    </header>
-
-    <!-- ==================================================================
-         2. Main Top Menu Bar (#visteras_menu_bar) - Below Options Bar
+         1. Main Top Menu Bar (#visteras_menu_bar) - Above Options Bar
          ================================================================== -->
     <nav id="visteras_menu_bar" aria-label="Main Menu">
       <div class="menu_group">
@@ -253,6 +162,97 @@
         </a>
       </div>
     </nav>
+
+    <!-- ==================================================================
+         2. Top Options Bar (#tools_top) - Below Menu Bar
+         ================================================================== -->
+    <header id="tools_top">
+      <a href="#" class="visteras_inspire_logo_wrap" title="Visteras - Inspire">
+        <img src="images/visteras_inspire_logo.png" alt="Visteras Inspire">
+        <span class="logo_text"><span class="logo_bold">VISTERAS</span> <span class="logo_light">INSPIRE</span></span>
+      </a>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- Canvas Mode Toggle -->
+      <div class="options_btn_group">
+        <button type="button" class="options_toggle_btn active" id="opt_btn_fixed" title="Fixed Artboard with preset print/digital aspect ratios">Fixed Board</button>
+        <button type="button" class="options_toggle_btn" id="opt_btn_infinite" title="Infinite Canvas for boundless brainstorming">Infinite Canvas</button>
+      </div>
+
+      <!-- Preset Selector -->
+      <select id="opt_board_preset" class="options_select" title="Canvas Preset" style="width: 175px;">
+        <!-- Populated by JS -->
+      </select>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- 1-Click Auto-Layout Trigger -->
+      <button type="button" id="opt_btn_autolayout" class="btn_visteras_secondary" title="Reconstitute board items into structured moodboard layout">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        Auto-Layout
+      </button>
+
+      <select id="opt_select_autolayout" class="options_select" title="Auto-Layout Algorithm" style="width: 145px;">
+        <option value="custom" selected>📌 Custom Layout</option>
+        <option value="masonry">🧱 Masonry Grid</option>
+        <option value="editorial">📰 Editorial Hero</option>
+        <option value="colorFlow">🌈 Color Flow</option>
+        <option value="collage">✂️ Collage Cluster</option>
+      </select>
+
+      <div class="visteras_top_divider"></div>
+
+      <!-- Undo / Redo Buttons -->
+      <button type="button" id="opt_btn_undo" class="btn_visteras_secondary" title="Undo (⌘Z)" disabled>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7v6h6"></path>
+          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+        </svg>
+      </button>
+
+      <button type="button" id="opt_btn_redo" class="btn_visteras_secondary" title="Redo (⇧⌘Z)" disabled>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 7v6h-6"></path>
+          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path>
+        </svg>
+      </button>
+
+      <!-- Right Action Controls -->
+      <div class="options_actions_right">
+        <button type="button" id="opt_btn_save_vid" class="btn_visteras_secondary" title="Save / Export 100% Client-Side .vid Document (⌘S)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          Save .VID
+        </button>
+
+        <button type="button" id="opt_btn_export_image" class="btn_visteras_secondary" title="Export High-Res PNG Moodboard">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Export PNG
+        </button>
+
+        <button type="button" id="opt_btn_print" class="btn_visteras_amber" title="Print Moodboard (⌘P)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Print Board
+        </button>
+      </div>
+    </header>
 
     <!-- ==================================================================
          3. Left Toolbar (#tools_left)
