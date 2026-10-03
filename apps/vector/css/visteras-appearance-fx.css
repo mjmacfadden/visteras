@@ -38,3 +38,12 @@
 .vfx_field_range input[type="range"] { accent-color: var(--visteras-accent, #fa7c1b); }
 .vfx_preview { font-size: 12px; color: #cccccc; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .vfx_preview input { accent-color: var(--visteras-accent, #fa7c1b); }
+
+/* Character / Paragraph controls (Illustrator Character + Paragraph panels) */
+.vpara_row { display: flex; gap: 6px; margin: 2px 0 4px; }
+.vpara_field { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; color: #cccccc; }
+.vpara_icon { display: inline-flex; color: #aaaaaa; flex: none; }
+.vpara_field .vpara_input { width: 100%; }
+.vpara_field .vpara_input:disabled { opacity: .45; }
+.vpara_ls_replaced #tool_letter_spacing { display: none !important; }
+#text_align_justify:disabled { opacity: .4; cursor: default !important; }

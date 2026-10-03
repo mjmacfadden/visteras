@@ -245,6 +245,7 @@
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountEffects } from './js/visteras-effects.js?v=gravit-1';
+    import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -2516,6 +2517,7 @@
     mountBlendModes(svgEditor);
     // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
+    mountParagraph(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
