@@ -527,3 +527,104 @@ test('Create Outlines: cleanGlyphPath unites overlapping component contours and 
   s.remove();
 });
 
+test('Create Outlines: getElementFontFamily reads from attribute, style object, and inline style', () => {
+  const elAttr = createMockElement('text', { 'font-family': 'Montserrat, sans-serif' });
+  assert.equal(T.getElementFontFamily(elAttr), 'Montserrat, sans-serif');
+
+  const elStyleObj = createMockElement('text');
+  elStyleObj.style.fontFamily = 'Playfair Display';
+  assert.equal(T.getElementFontFamily(elStyleObj), 'Playfair Display');
+
+  const elInline = createMockElement('text', { style: 'font-family: Poppins; font-size: 24px;' });
+  assert.equal(T.getElementFontFamily(elInline), 'Poppins');
+
+  const elDefault = createMockElement('text');
+  assert.equal(T.getElementFontFamily(elDefault), 'Roboto');
+});
+
+test('Create Outlines: selected font is strictly preserved and not reverted to Roboto', async () => {
+  // Mock document
+  const mockDoc = {
+    createElementNS(ns, tag) {
+      return createMockElement(tag);
+    },
+  };
+
+  // 1. Text with Playfair Display
+  const textPlayfair = createMockElement('text', {
+    'font-family': 'Playfair Display',
+    'font-size': '48',
+    x: '0',
+    y: '0',
+    textContent: 'Visteras',
+  });
+
+  // 2. Text with Roboto
+  const textRoboto = createMockElement('text', {
+    'font-family': 'Roboto',
+    'font-size': '48',
+    x: '0',
+    y: '0',
+    textContent: 'Visteras',
+  });
+
+  const groupPlayfair = await T.convertTextToOutlines(textPlayfair, mockDoc);
+  const groupRoboto = await T.convertTextToOutlines(textRoboto, mockDoc);
+
+  assert.ok(groupPlayfair, 'Playfair group must be created');
+  assert.ok(groupRoboto, 'Roboto group must be created');
+
+  assert.equal(groupPlayfair.getAttribute('data-visteras-font-family'), 'Playfair Display');
+  assert.equal(groupRoboto.getAttribute('data-visteras-font-family'), 'Roboto');
+
+  // Verify glyph outlines are distinct from Roboto outlines
+  const playfairPath = groupPlayfair.children[0].getAttribute('d');
+  const robotoPath = groupRoboto.children[0].getAttribute('d');
+  assert.notEqual(playfairPath, robotoPath, 'Playfair Display glyph outline geometry must differ from Roboto');
+});
+
+test('Create Outlines: custom uploaded font bridge is used when available', async () => {
+  // Use a bundled font buffer as a mock uploaded custom font named "MyBrandFont"
+  const fs = await import('node:fs');
+  const roboto700Url = new URL(`../lib/fonts/roboto-700.woff`, import.meta.url);
+  const customBuf = fs.readFileSync(roboto700Url).buffer;
+
+  globalThis.window = {
+    ...(globalThis.window || {}),
+    __visterasFontBytes: async (family) => {
+      if (family.toLowerCase() === 'mybrandfont') {
+        return { buffer: customBuf, type: 'woff' };
+      }
+      return null;
+    },
+  };
+
+  const font = await T.loadFont('MyBrandFont', '400', 'normal');
+  assert.ok(font, 'Custom font should be parsed and loaded');
+  assert.equal(font.names.fontFamily.en, 'Roboto'); // buffer was roboto-700, correctly parsed
+});
+
+test('Create Outlines: system font bridge is used when available', async () => {
+  const fs = await import('node:fs');
+  const roboto900Url = new URL(`../lib/fonts/roboto-900.woff`, import.meta.url);
+  const systemBuf = fs.readFileSync(roboto900Url).buffer;
+
+  globalThis.window = {
+    ...(globalThis.window || {}),
+    __visterasGetLocalFont: (family) => {
+      if (family.toLowerCase() === 'localsystemfont') {
+        return {
+          family: 'LocalSystemFont',
+          blob: async () => ({
+            arrayBuffer: async () => systemBuf,
+          }),
+        };
+      }
+      return null;
+    },
+  };
+
+  const font = await T.loadFont('LocalSystemFont', '400', 'normal');
+  assert.ok(font, 'Local system font should be parsed and loaded');
+});
+

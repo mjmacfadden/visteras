@@ -110,7 +110,34 @@ export function getElementFontStyle(el) {
 }
 
 /**
+ * Robustly reads font-family from element attributes, inline style, or computed style.
+ */
+export function getElementFontFamily(el) {
+  if (!el) return 'Roboto';
+  const attr = el.getAttribute?.('font-family');
+  if (attr) return attr;
+  const styleVal = el.style?.fontFamily;
+  if (styleVal) return styleVal;
+  const styleAttr = el.getAttribute?.('style') || '';
+  const match = styleAttr.match(/font-family\s*:\s*([^;]+)/i);
+  if (match) return match[1].trim();
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    try {
+      const computed = window.getComputedStyle(el).fontFamily;
+      if (computed) return computed;
+    } catch (_) {}
+  }
+  return 'Roboto';
+}
+
+/**
  * Loads a TrueType / OpenType font binary and parses it with OpenType.js.
+ * Supports:
+ *  1. Bundled static Roboto fonts (instant offline)
+ *  2. User-uploaded custom fonts from IndexedDB bridge
+ *  3. Locally installed system fonts via Chromium Local Font Access API
+ *  4. Google Fonts / web fonts via Fontsource CDN & fallbacks (TTF and WOFF)
+ *  5. Graceful fallback to bundled Roboto matching weight/style if unavailable
  */
 export async function loadFont(family = 'Roboto', weight = '400', style = 'normal') {
   const normFamily = (family || 'Roboto').replace(/['"]/g, '').split(',')[0].trim();
@@ -169,8 +196,105 @@ export async function loadFont(family = 'Roboto', weight = '400', style = 'norma
     }
   }
 
-  // 2. Try fetching from Google Fonts (or web) if in browser
-  if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
+  // 2. Try user-uploaded custom fonts from IndexedDB bridge
+  if (typeof window !== 'undefined' && typeof window.__visterasFontBytes === 'function') {
+    try {
+      const customFontData = await window.__visterasFontBytes(normFamily);
+      if (customFontData && customFontData.buffer) {
+        const font = ot.parse(customFontData.buffer);
+        if (font) {
+          fontCache.set(cacheKey, font);
+          return font;
+        }
+      }
+    } catch (e) {
+      console.warn(`Could not parse custom font "${normFamily}":`, e);
+    }
+  }
+
+  // 3. Try locally installed system fonts (Chromium Local Font Access API or bridge)
+  if (typeof window !== 'undefined') {
+    try {
+      let localFontData = null;
+      if (typeof window.__visterasGetLocalFont === 'function') {
+        localFontData = window.__visterasGetLocalFont(normFamily, normWeight, normStyle);
+      }
+      if (!localFontData && typeof window.queryLocalFonts === 'function') {
+        const localFonts = await window.queryLocalFonts().catch(() => null);
+        if (Array.isArray(localFonts) && localFonts.length > 0) {
+          const lower = normFamily.toLowerCase();
+          const matches = localFonts.filter(f => f.family && f.family.toLowerCase() === lower);
+          if (matches.length > 0) {
+            localFontData = matches[0];
+            if (normWeight === '700' || normWeight === '900') {
+              const bold = matches.find(f => /bold/i.test(f.style || ''));
+              if (bold) localFontData = bold;
+            }
+            if (normStyle === 'italic') {
+              const ital = matches.find(f => /italic|oblique/i.test(f.style || ''));
+              if (ital) localFontData = ital;
+            }
+          }
+        }
+      }
+      if (localFontData && typeof localFontData.blob === 'function') {
+        const blob = await localFontData.blob();
+        const buf = await blob.arrayBuffer();
+        const font = ot.parse(buf);
+        if (font) {
+          fontCache.set(cacheKey, font);
+          return font;
+        }
+      }
+    } catch (_) {
+      // Local font access unavailable or unpermitted
+    }
+  }
+
+  // 4. Try web / Google Fonts via CDN (Fontsource CDN, unpkg, etc.)
+  if (typeof fetch === 'function') {
+    const slug = normFamily
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    if (slug) {
+      const candidates = [
+        // Exact weight and style (TTF / WOFF)
+        `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-${normWeight}-${normStyle}.ttf`,
+        `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-${normWeight}-${normStyle}.woff`,
+        // Weight/style fallbacks
+        ...(normStyle === 'italic' && normWeight !== '400' ? [
+          `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-400-italic.ttf`,
+          `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-400-italic.woff`
+        ] : []),
+        ...(normWeight !== '400' ? [
+          `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-400-normal.ttf`,
+          `https://cdn.jsdelivr.net/fontsource/fonts/${slug}@latest/latin-400-normal.woff`
+        ] : []),
+        // unpkg fallbacks
+        `https://unpkg.com/@fontsource/${slug}/files/${slug}-latin-${normWeight}-${normStyle}.woff`,
+        `https://unpkg.com/@fontsource/${slug}/files/${slug}-latin-400-normal.woff`
+      ];
+
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const buf = await res.arrayBuffer();
+            const font = ot.parse(buf);
+            if (font) {
+              fontCache.set(cacheKey, font);
+              return font;
+            }
+          }
+        } catch (_) {
+          // Continue candidate search
+        }
+      }
+    }
+
+    // Secondary attempt: Google Fonts CSS API (non-WOFF2 formats like TTF/OTF)
     try {
       const isItalic = normStyle === 'italic';
       const weightNum = parseInt(normWeight, 10) || 400;
@@ -178,23 +302,26 @@ export async function loadFont(family = 'Roboto', weight = '400', style = 'norma
       const cssRes = await fetch(cssUrl);
       if (cssRes.ok) {
         const cssText = await cssRes.text();
-        const match = cssText.match(/src:\s*url\((https:[^)]+)\)\s*format\(['"]?(?:truetype|opentype|woff2?)['"]?\)/i);
+        const match = cssText.match(/src:\s*url\((https:[^)]+)\)\s*format\(['"]?(?:truetype|opentype|woff)['"]?\)/i);
         if (match && match[1]) {
           const fontRes = await fetch(match[1]);
           if (fontRes.ok) {
             const fontBuf = await fontRes.arrayBuffer();
             const font = ot.parse(fontBuf);
-            fontCache.set(cacheKey, font);
-            return font;
+            if (font) {
+              fontCache.set(cacheKey, font);
+              return font;
+            }
           }
         }
       }
     } catch (_) {
-      // Offline or network error
+      // Network failure
     }
   }
 
-  // 3. Fallback to bundled Roboto with matching weight (Bold stays Bold!)
+  // 5. Fallback to bundled Roboto with matching weight (Bold stays Bold!)
+  console.warn(`Font "${normFamily}" (${normWeight} ${normStyle}) could not be resolved from CDN, local, or custom fonts; falling back to bundled font.`);
   if (normWeight === '700' || normWeight === '900') {
     return loadFont('Roboto', '700', normStyle);
   }
@@ -416,8 +543,8 @@ export async function convertTextToOutlines(textElem, doc = document) {
   if (!isTextElement(textElem)) return null;
 
   // Extract font attributes with accurate bold / weight tracking
-  const rawFamily = textElem.getAttribute('font-family') || 'Roboto';
-  const family = rawFamily.replace(/['"]/g, '').split(',')[0].trim();
+  const rawFamily = getElementFontFamily(textElem);
+  const family = (rawFamily || 'Roboto').replace(/['"]/g, '').split(',')[0].trim();
   const weight = getElementFontWeight(textElem);
   const style = getElementFontStyle(textElem);
   const fontSize = parseFloat(textElem.getAttribute('font-size')) || 24;
@@ -469,7 +596,15 @@ export async function convertTextToOutlines(textElem, doc = document) {
         const y = parseFloat(ts.getAttribute('y') || textElem.getAttribute('y') || '0');
         const lineSize = parseFloat(ts.getAttribute('font-size')) || fontSize;
         const lineAnchor = ts.getAttribute('text-anchor') || defaultAnchor;
-        const lineGlyphs = extractGlyphPaths(font, lineText, x, y, lineSize, {
+        const hasCustomFont = ts.getAttribute('font-family') || ts.style?.fontFamily || ts.getAttribute('font-weight') || ts.getAttribute('font-style');
+        let lineFont = font;
+        if (hasCustomFont) {
+          const lineFamily = (getElementFontFamily(ts) || family).replace(/['"]/g, '').split(',')[0].trim();
+          const lineWeight = getElementFontWeight(ts) || weight;
+          const lineStyle = getElementFontStyle(ts) || style;
+          lineFont = (await loadFont(lineFamily, lineWeight, lineStyle)) || font;
+        }
+        const lineGlyphs = extractGlyphPaths(lineFont, lineText, x, y, lineSize, {
           letterSpacing,
           anchor: lineAnchor,
         });
@@ -494,6 +629,9 @@ export async function convertTextToOutlines(textElem, doc = document) {
   const group = doc.createElementNS(NS, 'g');
   group.setAttribute('class', 'visteras-text-outlines');
   group.setAttribute('data-visteras-converted-text', textElem.textContent?.trim() || '');
+  group.setAttribute('data-visteras-font-family', family);
+  group.setAttribute('data-visteras-font-weight', normalizeFontWeight(weight));
+  group.setAttribute('data-visteras-font-style', normalizeFontStyle(style));
 
   // Transfer all visual attributes
   const inheritAttrs = [

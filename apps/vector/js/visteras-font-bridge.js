@@ -16,6 +16,7 @@ import {
 	listGoogleCacheFamilies,
 	loadFontFamily,
 	formatWeightLabel,
+	registerLocalFontData,
 	styleNameToCssWeight,
 	weightLabelBase,
 } from '../lib/visteras-fonts.js';
@@ -33,6 +34,7 @@ const STORE_NAME = 'custom_fonts';
 let fontDbInstance = null;
 const customFontsMap = new Map(); // name -> { family, fileName, date, source: 'user_uploaded' }
 const systemFontVariantsMap = new Map(); // family -> Set<variantName>
+const localFontsDataMap = new Map(); // familyLower -> Array of FontData
 let cachedSystemFamilies = [];
 
 function openFontDB() {
@@ -154,6 +156,7 @@ async function querySystemFonts(forceRefresh = false) {
 	const localFonts = await window.queryLocalFonts();
 	const familySet = new Set();
 	systemFontVariantsMap.clear();
+	localFontsDataMap.clear();
 	for (const font of localFonts) {
 		if (font && font.family) {
 			const familyName = font.family.trim();
@@ -163,6 +166,15 @@ async function querySystemFonts(forceRefresh = false) {
 			}
 			const styleName = font.style && String(font.style).trim() ? String(font.style).trim() : 'Regular';
 			systemFontVariantsMap.get(familyName).add(styleName);
+
+			const key = familyName.toLowerCase();
+			if (!localFontsDataMap.has(key)) {
+				localFontsDataMap.set(key, []);
+			}
+			localFontsDataMap.get(key).push(font);
+			try {
+				registerLocalFontData(familyName, font);
+			} catch (_) {}
 		}
 	}
 	const unique = Array.from(familySet).filter(Boolean).sort((a, b) => a.localeCompare(b));
@@ -171,6 +183,22 @@ async function querySystemFonts(forceRefresh = false) {
 		localStorage.setItem(STORAGE_KEY_LOCAL_FONTS, JSON.stringify(unique));
 	} catch (_) {}
 	return unique;
+}
+
+if (typeof window !== 'undefined') {
+	window.__visterasGetLocalFont = (family, weight = '400', style = 'normal') => {
+		const list = localFontsDataMap.get(String(family || '').trim().toLowerCase());
+		if (!list || list.length === 0) return null;
+		if (weight === '700' || weight === '900') {
+			const bold = list.find(f => /bold/i.test(f.style || ''));
+			if (bold) return bold;
+		}
+		if (style === 'italic') {
+			const ital = list.find(f => /italic|oblique/i.test(f.style || ''));
+			if (ital) return ital;
+		}
+		return list[0];
+	};
 }
 
 function getSystemFontVariants(family) {
