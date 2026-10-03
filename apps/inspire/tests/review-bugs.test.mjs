@@ -241,3 +241,11 @@ test('Smoke fix 2: nothing calls the missing board.selectElement', () => {
   }
   assert.match(read('js/board-composer.js'), /^\s{2}select\(id, multi = false\) \{/m);
 });
+
+test('Smoke fix 3: meta.fileName follows the tab rename and the picked name', () => {
+  const src = read('js/app.js');
+  assert.match(src, /docModel\.fileName = val;\n\s*docModel\.doc\.fileName = val;/);
+  assert.match(src, /data: serializeAs,/);
+  assert.match(src, /data\.meta\.fileName = savedName;/);
+  assert.doesNotMatch(src, /const data = active\.doc\.serialize\(active\.board, active\.swipeFile\);\n\s*const result = await saveFile/);
+});

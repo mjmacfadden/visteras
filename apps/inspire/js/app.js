@@ -437,6 +437,7 @@ class InspireApp {
             if (val && val !== currentFileName) {
               val = safeVidFileName(val);
               docModel.fileName = val;
+              docModel.doc.fileName = val; // serialize() reads meta.fileName from the doc
               const cleanTitle = val.replace(/\.vid$/i, '');
               docModel.title = cleanTitle;
               docModel.doc.title = cleanTitle;
@@ -927,9 +928,17 @@ class InspireApp {
     try {
       // The tab name and the saved file name are always the same string
       const fileName = safeVidFileName(active.fileName || active.doc.title);
-      const data = active.doc.serialize(active.board, active.swipeFile);
+      // Serialize only once the target name is known (after the picker resolves),
+      // so meta.fileName / meta.title match the file actually written.
+      const serializeAs = (name) => {
+        const savedName = safeVidFileName(name || fileName);
+        const data = active.doc.serialize(active.board, active.swipeFile);
+        data.meta.fileName = savedName;
+        data.meta.title = savedName.replace(/\.vid$/i, '');
+        return JSON.stringify(data, null, 2);
+      };
       const result = await saveFile({
-        data: JSON.stringify(data, null, 2),
+        data: serializeAs,
         fileName,
         mimeType: 'application/json;charset=utf-8',
         types: VID_SAVE_TYPES,

@@ -95,7 +95,9 @@ async function writeToHandle(handle, blob) {
 /**
  * Save data to disk.
  * @param {object} opts
- * @param {Blob|string} opts.data
+ * @param {Blob|string|((name: string) => Blob|string|Promise<Blob|string>)} opts.data
+ *        a function is called once the target name is known (after the picker
+ *        resolves), so the file can embed the name it is actually saved under
  * @param {string} opts.fileName                suggested name incl. extension
  * @param {string} [opts.mimeType]
  * @param {Array}  [opts.types]                 showSaveFilePicker `types`
@@ -115,11 +117,11 @@ export async function saveFile({
   doc = (typeof document !== 'undefined' ? document : null),
   onWarn = (msg, err) => { if (typeof console !== 'undefined') console.warn(msg, err); },
 } = {}) {
-  const blob = toBlob(data, mimeType);
+  const blobFor = async (name) => toBlob(typeof data === 'function' ? await data(name) : data, mimeType);
 
   if (handle && typeof handle.createWritable === 'function') {
     try {
-      await writeToHandle(handle, blob);
+      await writeToHandle(handle, await blobFor(handle.name || fileName));
       return { method: 'handle', name: handle.name || fileName, handle };
     } catch (err) {
       onWarn('Writing to the open file failed, asking where to save:', err);
@@ -131,7 +133,7 @@ export async function saveFile({
       const opts = { suggestedName: fileName };
       if (types) opts.types = types;
       const newHandle = await win.showSaveFilePicker(opts);
-      await writeToHandle(newHandle, blob);
+      await writeToHandle(newHandle, await blobFor(newHandle.name || fileName));
       return { method: 'picker', name: newHandle.name || fileName, handle: newHandle };
     } catch (err) {
       if (err && err.name === 'AbortError') return { cancelled: true };
@@ -139,6 +141,6 @@ export async function saveFile({
     }
   }
 
-  downloadBlob(blob, fileName, { mimeType, doc });
+  downloadBlob(await blobFor(fileName), fileName, { mimeType, doc });
   return { method: 'download', name: fileName, handle: null };
 }

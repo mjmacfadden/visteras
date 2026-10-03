@@ -138,3 +138,24 @@ test('dirty tracking: close confirm only for dirty docs, titled like the tab', a
   assert.deepEqual(asked, ['Board.vid', 'Poster', 'X']);
   assert.equal(await confirmCloseIfDirty(null, ask), true);
 });
+
+test('saveFile: data function is serialized after the picker, with the picked name', async () => {
+  const log = [];
+  const calls = [];
+  let picked = false;
+  const data = (name) => { calls.push({ name, picked }); return JSON.stringify({ fileName: name }); };
+  const win = { showSaveFilePicker: async () => { picked = true; return handle('Picked.vid', log); } };
+  const r = await saveFile({ data, fileName: 'Untitled-1.vid', win, doc: null });
+  assert.equal(r.name, 'Picked.vid');
+  assert.deepEqual(calls, [{ name: 'Picked.vid', picked: true }]);
+  assert.equal(JSON.parse(log[0].text).fileName, 'Picked.vid');
+  // cancel → data never serialized
+  calls.length = 0;
+  const abort = Object.assign(new Error('x'), { name: 'AbortError' });
+  await saveFile({ data, fileName: 'A.vid', win: { showSaveFilePicker: async () => { throw abort; } }, doc: null });
+  assert.equal(calls.length, 0);
+  // existing handle → its name
+  const r2 = await saveFile({ data, fileName: 'A.vid', handle: handle('Kept.vid', log), win: {}, doc: null });
+  assert.equal(r2.method, 'handle');
+  assert.equal(JSON.parse(log.at(-1).text).fileName, 'Kept.vid');
+});
