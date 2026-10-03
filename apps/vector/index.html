@@ -27,6 +27,7 @@
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
   <link href="./css/visteras-panel-dock.css?v=dock-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-appearance-fx.css?v=gravit-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -242,6 +243,7 @@
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
     import { mountTransformPanel } from './js/visteras-transform-panel.js';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
+    import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -1539,6 +1541,9 @@
                   <div id="slot_opacity" style="flex:1;"></div>
                   <div id="slot_blur" style="flex:1;"></div>
                 </div>
+                <div class="prop_row visteras_blend_row" id="prop_row_blend">
+                  <div id="slot_blend_mode" style="flex:1;"></div>
+                </div>
                 <div class="prop_row rect_panel" id="prop_row_radius" style="display:none;">
                   <div id="slot_radius" style="flex:1;"></div>
                 </div>
@@ -2485,6 +2490,9 @@
 
     // Iconic panel dock: Color, Swatches, Stroke, Gradient, Layers
     mountVisterasPanelDock({ svgEditor });
+
+    // Transparency: per-object blending mode (Illustrator list/order)
+    mountBlendModes(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {

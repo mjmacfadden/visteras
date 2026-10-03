@@ -1,0 +1,14 @@
+/* Visteras Vector — Blending mode, Effects (Appearance) and Paragraph controls. */
+.visteras_blend_row #slot_blend_mode { display: flex; align-items: center; gap: 8px; }
+.visteras_blend_label,
+.vfx_label { font-size: 11px; color: #cccccc; user-select: none; white-space: nowrap; }
+.visteras_blend_select,
+.vfx_select,
+.vpara_input {
+  background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px;
+  font-size: 11px; height: 22px; padding: 0 4px; min-width: 0;
+}
+.visteras_blend_select { flex: 1; }
+.visteras_blend_select:focus-visible,
+.vfx_select:focus-visible,
+.vpara_input:focus-visible { outline: 1px solid var(--visteras-accent, #fa7c1b); outline-offset: 0; }
