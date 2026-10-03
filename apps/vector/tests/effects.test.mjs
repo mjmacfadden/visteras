@@ -71,7 +71,7 @@ test('Effects: apply / toggle / remove are undoable and keep the filter referenc
 test('Effects: wired as an Appearance-area section with the fx menu', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<div class="prop_section" id="sec_effects"/);
-  for (const t of ['dropShadow', 'innerShadow', 'colorAdjust', 'gaussianBlur']) assert.match(html, new RegExp(`<option value="${t}">`));
+  assert.match(html, /<button type="button" id="vfx_add" class="vfx_fx_btn" aria-haspopup="menu"/, 'fx button opens a menu mirroring Effect');
   assert.match(html, /mountEffects\(svgEditor\);/);
   const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
   assert.match(src, /if \(!keep\.has\(f\.id\)\) f\.remove\(\);/, 'orphan vfx_ filters are swept');
@@ -102,4 +102,38 @@ test('Effects: getVisualBounds unions the stroked bbox with effect extents', () 
   assert.equal(F.strokeOutset(fakeEl('rect', { stroke: 'none', 'stroke-width': '9' })), 0);
   const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
   assert.match(src, /getVisualBounds: \(el\) => getVisualBounds\(el, sc\)/, 'exposed on window.__visterasEffects');
+});
+
+test('Effect menu: Illustrator structure (Apply Last, Last Effect, raster settings, Illustrator / Photoshop Effects)', () => {
+  const html = F.effectMenuHtml();
+  const order = ['Apply Last Effect', 'Last Effect…', 'Document Raster Effects Settings…', 'Illustrator Effects', 'Stylize', 'Drop Shadow…', 'SVG Filters', 'Color Adjust…', 'Photoshop Effects', 'Blur', 'Gaussian Blur…'];
+  const idx = order.map((t) => html.indexOf(t));
+  assert.ok(idx.every((i) => i >= 0), JSON.stringify(idx));
+  assert.deepEqual([...idx].sort((a, b) => a - b), idx);
+  assert.match(html, /id="action_effect_apply_last"[^>]*><span class="menu_label">Apply Last Effect<\/span><span class="menu_dropdown_shortcut">⇧⌘E<\/span>/);
+  assert.match(html, /<span class="menu_dropdown_shortcut">⌥⇧⌘E<\/span>/);
+  assert.match(html, /class="menu_dropdown_item disabled"[^>]*id="action_effect_raster_settings"/);
+  assert.equal((html.match(/menu_has_submenu/g) || []).length, 3);
+  assert.doesNotMatch(html, /Inner Shadow/, 'Inner Shadow is legacy: not offered in menus');
+  const pop = F.effectMenuHtml({ prefix: 'vfx_menu_', withLast: false });
+  assert.doesNotMatch(pop, /Apply Last|Raster|menu_dropdown_separator/);
+  assert.match(pop, /id="vfx_menu_dropShadow"/);
+  const idx2 = ['Stylize', 'SVG Filters', 'Blur'].map((t) => pop.indexOf(t));
+  assert.deepEqual([...idx2].sort((a, b) => a - b), idx2, 'fx popup mirrors the Effect menu order');
+  const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(index.indexOf('id="menu_object"') < index.indexOf('id="menu_effect"') && index.indexOf('id="menu_effect"') < index.indexOf('id="menu_view"'), 'Effect sits between Object and View');
+  assert.match(index, /setupMenuBar\(\);\n[^\n]*\n\s*mountMenus\(\);/);
+  const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
+  assert.match(src, /e\.code !== 'KeyE'/);
+  assert.match(src, /if \(e\.altKey\) lastDialog\(\); else applyLast\(\);/);
+});
+
+test('Menus: submenu + keyboard module is delegated and keyboard-safe', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-menus.js', import.meta.url), 'utf8');
+  assert.match(src, /'\.vmenu-root \.menu_has_submenu'/);
+  assert.match(src, /const lists = openLists\(doc\);\n\s*if \(!lists\.length\) return;/, 'keys only taken while a menu is open');
+  assert.match(src, /flip-left/);
+  const css = fs.readFileSync(new URL('../css/visteras-menus.css', import.meta.url), 'utf8');
+  assert.match(css, /var\(--vui-menu-item-padding\)/);
+  assert.match(css, /--studio-orange, #fa7c1b/);
 });

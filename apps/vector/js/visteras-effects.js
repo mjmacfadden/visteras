@@ -321,6 +321,40 @@ export function summarizeEffect(type, e) {
   return `${e.x}, ${e.y} · ${e.blur}px · ${e.opacity}%`;
 }
 
+/**
+ * Effect menu (Illustrator structure). Rendered into the menu bar's Effect menu and
+ * mirrored by the Properties fx button. Types without an implementation render disabled.
+ */
+export const EFFECT_MENU = [
+  { id: 'action_effect_apply_last', label: 'Apply Last Effect', shortcut: '⇧⌘E', act: 'applyLast' },
+  { id: 'action_effect_last', label: 'Last Effect…', shortcut: '⌥⇧⌘E', act: 'last' },
+  { sep: true },
+  { id: 'action_effect_raster_settings', label: 'Document Raster Effects Settings…', disabled: true, title: 'Coming with the Export dialog' },
+  { sep: true },
+  { header: 'Illustrator Effects' },
+  { submenu: 'Stylize', id: 'stylize', items: ['dropShadow', 'innerGlow', 'outerGlow', 'feather'] },
+  { submenu: 'SVG Filters', id: 'svg_filters', items: ['colorAdjust'] },
+  { header: 'Photoshop Effects' },
+  { submenu: 'Blur', id: 'blur', items: ['gaussianBlur'] },
+];
+const MENU_LABELS = { dropShadow: 'Drop Shadow…', innerGlow: 'Inner Glow…', outerGlow: 'Outer Glow…', feather: 'Feather…', colorAdjust: 'Color Adjust…', gaussianBlur: 'Gaussian Blur…' };
+
+/** Menu HTML (menu-bar classes). `prefix` keeps ids unique between the menu bar and the fx popup. */
+export function effectMenuHtml({ prefix = 'action_effect_', withLast = true } = {}) {
+  const item = (type) => {
+    const ok = !!FX_DEFAULTS[type];
+    return `<div class="menu_dropdown_item${ok ? '' : ' disabled'}" role="menuitem" id="${prefix}${type}" data-fx-type="${type}"${ok ? '' : ' aria-disabled="true" title="Coming soon"'}>${MENU_LABELS[type] || type}</div>`;
+  };
+  // The fx popup mirrors the effect groups only (no Apply Last / raster settings).
+  return EFFECT_MENU.filter((m) => withLast || m.header || m.submenu).map((m) => {
+    if (m.sep) return '<div class="menu_dropdown_separator" role="separator"></div>';
+    if (m.header) return `<div class="menu_dropdown_header" role="presentation">${m.header}</div>`;
+    if (m.submenu) return `<div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="${prefix}menu_${m.id}">${m.submenu}<span class="menu_submenu_arrow" aria-hidden="true">▶</span><div class="menu_dropdown_list menu_submenu_list" role="menu">${m.items.map(item).join('')}</div></div>`;
+    const id = prefix === 'action_effect_' ? m.id : `${prefix}${m.id.replace('action_effect_', '')}`;
+    return `<div class="menu_dropdown_item${m.disabled ? ' disabled' : ''}" role="menuitem" id="${id}"${m.act ? ` data-fx-act="${m.act}"` : ''}${m.disabled ? ` aria-disabled="true" title="${m.title}"` : ''}><span class="menu_label">${m.label}</span>${m.shortcut ? `<span class="menu_dropdown_shortcut">${m.shortcut}</span>` : ''}</div>`;
+  }).join('');
+}
+
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const modeLabel = (m) => m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
@@ -353,7 +387,7 @@ export function mountEffects(editor) {
         <span class="vfx_summary">${esc(summarizeEffect(t, fx[t]))}</span>
         <button type="button" class="vfx_remove" aria-label="Remove ${FX_LABELS[t]}" title="Remove effect">×</button>
       </div>`).join('') : '<div class="vfx_empty">No effects</div>';
-    for (const opt of addSel.options) if (opt.value) opt.disabled = !!fx[opt.value];
+    for (const opt of addSel.options || []) if (opt.value) opt.disabled = !!fx[opt.value];
     // The SVG-Edit Blur slider writes its own filter; it is folded into Effects instead.
     if (blurSlot) {
       const busy = els.some((el) => el.hasAttribute(FX_ATTR));
@@ -362,11 +396,12 @@ export function mountEffects(editor) {
     }
   };
 
-  const edit = (type, { isNew = false } = {}) => {
+  let lastEffect = null; // { type, values } — Apply Last Effect / Last Effect… (per session, like Illustrator)
+  const edit = (type, { isNew = false, values = null } = {}) => {
     const els = targets();
-    if (!els.length) return;
+    if (!els.length || !FX_DEFAULTS[type]) return;
     const originals = els.map((el) => ({ el, fx: el.getAttribute(FX_ATTR), filter: el.getAttribute('filter') }));
-    const start = { ...(firstFx()[type] || FX_DEFAULTS[type]) };
+    const start = { ...(values || firstFx()[type] || FX_DEFAULTS[type]) };
     const restore = () => {
       for (const o of originals) {
         if (o.fx == null) o.el.removeAttribute(FX_ATTR); else o.el.setAttribute(FX_ATTR, o.fx);
@@ -429,8 +464,8 @@ export function mountEffects(editor) {
       document.removeEventListener('keydown', onKey, true);
       overlay.remove(); dlg.remove();
       restore();
-      if (ok) applyFx(sc, els, mutateWith(values), `${isNew ? 'Add' : 'Edit'} ${FX_LABELS[type]}`);
-      syncNow(); render();
+      if (ok) { applyFx(sc, els, mutateWith(values), `${isNew ? 'Add' : 'Edit'} ${FX_LABELS[type]}`); lastEffect = { type, values: normalizeEffect(type, values) }; }
+      syncNow(); render(); renderMenus();
     };
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(false); }
@@ -466,11 +501,66 @@ export function mountEffects(editor) {
     applyFx(sc, targets(), (fx) => (fx[type] ? { ...fx, [type]: { ...fx[type], enabled: on } } : fx), `${on ? 'Show' : 'Hide'} ${FX_LABELS[type]}`);
     syncNow(); render();
   });
-  addSel.addEventListener('change', () => {
-    const type = addSel.value;
-    addSel.value = '';
-    if (type) edit(type, { isNew: true });
-  });
+  /* ── Effect menu (menu bar) + Properties fx button (mirror) ── */
+  const openType = (type) => { if (!targets().length) return; edit(type, { isNew: !firstFx()[type] }); };
+  const applyLast = () => {
+    if (!lastEffect || !targets().length) return;
+    const { type, values } = lastEffect;
+    applyFx(sc, targets(), (fx) => ({ ...fx, [type]: normalizeEffect(type, values) }), `Apply ${FX_LABELS[type]}`);
+    syncNow(); render();
+  };
+  const lastDialog = () => { if (lastEffect && targets().length) edit(lastEffect.type, { isNew: !firstFx()[lastEffect.type], values: lastEffect.values }); };
+  const runItem = (node) => {
+    if (!node || node.classList.contains('disabled')) return;
+    if (node.dataset.fxType) openType(node.dataset.fxType);
+    else if (node.dataset.fxAct === 'applyLast') applyLast();
+    else if (node.dataset.fxAct === 'last') lastDialog();
+  };
+  const menuList = document.getElementById('menu_effect_list');
+  if (menuList) {
+    menuList.innerHTML = effectMenuHtml();
+    menuList.addEventListener('click', (e) => runItem(e.target.closest('[data-fx-type], [data-fx-act]')));
+  }
+  const fxBtn = addSel.tagName === 'BUTTON' ? addSel : null;
+  let fxMenu = null;
+  if (fxBtn) {
+    fxMenu = document.createElement('div');
+    fxMenu.id = 'vfx_fx_menu';
+    fxMenu.className = 'menu_dropdown_list vmenu-root vmenu-popup';
+    fxMenu.setAttribute('role', 'menu');
+    fxMenu.setAttribute('aria-label', 'Add effect');
+    fxMenu.innerHTML = effectMenuHtml({ prefix: 'vfx_menu_', withLast: false });
+    document.body.append(fxMenu);
+    const closeFx = () => { fxMenu.classList.remove('open'); fxBtn.setAttribute('aria-expanded', 'false'); for (const n of fxMenu.querySelectorAll('.submenu-open')) n.classList.remove('submenu-open'); };
+    fxBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (fxMenu.classList.contains('open')) { closeFx(); return; }
+      document.querySelectorAll('.menu_entry.open').forEach((m) => m.classList.remove('open'));
+      const r = fxBtn.getBoundingClientRect();
+      fxMenu.classList.add('open');
+      fxBtn.setAttribute('aria-expanded', 'true');
+      const w = fxMenu.offsetWidth, h = fxMenu.offsetHeight;
+      fxMenu.style.left = `${Math.max(4, Math.min(window.innerWidth - w - 4, r.right - w))}px`;
+      fxMenu.style.top = `${r.bottom + h + 4 > window.innerHeight ? Math.max(4, r.top - h - 2) : r.bottom + 2}px`;
+    });
+    fxMenu.addEventListener('click', (e) => { const n = e.target.closest('[data-fx-type]'); if (n && !n.classList.contains('disabled')) { closeFx(); runItem(n); } });
+    document.addEventListener('click', (e) => { if (!fxMenu.contains(e.target)) closeFx(); });
+  }
+  function renderMenus() {
+    const has = targets().length > 0;
+    for (const n of document.querySelectorAll('#menu_effect_list [data-fx-type], #vfx_fx_menu [data-fx-type]')) n.classList.toggle('disabled', !has || !FX_DEFAULTS[n.dataset.fxType]);
+    const ap = document.getElementById('action_effect_apply_last'), la = document.getElementById('action_effect_last');
+    const label = lastEffect ? FX_LABELS[lastEffect.type] : null;
+    if (ap) { ap.querySelector('.menu_label').textContent = label ? `Apply ${label}` : 'Apply Last Effect'; ap.classList.toggle('disabled', !label || !has); }
+    if (la) { la.querySelector('.menu_label').textContent = label ? `${label}…` : 'Last Effect…'; la.classList.toggle('disabled', !label || !has); }
+  }
+  // ⇧⌘E Apply Last Effect · ⌥⇧⌘E Last Effect… (Illustrator)
+  document.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.code !== 'KeyE') return;
+    if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase()) || document.querySelector('.vfx_dialog')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.altKey) lastDialog(); else applyLast();
+  }, true);
 
   const root = sc.getSvgRoot?.() || content();
   if (root && typeof MutationObserver !== 'undefined') {
@@ -483,10 +573,11 @@ export function mountEffects(editor) {
   const call = sc.call;
   sc.call = function (event, ...args) {
     const result = call.call(this, event, ...args);
-    if (event === 'selected' || event === 'changed') { render(); schedule(); }
+    if (event === 'selected' || event === 'changed') { render(); renderMenus(); schedule(); }
     return result;
   };
-  window.__visterasEffects = { edit, render, sync: syncNow, getVisualBounds: (el) => getVisualBounds(el, sc) };
+  window.__visterasEffects = { edit, render, sync: syncNow, applyLast, lastDialog, lastEffect: () => lastEffect && { ...lastEffect }, getVisualBounds: (el) => getVisualBounds(el, sc) };
+  renderMenus();
   syncNow();
   render();
   return window.__visterasEffects;

@@ -25,6 +25,11 @@
 .vfx_remove { background: none; border: 0; color: #999999; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
 .vfx_remove:hover { color: #ffffff; }
 .vfx_add { width: 100%; }
+/* Properties fx button (opens a menu mirroring Effect) */
+.vfx_fx_btn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px; font-size: 11px; cursor: pointer; }
+.vfx_fx_btn em { font-family: Georgia, serif; font-style: italic; font-weight: 700; color: var(--visteras-accent, #fa7c1b); }
+.vfx_fx_btn:hover, .vfx_fx_btn[aria-expanded="true"] { border-color: var(--visteras-accent, #fa7c1b); color: #ffffff; }
+#vfx_fx_menu { z-index: 3005; min-width: 190px; }
 .vfx_blur_locked { opacity: .45; pointer-events: none; }
 
 /* Effect dialog (Illustrator Effect ▸ Stylize ▸ Drop Shadow layout) */

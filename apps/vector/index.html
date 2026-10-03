@@ -28,7 +28,8 @@
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
   <link href="./css/visteras-panel-dock.css?v=dock-3" rel="stylesheet" media="all">
   <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-appearance-fx.css?v=transparency-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-appearance-fx.css?v=effect-menu-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -45,7 +46,7 @@
     <!-- ==================================================================
          1. Main Top Menu Bar (File, Edit, View, Object, Help)
          ================================================================== -->
-    <nav id="visteras_menu_bar" aria-label="Main Menu">
+    <nav id="visteras_menu_bar" class="vmenu-root" aria-label="Main Menu">
       <div class="menu_group">
         
         <!-- File Menu -->
@@ -115,6 +116,12 @@
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_type_on_path" title="Place editable text along a path">Type on Path…</div>
           </div>
+        </div>
+
+        <!-- Effect Menu (Illustrator: Apply Last / Last Effect, Illustrator Effects, Photoshop Effects) — items built by visteras-effects.js -->
+        <div class="menu_entry" id="menu_effect">
+          <div class="menu_entry_title">Effect</div>
+          <div class="menu_dropdown_list" id="menu_effect_list" role="menu" aria-label="Effect"></div>
         </div>
 
         <!-- View Menu -->
@@ -249,7 +256,8 @@
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
-    import { mountEffects } from './js/visteras-effects.js?v=gravit-1';
+    import { mountEffects } from './js/visteras-effects.js?v=effect-menu-1';
+    import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
     import { mountSelectionTools } from './js/visteras-selection.js?v=gradient-1';
@@ -1567,13 +1575,7 @@
               <div class="prop_section_body" id="sec_effects_body">
                 <div id="vfx_list" class="vfx_list" aria-live="polite"></div>
                 <div class="prop_row">
-                  <select id="vfx_add" class="vfx_select vfx_add" aria-label="Add effect" title="Add an effect (fx)">
-                    <option value="">fx  Add Effect…</option>
-                    <option value="dropShadow">Drop Shadow…</option>
-                    <option value="innerShadow">Inner Shadow…</option>
-                    <option value="colorAdjust">Color Adjust…</option>
-                    <option value="gaussianBlur">Gaussian Blur…</option>
-                  </select>
+                  <button type="button" id="vfx_add" class="vfx_fx_btn" aria-haspopup="menu" aria-expanded="false" title="Add New Effect (mirrors the Effect menu)"><em>fx</em> Add Effect…</button>
                 </div>
               </div>
             </div>
@@ -2469,6 +2471,8 @@
 
     applyStudioSkin();
     setupMenuBar();
+    // Submenus + keyboard navigation for the menu bar and popup menus (Effect menu, fx button)
+    mountMenus();
     setupPropertiesPanel();
     mountVectorWorkspace(svgEditor);
     mountPenTools(svgEditor);
