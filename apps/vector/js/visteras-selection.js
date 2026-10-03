@@ -159,11 +159,17 @@ export function mountSelectionTools(editor) {
     let start = drag.start, p = position(e);
     if (dir !== 'rotate') {
       try {
-        const delta = { dx: p.x - start.x, dy: p.y - start.y };
-        const snapRes = window.__visterasGuideManager?.evaluateSmartSnap?.(drag.items.map((i) => i.el), delta, { applyDirectSnap: false });
+        const snapRes = window.__visterasGuideManager?.evaluateHandleSnap?.({
+          dir,
+          p,
+          b,
+          basis,
+          elements: drag.items.map((i) => i.el),
+          altKey: e.altKey
+        });
         if (snapRes) {
-          if (/[ew]/.test(dir) && snapRes.snapDx) p.x += snapRes.snapDx;
-          if (/[ns]/.test(dir) && snapRes.snapDy) p.y += snapRes.snapDy;
+          if (/[ew]/.test(dir) && snapRes.snappedX !== undefined) p.x = snapRes.snappedX;
+          if (/[ns]/.test(dir) && snapRes.snappedY !== undefined) p.y = snapRes.snappedY;
         }
       } catch { /* ignore */ }
     }

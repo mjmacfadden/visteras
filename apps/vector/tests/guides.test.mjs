@@ -394,3 +394,106 @@ test('HTML: index.html contains Smart Guides and Ruler Guide menu items and moun
   assert.match(html, /import\s+\{\s*mountGuides\s*\}\s+from\s+'\.\/js\/visteras-guides\.js/, 'Must import mountGuides');
   assert.match(html, /mountGuides\(svgEditor\);/, 'Must call mountGuides');
 });
+
+test('Guides: Smart Guides only display when objects are in a snappable position', () => {
+  const mockCanvas = {
+    getZoom() { return 1; },
+    getResolution() { return { w: 800, h: 600 }; },
+    getSvgContent() {
+      return createMockElement('g');
+    }
+  };
+
+  const manager = new GuidesModule.GuideManager({ svgCanvas: mockCanvas });
+  const smartLayer = createMockElement('g', { id: 'visteras_smart_guides' });
+  manager.smartGuidesLayer = smartLayer;
+
+  // Object moving in free space, far from artboard edges (0, 800) and center (400, 300)
+  // Box: x = 120, y = 145, width = 50, height = 50 (center: 145, 170) -> min distance is > 20px from any candidate
+  const moving = createMockElement('rect');
+  moving._bbox = { x: 120, y: 145, width: 50, height: 50 };
+  moving.getBBox = () => moving._bbox;
+
+  const res = manager.evaluateSmartSnap([moving], { dx: 15, dy: 20 });
+  assert.equal(res.activeMatchesX.length, 0, 'No active matches in X');
+  assert.equal(res.activeMatchesY.length, 0, 'No active matches in Y');
+  assert.equal(res.snapDx, 0, 'No snap displacement in X');
+  assert.equal(res.snapDy, 0, 'No snap displacement in Y');
+  assert.equal(smartLayer.children.length, 0, 'Must NOT render any guides, markers, or badges when not in a snappable position');
+});
+
+test('Guides: Smart Guides layer renders above selectorParentGroup in DOM stacking order', () => {
+  const root = createMockElement('svg', { id: 'svgroot' });
+  const content = createMockElement('svg', { id: 'svgcontent' });
+  const selectorParent = createMockElement('g', { id: 'selectorParentGroup' });
+  root.append(content, selectorParent);
+
+  // Mock document
+  globalThis.document = {
+    createElementNS(ns, tag) {
+      return createMockElement(tag);
+    },
+    getElementById(id) {
+      if (id === 'svgroot') return root;
+      if (id === 'svgcontent') return content;
+      if (id === 'selectorParentGroup') return selectorParent;
+      return null;
+    }
+  };
+
+  const mockCanvas = {
+    getSvgRoot() { return root; },
+    getSvgContent() { return content; },
+    getZoom() { return 1; },
+    getResolution() { return { w: 800, h: 600 }; }
+  };
+
+  const manager = new GuidesModule.GuideManager({ svgCanvas: mockCanvas });
+  manager._ensureLayers();
+
+  // Smart guides layer must be in root and placed AFTER selectorParentGroup
+  assert.ok(manager.smartGuidesLayer, 'Must create smart guides layer');
+  const selectorIdx = root.children.indexOf(selectorParent);
+  const smartIdx = root.children.indexOf(manager.smartGuidesLayer);
+  assert.ok(smartIdx > selectorIdx, 'Smart guides layer must be after selectorParentGroup so crosshairs render above handles');
+});
+
+test('Guides: evaluateHandleSnap snaps resize handles to alignment targets and renders crosshair markers', () => {
+  const mockCanvas = {
+    getZoom() { return 1; },
+    getResolution() { return { w: 800, h: 600 }; },
+    getSvgContent() {
+      const content = createMockElement('g');
+      const sibling = createMockElement('rect');
+      sibling.getBBox = () => ({ x: 100, y: 100, width: 200, height: 150 });
+      content.append(sibling);
+      return content;
+    }
+  };
+
+  const manager = new GuidesModule.GuideManager({ svgCanvas: mockCanvas });
+  const smartLayer = createMockElement('g', { id: 'visteras_smart_guides' });
+  manager.smartGuidesLayer = smartLayer;
+
+  // Handle drag on 'e' (right edge) where live pointer p.x = 298.5 is close to sibling right edge 300
+  const snapRes = manager.evaluateHandleSnap({
+    dir: 'e',
+    p: { x: 298.5, y: 120 },
+    b: { x: 50, y: 50, width: 250, height: 100 },
+    basis: null,
+    elements: [],
+    altKey: false
+  });
+
+  assert.ok(snapRes, 'Must return snap result for handle drag');
+  assert.equal(snapRes.snappedX, 300, 'Must snap right edge to sibling right edge X = 300');
+  assert.ok(smartLayer.children.length > 0, 'Must render vertical guide and crosshair');
+
+  const vGuide = smartLayer.children.find(el => el.getAttribute('class') === 'visteras-smart-guide');
+  assert.ok(vGuide, 'Must render pink guide line for handle snap');
+  assert.equal(vGuide.getAttribute('x1'), '300');
+
+  const marker = smartLayer.children.find(el => el.getAttribute('class') === 'visteras-smart-marker');
+  assert.ok(marker, 'Must render pink crosshair marker on the handle');
+});
+

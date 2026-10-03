@@ -114,20 +114,49 @@ export class GuideManager {
       if (guidesGroup) this.rulerGuidesLayer = guidesGroup;
     }
 
+    // Smart guides layer belongs in svgRoot (above selectorParentGroup and transform handles)
+    const svgRoot = this.sc?.getSvgRoot?.() || (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('svgroot') : null);
+    const smartParent = svgRoot || svgContent;
     const smartConnected = typeof this.smartGuidesLayer?.isConnected === 'boolean' ? this.smartGuidesLayer.isConnected : true;
-    const smartContained = typeof svgContent.contains === 'function' && this.smartGuidesLayer ? svgContent.contains(this.smartGuidesLayer) : true;
+    const smartContained = typeof smartParent.contains === 'function' && this.smartGuidesLayer ? smartParent.contains(this.smartGuidesLayer) : true;
     if (!this.smartGuidesLayer || !smartConnected || !smartContained) {
       let smartGroup = document.getElementById('visteras_smart_guides');
-      if (!smartGroup || (typeof svgContent.contains === 'function' && !svgContent.contains(smartGroup))) {
+      if (!smartGroup || (typeof smartParent.contains === 'function' && !smartParent.contains(smartGroup))) {
         if (typeof document.createElementNS === 'function') {
           smartGroup = document.createElementNS(NS, 'g');
           smartGroup.setAttribute('id', 'visteras_smart_guides');
           smartGroup.setAttribute('class', 'visteras-smart-guides-layer');
           smartGroup.setAttribute('style', 'pointer-events: none;');
-          svgContent.append(smartGroup);
+          smartParent.append(smartGroup);
         }
       }
       if (smartGroup) this.smartGuidesLayer = smartGroup;
+    }
+
+    // Always ensure smart guides layer is positioned above selectorParentGroup and transform handles
+    const selectorParent = (typeof document !== 'undefined' && typeof document.getElementById === 'function') ? document.getElementById('selectorParentGroup') : null;
+    if (this.smartGuidesLayer && smartParent) {
+      if (selectorParent && selectorParent.parentNode === smartParent) {
+        if (selectorParent.nextSibling !== this.smartGuidesLayer && typeof selectorParent.after === 'function') {
+          selectorParent.after(this.smartGuidesLayer);
+        }
+      } else if (smartParent.lastElementChild !== this.smartGuidesLayer && typeof smartParent.append === 'function') {
+        smartParent.append(this.smartGuidesLayer);
+      }
+    }
+
+    // Synchronize coordinate transform if smartParent is svgRoot
+    if (this.smartGuidesLayer && smartParent === svgRoot && svgContent.getScreenCTM && svgRoot.getScreenCTM) {
+      try {
+        const rootCTM = svgRoot.getScreenCTM();
+        const contentCTM = svgContent.getScreenCTM();
+        if (rootCTM && contentCTM && typeof DOMMatrix !== 'undefined') {
+          const rootM = new DOMMatrix([rootCTM.a, rootCTM.b, rootCTM.c, rootCTM.d, rootCTM.e, rootCTM.f]);
+          const contentM = new DOMMatrix([contentCTM.a, contentCTM.b, contentCTM.c, contentCTM.d, contentCTM.e, contentCTM.f]);
+          const m = rootM.inverse().multiply(contentM);
+          this.smartGuidesLayer.setAttribute('transform', `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`);
+        }
+      } catch (_) {}
     }
   }
 
@@ -426,22 +455,28 @@ export class GuideManager {
   _bindSmartGuides() {
     if (!this.sc) return;
 
-    // Listen to selection dragging / transition events
-    this.sc.bind?.('transition', (elements) => {
-      if (!this.smartGuidesEnabled || !elements || !elements.length) {
-        this.clearSmartGuides();
-        return;
-      }
-      this._transitionRanThisTick = true;
-      const delta = (this._startPos && this._lastMousePos)
-        ? { dx: this._lastMousePos.x - this._startPos.x, dy: this._lastMousePos.y - this._startPos.y }
-        : null;
-      this.evaluateSmartSnap(elements, delta, { applyDirectSnap: true });
-    });
-
-    this.sc.bind?.('changed', () => {
-      this.clearSmartGuides();
-    });
+    // Wrap sc.call to intercept 'transition' and 'changed' events from SVGEdit
+    if (this.sc.call && !this._origScCall) {
+      this._origScCall = this.sc.call;
+      const self = this;
+      this.sc.call = function (event, ...args) {
+        const result = self._origScCall.apply(this, [event, ...args]);
+        try {
+          if (event === 'transition') {
+            const elements = args[0];
+            if (self.smartGuidesEnabled && elements && elements.length) {
+              const delta = (self._startPos && self._lastMousePos)
+                ? { dx: self._lastMousePos.x - self._startPos.x, dy: self._lastMousePos.y - self._startPos.y }
+                : null;
+              self.evaluateSmartSnap(elements, delta, { applyDirectSnap: true });
+            }
+          } else if (event === 'changed') {
+            self.clearSmartGuides();
+          }
+        } catch (_) {}
+        return result;
+      };
+    }
 
     if (typeof window !== 'undefined') {
       let isMouseDown = false;
@@ -465,26 +500,14 @@ export class GuideManager {
         this._startPos = null;
         this._lastMousePos = null;
         this._startDragBBox = null;
-        this._transitionRanThisTick = false;
+        this._lastSnappedTargetX = null;
+        this._lastSnappedTargetY = null;
         this.clearSmartGuides();
       }, true);
 
       window.addEventListener('mousemove', (e) => {
         if (!isMouseDown) return;
         this._lastMousePos = this.clientToSvg(e.clientX, e.clientY);
-        if (!this.smartGuidesEnabled) return;
-        if (this._transitionRanThisTick) {
-          this._transitionRanThisTick = false;
-          return;
-        }
-        const mode = this.sc?.getMode?.();
-        if (mode === 'select' && (e.buttons === 1 || e.which === 1)) {
-          const sel = this.sc.getSelectedElements?.() || [];
-          if (sel.length > 0) {
-            const delta = this._startPos ? { dx: this._lastMousePos.x - this._startPos.x, dy: this._lastMousePos.y - this._startPos.y } : null;
-            this.evaluateSmartSnap(sel, delta, { applyDirectSnap: true });
-          }
-        }
       }, true);
     }
   }
@@ -660,7 +683,16 @@ export class GuideManager {
           if (first && (first.type === 2 || (typeof SVGTransform !== 'undefined' && first.type === SVGTransform.SVG_TRANSFORM_TRANSLATE))) {
             const curX = (first.matrix && typeof first.matrix.e === 'number') ? first.matrix.e : 0;
             const curY = (first.matrix && typeof first.matrix.f === 'number') ? first.matrix.f : 0;
-            first.setTranslate(curX + snapDx, curY + snapDy);
+            const newX = curX + snapDx;
+            const newY = curY + snapDy;
+            const svgRoot = this.sc?.getSvgRoot?.() || (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('svgroot') : null);
+            const tf = svgRoot?.createSVGTransform?.() || el.ownerSVGElement?.createSVGTransform?.();
+            if (tf && typeof tList.replaceItem === 'function') {
+              tf.setTranslate(newX, newY);
+              tList.replaceItem(tf, 0);
+            } else {
+              first.setTranslate(newX, newY);
+            }
             applied = true;
           }
         }
@@ -718,6 +750,7 @@ export class GuideManager {
       this.clearSmartGuides();
       return null;
     }
+    this._ensureLayers();
     this.clearSmartGuides();
 
     const movingSet = new Set(movingElements);
@@ -735,7 +768,13 @@ export class GuideManager {
     }
 
     const zoom = this.sc?.getZoom?.() || 1;
-    const snapThreshold = 6 / zoom; // 6 screen pixels tolerance
+    const baseSnapThreshold = 8 / zoom; // 8 screen pixels base tolerance
+    const snapThresholdX = (this._lastSnappedTargetX !== null && this._lastSnappedTargetX !== undefined)
+      ? baseSnapThreshold * 1.5
+      : baseSnapThreshold;
+    const snapThresholdY = (this._lastSnappedTargetY !== null && this._lastSnappedTargetY !== undefined)
+      ? baseSnapThreshold * 1.5
+      : baseSnapThreshold;
 
     const movingX = [
       { val: movingBBox.x, name: 'left', type: 'endpoint' },
@@ -961,7 +1000,7 @@ export class GuideManager {
 
     // Evaluate closest match in X
     let bestMatchX = null;
-    let minDiffX = snapThreshold;
+    let minDiffX = snapThresholdX;
     for (const m of movingX) {
       for (const c of candidatesX) {
         const diff = Math.abs(m.val - c.val);
@@ -981,7 +1020,7 @@ export class GuideManager {
 
     // Evaluate closest match in Y
     let bestMatchY = null;
-    let minDiffY = snapThreshold;
+    let minDiffY = snapThresholdY;
     for (const m of movingY) {
       for (const c of candidatesY) {
         const diff = Math.abs(m.val - c.val);
@@ -997,6 +1036,21 @@ export class GuideManager {
           };
         }
       }
+    }
+
+    this._lastSnappedTargetX = bestMatchX ? bestMatchX.targetVal : null;
+    this._lastSnappedTargetY = bestMatchY ? bestMatchY.targetVal : null;
+
+    // Display ONLY when objects are actively in a snappable position
+    if (!bestMatchX && !bestMatchY) {
+      this.clearSmartGuides();
+      return {
+        activeMatchesX: [],
+        activeMatchesY: [],
+        snapDx: 0,
+        snapDy: 0,
+        delta
+      };
     }
 
     const snapDx = bestMatchX ? (bestMatchX.targetVal - bestMatchX.movingPoint.val) : 0;
@@ -1160,6 +1214,139 @@ export class GuideManager {
       snapDx,
       snapDy,
       delta
+    };
+  }
+
+  evaluateHandleSnap({ dir, p, b, basis, elements = [], altKey = false }) {
+    if (!this.smartGuidesEnabled) {
+      this.clearSmartGuides();
+      return null;
+    }
+    this._ensureLayers();
+    this.clearSmartGuides();
+
+    const zoom = this.sc?.getZoom?.() || 1;
+    const baseSnapThreshold = 8 / zoom;
+    const snapThresholdX = (this._lastSnappedTargetX !== null && this._lastSnappedTargetX !== undefined)
+      ? baseSnapThreshold * 1.5
+      : baseSnapThreshold;
+    const snapThresholdY = (this._lastSnappedTargetY !== null && this._lastSnappedTargetY !== undefined)
+      ? baseSnapThreshold * 1.5
+      : baseSnapThreshold;
+
+    const res = this.sc?.getResolution?.() || { w: 800, h: 600 };
+    const abW = Number(res.w ?? res.width ?? 800);
+    const abH = Number(res.h ?? res.height ?? 600);
+
+    const candidatesX = [
+      { val: 0, label: 'artboard', type: 'artboard' },
+      { val: abW / 2, label: 'center', type: 'center' },
+      { val: abW, label: 'artboard', type: 'artboard' }
+    ];
+    const candidatesY = [
+      { val: 0, label: 'artboard', type: 'artboard' },
+      { val: abH / 2, label: 'center', type: 'center' },
+      { val: abH, label: 'artboard', type: 'artboard' }
+    ];
+
+    if (this.showGuides) {
+      for (const g of this.rulerGuides) {
+        if (g.type === 'v') candidatesX.push({ val: g.pos, label: 'guide', type: 'guide' });
+        if (g.type === 'h') candidatesY.push({ val: g.pos, label: 'guide', type: 'guide' });
+      }
+    }
+
+    const movingSet = new Set(elements);
+    const svgContent = this.sc?.getSvgContent?.() || (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('svgcontent') : null);
+    if (svgContent) {
+      const targets = svgContent.querySelectorAll ? svgContent.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, image, g:not(.layer):not(.vclip-group)') : (svgContent.children || []);
+      for (const sib of targets) {
+        if (
+          movingSet.has(sib) ||
+          elements.some(m => m.contains?.(sib) || sib.contains?.(m)) ||
+          sib.id === 'visteras_ruler_guides' ||
+          sib.id === 'visteras_smart_guides' ||
+          sib.id === 'canvasBackground' ||
+          sib.nodeType !== 1 ||
+          sib.closest?.('#visteras_ruler_guides, #visteras_smart_guides, #canvasBackground, defs')
+        ) {
+          continue;
+        }
+        const sb = this._getElementSceneBBox(sib);
+        if (sb && (sb.width > 0 || sb.height > 0)) {
+          candidatesX.push({ val: sb.x, label: 'endpoint', type: 'sibling' });
+          candidatesX.push({ val: sb.x + sb.width / 2, label: 'midpoint', type: 'sibling' });
+          candidatesX.push({ val: sb.x + sb.width, label: 'endpoint', type: 'sibling' });
+
+          candidatesY.push({ val: sb.y, label: 'endpoint', type: 'sibling' });
+          candidatesY.push({ val: sb.y + sb.height / 2, label: 'midpoint', type: 'sibling' });
+          candidatesY.push({ val: sb.y + sb.height, label: 'endpoint', type: 'sibling' });
+        }
+      }
+    }
+
+    let snappedX = p.x;
+    let snappedY = p.y;
+    let matchX = null;
+    let matchY = null;
+
+    if (/[ew]/.test(dir)) {
+      let minDiffX = snapThresholdX;
+      for (const c of candidatesX) {
+        const diff = Math.abs(p.x - c.val);
+        if (diff < minDiffX) {
+          minDiffX = diff;
+          matchX = c;
+        }
+      }
+      if (matchX) {
+        snappedX = matchX.val;
+      }
+    }
+
+    if (/[ns]/.test(dir)) {
+      let minDiffY = snapThresholdY;
+      for (const c of candidatesY) {
+        const diff = Math.abs(p.y - c.val);
+        if (diff < minDiffY) {
+          minDiffY = diff;
+          matchY = c;
+        }
+      }
+      if (matchY) {
+        snappedY = matchY.val;
+      }
+    }
+
+    this._lastSnappedTargetX = matchX ? matchX.val : null;
+    this._lastSnappedTargetY = matchY ? matchY.val : null;
+
+    if (!matchX && !matchY) {
+      this.clearSmartGuides();
+      return null;
+    }
+
+    if (matchX) {
+      this.drawSmartGuideLine('v', matchX.val);
+      const cross = this._createCrosshair(matchX.val, snappedY);
+      if (cross) this.smartGuidesLayer?.append(cross);
+      const lbl = this._createLabel(matchX.val, snappedY, matchX.label);
+      if (lbl) this.smartGuidesLayer?.append(lbl);
+    }
+
+    if (matchY) {
+      this.drawSmartGuideLine('h', matchY.val);
+      const cross = this._createCrosshair(snappedX, matchY.val);
+      if (cross) this.smartGuidesLayer?.append(cross);
+      const lbl = this._createLabel(snappedX, matchY.val, matchY.label);
+      if (lbl) this.smartGuidesLayer?.append(lbl);
+    }
+
+    return {
+      snappedX,
+      snappedY,
+      matchX,
+      matchY
     };
   }
 
