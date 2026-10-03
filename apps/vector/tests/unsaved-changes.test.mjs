@@ -70,7 +70,7 @@ test('unsaved: shell and index.html wiring', () => {
 
 test('open/save: .vvd goes through the shared file helper with the FileHandle kept on the tab', () => {
   const html = read('../index.html');
-  assert.match(html, /import \{ openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle \} from '\.\/lib\/visteras-ui\/file\.js/);
+  assert.match(html, /import \{ openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob \} from '\.\/lib\/visteras-ui\/file\.js/);
   assert.match(html, /const opened = await openFile\(\{\s*types: VVD_OPEN_TYPES,/);
   assert.match(html, /const handle = \/\\\.vvd\$\/i\.test\(opened\.name \|\| ''\) \? opened\.handle : null;/, 'only .vvd handles are kept');
   assert.match(html, /openVectorFile\(opened\.file, handle\);/);

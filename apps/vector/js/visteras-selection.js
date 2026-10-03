@@ -29,17 +29,44 @@ export function mountSelectionTools(editor) {
     return m;
   };
   const point = (x, y, m) => new DOMPoint(x, y).matrixTransform(m);
+  /**
+   * Area text (Illustrator area type): resize grips change the frame, not the glyphs.
+   * Only for a single unrotated/unscaled area text; point text and rotated frames scale.
+   */
+  const areaTextFrame = (elements, dir) => {
+    const el = elements.length === 1 ? elements[0] : null;
+    if (!el || dir === 'rotate' || el.tagName !== 'text' || !el.hasAttribute('data-text-width') || el.querySelector('textPath')) return null;
+    const lm = localMatrix(el);
+    if (Math.abs(lm.a - 1) > 1e-9 || Math.abs(lm.d - 1) > 1e-9 || Math.abs(lm.b) > 1e-9 || Math.abs(lm.c) > 1e-9) return null;
+    const n = (k) => Number(el.getAttribute(k)) || 0;
+    return { el, x: n('x'), y: n('y'), w: n('data-text-width'), h: n('data-text-height'), attrs: Object.fromEntries(['x', 'y', 'data-text-width', 'data-text-height'].map((k) => [k, el.getAttribute(k)])) };
+  };
+  /** New frame (element user space) after the content-space scale `transform`. */
+  const resizedFrame = (area, transform, elMatrix) => {
+    const t = elMatrix.inverse().multiply(transform).multiply(elMatrix);
+    const a = point(area.x, area.y, t), b = point(area.x + area.w, area.y + area.h, t);
+    const r = (v) => Math.round(v * 100) / 100;
+    return { x: r(Math.min(a.x, b.x)), y: r(Math.min(a.y, b.y)), w: r(Math.max(1, Math.abs(b.x - a.x))), h: r(Math.max(1, Math.abs(b.y - a.y))) };
+  };
   const rotationCursor = "url('../studio/images/icons/rotate.svg') 12 12, default";
   let compoundFrame;
+  // Area text's box is its frame (handles sit on the frame, like Illustrator), not its glyphs.
+  const ownBox = el => {
+    if (el.tagName === 'text' && el.hasAttribute('data-text-width') && !el.querySelector('textPath')) {
+      const n = (k) => Number(el.getAttribute(k)) || 0;
+      return { x: n('x'), y: n('y'), width: n('data-text-width'), height: n('data-text-height') };
+    }
+    return el.getBBox();
+  };
   const selectionFrame = elements => {
-    if (elements.length === 1) return { b: elements[0].getBBox(), m: matrix(elements[0]) };
+    if (elements.length === 1) return { b: ownBox(elements[0]), m: matrix(elements[0]) };
     const signature = elements.map(el => el.getAttribute('transform'));
     if (compoundFrame && elements.every((el,i) => el === compoundFrame.elements[i] && signature[i] === compoundFrame.signature[i]) && elements.length === compoundFrame.elements.length) return compoundFrame;
     return { b: bounds(elements), m: new DOMMatrix() };
   };
   const bounds = elements => {
     const points = elements.flatMap(el => {
-      const b = el.getBBox(), m = matrix(el);
+      const b = ownBox(el), m = matrix(el);
       return [[b.x, b.y], [b.x + b.width, b.y], [b.x, b.y + b.height], [b.x + b.width, b.y + b.height]].map(([x, y]) => point(x, y, m));
     });
     const x = Math.min(...points.map(p => p.x)), y = Math.min(...points.map(p => p.y));
@@ -122,7 +149,7 @@ export function mountSelectionTools(editor) {
     e.preventDefault();
     e.stopImmediatePropagation();
     const {b,m} = selectionFrame(elements);
-    drag = { dir, b, basis:m, start: position(e), moved: false, items: elements.map(el => ({ el, original: el.getAttribute('transform'), local: localMatrix(el), parent: matrix(el.parentNode) })) };
+    drag = { dir, b, basis:m, start: position(e), moved: false, area: areaTextFrame(elements, dir), items: elements.map(el => ({ el, original: el.getAttribute('transform'), local: localMatrix(el), parent: matrix(el.parentNode) })) };
   }, true);
   document.addEventListener('mousemove', e => {
     if (!drag) return;
@@ -153,6 +180,19 @@ export function mountSelectionTools(editor) {
       transform = transform.translate(ax, ay).scale(sx, sy).translate(-ax, -ay);
       transform = basis.multiply(transform).multiply(basis.inverse());
     }
+    if (drag.area) {
+      // Resize the frame; the text-editing observer reflows the lines (font size unchanged).
+      const f = resizedFrame(drag.area, transform, matrix(drag.area.el));
+      const el = drag.area.el;
+      el.setAttribute('x', f.x); el.setAttribute('y', f.y);
+      el.setAttribute('data-text-width', f.w); el.setAttribute('data-text-height', f.h);
+      // Keep the original origin: later moves recompute from the gesture start.
+      drag.area.live = f;
+      drag.moved = true;
+      drag.visualFrame = null;
+      schedule();
+      return;
+    }
     for (const item of drag.items) {
       const m = item.parent.inverse().multiply(transform).multiply(item.parent).multiply(item.local);
       item.el.setAttribute('transform', `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`);
@@ -167,8 +207,19 @@ export function mountSelectionTools(editor) {
   }, true);
   function finish(cancel = false) {
     if (!drag) return;
-    const { items, moved, visualFrame } = drag;
+    const { items, moved, visualFrame, area } = drag;
     drag = null;
+    if (area) {
+      const restore = () => { for (const [k, v] of Object.entries(area.attrs)) v === null ? area.el.removeAttribute(k) : area.el.setAttribute(k, v); };
+      if (cancel || !moved) restore();
+      else {
+        const { ChangeElementCommand } = sc.history;
+        sc.addCommandToHistory(new ChangeElementCommand(area.el, area.attrs, 'Resize text box'));
+        sc.call('changed', [area.el]);
+      }
+      schedule();
+      return;
+    }
     if (cancel || !moved) {
       for (const { el, original } of items) original === null ? el.removeAttribute('transform') : el.setAttribute('transform', original);
       try { window.__visterasLiveSyncStrokeAlign?.(items.map((i) => i.el), sc); } catch { /* ignore */ }
@@ -192,7 +243,7 @@ export function mountSelectionTools(editor) {
   }, true);
   // One route for toolbar clicks and Illustrator tool keys. Capture prevents legacy
   // SVGEdit bindings (A=select all, D=duplicate, Ctrl-only Undo) from also firing.
-  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', h: 'ext-panning', c: 'tool_scissors', '\\': 'tool_line' };
+  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', g: 'tool_gradient', h: 'ext-panning', c: 'tool_scissors', '\\': 'tool_line' };
   document.addEventListener('keydown', e => {
     if (e.isComposing || window.__visterasIsTypingDirectly || e.composedPath().some(el => el?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.nodeName))) return;
     const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;

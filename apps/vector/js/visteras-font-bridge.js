@@ -77,6 +77,19 @@ async function getAllCustomFontsFromDB() {
 	});
 }
 
+/**
+ * Bytes of an uploaded font (File ▸ Export inlines them: an SVG rendered through <img>
+ * can't see fonts added to document.fonts). { buffer, type } or null.
+ */
+async function getCustomFontBytes(family) {
+	const want = String(family || '').trim().toLowerCase();
+	if (!want) return null;
+	const items = await getAllCustomFontsFromDB();
+	const hit = items.find((i) => String(i?.name || '').toLowerCase() === want);
+	return hit && hit.buffer ? { buffer: hit.buffer, type: String(hit.type || '').toLowerCase() } : null;
+}
+if (typeof window !== 'undefined') window.__visterasFontBytes = getCustomFontBytes;
+
 async function saveCustomFontToDB(name, buffer, type, fileName) {
 	const db = await openFontDB();
 	if (!db) return false;

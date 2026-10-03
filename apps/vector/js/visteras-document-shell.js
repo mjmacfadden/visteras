@@ -526,7 +526,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     return newDoc;
   }
 
-  function openDocument({ title, width, height, unit = 'px', svg, fileHandle = null, forceNew = false } = {}) {
+  function openDocument({ title, width, height, unit = 'px', svg, fileHandle = null, forceNew = false, rasterEffects = null } = {}) {
     const replace = !forceNew && isActiveUntouchedDefault();
     setBaseUnit(unit || 'px');
 
@@ -556,6 +556,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       targetDoc.dirty = false;
       targetDoc.isStartupDefault = false;
       targetDoc.fileHandle = fileHandle || null;
+      // Document Raster Effects Settings from the .vvd (null = defaults: 72 ppi, white)
+      targetDoc.rasterEffects = rasterEffects && typeof rasterEffects === 'object' ? { ...rasterEffects } : null;
     }
 
     if (svgEditor) svgEditor.title = resolvedTitle;

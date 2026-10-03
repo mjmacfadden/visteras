@@ -15,7 +15,7 @@
 
 import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
 import { mountStrokeLink } from './visteras-stroke-link.js?v=stroke-link-2';
-import { resolveSelectionPaint } from './visteras-paint-resolver.js?v=paint-resolver-2';
+import { resolveSelectionPaint } from './visteras-paint-resolver.js?v=paint-resolver-3';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
@@ -342,6 +342,51 @@ function applyPaintAttribute(sc, attr, value, { noUndo = false } = {}) {
     }
   }
   return changed.length > 0;
+}
+
+/**
+ * Per-element paint writes inside a caller's BatchCommand (gradients: a
+ * different url(#…) per object). Same rules as applyPaintAttribute's direct
+ * path: Inside/Outside stroke bodies take the stored paint attribute and the
+ * helper ring is re-rendered; ChangeElementCommand is built after the write.
+ * @param {object} sc
+ * @param {'fill'|'stroke'} attr
+ * @param {(el: Element) => string|null} valueFor
+ * @param {{batch?: object, elements?: Element[], record?: boolean}} [opts]
+ * @returns {{el: Element, key: string, prev: string|null}[]} changed entries
+ */
+function applyPaintToElements(sc, attr, valueFor, { batch = null, elements = null, record = true } = {}) {
+  if (!sc) return [];
+  const elems = elements || flattenPaintTargets(resolvePaintTargets(sc), { attr });
+  const { ChangeElementCommand } = sc.history || {};
+  const changed = [];
+  for (const el of elems) {
+    if (!el?.isConnected) continue;
+    const raw = valueFor(el);
+    const next = raw == null || raw === '' ? null : String(raw);
+    const key = paintKeyFor(el, attr);
+    const prev = el.getAttribute(key);
+    if (prev === next) continue;
+    if (next == null) el.removeAttribute(key); else el.setAttribute(key, next);
+    if (record && batch && ChangeElementCommand) batch.addSubCommand(new ChangeElementCommand(el, { [key]: prev }));
+    changed.push({ el, key, prev });
+  }
+  const aligned = changed.filter((c) => c.key === STROKE_PAINT_ATTR).map((c) => c.el);
+  const resync = () => { for (const el of aligned) { try { if (el.isConnected) syncStrokeAlignRendering(el, sc); } catch { /* ignore */ } } };
+  resync();
+  if (record && batch && aligned.length && !batch.__vcsResync) {
+    batch.__vcsResync = true;
+    const origApply = batch.apply.bind(batch);
+    const origUnapply = batch.unapply.bind(batch);
+    batch.apply = (handler) => { origApply(handler); resync(); };
+    batch.unapply = (handler) => { origUnapply(handler); resync(); };
+  }
+  return changed;
+}
+
+/** Attribute that holds an element's real paint (stored paint for Inside/Outside strokes). */
+function paintKeyFor(el, attr) {
+  return attr === 'stroke' && readElementStrokeAlign(el) !== 'center' ? STROKE_PAINT_ATTR : attr;
 }
 
 // ---------------------------------------------------------------------------
@@ -1102,6 +1147,10 @@ function createColorController(svgEditor) {
     getWorkingHex: () => (state.workingNone ? 'none' : state.workingHex),
 
     // Stroke-align helpers shared with other tools (Eyedropper, Shape Builder).
+    // Gradients: per-object paint writes inside one BatchCommand.
+    applyPaintToElements: (attr, valueFor, opts) => applyPaintToElements(svgEditor.svgCanvas, attr, valueFor, opts),
+    paintTargets: (attr) => flattenPaintTargets(resolvePaintTargets(svgEditor.svgCanvas), { attr }),
+    paintKeyFor,
     readElementStrokeWeight,
     readElementStrokeAlign,
     applyStrokeAlignToTargets,
@@ -1694,7 +1743,7 @@ function readCanvasPaint(svgEditor, which) {
     if (targets.length) {
       const p = resolveSelectionPaint(targets, which, { resolveBody: resolveStrokeAlignBody });
       if (p) {
-        return { none: p.none, hex: p.hex || fallbackHex, mixed: p.mixed, gradient: p.gradient, fromSelection: true };
+        return { none: p.none, hex: p.hex || fallbackHex, mixed: p.mixed, gradient: p.gradient, ref: p.ref || null, fromSelection: true };
       }
     }
   } catch { /* fall through */ }
@@ -1721,6 +1770,11 @@ function paintWell(el, paint, which) {
     el.classList.remove('is-none');
     el.style.setProperty('background-color', paint.hex, 'important');
   }
+  // Gradient fills: preview the ramp (visteras-gradient.js provides the CSS).
+  const css = paint.gradient && !paint.none ? window.__visterasGradientCss?.(paint.ref) : null;
+  if (css) el.style.setProperty('background-image', css, 'important');
+  else el.style.removeProperty('background-image');
+  el.classList.toggle('is-gradient', !!css);
   el.classList.toggle('is-mixed', !!paint.mixed);
   el.dataset.paint = paint.none ? 'none' : paint.hex;
   const label = which === 'fill' ? 'Fill' : 'Stroke';

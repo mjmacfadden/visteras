@@ -37724,6 +37724,17 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let n = t.nodeName, r = null;
 		switch (n) {
 			case "text":
+				// Visteras: area (paragraph) text is bounded by its frame, not its glyphs, so the
+				// selection box / W·H stay at the dragged size while typing (Illustrator area type).
+				if (Number(t.getAttribute("data-text-width")) > 0) {
+					r = {
+						x: Number(t.getAttribute("x")) || 0,
+						y: Number(t.getAttribute("y")) || 0,
+						width: Number(t.getAttribute("data-text-width")),
+						height: Number(t.getAttribute("data-text-height")) || 0
+					};
+					break;
+				}
 				t.textContent === "" ? (t.textContent = "a", r = t.getBBox(), t.textContent = "") : t.getBBox && (r = t.getBBox());
 				break;
 			case "path":
@@ -39664,7 +39675,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let i = r === 0 ? "fill" : "stroke", a = e.getAttribute(i);
 			if (a && a.startsWith("url(")) {
 				let r = Eg(a);
-				if (r.tagName === "linearGradient") {
+				// Visteras: skip gradients with a per-object gradientTransform (visteras-gradient.js rebases them).
+				if (r && r.tagName === "linearGradient" && !r.hasAttribute("data-visteras-gradient")) {
 					let a = r.getAttribute("x1") || 0, o = r.getAttribute("y1") || 0, s = r.getAttribute("x2") || 1, c = r.getAttribute("y2") || 0;
 					a = n.width * a + n.x, o = n.height * o + n.y, s = n.width * s + n.x, c = n.height * c + n.y;
 					let l = jh(a, o, t), u = jh(s, c, t), d = {
@@ -41971,6 +41983,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				if (!i) return;
 				let a = (i.tagName || "").toLowerCase();
 				if (!["lineargradient", "radialgradient"].includes(a) || i.getAttribute("gradientUnits") === "userSpaceOnUse") return;
+				// Visteras: data-visteras-gradient carries a gradientTransform the fraction mirror ignores; visteras-gradient.js mirrors it after flipSelectedElements.
+				if (i.hasAttribute("data-visteras-gradient")) return;
 				let o = i.cloneNode(!0);
 				n.a < 0 && (a === "lineargradient" ? (kb(o, "x1"), kb(o, "x2")) : (kb(o, "cx"), kb(o, "fx"))), n.d < 0 && (a === "lineargradient" ? (kb(o, "y1"), kb(o, "y2")) : (kb(o, "cy"), kb(o, "fy")));
 				let s = (Db.getCurrentDrawing?.() || Db.getDrawing?.())?.getNextId?.() ?? (i.id ? `${i.id}-mirrored` : `mirrored-grad-${Date.now()}`);
@@ -68873,6 +68887,8 @@ var fz = () => {
 			return t.hasAttribute("data-root") ? this.svgCanvas.leaveContext() : this.svgCanvas.setContext(t.textContent), this.svgCanvas.clearSelection(), !1;
 		}), this.svgCanvas.bind("selected", this.selectedChanged.bind(this)), this.svgCanvas.bind("transition", this.elementTransition.bind(this)), this.svgCanvas.bind("changed", this.elementChanged.bind(this)), this.svgCanvas.bind("exported", this.exportHandler.bind(this)), this.svgCanvas.bind("exportedPDF", function(e, t) {
 			if (!t.output) return;
+			// Visteras: PDF is rendered to a Blob and saved by js/visteras-export.js (no popup).
+			if (window.__visterasExport && t.outputType === "blob") return;
 			let { exportWindowName: n } = t;
 			if (n && (this.exportWindow = window.open("", this.exportWindowName)), !this.exportWindow || this.exportWindow.closed) {
 				seAlert(this.i18next.t("notification.popupWindowBlocked"));
@@ -70227,6 +70243,9 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 		return Object.values(this.shortcuts).find((t) => t.sel === e);
 	}
 	exportHandler(e, t) {
+		// Visteras: no popup window. Export goes through File ▸ Export (js/visteras-export.js);
+		// a stray legacy "exported" event is delivered as a download instead.
+		if (window.__visterasExport) { window.__visterasExport.legacyExported?.(t); return; }
 		let { issues: n, exportWindowName: r } = t;
 		if (this.exportWindow = window.open("", r), !this.exportWindow || this.exportWindow.closed) {
 			seAlert(this.i18next.t("notification.popupWindowBlocked"));

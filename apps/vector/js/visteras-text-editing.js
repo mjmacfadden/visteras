@@ -27,6 +27,99 @@ export function wrapText(value, width, measure) {
   return lines;
 }
 
+// Paragraph / character attributes (Illustrator Paragraph + Character panels).
+// Data attributes survive the SVG-Edit sanitizer; tspans are regenerated from them.
+export const PARA_ATTRS = {
+  leading: 'data-visteras-leading', // px; absent = Auto (120% of size)
+  align: 'data-visteras-align', // left | center | right | justify
+  spaceBefore: 'data-visteras-space-before', // px, not applied to the first paragraph
+  spaceAfter: 'data-visteras-space-after', // px, not applied after the last paragraph
+};
+export const AUTO_LEADING = 1.2;
+const ANCHOR_ALIGN = { start: 'left', middle: 'center', end: 'right' };
+
+/**
+ * Pure paragraph layout. Returns one entry per visible line:
+ * { text, start, x, y, wordSpacing } (wordSpacing only for justified lines).
+ * Justify = Illustrator "Justify with last line aligned left": every wrapped line
+ * except a paragraph's last gets extra word-spacing to fill the box width.
+ */
+export function computeParagraphLayout(opts, measure) {
+  const { value = '', width, height = Infinity, size = 24, x = 0, y = 0 } = opts;
+  const leading = Number(opts.leading) > 0 ? Number(opts.leading) : size * AUTO_LEADING;
+  const align = ['left', 'center', 'right', 'justify'].includes(opts.align) ? opts.align : 'left';
+  const before = Math.max(0, Number(opts.spaceBefore) || 0), after = Math.max(0, Number(opts.spaceAfter) || 0);
+  const lineX = x + (align === 'center' ? width / 2 : align === 'right' ? width : 0);
+  const out = [];
+  let baseline = size, sourceIndex = 0, first = true, full = false;
+  value.split('\n').forEach((paragraph, pi) => {
+    if (full) return;
+    if (pi > 0) sourceIndex++; // the newline
+    const lines = wrapText(paragraph, width, measure);
+    lines.forEach((line, li) => {
+      if (full) return;
+      if (!first) baseline += leading + (li === 0 ? after + before : 0);
+      first = false;
+      if (baseline + size * (AUTO_LEADING - 1) > height + 1e-6) { full = true; return; }
+      const entry = { text: line, start: sourceIndex, x: lineX, y: y + baseline, wordSpacing: null };
+      if (align === 'justify' && li < lines.length - 1) {
+        const trimmed = line.replace(/\s+$/, '');
+        const gaps = (trimmed.match(/ /g) || []).length;
+        if (gaps) {
+          const extra = (width - measure(trimmed)) / gaps;
+          if (extra > 0) entry.wordSpacing = Math.round(extra * 1000) / 1000;
+        }
+      }
+      out.push(entry);
+      sourceIndex += line.length;
+    });
+  });
+  // Overset (Illustrator's red + out-port): some text did not fit in the frame.
+  out.overset = full;
+  return out;
+}
+
+/** Paragraph settings stored on a text element (alignment falls back to text-anchor). */
+export function readParagraphAttrs(text) {
+  const num = (k) => { const v = Number(text.getAttribute(PARA_ATTRS[k])); return Number.isFinite(v) && text.getAttribute(PARA_ATTRS[k]) !== null && text.getAttribute(PARA_ATTRS[k]) !== '' ? v : null; };
+  const stored = text.getAttribute(PARA_ATTRS.align);
+  const align = ['left', 'center', 'right', 'justify'].includes(stored) ? stored : ANCHOR_ALIGN[text.getAttribute('text-anchor') || 'start'] || 'left';
+  return { leading: num('leading'), align, spaceBefore: num('spaceBefore') || 0, spaceAfter: num('spaceAfter') || 0 };
+}
+
+/**
+ * XML parsers normalise raw newlines inside attribute values to spaces, so area
+ * text paragraphs (data-text-content) must be written as &#10; to survive a
+ * save → reopen round trip.
+ */
+export function encodeTextContentNewlines(svg) {
+  return String(svg).replace(/(\sdata-text-content=")([^"]*)"/g, (_, head, v) => `${head}${v.replace(/\r\n|\r|\n/g, '&#10;').replace(/\t/g, '&#9;')}"`);
+}
+
+// Area text whose content overflows its frame (layout state only — never written to the document).
+const oversetTexts = new WeakSet();
+export const isOverset = (text) => oversetTexts.has(text);
+
+/** Corner of the frame where Illustrator draws the out-port, in the text's user space. */
+export function oversetPort(text) {
+  const x = Number(text.getAttribute('x')) || 0, y = Number(text.getAttribute('y')) || 0;
+  return { x: x + (Number(text.getAttribute('data-text-width')) || 0), y: y + (Number(text.getAttribute('data-text-height')) || 0) };
+}
+
+/** Draws the red + square (8px on screen) centred on the frame's bottom-right corner. */
+export function drawOversetMarker(parent, point) {
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('data-text-overset', '');
+  g.setAttribute('pointer-events', 'none');
+  const r = document.createElementNS(NS, 'rect');
+  for (const [k, v] of Object.entries({ x: point.x - 4.5, y: point.y - 4.5, width: 9, height: 9, fill: '#fff', stroke: '#e5191a', 'stroke-width': 1 })) r.setAttribute(k, v);
+  const plus = document.createElementNS(NS, 'path');
+  plus.setAttribute('d', `M${point.x - 2.5},${point.y}H${point.x + 2.5}M${point.x},${point.y - 2.5}V${point.y + 2.5}`);
+  plus.setAttribute('stroke', '#e5191a'); plus.setAttribute('stroke-width', '1.4');
+  g.append(r, plus); parent.append(g);
+  return g;
+}
+
 export function layoutParagraph(text) {
   const width = Number(text.getAttribute('data-text-width'));
   if (!width) return;
@@ -35,23 +128,23 @@ export function layoutParagraph(text) {
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
   ctx.font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
   const spacing = parseFloat(style.letterSpacing) || 0;
-  const lines = wrapText(value, width, s => ctx.measureText(s).width + Math.max(0,s.length-1)*spacing);
-  const x = Number(text.getAttribute('x')) || 0, y = Number(text.getAttribute('y')) || 0;
-  const anchor = text.getAttribute('text-anchor') || 'start';
-  const height = Number(text.getAttribute('data-text-height'));
+  const measure = s => ctx.measureText(s).width + Math.max(0,s.length-1)*spacing;
+  const para = readParagraphAttrs(text);
+  const lines = computeParagraphLayout({
+    value, width, height: Number(text.getAttribute('data-text-height')), size,
+    x: Number(text.getAttribute('x')) || 0, y: Number(text.getAttribute('y')) || 0, ...para,
+  }, measure);
+  if (lines.overset) oversetTexts.add(text); else oversetTexts.delete(text);
   const fragment = document.createDocumentFragment();
-  let sourceIndex = 0;
-  lines.forEach((line, i) => {
-    if ((i + 1) * size * 1.2 > height) return;
+  for (const line of lines) {
     const span = document.createElementNS(NS, 'tspan');
-    span.setAttribute('x', x + (anchor === 'middle' ? width/2 : anchor === 'end' ? width : 0));
-    span.setAttribute('y', y + size + i * size * 1.2);
-    if (value[sourceIndex] === '\n') sourceIndex++;
-    span.setAttribute('data-text-start', sourceIndex);
-    sourceIndex += line.length;
-    span.textContent = line || '\u200b';
+    span.setAttribute('x', line.x);
+    span.setAttribute('y', line.y);
+    span.setAttribute('data-text-start', line.start);
+    if (line.wordSpacing != null) span.setAttribute('word-spacing', line.wordSpacing);
+    span.textContent = line.text || '\u200b';
     fragment.append(span);
-  });
+  }
   if (text.innerHTML !== [...fragment.childNodes].map(n => n.outerHTML).join('')) text.replaceChildren(fragment);
 }
 
@@ -92,6 +185,10 @@ export function beginTextEdit(editor, text) {
       const frame=document.createElementNS(NS,'rect');
       for(const [k,v] of Object.entries({x:text.getAttribute('x')||0,y:text.getAttribute('y')||0,width:text.getAttribute('data-text-width'),height:text.getAttribute('data-text-height'),fill:'none',stroke:'#1C79C4','stroke-width':1,'vector-effect':'non-scaling-stroke'}))frame.setAttribute(k,v);
       group.append(frame);
+      if (isOverset(text)) {
+        const p = new DOMPoint(oversetPort(text).x, oversetPort(text).y).matrixTransform(matrix);
+        drawOversetMarker(overlay, p);
+      }
     }
     const sourceIndices = paragraph ? [...text.children].flatMap(span => [...span.textContent].map((_,i)=>Number(span.getAttribute('data-text-start'))+i)) : [...input.value].map((_,i)=>i);
     const start = input.selectionStart, end = input.selectionEnd;
@@ -281,8 +378,32 @@ export function mountTextEditing(editor) {
   // Reflow after typography edits and history replay. Content remains SVG text.
   const originalCall=sc.call;
   sc.call=function(event,...args){const result=originalCall.call(this,event,...args);if(event==='selected'||event==='changed')syncPanel();return result;};
-  const observer=new MutationObserver(()=>{
-    for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);
-  });
-  observer.observe(sc.getSvgContent(),{subtree:true,attributes:true,childList:true});
+  if(typeof sc.svgCanvasToString==='function'&&!sc.svgCanvasToString.__visterasNewlines){
+    const toString=sc.svgCanvasToString;
+    sc.svgCanvasToString=function(...args){return encodeTextContentNewlines(toString.apply(this,args));};
+    sc.svgCanvasToString.__visterasNewlines=true;
+  }
+  // Overset out-port for selected area text, drawn in the selector layer (screen-sized).
+  const renderOverset=()=>{
+    const parent=sc.selectorManager?.selectorParentGroup;if(!parent)return;
+    parent.querySelector(':scope > [data-text-overset-layer]')?.remove();
+    const texts=(sc.getSelectedElements?.()||[]).filter(t=>t?.tagName==='text'&&t.hasAttribute('data-text-width')&&isOverset(t));
+    if(!texts.length)return;
+    const layer=document.createElementNS(NS,'g');layer.setAttribute('data-text-overset-layer','');parent.append(layer);
+    const rootInv=parent.getScreenCTM()?.inverse();if(!rootInv)return;
+    for(const t of texts){const m=t.getScreenCTM();if(!m)continue;const port=oversetPort(t);drawOversetMarker(layer,new DOMPoint(port.x,port.y).matrixTransform(m).matrixTransform(rootInv));}
+  };
+  let oversetQueued=false;
+  const queueOverset=()=>{if(oversetQueued)return;oversetQueued=true;requestAnimationFrame(()=>{oversetQueued=false;renderOverset();});};
+  const call2=sc.call;
+  sc.call=function(event,...args){const result=call2.call(this,event,...args);if(event==='selected'||event==='changed'||event==='zoomed')queueOverset();return result;};
+  document.getElementById('workarea')?.addEventListener('scroll',queueOverset,{passive:true});
+  const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);queueOverset();};
+  const observer=new MutationObserver(relayout);
+  // Opening a file (setSvgString) replaces #svgcontent: re-attach and reflow.
+  let bound=null;
+  const bind=()=>{const c=sc.getSvgContent();if(!c||c===bound)return;bound=c;observer.disconnect();observer.observe(c,{subtree:true,attributes:true,childList:true});relayout();};
+  bind();
+  const root=sc.getSvgRoot?.();
+  if(root)new MutationObserver(bind).observe(root,{childList:true});
 }

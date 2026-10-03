@@ -1,0 +1,78 @@
+/* Visteras Vector — Blending mode, Effects (Appearance) and Paragraph controls. */
+.visteras_blend_row #slot_blend_mode { display: flex; align-items: center; gap: 8px; }
+.visteras_blend_label,
+.vfx_label { font-size: 11px; color: #cccccc; user-select: none; white-space: nowrap; }
+.visteras_blend_select,
+.vfx_select,
+.vpara_input {
+  background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px;
+  font-size: 11px; height: 22px; padding: 0 4px; min-width: 0;
+}
+.visteras_blend_select { flex: 1; }
+.visteras_blend_select:focus-visible,
+.vfx_select:focus-visible,
+.vpara_input:focus-visible { outline: 1px solid var(--visteras-accent, #fa7c1b); outline-offset: 0; }
+
+/* Effects list (Appearance-style rows) */
+.vfx_list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.vfx_empty { font-size: 11px; color: #888888; padding: 2px 0; }
+.vfx_row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 3px; background: #2a2a2a; }
+.vfx_row.vfx_off .vfx_name, .vfx_row.vfx_off .vfx_summary { opacity: .45; }
+.vfx_toggle { accent-color: var(--visteras-accent, #fa7c1b); margin: 0; }
+.vfx_name { background: none; border: 0; padding: 0; color: #dddddd; font-size: 11px; text-decoration: underline; text-decoration-color: #666; cursor: pointer; }
+.vfx_name:hover { color: var(--visteras-accent, #fa7c1b); }
+.vfx_summary { flex: 1; font-size: 10px; color: #999999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vfx_remove { background: none; border: 0; color: #999999; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.vfx_remove:hover { color: #ffffff; }
+.vfx_add { width: 100%; }
+/* Properties fx button (opens a menu mirroring Effect) */
+.vfx_fx_btn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px; font-size: 11px; cursor: pointer; }
+.vfx_fx_btn em { font-family: Georgia, serif; font-style: italic; font-weight: 700; color: var(--visteras-accent, #fa7c1b); }
+.vfx_fx_btn:hover, .vfx_fx_btn[aria-expanded="true"] { border-color: var(--visteras-accent, #fa7c1b); color: #ffffff; }
+#vfx_fx_menu { z-index: 3005; min-width: 190px; }
+.vfx_blur_locked { opacity: .45; pointer-events: none; }
+
+/* Effect dialog (Illustrator Effect ▸ Stylize ▸ Drop Shadow layout) */
+.vfx_dialog { width: min(320px, calc(100vw - 40px)); }
+.vfx_body { display: flex; flex-direction: column; gap: 8px; }
+.vfx_field { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 6px; font-size: 12px; color: #cccccc; }
+.vfx_field > span { text-align: right; }
+.vfx_field em { font-style: normal; color: #999999; font-size: 11px; }
+.vfx_field input[type="color"] { width: 44px; height: 22px; padding: 0; border: 1px solid #444; background: #2a2a2a; }
+.vfx_field_range { grid-template-columns: 84px 1fr 56px auto; }
+.vfx_field_range input[type="range"] { accent-color: var(--visteras-accent, #fa7c1b); }
+.vfx_preview { font-size: 12px; color: #cccccc; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.vfx_preview input { accent-color: var(--visteras-accent, #fa7c1b); }
+
+/* Character / Paragraph controls (Illustrator Character + Paragraph panels) */
+.vpara_row { display: flex; gap: 6px; margin: 2px 0 4px; }
+.vpara_field { flex: 1; display: flex; align-items: center; gap: 4px; min-width: 0; color: #cccccc; }
+.vpara_icon { display: inline-flex; color: #aaaaaa; flex: none; }
+.vpara_field .vpara_input { width: 100%; }
+.vpara_field .vpara_input:disabled { opacity: .45; }
+.vpara_ls_replaced #tool_letter_spacing { display: none !important; }
+#text_align_justify:disabled { opacity: .4; cursor: default !important; }
+
+/* Window ▸ Transparency panel (⇧⌘F10) */
+.vtr { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; color: #ddd; font-size: 11px; }
+.vtr-row { display: flex; align-items: center; gap: 8px; }
+.vtr-select { flex: 1; min-width: 0; height: 22px; background: #1e1e1e; color: #ddd; border: 1px solid #444; border-radius: 3px; font-size: 11px; }
+.vtr-select:focus { outline: none; border-color: var(--studio-orange, #fa7c1b); }
+.vtr-field { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 4px; background: #1e1e1e; border: 1px solid #444; border-radius: 3px; }
+.vtr-field:focus-within { border-color: var(--studio-orange, #fa7c1b); }
+.vtr-label { color: #8a8a8a; }
+.vtr-field em { font-style: normal; color: #8a8a8a; }
+.vtr-input { width: 38px; background: transparent; border: none; outline: none; color: #ddd; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.vtr-slider { width: 100%; accent-color: var(--studio-orange, #fa7c1b); }
+.vtr-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; }
+.vtr-check input { accent-color: var(--studio-orange, #fa7c1b); }
+.vtr-check:has(input:disabled) { color: #666; }
+.vtr-empty { color: #777; }
+.vtr-empty[hidden] { display: none; }
+/* Effect dialogs: radio rows (Drop Shadow Color/Darkness, Inner Glow Center/Edge) + backdrop note */
+.vfx_radio { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.vfx_radio label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.vfx_radio input[type="radio"] { accent-color: var(--visteras-accent, #fa7c1b); margin: 0; }
+.vfx_color_dark input[type="number"] { width: 56px; }
+.vfx_color_dark input:disabled { opacity: .45; }
+.vfx_note { margin: -2px 0 4px; font-size: 10px; line-height: 1.35; color: #9a9a9a; max-width: 260px; }

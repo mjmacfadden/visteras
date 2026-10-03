@@ -1,0 +1,20 @@
+/* Visteras Vector — submenus, section headers, keyboard focus and popup menus.
+   Uses the shared menu tokens (--vui-menu-*) from visteras-theme.css; orange accent
+   marks an open submenu parent. */
+.menu_has_submenu { position: relative; }
+.menu_submenu_arrow { margin-left: var(--vui-menu-shortcut-gap, 24px); font-size: 9px; color: #888888; }
+.menu_has_submenu.submenu-open > .menu_submenu_arrow,
+.menu_has_submenu:hover:not(.disabled) > .menu_submenu_arrow { color: var(--studio-orange, #fa7c1b); }
+.menu_has_submenu.submenu-open { background: #4a4a4a; color: #ffffff; box-shadow: inset 2px 0 0 var(--studio-orange, #fa7c1b); }
+.menu_submenu_list { display: none; position: absolute; top: calc(-1 * var(--vui-menu-dropdown-padding, 4px) - 1px); left: 100%; z-index: 3002; }
+.menu_submenu_list.flip-left { left: auto; right: 100%; }
+.menu_has_submenu.submenu-open > .menu_submenu_list { display: block; }
+/* hover on a parent row should not paint its children as hovered */
+.menu_submenu_list .menu_dropdown_item { background: transparent; color: #cccccc; }
+.menu_submenu_list .menu_dropdown_item:hover:not(.disabled) { background: var(--studio-blue-active); color: #ffffff; }
+.menu_dropdown_header { padding: var(--vui-menu-item-padding); font-size: var(--vui-menu-shortcut-font-size, 10px); color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.04em; cursor: default; user-select: none; }
+.menu_dropdown_item.kb-focus:not(.disabled) { background: var(--studio-blue-active); color: #ffffff; outline: 1px solid var(--studio-orange, #fa7c1b); outline-offset: -1px; }
+.menu_dropdown_item.disabled .menu_submenu_arrow { color: #555555; }
+/* Popup menus that reuse the menu-bar look (Properties fx button) */
+.vmenu-popup { position: fixed; display: none; top: 0; left: 0; }
+.vmenu-popup.open { display: block; }

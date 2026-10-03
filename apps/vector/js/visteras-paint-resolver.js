@@ -24,14 +24,18 @@ const hex2 = (n) => Math.max(0, Math.min(255, Math.round(Number(n)))).toString(1
 /**
  * Parse a CSS/SVG paint value.
  * @param {string|null|undefined} v
- * @returns {{none:boolean, hex:string|null, gradient:boolean}|null} null = no information
+ * @returns {{none:boolean, hex:string|null, gradient:boolean, ref?:string|null}|null} null = no information
  */
 export function parseCssPaint(v) {
   if (v == null) return null;
   const s = String(v).trim().toLowerCase();
   if (!s || s === 'inherit' || s === 'currentcolor' || s === 'context-stroke' || s === 'context-fill') return null;
   if (s === 'none' || s === 'transparent') return { none: true, hex: null, gradient: false };
-  if (s.startsWith('url(')) return { none: false, hex: null, gradient: true };
+  if (s.startsWith('url(')) {
+    // ref = the referenced id (computed style may expand to an absolute URL)
+    const ref = String(v).match(/#([^"')\s]+)/);
+    return { none: false, hex: null, gradient: true, ref: ref ? ref[1] : null };
+  }
   let m = s.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/);
   if (m) {
     const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];

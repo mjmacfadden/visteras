@@ -26,7 +26,11 @@
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-panel-dock.css?v=dock-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-panel-dock.css?v=dock-3" rel="stylesheet" media="all">
+  <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-appearance-fx.css?v=effects-polish-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-export.css?v=export-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -43,7 +47,7 @@
     <!-- ==================================================================
          1. Main Top Menu Bar (File, Edit, View, Object, Help)
          ================================================================== -->
-    <nav id="visteras_menu_bar" aria-label="Main Menu">
+    <nav id="visteras_menu_bar" class="vmenu-root" aria-label="Main Menu">
       <div class="menu_group">
         
         <!-- File Menu -->
@@ -57,9 +61,15 @@
             <div class="menu_dropdown_item" id="action_save">Save <span class="menu_dropdown_shortcut">⌘S</span></div>
             <div class="menu_dropdown_item" id="action_save_as">Save As... <span class="menu_dropdown_shortcut">⌘⇧S</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_export_svg">Export SVG...</div>
-            <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
-            <div class="menu_dropdown_item" id="action_export_pdf">Export PDF...</div>
+            <!-- File ▸ Export (Illustrator): Export for Screens… ⌥⌘E, Export As… — js/visteras-export.js -->
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_export_menu">Export<span class="menu_submenu_arrow" aria-hidden="true">▶</span><div class="menu_dropdown_list menu_submenu_list" role="menu">
+              <div class="menu_dropdown_item" role="menuitem" id="action_export_screens"><span class="menu_label">Export for Screens…</span><span class="menu_dropdown_shortcut">⌥⌘E</span></div>
+              <div class="menu_dropdown_item" role="menuitem" id="action_export_as"><span class="menu_label">Export As…</span></div>
+            </div></div>
+            <!-- Legacy ids kept as hidden aliases (open Export As with that format) -->
+            <div class="menu_dropdown_item" id="action_export_svg" hidden>Export SVG...</div>
+            <div class="menu_dropdown_item" id="action_export_png" hidden>Export PNG...</div>
+            <div class="menu_dropdown_item" id="action_export_pdf" hidden>Export PDF...</div>
           </div>
         </div>
 
@@ -115,6 +125,12 @@
           </div>
         </div>
 
+        <!-- Effect Menu (Illustrator: Apply Last / Last Effect, Illustrator Effects, Photoshop Effects) — items built by visteras-effects.js -->
+        <div class="menu_entry" id="menu_effect">
+          <div class="menu_entry_title">Effect</div>
+          <div class="menu_dropdown_list" id="menu_effect_list" role="menu" aria-label="Effect"></div>
+        </div>
+
         <!-- View Menu -->
         <div class="menu_entry" id="menu_view">
           <div class="menu_entry_title">View</div>
@@ -129,6 +145,7 @@
             <div class="menu_dropdown_item" id="action_snap_point" role="menuitemcheckbox" aria-checked="true">Snap to Point</div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_gradient_annotator">Hide Gradient Annotator <span class="menu_dropdown_shortcut">⌥⌘G</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
             <div class="menu_dropdown_separator"></div>
@@ -144,6 +161,8 @@
             <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
             <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
             <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
+            <div class="menu_dropdown_item disabled" id="action_window_appearance" aria-disabled="true" title="Appearance panel coming">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
             <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_window_properties">Properties</div>
@@ -232,7 +251,7 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=path-text-transforms-1';
+    import Editor from './Editor.js?v=export-1';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
@@ -242,7 +261,13 @@
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
     import { mountTransformPanel } from './js/visteras-transform-panel.js';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
-    import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
+    import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
+    import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
+    import { mountEffects } from './js/visteras-effects.js?v=export-1';
+    import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
+    import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
+    import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
+    import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountTextEditing } from './js/visteras-text-editing.js';
@@ -255,10 +280,11 @@
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
-    import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle } from './lib/visteras-ui/file.js?v=open-1';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
+    import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
+    import { mountExport } from './js/visteras-export.js?v=export-1';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
-    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
+    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -620,6 +646,7 @@
           let docWidth = null;
           let docHeight = null;
           let docUnit = null;
+          let docRaster = null;
 
           if (typeof raw === 'string' && raw.trim().startsWith('{')) {
             try {
@@ -628,6 +655,7 @@
               if (bundle.width) docWidth = bundle.width;
               if (bundle.height) docHeight = bundle.height;
               if (bundle.unit) docUnit = bundle.unit;
+              if (bundle.rasterEffects && typeof bundle.rasterEffects === 'object') docRaster = bundle.rasterEffects;
               if (!base || /^untitled(-\d+)?$/i.test(base)) {
                 if (bundle.title && !/^untitled(-\d+)?$/i.test(bundle.title)) {
                   base = bundle.title;
@@ -648,6 +676,7 @@
               unit: docUnit || 'px',
               svg: svgContent,
               fileHandle: fileHandle,
+              rasterEffects: docRaster,
             });
           } else {
             if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
@@ -770,6 +799,8 @@
           height: res.h,
           unit: unit,
           thumbnail: thumbUrl,
+          // Effect ▸ Document Raster Effects Settings (per document, like Illustrator)
+          rasterEffects: activeDoc?.rasterEffects || undefined,
           svg: svgStr,
         }, null, 2);
 
@@ -812,24 +843,8 @@
         void saveVectorDoc(true);
       });
 
-      document.getElementById('action_export_svg')?.addEventListener('click', () => {
-        const svgStr = sc.getSvgString();
-        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        const title = (svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
-        a.download = `${title}.svg`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
-
-      document.getElementById('action_export_png')?.addEventListener('click', () => {
-        if (sc.rasterExport) sc.rasterExport('PNG');
-      });
-
-      document.getElementById('action_export_pdf')?.addEventListener('click', () => {
-        if (sc.exportPDF) sc.exportPDF();
-      });
+      // File ▸ Export ▸ … is wired by mountExport (js/visteras-export.js): Export As /
+      // Export for Screens render client-side and save through saveFile (no popup window).
 
       document.getElementById('action_undo')?.addEventListener('click', () => {
         document.getElementById('tool_undo')?.click();
@@ -1287,7 +1302,7 @@
           }
 
           // Command/Ctrl + Shift + G: Ungroup
-          if (e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+          if (e.shiftKey && !e.altKey && (e.key === 'g' || e.key === 'G')) {
             e.preventDefault();
             e.stopPropagation();
             sc.ungroupSelectedElement?.();
@@ -1295,7 +1310,7 @@
           }
 
           // Command/Ctrl + G: Group
-          if (!e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+          if (!e.shiftKey && !e.altKey && (e.key === 'g' || e.key === 'G')) {
             e.preventDefault();
             e.stopPropagation();
             sc.groupSelectedElements?.();
@@ -1537,10 +1552,27 @@
                 </div>
                 <div class="prop_row">
                   <div id="slot_opacity" style="flex:1;"></div>
-                  <div id="slot_blur" style="flex:1;"></div>
+                  <div id="slot_blur" hidden style="display:none;"><!-- SVG-Edit Blur retired: Effect ▸ Blur ▸ Gaussian Blur --></div>
+                </div>
+                <div class="prop_row visteras_blend_row" id="prop_row_blend">
+                  <div id="slot_blend_mode" style="flex:1;"></div>
                 </div>
                 <div class="prop_row rect_panel" id="prop_row_radius" style="display:none;">
                   <div id="slot_radius" style="flex:1;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Color Adjust) -->
+            <div class="prop_section" id="sec_effects" style="display:none;">
+              <div class="prop_section_header" data-target="sec_effects_body">
+                <span class="prop_section_arrow"></span>
+                <span class="prop_section_title">Effects</span>
+              </div>
+              <div class="prop_section_body" id="sec_effects_body">
+                <div id="vfx_list" class="vfx_list" aria-live="polite"></div>
+                <div class="prop_row">
+                  <button type="button" id="vfx_add" class="vfx_fx_btn" aria-haspopup="menu" aria-expanded="false" title="Add New Effect (mirrors the Effect menu)"><em>fx</em> Add Effect…</button>
                 </div>
               </div>
             </div>
@@ -2436,6 +2468,8 @@
 
     applyStudioSkin();
     setupMenuBar();
+    // Submenus + keyboard navigation for the menu bar and popup menus (Effect menu, fx button)
+    mountMenus();
     setupPropertiesPanel();
     mountVectorWorkspace(svgEditor);
     mountPenTools(svgEditor);
@@ -2485,6 +2519,18 @@
 
     // Iconic panel dock: Color, Swatches, Stroke, Gradient, Layers
     mountVisterasPanelDock({ svgEditor });
+
+    // Transparency: per-object blending mode (Illustrator list/order)
+    mountBlendModes(svgEditor);
+    // Window ▸ Transparency (⇧⌘F10): Blend Mode, Opacity, Isolate Blending
+    mountTransparency(svgEditor);
+    // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
+    mountEffects(svgEditor);
+    mountParagraph(svgEditor);
+    // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
+    mountGradient(svgEditor);
+    // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
+    mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {

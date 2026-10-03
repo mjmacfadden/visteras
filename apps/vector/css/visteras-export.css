@@ -1,0 +1,39 @@
+/* File ▸ Export dialogs (Export As / Export for Screens / Document Raster Effects Settings) */
+.vexp_dialog { width: min(460px, calc(100vw - 40px)); }
+.vexp_dialog.vexp_screens { width: min(720px, calc(100vw - 40px)); }
+.vexp_body { display: flex; flex-direction: column; gap: 8px; font-size: 12px; max-height: calc(100vh - 180px); overflow: auto; }
+.vexp_row { display: flex; align-items: center; gap: 8px; }
+.vexp_row > span:first-child { min-width: 78px; color: var(--vui-text, #ccc); }
+.vexp_row select, .vexp_row input[type="text"] { flex: 1; min-width: 0; height: 24px; background: #1f1f1f; color: #e6e6e6; border: 1px solid #444; border-radius: 3px; padding: 0 6px; font: inherit; }
+.vexp_row input[type="number"] { width: 70px; }
+.vexp_row input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid #444; background: none; }
+.vexp_row em { font-style: normal; color: #999; }
+.vexp_checks { gap: 16px; }
+.vexp_checks label, .vexp_scope { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.vexp_dialog input[type="checkbox"], .vexp_dialog input[type="radio"], .vexp_dialog input[type="range"] { accent-color: var(--visteras-accent, #fa7c1b); }
+.vexp_dialog fieldset { border: 1px solid #3a3a3a; border-radius: 4px; padding: 8px 10px 10px; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.vexp_dialog fieldset[hidden] { display: none; }
+.vexp_dialog legend { padding: 0 4px; color: #aaa; }
+.vexp_note { margin: 0; font-size: 11px; color: #9a9a9a; line-height: 1.4; }
+.vexp_info { margin: 0; font-size: 11px; color: #bbb; font-variant-numeric: tabular-nums; }
+.vexp_info.vexp_error { color: #ff6b5f; }
+.vexp_cols { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+.vexp_left { display: flex; flex-direction: column; gap: 8px; }
+.vexp_thumb { height: 150px; display: flex; align-items: center; justify-content: center; border-radius: 4px; border: 1px solid #3a3a3a;
+  background: repeating-conic-gradient(#2c2c2c 0 25%, #353535 0 50%) 0 0 / 12px 12px; }
+.vexp_thumb img { max-width: 180px; max-height: 140px; }
+.vexp_right { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vexp_section_title { font-weight: 600; color: #ddd; }
+.vexp_head, .vexp_scale_row { display: grid; grid-template-columns: 70px 1fr 100px 24px; gap: 6px; align-items: center; }
+.vexp_head { color: #999; font-size: 11px; }
+#vexp_rows { display: flex; flex-direction: column; gap: 4px; }
+.vexp_scale_row select, .vexp_scale_row input { height: 24px; background: #1f1f1f; color: #e6e6e6; border: 1px solid #444; border-radius: 3px; padding: 0 4px; font: inherit; min-width: 0; }
+.vexp_del { background: none; border: 0; color: #999; cursor: pointer; font-size: 12px; }
+.vexp_del:hover { color: #fff; }
+.vexp_add { align-self: flex-start; background: none; border: 1px dashed #555; color: #ddd; border-radius: 3px; padding: 3px 10px; cursor: pointer; font: inherit; }
+.vexp_add:hover { border-color: var(--visteras-accent, #fa7c1b); color: #fff; }
+.vexp_progress { display: flex; align-items: center; gap: 10px; padding: 0 16px 6px; font-size: 11px; color: #bbb; }
+.vexp_progress[hidden] { display: none; }
+.vexp_bar { flex: 0 0 120px; height: 4px; background: #333; border-radius: 2px; overflow: hidden; }
+.vexp_bar i { display: block; height: 100%; width: 0; background: var(--visteras-accent, #fa7c1b); transition: width .15s; }
+.vexp_busy .vexp_body { opacity: .6; pointer-events: none; }

@@ -405,6 +405,9 @@ export function applyStyleToElements(targets, style, history, env = {}) {
           if (v == null) el.style.removeProperty('mix-blend-mode');
           else el.style.setProperty('mix-blend-mode', v);
           if (!attr(el, 'style')?.trim()) el.removeAttribute('style');
+          // Keep the stored mode (visteras-blend-modes.js) in sync so it survives reload.
+          record('data-visteras-blend');
+          setAttr('data-visteras-blend', v == null || v === 'normal' ? null : v);
         }
         continue;
       }
