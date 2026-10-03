@@ -805,7 +805,7 @@ export class WorkspaceCanvas {
           const id = clickedEl.dataset.id;
           const el = this.board.getElementById(id);
           if (el && el.type === 'text') {
-            this.board.selectElement(id);
+            this.board.select(id);
             this.openInlineEditor(el, clickedEl);
             return;
           }
@@ -1004,7 +1004,7 @@ export class WorkspaceCanvas {
           });
         }
 
-        this.board.selectElement(el.id);
+        this.board.select(el.id);
         const cardDom = document.getElementById(`dom_${el.id}`);
         if (cardDom) {
           this.openInlineEditor(el, cardDom);

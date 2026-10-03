@@ -234,3 +234,10 @@ test('Smoke fix 1: a click with no movement is not a transform', () => {
   const src = read('js/canvas.js');
   assert.match(src, /if \(!transformChanged\(before, this\.board\.getSelectedElements\(\)\)\) return;/);
 });
+
+test('Smoke fix 2: nothing calls the missing board.selectElement', () => {
+  for (const f of ['js/app.js', 'js/canvas.js', 'js/inspector.js']) {
+    assert.doesNotMatch(read(f), /\.selectElement\(/, f);
+  }
+  assert.match(read('js/board-composer.js'), /^\s{2}select\(id, multi = false\) \{/m);
+});

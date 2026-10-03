@@ -434,7 +434,7 @@ export class InspectorPanel {
           x: Math.round(center.x - 190),
           y: Math.round(center.y - 110)
         });
-        this.board.selectElement(el.id);
+        this.board.select(el.id);
       }
       this.activeView = null;
       this.render();

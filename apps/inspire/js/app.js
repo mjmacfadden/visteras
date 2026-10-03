@@ -1990,7 +1990,7 @@ class InspireApp {
           x: Math.round(center.x - 190),
           y: Math.round(center.y - 110)
         });
-        this.board.selectElement(el.id);
+        this.board.select(el.id);
         const active = this.getActiveDocument();
         if (active) active.isDirty = true;
         this.renderDocumentTabs();
@@ -2023,7 +2023,7 @@ class InspireApp {
       x: Math.round(center.x - 160),
       y: Math.round(center.y - 40)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
@@ -2042,7 +2042,7 @@ class InspireApp {
       x: Math.round(center.x - 110),
       y: Math.round(center.y - 110)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
@@ -2059,7 +2059,7 @@ class InspireApp {
       x: Math.round(center.x - 80),
       y: Math.round(center.y - 80)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
