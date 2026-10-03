@@ -201,12 +201,20 @@ export function mountSelectionTools(editor) {
     try {
       window.__visterasLiveSyncStrokeAlign?.(drag.items.map((i) => i.el), sc);
     } catch { /* ignore */ }
+    try {
+      const pCurrent = position(e);
+      const delta = { dx: pCurrent.x - drag.start.x, dy: pCurrent.y - drag.start.y };
+      window.__visterasGuideManager?.evaluateSmartSnap?.(drag.items.map((i) => i.el), delta);
+    } catch { /* ignore */ }
     drag.moved = true;
     drag.visualFrame = {b,m:transform.multiply(basis)};
     schedule();
   }, true);
   function finish(cancel = false) {
     if (!drag) return;
+    try {
+      window.__visterasGuideManager?.clearSmartGuides?.();
+    } catch { /* ignore */ }
     const { items, moved, visualFrame, area } = drag;
     drag = null;
     if (area) {

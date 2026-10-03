@@ -441,13 +441,25 @@ export class GuideManager {
 
     if (typeof window !== 'undefined') {
       let isMouseDown = false;
+      let startPos = null;
       const workarea = document.getElementById('workarea') || window;
       workarea.addEventListener('mousedown', (e) => {
-        if (e.button === 0) isMouseDown = true;
+        if (e.button === 0) {
+          isMouseDown = true;
+          startPos = this.clientToSvg(e.clientX, e.clientY);
+          const sel = this.sc?.getSelectedElements?.() || [];
+          if (sel.length > 0) {
+            this._startDragBBox = this._getCombinedBBox(sel);
+          } else {
+            this._startDragBBox = null;
+          }
+        }
       }, true);
 
       window.addEventListener('mouseup', () => {
         isMouseDown = false;
+        startPos = null;
+        this._startDragBBox = null;
         this.clearSmartGuides();
       }, true);
 
@@ -457,7 +469,9 @@ export class GuideManager {
         if (mode === 'select' && (e.buttons === 1 || e.which === 1)) {
           const sel = this.sc.getSelectedElements?.() || [];
           if (sel.length > 0) {
-            this.evaluateSmartSnap(sel);
+            const currentPos = this.clientToSvg(e.clientX, e.clientY);
+            const delta = startPos ? { dx: currentPos.x - startPos.x, dy: currentPos.y - startPos.y } : null;
+            this.evaluateSmartSnap(sel, delta);
           }
         }
       });
@@ -470,12 +484,97 @@ export class GuideManager {
     }
   }
 
+  _createCrosshair(x, y) {
+    if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'visteras-smart-marker');
+
+    const l1 = document.createElementNS(NS, 'line');
+    l1.setAttribute('x1', String(x - 3));
+    l1.setAttribute('y1', String(y - 3));
+    l1.setAttribute('x2', String(x + 3));
+    l1.setAttribute('y2', String(y + 3));
+    l1.setAttribute('stroke', '#fa229b');
+    l1.setAttribute('stroke-width', '1');
+    l1.setAttribute('vector-effect', 'non-scaling-stroke');
+
+    const l2 = document.createElementNS(NS, 'line');
+    l2.setAttribute('x1', String(x - 3));
+    l2.setAttribute('y1', String(y + 3));
+    l2.setAttribute('x2', String(x + 3));
+    l2.setAttribute('y2', String(y - 3));
+    l2.setAttribute('stroke', '#fa229b');
+    l2.setAttribute('stroke-width', '1');
+    l2.setAttribute('vector-effect', 'non-scaling-stroke');
+
+    g.append(l1, l2);
+    return g;
+  }
+
+  _createLabel(x, y, text) {
+    if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+    const txt = document.createElementNS(NS, 'text');
+    txt.setAttribute('class', 'visteras-smart-label');
+    txt.setAttribute('x', String(x + 5));
+    txt.setAttribute('y', String(y - 4));
+    txt.setAttribute('fill', '#fa229b');
+    txt.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+    txt.setAttribute('font-size', '10px');
+    txt.setAttribute('font-weight', '500');
+    txt.setAttribute('vector-effect', 'non-scaling-stroke');
+    txt.textContent = text;
+    return txt;
+  }
+
+  _createDeltaBadge(x, y, dx, dy) {
+    if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('class', 'visteras-smart-badge');
+
+    const formatDelta = (val) => `${Math.abs(val) < 0.005 ? '0' : Number(val.toFixed(2))} px`;
+    const line1Text = `dX: ${formatDelta(dx)}`;
+    const line2Text = `dY: ${formatDelta(dy)}`;
+
+    const rect = document.createElementNS(NS, 'rect');
+    rect.setAttribute('x', String(Math.round(x)));
+    rect.setAttribute('y', String(Math.round(y)));
+    rect.setAttribute('width', '88');
+    rect.setAttribute('height', '36');
+    rect.setAttribute('rx', '4');
+    rect.setAttribute('ry', '4');
+    rect.setAttribute('fill', '#cccccc');
+    rect.setAttribute('fill-opacity', '0.94');
+    rect.setAttribute('stroke', 'rgba(0, 0, 0, 0.15)');
+    rect.setAttribute('stroke-width', '1');
+
+    const t1 = document.createElementNS(NS, 'text');
+    t1.setAttribute('x', String(Math.round(x) + 8));
+    t1.setAttribute('y', String(Math.round(y) + 15));
+    t1.setAttribute('fill', '#1a1a1a');
+    t1.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+    t1.setAttribute('font-size', '10px');
+    t1.setAttribute('font-weight', '500');
+    t1.textContent = line1Text;
+
+    const t2 = document.createElementNS(NS, 'text');
+    t2.setAttribute('x', String(Math.round(x) + 8));
+    t2.setAttribute('y', String(Math.round(y) + 29));
+    t2.setAttribute('fill', '#1a1a1a');
+    t2.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif');
+    t2.setAttribute('font-size', '10px');
+    t2.setAttribute('font-weight', '500');
+    t2.textContent = line2Text;
+
+    g.append(rect, t1, t2);
+    return g;
+  }
+
   drawSmartGuideLine(type, pos, minExtent = -10000, maxExtent = 10000) {
     this._ensureLayers();
     if (!this.smartGuidesLayer) return;
 
     const line = document.createElementNS(NS, 'line');
-    line.setAttribute('stroke', '#ff007f'); // Classic Illustrator magenta smart guide
+    line.setAttribute('stroke', '#fa229b'); // Classic Illustrator magenta/pink smart guide
     line.setAttribute('stroke-width', '1');
     line.setAttribute('vector-effect', 'non-scaling-stroke');
     line.setAttribute('class', 'visteras-smart-guide');
@@ -532,51 +631,146 @@ export class GuideManager {
     return null;
   }
 
-  evaluateSmartSnap(movingElements) {
-    if (!this.smartGuidesEnabled) return;
+  evaluateSmartSnap(movingElements, delta = null) {
+    if (!this.smartGuidesEnabled || !movingElements || !movingElements.length) {
+      this.clearSmartGuides();
+      return null;
+    }
     this.clearSmartGuides();
 
     const movingSet = new Set(movingElements);
     const movingBBox = this._getCombinedBBox(movingElements);
-    if (!movingBBox) return;
+    if (!movingBBox) return null;
+
+    if (!delta) {
+      if (!this._startDragBBox) {
+        this._startDragBBox = { ...movingBBox };
+      }
+      delta = {
+        dx: movingBBox.x - this._startDragBBox.x,
+        dy: movingBBox.y - this._startDragBBox.y
+      };
+    }
 
     const zoom = this.sc?.getZoom?.() || 1;
     const snapThreshold = 6 / zoom; // 6 screen pixels tolerance
 
     const movingX = [
-      { val: movingBBox.x, name: 'left' },
-      { val: movingBBox.x + movingBBox.width / 2, name: 'center' },
-      { val: movingBBox.x + movingBBox.width, name: 'right' }
+      { val: movingBBox.x, name: 'left', type: 'endpoint' },
+      { val: movingBBox.x + movingBBox.width / 2, name: 'center', type: 'midpoint' },
+      { val: movingBBox.x + movingBBox.width, name: 'right', type: 'endpoint' }
     ];
 
     const movingY = [
-      { val: movingBBox.y, name: 'top' },
-      { val: movingBBox.y + movingBBox.height / 2, name: 'center' },
-      { val: movingBBox.y + movingBBox.height, name: 'bottom' }
+      { val: movingBBox.y, name: 'top', type: 'endpoint' },
+      { val: movingBBox.y + movingBBox.height / 2, name: 'center', type: 'midpoint' },
+      { val: movingBBox.y + movingBBox.height, name: 'bottom', type: 'endpoint' }
     ];
 
     // Collect snap candidates
     const candidatesX = [];
     const candidatesY = [];
 
-    // 1. Artboard boundaries & center
+    // 1. Artboard boundaries & center / middle
     const res = this.sc?.getResolution?.() || { w: 800, h: 600 };
     const abW = Number(res.w ?? res.width ?? 800);
     const abH = Number(res.h ?? res.height ?? 600);
 
-    candidatesX.push({ val: 0, label: 'Artboard Left', min: 0, max: abH });
-    candidatesX.push({ val: abW / 2, label: 'Artboard Center', min: 0, max: abH });
-    candidatesX.push({ val: abW, label: 'Artboard Right', min: 0, max: abH });
+    // Artboard Left
+    candidatesX.push({
+      val: 0,
+      label: 'artboard',
+      type: 'artboard',
+      min: Math.min(0, movingBBox.y) - 20,
+      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
+      markers: [
+        { x: 0, y: 0, label: 'artboard' },
+        { x: 0, y: abH, label: 'artboard' }
+      ]
+    });
+    // Artboard Center
+    candidatesX.push({
+      val: abW / 2,
+      label: 'center',
+      type: 'center',
+      min: Math.min(0, movingBBox.y) - 20,
+      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
+      markers: [
+        { x: abW / 2, y: abH / 2, label: 'center' }
+      ]
+    });
+    // Artboard Right
+    candidatesX.push({
+      val: abW,
+      label: 'artboard',
+      type: 'artboard',
+      min: Math.min(0, movingBBox.y) - 20,
+      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
+      markers: [
+        { x: abW, y: 0, label: 'artboard' },
+        { x: abW, y: abH, label: 'artboard' }
+      ]
+    });
 
-    candidatesY.push({ val: 0, label: 'Artboard Top', min: 0, max: abW });
-    candidatesY.push({ val: abH / 2, label: 'Artboard Center', min: 0, max: abW });
-    candidatesY.push({ val: abH, label: 'Artboard Bottom', min: 0, max: abW });
+    // Artboard Top
+    candidatesY.push({
+      val: 0,
+      label: 'artboard',
+      type: 'artboard',
+      min: Math.min(0, movingBBox.x) - 20,
+      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
+      markers: [
+        { x: 0, y: 0, label: 'artboard' },
+        { x: abW, y: 0, label: 'artboard' }
+      ]
+    });
+    // Artboard Middle (Center)
+    candidatesY.push({
+      val: abH / 2,
+      label: 'center',
+      type: 'center',
+      min: Math.min(0, movingBBox.x) - 20,
+      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
+      markers: [
+        { x: abW / 2, y: abH / 2, label: 'center' }
+      ]
+    });
+    // Artboard Bottom
+    candidatesY.push({
+      val: abH,
+      label: 'artboard',
+      type: 'artboard',
+      min: Math.min(0, movingBBox.x) - 20,
+      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
+      markers: [
+        { x: 0, y: abH, label: 'artboard' },
+        { x: abW, y: abH, label: 'artboard' }
+      ]
+    });
 
     // 2. Active Ruler Guides
     if (this.showGuides) {
       for (const g of this.rulerGuides) {
-        if (g.type === 'v') candidatesX.push({ val: g.pos, label: 'Ruler Guide', min: -5000, max: 5000 });
-        if (g.type === 'h') candidatesY.push({ val: g.pos, label: 'Ruler Guide', min: -5000, max: 5000 });
+        if (g.type === 'v') {
+          candidatesX.push({
+            val: g.pos,
+            label: 'guide',
+            type: 'guide',
+            min: Math.min(0, movingBBox.y) - 50,
+            max: Math.max(abH, movingBBox.y + movingBBox.height) + 50,
+            markers: []
+          });
+        }
+        if (g.type === 'h') {
+          candidatesY.push({
+            val: g.pos,
+            label: 'guide',
+            type: 'guide',
+            min: Math.min(0, movingBBox.x) - 50,
+            max: Math.max(abW, movingBBox.x + movingBBox.width) + 50,
+            markers: []
+          });
+        }
       }
     }
 
@@ -599,55 +793,239 @@ export class GuideManager {
 
         const b = this._getElementSceneBBox(sib);
         if (b && (b.width > 0 || b.height > 0)) {
-          const minX = Math.min(movingBBox.x, b.x) - 50;
-          const maxX = Math.max(movingBBox.x + movingBBox.width, b.x + b.width) + 50;
-          const minY = Math.min(movingBBox.y, b.y) - 50;
-          const maxY = Math.max(movingBBox.y + movingBBox.height, b.y + b.height) + 50;
+          const minSpanX = Math.min(movingBBox.x, b.x) - 30;
+          const maxSpanX = Math.max(movingBBox.x + movingBBox.width, b.x + b.width) + 30;
+          const minSpanY = Math.min(movingBBox.y, b.y) - 30;
+          const maxSpanY = Math.max(movingBBox.y + movingBBox.height, b.y + b.height) + 30;
 
-          candidatesX.push({ val: b.x, min: minY, max: maxY });
-          candidatesX.push({ val: b.x + b.width / 2, min: minY, max: maxY });
-          candidatesX.push({ val: b.x + b.width, min: minY, max: maxY });
+          // Sibling X candidates
+          candidatesX.push({
+            val: b.x,
+            label: 'endpoint',
+            type: 'sibling',
+            min: minSpanY,
+            max: maxSpanY,
+            markers: [
+              { x: b.x, y: b.y, label: 'endpoint' },
+              { x: b.x, y: b.y + b.height / 2, label: 'midpoint' },
+              { x: b.x, y: b.y + b.height, label: 'endpoint' }
+            ]
+          });
+          candidatesX.push({
+            val: b.x + b.width / 2,
+            label: 'midpoint',
+            type: 'sibling',
+            min: minSpanY,
+            max: maxSpanY,
+            markers: [
+              { x: b.x + b.width / 2, y: b.y, label: 'midpoint' },
+              { x: b.x + b.width / 2, y: b.y + b.height / 2, label: 'center' },
+              { x: b.x + b.width / 2, y: b.y + b.height, label: 'midpoint' }
+            ]
+          });
+          candidatesX.push({
+            val: b.x + b.width,
+            label: 'endpoint',
+            type: 'sibling',
+            min: minSpanY,
+            max: maxSpanY,
+            markers: [
+              { x: b.x + b.width, y: b.y, label: 'endpoint' },
+              { x: b.x + b.width, y: b.y + b.height / 2, label: 'midpoint' },
+              { x: b.x + b.width, y: b.y + b.height, label: 'endpoint' }
+            ]
+          });
 
-          candidatesY.push({ val: b.y, min: minX, max: maxX });
-          candidatesY.push({ val: b.y + b.height / 2, min: minX, max: maxX });
-          candidatesY.push({ val: b.y + b.height, min: minX, max: maxX });
+          // Sibling Y candidates
+          candidatesY.push({
+            val: b.y,
+            label: 'endpoint',
+            type: 'sibling',
+            min: minSpanX,
+            max: maxSpanX,
+            markers: [
+              { x: b.x, y: b.y, label: 'endpoint' },
+              { x: b.x + b.width / 2, y: b.y, label: 'midpoint' },
+              { x: b.x + b.width, y: b.y, label: 'endpoint' }
+            ]
+          });
+          candidatesY.push({
+            val: b.y + b.height / 2,
+            label: 'midpoint',
+            type: 'sibling',
+            min: minSpanX,
+            max: maxSpanX,
+            markers: [
+              { x: b.x, y: b.y + b.height / 2, label: 'midpoint' },
+              { x: b.x + b.width / 2, y: b.y + b.height / 2, label: 'center' },
+              { x: b.x + b.width, y: b.y + b.height / 2, label: 'midpoint' }
+            ]
+          });
+          candidatesY.push({
+            val: b.y + b.height,
+            label: 'endpoint',
+            type: 'sibling',
+            min: minSpanX,
+            max: maxSpanX,
+            markers: [
+              { x: b.x, y: b.y + b.height, label: 'endpoint' },
+              { x: b.x + b.width / 2, y: b.y + b.height, label: 'midpoint' },
+              { x: b.x + b.width, y: b.y + b.height, label: 'endpoint' }
+            ]
+          });
         }
       }
     }
 
-    // Evaluate best X alignment
-    let matchedX = null;
-    let minDiffX = snapThreshold;
+    // Evaluate best X alignments
+    const activeMatchesX = [];
+    const seenX = new Set();
     for (const m of movingX) {
+      let bestCandidate = null;
+      let bestDiff = snapThreshold;
       for (const c of candidatesX) {
         const diff = Math.abs(m.val - c.val);
-        if (diff < minDiffX) {
-          minDiffX = diff;
-          matchedX = { movingVal: m.val, targetVal: c.val, min: c.min, max: c.max };
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestCandidate = c;
+        }
+      }
+      if (bestCandidate) {
+        const key = Math.round(bestCandidate.val * 10) / 10;
+        if (!seenX.has(key)) {
+          seenX.add(key);
+          activeMatchesX.push({
+            movingPoint: m,
+            targetVal: bestCandidate.val,
+            candidate: bestCandidate,
+            min: bestCandidate.min,
+            max: bestCandidate.max
+          });
         }
       }
     }
 
-    // Evaluate best Y alignment
-    let matchedY = null;
-    let minDiffY = snapThreshold;
+    // Evaluate best Y alignments
+    const activeMatchesY = [];
+    const seenY = new Set();
     for (const m of movingY) {
+      let bestCandidate = null;
+      let bestDiff = snapThreshold;
       for (const c of candidatesY) {
         const diff = Math.abs(m.val - c.val);
-        if (diff < minDiffY) {
-          minDiffY = diff;
-          matchedY = { movingVal: m.val, targetVal: c.val, min: c.min, max: c.max };
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestCandidate = c;
+        }
+      }
+      if (bestCandidate) {
+        const key = Math.round(bestCandidate.val * 10) / 10;
+        if (!seenY.has(key)) {
+          seenY.add(key);
+          activeMatchesY.push({
+            movingPoint: m,
+            targetVal: bestCandidate.val,
+            candidate: bestCandidate,
+            min: bestCandidate.min,
+            max: bestCandidate.max
+          });
         }
       }
     }
 
-    // Render guide lines
-    if (matchedX) {
-      this.drawSmartGuideLine('v', matchedX.targetVal, matchedX.min, matchedX.max);
+    // Marker tracking to avoid duplicate crosshairs
+    const seenMarkers = new Set();
+    const addMarker = (mx, my, label) => {
+      const k = `${Math.round(mx * 10) / 10},${Math.round(my * 10) / 10}`;
+      if (seenMarkers.has(k)) return;
+      seenMarkers.add(k);
+      const cross = this._createCrosshair(mx, my);
+      if (cross) this.smartGuidesLayer.append(cross);
+      if (label) {
+        const lbl = this._createLabel(mx, my, label);
+        if (lbl) this.smartGuidesLayer.append(lbl);
+      }
+    };
+
+    // Render X matches (vertical guides)
+    for (const match of activeMatchesX) {
+      this.drawSmartGuideLine('v', match.targetVal, match.min, match.max);
+
+      if (match.candidate.type === 'center') {
+        addMarker(match.targetVal, abH / 2, 'center');
+        addMarker(match.targetVal, movingBBox.y + movingBBox.height / 2, 'center');
+      } else if (match.candidate.type === 'artboard') {
+        addMarker(match.targetVal, 0, 'artboard');
+        addMarker(match.targetVal, abH, 'artboard');
+        addMarker(match.targetVal, movingBBox.y, 'endpoint');
+        addMarker(match.targetVal, movingBBox.y + movingBBox.height, 'endpoint');
+      } else {
+        // Sibling
+        for (const pt of (match.candidate.markers || [])) {
+          addMarker(pt.x, pt.y, pt.label);
+        }
+        if (match.movingPoint.type === 'endpoint') {
+          addMarker(match.targetVal, movingBBox.y, 'endpoint');
+          addMarker(match.targetVal, movingBBox.y + movingBBox.height, 'endpoint');
+        } else {
+          addMarker(match.targetVal, movingBBox.y + movingBBox.height / 2, 'midpoint');
+        }
+      }
     }
-    if (matchedY) {
-      this.drawSmartGuideLine('h', matchedY.targetVal, matchedY.min, matchedY.max);
+
+    // Render Y matches (horizontal guides)
+    for (const match of activeMatchesY) {
+      this.drawSmartGuideLine('h', match.targetVal, match.min, match.max);
+
+      if (match.candidate.type === 'center') {
+        addMarker(abW / 2, match.targetVal, 'center');
+        addMarker(movingBBox.x + movingBBox.width / 2, match.targetVal, 'center');
+      } else if (match.candidate.type === 'artboard') {
+        addMarker(0, match.targetVal, 'artboard');
+        addMarker(abW, match.targetVal, 'artboard');
+        addMarker(movingBBox.x, match.targetVal, 'endpoint');
+        addMarker(movingBBox.x + movingBBox.width, match.targetVal, 'endpoint');
+      } else {
+        // Sibling
+        for (const pt of (match.candidate.markers || [])) {
+          addMarker(pt.x, pt.y, pt.label);
+        }
+        if (match.movingPoint.type === 'endpoint') {
+          addMarker(movingBBox.x, match.targetVal, 'endpoint');
+          addMarker(movingBBox.x + movingBBox.width, match.targetVal, 'endpoint');
+        } else {
+          addMarker(movingBBox.x + movingBBox.width / 2, match.targetVal, 'midpoint');
+        }
+        // Mark line extension endpoint
+        addMarker(match.max, match.targetVal, match.movingPoint.type === 'midpoint' ? 'midpoint' : 'endpoint');
+      }
     }
+
+    // Intersections between X and Y guides
+    for (const mx of activeMatchesX) {
+      for (const my of activeMatchesY) {
+        const isBothCenter = mx.candidate.type === 'center' && my.candidate.type === 'center';
+        addMarker(mx.targetVal, my.targetVal, isBothCenter ? 'center' : 'intersect');
+      }
+    }
+
+    // Render displacement delta badge (dX, dY)
+    if (delta && this.smartGuidesLayer) {
+      const badgeW = 92;
+      const badgeH = 36;
+      const badgeX = (movingBBox.x + movingBBox.width + 16 + badgeW > abW)
+        ? Math.max(10, movingBBox.x - badgeW - 16)
+        : (movingBBox.x + movingBBox.width + 16);
+      const badgeY = Math.max(10, Math.min(abH - badgeH - 10, movingBBox.y + movingBBox.height * 0.5 - 10));
+      const badge = this._createDeltaBadge(badgeX, badgeY, delta.dx, delta.dy);
+      if (badge) this.smartGuidesLayer.append(badge);
+    }
+
+    return {
+      activeMatchesX,
+      activeMatchesY,
+      delta
+    };
   }
 
   _getCombinedBBox(elements) {
