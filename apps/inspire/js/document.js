@@ -5,6 +5,7 @@
  */
 
 import { safeVidFileName } from './inspire-utils.js';
+import { downloadBlob } from '../lib/visteras-ui/file.js';
 
 export const VID_FORMAT_IDENTIFIER = 'visteras-inspire';
 export const VID_CURRENT_VERSION = '1.0.0';
@@ -91,18 +92,8 @@ export class InspireDocument {
     // Same name the tab shows (spaces kept, only illegal characters replaced), like Studio
     const cleanName = safeVidFileName(filename || title);
     const jsonStr = JSON.stringify(docData, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = cleanName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 100);
+    // Shared @visteras/ui download (same <a download> + revoke as before)
+    downloadBlob(jsonStr, cleanName, { mimeType: 'application/json;charset=utf-8' });
     return cleanName;
   }
 

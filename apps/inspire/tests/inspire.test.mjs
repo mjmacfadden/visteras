@@ -405,7 +405,9 @@ test('Document Tabs: Workspace provides tabbed document bar and styling for mult
   // Verify CSS styles document tabs, active state with amber accent, close button, and new tab button
   const css = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
   assert.match(css, /\.document_tabs\s*\{/, 'Theme CSS must style .document_tabs');
-  assert.match(css, /\.document_tab\.active\s*\{[^}]*var\(--inspire-amber\)/, 'Active document tab must have amber accent border');
+  // Shared @visteras/ui tab tokens: the active stripe reads --visteras-accent, which Inspire maps to amber
+  assert.match(css, /\.document_tab\.active\s*\{[^}]*var\(--visteras-accent\)/, 'Active document tab must use the app accent');
+  assert.match(css, /--visteras-accent: var\(--inspire-amber\);/, 'Inspire accent is amber');
   assert.match(css, /\.document_tabs\s+\.new_tab_btn\s*\{/, 'Theme CSS must style .new_tab_btn');
   assert.match(css, /\.document_tab\s+\.tab_close\s*\{/, 'Theme CSS must style .tab_close button');
   assert.match(css, /\.tab_rename_input\s*\{/, 'Theme CSS must style inline rename input');
@@ -603,10 +605,14 @@ test('Save & Export (.vid) UX: InspireDocument defines downloadVidFile and expor
     InspireDocument.downloadAsFile = originalDownload;
   }
 
-  // 3. Verify app.js exportVidFile uses downloadVidFile with fallback
+  // 3. Verify app.js saves through the shared @visteras/ui file helper:
+  //    existing handle → save picker → download fallback (Studio behaviour)
   const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
-  assert.match(appJs, /active\.doc\.downloadVidFile\(/, 'app.js must call active.doc.downloadVidFile');
-  assert.match(appJs, /InspireDocument\.downloadAsFile\(/, 'app.js must have fallback to InspireDocument.downloadAsFile');
+  assert.match(appJs, /import \{ saveFile, openFile, findBySameHandle \} from '\.\.\/lib\/visteras-ui\/file\.js';/);
+  assert.match(appJs, /await saveFile\(\{[\s\S]*?types: VID_SAVE_TYPES,[\s\S]*?handle: saveAs \? null : \(active\.fileHandle \|\| null\)/, 'Save reuses the file handle; Save As always asks');
+  assert.match(appJs, /if \(result\.cancelled\) return;/, 'cancelling the picker changes nothing');
+  assert.match(appJs, /'\.vid'/, '.vid stays the Inspire file type');
+  assert.match(appJs, /action_menu_save_as'\)\?\.addEventListener\('click', \(\) => this\.exportVidFile\(\{ saveAs: true \}\)\)/);
 });
 
 test('Direct File Reading & Clean Startup: App starts with fresh blank document, prunes stale storage, and reads/writes files directly', () => {
@@ -627,7 +633,7 @@ test('Direct File Reading & Clean Startup: App starts with fresh blank document,
   assert.doesNotMatch(appJs, /scheduleAutoSave\(\)/, 'app.js must not schedule autosaves');
 
   // 4. Verify opening document reads the .vid file structure directly
-  assert.match(appJs, /openDocumentData\(docData\)/, 'app.js must support opening .vid document data directly');
+  assert.match(appJs, /openDocumentData\(docData, fileName = null/, 'app.js must support opening .vid document data directly');
 });
 
 test('Bounding Box & Corner Rotation Zone UX: Blue lines with square handles and corner rotation zones matching Studio and Vector', () => {
@@ -744,7 +750,7 @@ test('Document Tab File Name Display UX: Tabs display document file name (.vid) 
   assert.match(appJs, /fileName:\s*'Untitled-1\.vid'/, 'Initial document model must default fileName to Untitled-1.vid');
 
   // 3. Verify openVidFile passes the file name to openDocumentData
-  assert.match(appJs, /this\.openDocumentData\(docData,\s*file\.name\)/, 'openVidFile must pass file.name to openDocumentData');
+  assert.match(appJs, /this\.openDocumentData\(docData,\s*opened\.name,/, 'openVidFile must pass the opened file name to openDocumentData');
 
   // 4. Verify canvas drop passes file name to window.__visterasLoadDocument
   assert.match(canvasJs, /window\.__visterasLoadDocument\?\.\(docData,\s*f\.name\)/, 'canvas.js drop listener must forward f.name');

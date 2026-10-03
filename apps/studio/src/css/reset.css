@@ -1,4 +1,8 @@
 :root {
+	/* @visteras/ui accent hook: Studio blue (active tab stripe). packages/ui never hardcodes an accent. */
+	--visteras-accent: #2f6fae;
+	--visteras-accent-hover: #2a6bb5;
+	--visteras-on-accent: #ffffff;
 	/* PhotoChop - Photoshop-like dark theme */
 	--background: #535353;
 	--text-color: #cccccc;

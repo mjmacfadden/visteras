@@ -93,7 +93,9 @@ test('Studio Toast: red toast system replaces standard browser alerts', () => {
   const css = fs.readFileSync(cssPath, 'utf8');
 
   // Verify showStudioToast is defined and mounted on window
-  assert.match(html, /function\s+showStudioToast\(message,\s*type\s*=\s*'error',\s*duration\s*=\s*3500\)/);
+  // Shared @visteras/ui toast, Vector default = red error toast for 3.5 s
+  assert.match(html, /import \{ showToast \} from '\.\/lib\/visteras-ui\/toast\.js';/);
+  assert.match(html, /const\s+showStudioToast\s*=\s*\(message,\s*type\s*=\s*'error',\s*duration\s*=\s*3500\)\s*=>\s*showToast\(message,\s*type,\s*duration\);/);
   assert.match(html, /window\.showStudioToast\s*=\s*showStudioToast;/);
   assert.match(html, /window\.showWarning\s*=\s*\(msg\)\s*=>\s*showStudioToast\(msg,\s*'error'\);/);
 

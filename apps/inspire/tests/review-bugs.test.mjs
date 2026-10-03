@@ -77,7 +77,8 @@ test('Bug 6: tab name and downloaded .vid name are the same (spaces kept, only i
   }
   const app = read('js/app.js');
   assert.match(app, /const fileName = safeVidFileName\(active\.fileName \|\| active\.doc\.title\);/);
-  assert.match(app, /active\.fileName = fileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
+  assert.match(app, /const savedFileName = safeVidFileName\(result\.name \|\| fileName\);/, 'name chosen in the save picker goes through the same rule');
+  assert.match(app, /active\.fileName = savedFileName;\n\s*active\.title = savedTitle;/, 'tab reflects the saved name');
   assert.match(app, /val = safeVidFileName\(val\);/, 'renaming a tab uses the same rule');
 });
 
@@ -219,4 +220,56 @@ test('Bug 2: export scale is clamped to safe canvas limits and reports when redu
   for (const p of Object.values(CANVAS_PRESETS)) assert.ok(within(ex.computeSafeExportScale(p.width, p.height)), p.name);
   assert.match(read('js/app.js'), /scale reduced to \$\{sizing\.scale\}×/);
   assert.doesNotMatch(read('js/app.js'), /scale: 2, \/\/ 2x retina clarity/);
+});
+
+test('Smoke fix 1: a click with no movement is not a transform', () => {
+  const el = { id: 'a', x: 10, y: 20, width: 100, height: 50, rotation: 0, data: { text: 'hi' } };
+  const snap = [{ ...el, data: { ...el.data } }];
+  assert.equal(utils.transformChanged(snap, [el]), false);
+  assert.equal(utils.transformChanged(snap, [{ ...el, x: 11 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, rotation: 15 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, width: 90 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, data: { text: 'hi', fontSize: 30 } }]), true);
+  assert.equal(utils.transformChanged([], []), false);
+  const src = read('js/canvas.js');
+  assert.match(src, /if \(!transformChanged\(before, this\.board\.getSelectedElements\(\)\)\) return;/);
+});
+
+test('Smoke fix 2: nothing calls the missing board.selectElement', () => {
+  for (const f of ['js/app.js', 'js/canvas.js', 'js/inspector.js']) {
+    assert.doesNotMatch(read(f), /\.selectElement\(/, f);
+  }
+  assert.match(read('js/board-composer.js'), /^\s{2}select\(id, multi = false\) \{/m);
+});
+
+test('Smoke fix 3: meta.fileName follows the tab rename and the picked name', () => {
+  const src = read('js/app.js');
+  assert.match(src, /docModel\.fileName = val;\n\s*docModel\.doc\.fileName = val;/);
+  assert.match(src, /data: serializeAs,/);
+  assert.match(src, /data\.meta\.fileName = savedName;/);
+  assert.doesNotMatch(src, /const data = active\.doc\.serialize\(active\.board, active\.swipeFile\);\n\s*const result = await saveFile/);
+});
+
+test('Open keeps the FileHandle: same-entry tabs count as matches; open uses the shared openFile', async () => {
+  const { InspireDocument } = await import('../js/document.js');
+  const { BoardComposer } = await import('../js/board-composer.js');
+  const { SwipeFileManager } = await import('../js/swipe-file.js');
+  const { resolveOpenTarget } = await import('../js/open-match.js');
+  const data = InspireDocument.createBlank('Renamed On Disk');
+  data.board.elements = [{ id: 'e1', type: 'text', x: 1, y: 2, width: 30, height: 20, data: { text: 'H' } }];
+  const doc = new InspireDocument(data.board);
+  const tab = { id: 'other_id', title: 'Tab Title', fileName: 'Tab Title.vid', doc,
+    board: new BoardComposer(data.board.elements, null, doc), swipeFile: new SwipeFileManager(data.swipeFile) };
+  const incoming = JSON.parse(JSON.stringify(data)); incoming.meta.id = 'disk_id';
+  // no name/title/id match → new tab, unless the tab's handle isSameEntry (extraCandidates)
+  assert.equal(resolveOpenTarget([tab], incoming, { fileName: 'X.vid', title: 'X' }).action, 'new');
+  const r = resolveOpenTarget([tab], incoming, { fileName: 'X.vid', title: 'X', extraCandidates: [tab] });
+  assert.equal(r.action, 'switch');
+  assert.equal(r.model, tab);
+  const src = read('js/app.js');
+  assert.match(src, /const opened = await openFile\(\{ types: VID_SAVE_TYPES, accept: '\.vid,application\/json' \}\);/);
+  assert.match(src, /const sameFile = await findBySameHandle\(this\.documents, opened\.handle\);/);
+  assert.match(src, /newModel\.fileHandle = fileHandle \|\| null;/);
+  assert.match(src, /replaced\.fileHandle = fileHandle \|\| null;/);
+  assert.match(src, /handle: saveAs \? null : \(active\.fileHandle \|\| null\)/);
 });

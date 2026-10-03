@@ -28,6 +28,10 @@ jobs:
             apps/publish/package-lock.json
       - run: npm ci --prefix apps/studio
       - run: npm ci --prefix apps/publish
+      # Test gate: Vector, Inspire and Studio unit tests plus the browser-storage guard.
+      # A failure stops the job here, so nothing is built or deployed.
+      - name: Run tests (npm test)
+        run: npm test
       - run: npm run build:site
       - uses: actions/upload-pages-artifact@v3
         with:

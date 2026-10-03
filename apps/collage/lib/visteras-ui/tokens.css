@@ -1,0 +1,38 @@
+/* @visteras/ui — generated from packages/ui/src/tokens.css by packages/ui/scripts/build-static.mjs — do not edit by hand */
+/*
+ * @visteras/ui — menu bar + document tab tokens (spacing, typography, metrics).
+ *
+ * Shared metrics only. Colours — above all the accent — stay with each app:
+ * the active-tab stripe reads the app's --visteras-accent (Vector orange,
+ * Studio blue, Publish teal, Collage purple, Inspire amber), menu highlight
+ * colours stay in each app's stylesheet. An app that differs from a default
+ * overrides the token in its own :root (its stylesheet loads after this file).
+ * Defaults = the shared Studio/Vector values.
+ */
+:root {
+  /* Menu bar (#visteras_menu_bar) */
+  --vui-menu-bar-height: 28px;
+  --vui-menu-bar-padding-x: 8px;
+  --vui-menu-font-size: 11px;
+  --vui-menu-title-padding: 0 8px 1.4px 8px;
+  --vui-menu-dropdown-padding: 4px 0;
+  --vui-menu-item-padding: 4px 16px;
+  --vui-menu-item-line-height: 18px;
+  --vui-menu-shortcut-font-size: 10px;
+  --vui-menu-shortcut-gap: 20px;
+  --vui-menu-separator-margin: 4px 0;
+
+  /* Document tabs (.document_tabs / .document_tab) */
+  --vui-tab-bar-height: 28px;
+  --vui-tab-padding-x: 10px;
+  --vui-tab-font-size: 12px;
+  --vui-tab-min-width: 100px;
+  --vui-tab-max-width: 220px;
+  --vui-tab-accent-width: 2px;
+  --vui-tab-title-gap: 6px;
+  --vui-tab-close-size: 16px;
+  --vui-tab-close-font-size: 10px;
+  --vui-tab-zoom-font-size: 10px;
+  --vui-new-tab-size: 28px;
+  --vui-new-tab-font-size: 16px;
+}

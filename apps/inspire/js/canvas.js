@@ -8,6 +8,7 @@ import { measureTextBounds, LOREM_IPSUM, getLoremIpsumForBox } from './board-com
 import { isDarkColor } from './color-extractor.js';
 import { SpatialPresentation } from './presentation.js';
 import { gridStylesForMode } from './grid-config.js';
+import { transformChanged } from './inspire-utils.js';
 
 export class WorkspaceCanvas {
   constructor({
@@ -804,7 +805,7 @@ export class WorkspaceCanvas {
           const id = clickedEl.dataset.id;
           const el = this.board.getElementById(id);
           if (el && el.type === 'text') {
-            this.board.selectElement(id);
+            this.board.select(id);
             this.openInlineEditor(el, clickedEl);
             return;
           }
@@ -1003,7 +1004,7 @@ export class WorkspaceCanvas {
           });
         }
 
-        this.board.selectElement(el.id);
+        this.board.select(el.id);
         const cardDom = document.getElementById(`dom_${el.id}`);
         if (cardDom) {
           this.openInlineEditor(el, cardDom);
@@ -1614,6 +1615,10 @@ export class WorkspaceCanvas {
     this.isTransforming = false;
     this.viewport.style.cursor = '';
     this.clearGuides();
+    const before = this.transformStart?.elements || [];
+    this.transformStart = null;
+    // A click with no movement must not dirty the doc or add an undo step.
+    if (!transformChanged(before, this.board.getSelectedElements())) return;
     this.board.activeLayout = 'custom';
     this.board.saveHistory(`Transformed elements`);
   }

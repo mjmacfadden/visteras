@@ -5,6 +5,11 @@
   "description": "Visteras monorepo — Studio (raster) + Vector (SVG-Edit companion) + Publish (morning newspaper) + Collage (printable fodder generator).",
   "license": "MIT",
   "scripts": {
+    "test": "node scripts/run-tests.mjs",
+    "test:vector": "node --test apps/vector/tests/*.test.mjs",
+    "test:studio": "node --test apps/studio/tests/*.test.cjs",
+    "test:ui": "node --test packages/ui/tests/*.test.mjs && node packages/ui/scripts/build-static.mjs --check && node packages/icons/scripts/copy-tools.mjs --check",
+    "check:storage": "node --test scripts/check-no-doc-localstorage.test.mjs && node scripts/check-no-doc-localstorage.mjs",
     "dev:studio": "npm run server --prefix apps/studio",
     "build:studio": "npm run build --prefix apps/studio",
     "dev:vector": "npx --yes serve apps/vector -p 5173",
@@ -17,7 +22,9 @@
     "build:inspire": "node -e \"console.log('Inspire is a static app under apps/inspire; nothing to compile.')\"",
     "test:inspire": "node --test apps/inspire/tests/inspire.test.mjs apps/inspire/tests/presentation.test.mjs apps/inspire/tests/unsaved-changes.test.mjs apps/inspire/tests/grid-config.test.mjs apps/inspire/tests/review-bugs.test.mjs",
     "build:site": "bash scripts/build-site.sh",
-    "build:fonts": "npm run build:vector --prefix packages/fonts"
+    "build:fonts": "npm run build:vector --prefix packages/fonts",
+    "build:ui": "node packages/ui/scripts/build-static.mjs",
+    "build:icons": "node packages/icons/scripts/copy-tools.mjs"
   },
   "repository": {
     "type": "git",

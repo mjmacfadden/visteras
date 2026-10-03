@@ -158,11 +158,16 @@ test('Close confirm: dirty tabs ask (Studio wording), clean tabs close without a
   assert.equal(asked, 'Board.vid');
   assert.equal(await confirmCloseIfDirty(model, async () => true), true, 'Close closes a dirty tab');
 
+  // The dialog is the shared @visteras/ui one (wording/focus covered by packages/ui tests);
+  // its accent button reads Inspire's amber through --visteras-accent.
   const src = read('js/unsaved-changes.js');
-  assert.match(src, /Unsaved Changes/);
-  assert.match(src, /Unsaved changes will be lost\./);
-  assert.match(src, /btn_visteras_amber" data-action="close">Close</, 'Close uses Inspire amber button');
-  assert.match(src, /\[data-action="cancel"\]'\)\?\.focus\(\)/, 'Cancel has default focus like Studio');
+  assert.match(src, /export \{ escapeHtml, showUnsavedChangesDialog \} from '\.\.\/lib\/visteras-ui\/dialog\.js';/);
+  const kit = read('lib/visteras-ui/dialog.js');
+  assert.match(kit, /title: 'Unsaved Changes'/);
+  assert.match(kit, /Unsaved changes will be lost\./);
+  assert.match(kit, /defaultFocus: 'cancel'/, 'Cancel has default focus like Studio');
+  assert.match(read('css/visteras-inspire-theme.css'), /--visteras-accent: var\(--inspire-amber\);/, 'Close uses Inspire amber');
+  assert.match(read('index.html'), /<link rel="stylesheet" href="lib\/visteras-ui\/ui\.css">/);
   const app = read('js/app.js');
   assert.match(app, /await confirmCloseIfDirty\(docToClose\)/, 'closeDocument awaits the dirty confirm');
   assert.doesNotMatch(app, /has unsaved changes\. Close anyway\?/, 'native confirm() replaced');

@@ -18,6 +18,14 @@ import { InspectorPanel } from './inspector.js';
 import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
+import { showToast } from '../lib/visteras-ui/toast.js';
+import { saveFile, openFile, findBySameHandle } from '../lib/visteras-ui/file.js';
+
+/** showSaveFilePicker types for Inspire documents (.vid stays Inspire's own type). */
+const VID_SAVE_TYPES = [{
+  description: 'Visteras Inspire Document (.vid)',
+  accept: { 'application/json': ['.vid'], 'application/x-visteras-inspire': ['.vid'] }
+}];
 import { exportRegion, computeSafeExportScale, prepareExportClone, EXPORT_DEFAULT_SCALE } from './export-utils.js';
 import {
   clearStaleDocumentStorage,
@@ -251,8 +259,10 @@ class InspireApp {
     this.showToast(`Created "${newModel.fileName}"`, 'success');
   }
 
-  // openDocumentData(docData)
-  openDocumentData(docData, fileName = null) {
+  // openDocumentData(docData, fileName, { fileHandle, sameFile })
+  // fileHandle: from the open picker (kept on the tab so ⌘S writes back silently).
+  // sameFile: open tabs whose handle isSameEntry() as fileHandle (they count as name matches).
+  openDocumentData(docData, fileName = null, { fileHandle = null, sameFile = [] } = {}) {
     if (!docData || !docData.board || !docData.swipeFile) {
       this.showToast('Invalid .vid document structure', 'error');
       return;
@@ -271,6 +281,7 @@ class InspireApp {
     ) {
       const idx = this.documents.findIndex(d => d.id === active.id);
       const replaced = this.createDocumentModel({ initialData: docData, title, fileName: resolvedFileName, isDirty: false });
+      replaced.fileHandle = fileHandle || null;
       this.documents[idx] = replaced;
       this.activateDocument(replaced.id);
       this.showToast(`Opened "${resolvedFileName}"`, 'success');
@@ -279,8 +290,10 @@ class InspireApp {
 
     // Same name/title/id already open: switch only if the content is identical; otherwise open a
     // new tab (Studio always opens into a new tab), so a different file is never hidden.
-    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title });
+    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title, extraCandidates: sameFile });
     if (target.action === 'switch') {
+      // Same content already open: switch to it. A tab without a handle adopts this one.
+      if (fileHandle && !target.model.fileHandle) target.model.fileHandle = fileHandle;
       this.activateDocument(target.model.id);
       this.showToast(`"${target.model.fileName || target.model.title}" is already open`, 'info');
       return;
@@ -297,6 +310,7 @@ class InspireApp {
       fileName: resolvedFileName,
       isDirty: false
     });
+    newModel.fileHandle = fileHandle || null;
 
     this.documents.push(newModel);
     this.activateDocument(newModel.id);
@@ -429,6 +443,7 @@ class InspireApp {
             if (val && val !== currentFileName) {
               val = safeVidFileName(val);
               docModel.fileName = val;
+              docModel.doc.fileName = val; // serialize() reads meta.fileName from the doc
               const cleanTitle = val.replace(/\.vid$/i, '');
               docModel.title = cleanTitle;
               docModel.doc.title = cleanTitle;
@@ -821,7 +836,7 @@ class InspireApp {
     document.getElementById('action_menu_new')?.addEventListener('click', () => this.newDocument());
     document.getElementById('action_menu_open')?.addEventListener('click', () => this.openVidFile());
     document.getElementById('action_menu_save')?.addEventListener('click', () => this.exportVidFile());
-    document.getElementById('action_menu_save_as')?.addEventListener('click', () => this.exportVidFile());
+    document.getElementById('action_menu_save_as')?.addEventListener('click', () => this.exportVidFile({ saveAs: true }));
     document.getElementById('action_menu_import_image')?.addEventListener('click', () => this.promptAddImage());
     document.getElementById('action_menu_export_png')?.addEventListener('click', () => this.exportHighResImage('png'));
     document.getElementById('action_menu_export_jpg')?.addEventListener('click', () => this.exportHighResImage('jpg'));
@@ -890,45 +905,62 @@ class InspireApp {
     document.getElementById('action_menu_shortcuts')?.addEventListener('click', () => this.showShortcutsModal());
   }
 
-  openVidFile() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.vid,application/json';
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const docData = await InspireDocument.parseVidFile(file);
-        this.openDocumentData(docData, file.name);
-      } catch (err) {
-        this.showToast(`Error opening .vid file: ${err.message}`, 'error');
-      }
-    };
-    input.click();
+  /**
+   * Open a .vid through the shared kit: showOpenFilePicker where available (the tab
+   * keeps the FileHandle, so ⌘S writes back silently), else <input type=file>.
+   */
+  async openVidFile() {
+    try {
+      const opened = await openFile({ types: VID_SAVE_TYPES, accept: '.vid,application/json' });
+      if (opened.cancelled) return;
+      const docData = await InspireDocument.parseVidFile(opened.file);
+      const sameFile = await findBySameHandle(this.documents, opened.handle);
+      this.openDocumentData(docData, opened.name, { fileHandle: opened.handle, sameFile });
+    } catch (err) {
+      this.showToast(`Error opening .vid file: ${err.message}`, 'error');
+    }
   }
 
-  exportVidFile() {
+  /**
+   * Save the active board as .vid (shared @visteras/ui file helper, Studio behaviour):
+   * Save writes back to the file chosen earlier; otherwise (and always for Save As)
+   * the save picker opens with the tab's name; browsers without the picker download.
+   * The tab takes the name that was actually saved. Cancelling changes nothing.
+   */
+  async exportVidFile({ saveAs = false } = {}) {
+    const active = this.getActiveDocument();
+    if (!active) return;
     try {
-      const active = this.getActiveDocument();
-      if (!active) return;
-
-      // The tab name and the downloaded file name are always the same string
+      // The tab name and the saved file name are always the same string
       const fileName = safeVidFileName(active.fileName || active.doc.title);
-      if (typeof active.doc.downloadVidFile === 'function') {
-        active.doc.downloadVidFile(active.board, active.swipeFile, fileName);
-      } else {
+      // Serialize only once the target name is known (after the picker resolves),
+      // so meta.fileName / meta.title match the file actually written.
+      const serializeAs = (name) => {
+        const savedName = safeVidFileName(name || fileName);
         const data = active.doc.serialize(active.board, active.swipeFile);
-        InspireDocument.downloadAsFile(data, fileName);
-      }
-      const savedTitle = fileName.replace(/\.vid$/i, '');
-      active.fileName = fileName;
+        data.meta.fileName = savedName;
+        data.meta.title = savedName.replace(/\.vid$/i, '');
+        return JSON.stringify(data, null, 2);
+      };
+      const result = await saveFile({
+        data: serializeAs,
+        fileName,
+        mimeType: 'application/json;charset=utf-8',
+        types: VID_SAVE_TYPES,
+        handle: saveAs ? null : (active.fileHandle || null)
+      });
+      if (result.cancelled) return;
+      const savedFileName = safeVidFileName(result.name || fileName);
+      const savedTitle = savedFileName.replace(/\.vid$/i, '');
+      active.fileHandle = result.handle || null;
+      active.fileName = savedFileName;
       active.title = savedTitle;
-      active.doc.fileName = fileName;
+      active.doc.fileName = savedFileName;
       active.doc.title = savedTitle;
       markSaved(active);
       this.renderDocumentTabs();
       if (active.id === this.activeDocId) this.canvas?.renderArtboardMeta();
-      this.showToast(`Saved "${fileName}"`, 'success');
+      this.showToast(`Saved "${savedFileName}"`, 'success');
     } catch (err) {
       this.showToast(`Export failed: ${err.message}`, 'error');
     }
@@ -1783,9 +1815,9 @@ class InspireApp {
         return;
       }
 
-      if (isCmdOrCtrl && e.key === 's') {
+      if (isCmdOrCtrl && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        this.exportVidFile();
+        this.exportVidFile({ saveAs: e.shiftKey }); // ⌘S Save, ⇧⌘S Save As
         return;
       }
 
@@ -1972,7 +2004,7 @@ class InspireApp {
           x: Math.round(center.x - 190),
           y: Math.round(center.y - 110)
         });
-        this.board.selectElement(el.id);
+        this.board.select(el.id);
         const active = this.getActiveDocument();
         if (active) active.isDirty = true;
         this.renderDocumentTabs();
@@ -2005,7 +2037,7 @@ class InspireApp {
       x: Math.round(center.x - 160),
       y: Math.round(center.y - 40)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
@@ -2024,7 +2056,7 @@ class InspireApp {
       x: Math.round(center.x - 110),
       y: Math.round(center.y - 110)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
@@ -2041,7 +2073,7 @@ class InspireApp {
       x: Math.round(center.x - 80),
       y: Math.round(center.y - 80)
     });
-    this.board.selectElement(el.id);
+    this.board.select(el.id);
     this.switchSidepanel('inspector');
     const active = this.getActiveDocument();
     if (active) active.isDirty = true;
@@ -2215,25 +2247,7 @@ class InspireApp {
   }
 
   showToast(message, type = 'info', duration = 3000) {
-    let notifier = document.getElementById('visteras_notifier');
-    if (!notifier) {
-      notifier = document.createElement('div');
-      notifier.id = 'visteras_notifier';
-      notifier.className = 'alertify-notifier ajs-top ajs-center';
-      document.body.appendChild(notifier);
-    }
-
-    const msg = document.createElement('div');
-    msg.className = `ajs-message ajs-${type}`;
-    msg.textContent = message;
-    notifier.appendChild(msg);
-
-    requestAnimationFrame(() => msg.classList.add('ajs-visible'));
-
-    setTimeout(() => {
-      msg.classList.remove('ajs-visible');
-      setTimeout(() => msg.remove(), 250);
-    }, duration);
+    return showToast(message, type, duration); // shared kit (lib/visteras-ui/toast.js)
   }
 }
 

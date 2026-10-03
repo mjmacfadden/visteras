@@ -21,3 +21,7 @@ Copies of the respective icons are placed directly into each app's image bundle:
 - Vector: `apps/vector/images/file-vvd.{svg,png}`, `apps/vector/images/app-vvd.{svg,png}`
 - Publish: `apps/publish/public/images/file-vpd.{svg,png}`, `apps/publish/public/images/app-vpd.{svg,png}`
 - Collage: `apps/collage/images/file-vcd.{svg,png}`, `apps/collage/images/app-vcd.{svg,png}`
+
+## Tool icons
+
+`tools/`: shared monochrome tool icons drawn with `currentColor` (Studio source; Selection and Direct Selection from Vector). Copied into apps by `npm run build:icons`. See [tools/README.md](./tools/README.md).

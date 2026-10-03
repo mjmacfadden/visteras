@@ -515,7 +515,7 @@ import {
       if (fontUnderline) fontUnderline.classList.toggle('active', !!state.textOverlay.underline);
 
       if (fontPickerInstance && state.textOverlay.fontFamily) {
-        fontPickerInstance.selectFamily(state.textOverlay.fontFamily, state.textOverlay.fontWeight || '400');
+        fontPickerInstance.selectFamily(state.textOverlay.fontFamily, state.textOverlay.fontWeight || '400', { notify: false });
       }
 
       // 7. Custom Image URL
