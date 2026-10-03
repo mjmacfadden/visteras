@@ -147,8 +147,12 @@ export async function loadFont(family = 'Roboto', weight = '400', style = 'norma
     try {
       let buf = null;
       if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
-        const res = await fetch(`./lib/fonts/${fileName}`);
-        if (res.ok) buf = await res.arrayBuffer();
+        const fontUrl = new URL(`../lib/fonts/${fileName}`, import.meta.url).href;
+        let res = await fetch(fontUrl).catch(() => null);
+        if (!res || !res.ok) {
+          res = await fetch(`./lib/fonts/${fileName}`).catch(() => null);
+        }
+        if (res && res.ok) buf = await res.arrayBuffer();
       } else {
         // Node environment
         const fs = await import('node:fs');
@@ -249,6 +253,48 @@ function transformCommands(commands, cos, sin, tx, ty) {
     }
   }
   return d;
+}
+
+/**
+ * Merges overlapping component contours within a glyph into a single clean contour.
+ * Variable fonts (or certain TTF/OTF fonts) construct glyphs with overlapping sub-paths
+ * (e.g. stem and arch). When outlined, these appear as overlapping lines unless united.
+ */
+export function cleanGlyphPath(pathData) {
+  if (!pathData || typeof pathData !== 'string') return pathData;
+  const zMatches = pathData.match(/[zZ]/g);
+  if (!zMatches || zMatches.length <= 1) return pathData;
+  if (typeof window === 'undefined' || !window.paper) return pathData;
+
+  try {
+    const paper = window.paper;
+    const scope = new paper.PaperScope();
+    scope.setup(new paper.Size(2000, 2000));
+    const item = scope.project.importSVG(`<path d="${pathData}" fill-rule="evenodd" />`, { expandShapes: true, insert: false });
+    if (!item) return pathData;
+
+    let united = null;
+    const parts = item.children ? [...item.children] : [item];
+    if (parts.length > 1) {
+      united = parts.reduce((acc, p) => {
+        if (!acc) return p;
+        try {
+          return acc.unite(p, { insert: false });
+        } catch (_) {
+          return acc;
+        }
+      }, null);
+    } else if (typeof item.unite === 'function') {
+      united = item.unite(item, { insert: false });
+    }
+
+    if (united && united.pathData && united.pathData.length > 0) {
+      return united.pathData;
+    }
+  } catch (_) {
+    // Fallback to original pathData on any error
+  }
+  return pathData;
 }
 
 /**
@@ -440,7 +486,7 @@ export async function convertTextToOutlines(textElem, doc = document) {
     // When text has a gradient, all glyphs must be in a single compound path
     // so gradientUnits="objectBoundingBox" spans across the ENTIRE text continuously.
     const compoundPath = doc.createElementNS(NS, 'path');
-    compoundPath.setAttribute('d', allGlyphs.map((g) => g.d).join(' '));
+    compoundPath.setAttribute('d', allGlyphs.map((g) => cleanGlyphPath(g.d)).join(' '));
     compoundPath.setAttribute('class', 'visteras-glyph visteras-glyph-compound');
     compoundPath.setAttribute('data-char', textElem.textContent || '');
     if (origId) compoundPath.setAttribute('id', `${origId}_0`);
@@ -449,8 +495,9 @@ export async function convertTextToOutlines(textElem, doc = document) {
     // For solid fills, append individual glyph paths for discrete selection & editing
     let glyphIdx = 0;
     for (const item of allGlyphs) {
+      const cleanD = cleanGlyphPath(item.d);
       const path = doc.createElementNS(NS, 'path');
-      path.setAttribute('d', item.d);
+      path.setAttribute('d', cleanD);
       path.setAttribute('class', 'visteras-glyph');
       path.setAttribute('data-char', item.char);
       if (origId) {

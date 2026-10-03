@@ -3,6 +3,49 @@
  * Tailored for SVG-Edit 7.4.2 to match Visteras Studio pixel-perfect
  */
 
+/* Clean, non-overlapping bundled static Roboto fonts for vector design & outline view */
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 300;
+  font-style: normal;
+  src: url('../lib/fonts/roboto-300.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 400;
+  font-style: normal;
+  src: url('../lib/fonts/roboto-400.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 400;
+  font-style: italic;
+  src: url('../lib/fonts/roboto-400-italic.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 700;
+  font-style: normal;
+  src: url('../lib/fonts/roboto-700.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 700;
+  font-style: italic;
+  src: url('../lib/fonts/roboto-700-italic.woff') format('woff');
+}
+
+@font-face {
+  font-family: 'Roboto';
+  font-weight: 900;
+  font-style: normal;
+  src: url('../lib/fonts/roboto-900.woff') format('woff');
+}
+
 :root {
   --ui-font: "Segoe UI", "Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   --mono-font: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;

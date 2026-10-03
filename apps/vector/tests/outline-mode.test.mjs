@@ -93,3 +93,16 @@ test('Outline Mode: artboard outline is black (#000000) non-scaling stroke in ou
   );
 });
 
+test('Outline Mode: clean non-overlapping bundled Roboto fonts are declared in CSS', () => {
+  const themeCss = fs.readFileSync(path.resolve(vectorRoot, 'css/visteras-theme.css'), 'utf8');
+
+  // Verify @font-face rules point to bundled static woff fonts (which have single merged contours per glyph)
+  assert.match(themeCss, /@font-face\s*\{[\s\S]*?font-family:\s*'Roboto'[\s\S]*?roboto-400\.woff/);
+  assert.match(themeCss, /@font-face\s*\{[\s\S]*?font-family:\s*'Roboto'[\s\S]*?roboto-700\.woff/);
+
+  // Verify visteras-fonts.js bypasses Google variable font for Roboto
+  const fontsJs = fs.readFileSync(path.resolve(vectorRoot, 'lib/visteras-fonts.js'), 'utf8');
+  assert.match(fontsJs, /name\.toLowerCase\(\)\s*===\s*"roboto"/);
+});
+
+
