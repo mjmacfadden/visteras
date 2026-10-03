@@ -38,12 +38,14 @@ export function vidContentFingerprint(docData) {
 }
 
 /**
- * Returns { action: 'switch', model } when an open tab with a matching name/title/id has
+ * Returns { action: 'switch', model } when an open tab with a matching name/title/id (or one of
+ * `extraCandidates`, e.g. tabs whose FileHandle isSameEntry as the opened file) has
  * identical content, otherwise { action: 'new', sameNameOpen }.
  */
-export function resolveOpenTarget(documents, docData, { fileName, title } = {}) {
+export function resolveOpenTarget(documents, docData, { fileName, title, extraCandidates = [] } = {}) {
   const candidates = (documents || []).filter((d) =>
-    (fileName && d.fileName === fileName) || (title && d.title === title) || (docData?.meta?.id && d.id === docData.meta.id));
+    (fileName && d.fileName === fileName) || (title && d.title === title) || (docData?.meta?.id && d.id === docData.meta.id)
+    || extraCandidates.includes(d));
   if (!candidates.length) return { action: 'new', sameNameOpen: false };
   const incoming = vidContentFingerprint(docData);
   const same = candidates.find((d) => modelContentFingerprint(d) === incoming);

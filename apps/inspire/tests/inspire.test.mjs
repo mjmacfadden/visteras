@@ -608,7 +608,7 @@ test('Save & Export (.vid) UX: InspireDocument defines downloadVidFile and expor
   // 3. Verify app.js saves through the shared @visteras/ui file helper:
   //    existing handle → save picker → download fallback (Studio behaviour)
   const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
-  assert.match(appJs, /import \{ saveFile \} from '\.\.\/lib\/visteras-ui\/file\.js';/);
+  assert.match(appJs, /import \{ saveFile, openFile, findBySameHandle \} from '\.\.\/lib\/visteras-ui\/file\.js';/);
   assert.match(appJs, /await saveFile\(\{[\s\S]*?types: VID_SAVE_TYPES,[\s\S]*?handle: saveAs \? null : \(active\.fileHandle \|\| null\)/, 'Save reuses the file handle; Save As always asks');
   assert.match(appJs, /if \(result\.cancelled\) return;/, 'cancelling the picker changes nothing');
   assert.match(appJs, /'\.vid'/, '.vid stays the Inspire file type');
@@ -633,7 +633,7 @@ test('Direct File Reading & Clean Startup: App starts with fresh blank document,
   assert.doesNotMatch(appJs, /scheduleAutoSave\(\)/, 'app.js must not schedule autosaves');
 
   // 4. Verify opening document reads the .vid file structure directly
-  assert.match(appJs, /openDocumentData\(docData\)/, 'app.js must support opening .vid document data directly');
+  assert.match(appJs, /openDocumentData\(docData, fileName = null/, 'app.js must support opening .vid document data directly');
 });
 
 test('Bounding Box & Corner Rotation Zone UX: Blue lines with square handles and corner rotation zones matching Studio and Vector', () => {
@@ -750,7 +750,7 @@ test('Document Tab File Name Display UX: Tabs display document file name (.vid) 
   assert.match(appJs, /fileName:\s*'Untitled-1\.vid'/, 'Initial document model must default fileName to Untitled-1.vid');
 
   // 3. Verify openVidFile passes the file name to openDocumentData
-  assert.match(appJs, /this\.openDocumentData\(docData,\s*file\.name\)/, 'openVidFile must pass file.name to openDocumentData');
+  assert.match(appJs, /this\.openDocumentData\(docData,\s*opened\.name,/, 'openVidFile must pass the opened file name to openDocumentData');
 
   // 4. Verify canvas drop passes file name to window.__visterasLoadDocument
   assert.match(canvasJs, /window\.__visterasLoadDocument\?\.\(docData,\s*f\.name\)/, 'canvas.js drop listener must forward f.name');

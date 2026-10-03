@@ -19,7 +19,7 @@ import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
 import { showToast } from '../lib/visteras-ui/toast.js';
-import { saveFile } from '../lib/visteras-ui/file.js';
+import { saveFile, openFile, findBySameHandle } from '../lib/visteras-ui/file.js';
 
 /** showSaveFilePicker types for Inspire documents (.vid stays Inspire's own type). */
 const VID_SAVE_TYPES = [{
@@ -259,8 +259,10 @@ class InspireApp {
     this.showToast(`Created "${newModel.fileName}"`, 'success');
   }
 
-  // openDocumentData(docData)
-  openDocumentData(docData, fileName = null) {
+  // openDocumentData(docData, fileName, { fileHandle, sameFile })
+  // fileHandle: from the open picker (kept on the tab so ⌘S writes back silently).
+  // sameFile: open tabs whose handle isSameEntry() as fileHandle (they count as name matches).
+  openDocumentData(docData, fileName = null, { fileHandle = null, sameFile = [] } = {}) {
     if (!docData || !docData.board || !docData.swipeFile) {
       this.showToast('Invalid .vid document structure', 'error');
       return;
@@ -279,6 +281,7 @@ class InspireApp {
     ) {
       const idx = this.documents.findIndex(d => d.id === active.id);
       const replaced = this.createDocumentModel({ initialData: docData, title, fileName: resolvedFileName, isDirty: false });
+      replaced.fileHandle = fileHandle || null;
       this.documents[idx] = replaced;
       this.activateDocument(replaced.id);
       this.showToast(`Opened "${resolvedFileName}"`, 'success');
@@ -287,8 +290,10 @@ class InspireApp {
 
     // Same name/title/id already open: switch only if the content is identical; otherwise open a
     // new tab (Studio always opens into a new tab), so a different file is never hidden.
-    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title });
+    const target = resolveOpenTarget(this.documents, docData, { fileName: resolvedFileName, title, extraCandidates: sameFile });
     if (target.action === 'switch') {
+      // Same content already open: switch to it. A tab without a handle adopts this one.
+      if (fileHandle && !target.model.fileHandle) target.model.fileHandle = fileHandle;
       this.activateDocument(target.model.id);
       this.showToast(`"${target.model.fileName || target.model.title}" is already open`, 'info');
       return;
@@ -305,6 +310,7 @@ class InspireApp {
       fileName: resolvedFileName,
       isDirty: false
     });
+    newModel.fileHandle = fileHandle || null;
 
     this.documents.push(newModel);
     this.activateDocument(newModel.id);
@@ -899,21 +905,20 @@ class InspireApp {
     document.getElementById('action_menu_shortcuts')?.addEventListener('click', () => this.showShortcutsModal());
   }
 
-  openVidFile() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.vid,application/json';
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const docData = await InspireDocument.parseVidFile(file);
-        this.openDocumentData(docData, file.name);
-      } catch (err) {
-        this.showToast(`Error opening .vid file: ${err.message}`, 'error');
-      }
-    };
-    input.click();
+  /**
+   * Open a .vid through the shared kit: showOpenFilePicker where available (the tab
+   * keeps the FileHandle, so ⌘S writes back silently), else <input type=file>.
+   */
+  async openVidFile() {
+    try {
+      const opened = await openFile({ types: VID_SAVE_TYPES, accept: '.vid,application/json' });
+      if (opened.cancelled) return;
+      const docData = await InspireDocument.parseVidFile(opened.file);
+      const sameFile = await findBySameHandle(this.documents, opened.handle);
+      this.openDocumentData(docData, opened.name, { fileHandle: opened.handle, sameFile });
+    } catch (err) {
+      this.showToast(`Error opening .vid file: ${err.message}`, 'error');
+    }
   }
 
   /**

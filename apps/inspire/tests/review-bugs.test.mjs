@@ -249,3 +249,27 @@ test('Smoke fix 3: meta.fileName follows the tab rename and the picked name', ()
   assert.match(src, /data\.meta\.fileName = savedName;/);
   assert.doesNotMatch(src, /const data = active\.doc\.serialize\(active\.board, active\.swipeFile\);\n\s*const result = await saveFile/);
 });
+
+test('Open keeps the FileHandle: same-entry tabs count as matches; open uses the shared openFile', async () => {
+  const { InspireDocument } = await import('../js/document.js');
+  const { BoardComposer } = await import('../js/board-composer.js');
+  const { SwipeFileManager } = await import('../js/swipe-file.js');
+  const { resolveOpenTarget } = await import('../js/open-match.js');
+  const data = InspireDocument.createBlank('Renamed On Disk');
+  data.board.elements = [{ id: 'e1', type: 'text', x: 1, y: 2, width: 30, height: 20, data: { text: 'H' } }];
+  const doc = new InspireDocument(data.board);
+  const tab = { id: 'other_id', title: 'Tab Title', fileName: 'Tab Title.vid', doc,
+    board: new BoardComposer(data.board.elements, null, doc), swipeFile: new SwipeFileManager(data.swipeFile) };
+  const incoming = JSON.parse(JSON.stringify(data)); incoming.meta.id = 'disk_id';
+  // no name/title/id match → new tab, unless the tab's handle isSameEntry (extraCandidates)
+  assert.equal(resolveOpenTarget([tab], incoming, { fileName: 'X.vid', title: 'X' }).action, 'new');
+  const r = resolveOpenTarget([tab], incoming, { fileName: 'X.vid', title: 'X', extraCandidates: [tab] });
+  assert.equal(r.action, 'switch');
+  assert.equal(r.model, tab);
+  const src = read('js/app.js');
+  assert.match(src, /const opened = await openFile\(\{ types: VID_SAVE_TYPES, accept: '\.vid,application\/json' \}\);/);
+  assert.match(src, /const sameFile = await findBySameHandle\(this\.documents, opened\.handle\);/);
+  assert.match(src, /newModel\.fileHandle = fileHandle \|\| null;/);
+  assert.match(src, /replaced\.fileHandle = fileHandle \|\| null;/);
+  assert.match(src, /handle: saveAs \? null : \(active\.fileHandle \|\| null\)/);
+});
