@@ -286,6 +286,7 @@
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
+    import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-1';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -1318,6 +1319,14 @@
             return;
           }
 
+          // Command/Ctrl + 7: Make Clipping Mask
+          if (!e.shiftKey && (e.key === '7' || e.code === 'Digit7' || e.code === 'Numpad7')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.__visterasClippingMask?.make();
+            return;
+          }
+
           // Command/Ctrl + Shift + A: Deselect All
           if (e.shiftKey && (e.key === 'a' || e.key === 'A')) {
             e.preventDefault();
@@ -1403,6 +1412,17 @@
             e.preventDefault();
             e.stopPropagation();
             document.getElementById('view_grid')?.click();
+            return;
+          }
+        }
+
+        // Alt + Command / Control shortcuts
+        if (isCmdOrCtrl && e.altKey) {
+          // Alt + Command/Ctrl + 7: Release Clipping Mask
+          if (!e.shiftKey && (e.key === '7' || e.code === 'Digit7' || e.code === 'Numpad7')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.__visterasClippingMask?.release();
             return;
           }
         }
@@ -2520,6 +2540,8 @@
     mountGradient(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
+    // Object ▸ Clipping Mask ▸ Make (⌘7), Release (⌥⌘7)
+    mountClippingMask(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
