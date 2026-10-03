@@ -41,11 +41,82 @@ export async function getOpenType() {
 }
 
 /**
+ * Normalizes CSS font-weight (names or numbers) to standard weight string (300, 400, 700, 900).
+ */
+export function normalizeFontWeight(weight) {
+  if (!weight) return '400';
+  const str = String(weight).trim().toLowerCase();
+  if (str === 'bold' || str === 'bolder') return '700';
+  if (str === 'normal') return '400';
+  if (str === 'lighter') return '300';
+  const num = parseInt(str, 10);
+  if (!isNaN(num)) {
+    if (num <= 350) return '300';
+    if (num <= 550) return '400';
+    if (num <= 750) return '700';
+    return '900';
+  }
+  return '400';
+}
+
+/**
+ * Normalizes CSS font-style to 'normal' or 'italic'.
+ */
+export function normalizeFontStyle(style) {
+  if (!style) return 'normal';
+  const str = String(style).trim().toLowerCase();
+  if (str === 'italic' || str === 'oblique') return 'italic';
+  return 'normal';
+}
+
+/**
+ * Robustly reads font-weight from element attributes or computed style.
+ */
+export function getElementFontWeight(el) {
+  const attr = el.getAttribute?.('font-weight');
+  if (attr) return attr;
+  const styleWeight = el.style?.fontWeight;
+  if (styleWeight) return styleWeight;
+  const styleAttr = el.getAttribute?.('style') || '';
+  const match = styleAttr.match(/font-weight\s*:\s*([^;]+)/i);
+  if (match) return match[1].trim();
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    try {
+      const computed = window.getComputedStyle(el).fontWeight;
+      if (computed) return computed;
+    } catch (_) {}
+  }
+  return '400';
+}
+
+/**
+ * Robustly reads font-style from element attributes or computed style.
+ */
+export function getElementFontStyle(el) {
+  const attr = el.getAttribute?.('font-style');
+  if (attr) return attr;
+  const styleVal = el.style?.fontStyle;
+  if (styleVal) return styleVal;
+  const styleAttr = el.getAttribute?.('style') || '';
+  const match = styleAttr.match(/font-style\s*:\s*([^;]+)/i);
+  if (match) return match[1].trim();
+  if (typeof window !== 'undefined' && window.getComputedStyle) {
+    try {
+      const computed = window.getComputedStyle(el).fontStyle;
+      if (computed) return computed;
+    } catch (_) {}
+  }
+  return 'normal';
+}
+
+/**
  * Loads a TrueType / OpenType font binary and parses it with OpenType.js.
  */
 export async function loadFont(family = 'Roboto', weight = '400', style = 'normal') {
   const normFamily = (family || 'Roboto').replace(/['"]/g, '').split(',')[0].trim();
-  const cacheKey = `${normFamily.toLowerCase()}_${weight}_${style}`;
+  const normWeight = normalizeFontWeight(weight);
+  const normStyle = normalizeFontStyle(style);
+  const cacheKey = `${normFamily.toLowerCase()}_${normWeight}_${normStyle}`;
   if (fontCache.has(cacheKey)) {
     return fontCache.get(cacheKey);
   }
@@ -53,34 +124,53 @@ export async function loadFont(family = 'Roboto', weight = '400', style = 'norma
   const ot = await getOpenType();
   if (!ot) return null;
 
-  // 1. Try bundled Roboto font (bundled in apps/vector/lib/fonts/Roboto-Regular.ttf)
-  if (normFamily.toLowerCase() === 'roboto' || normFamily.toLowerCase() === 'sans-serif' || normFamily.toLowerCase() === 'default') {
+  // 1. Try bundled clean static Roboto font files
+  const isRoboto =
+    normFamily.toLowerCase() === 'roboto' ||
+    normFamily.toLowerCase() === 'sans-serif' ||
+    normFamily.toLowerCase() === 'default';
+
+  if (isRoboto) {
+    let fileName = `roboto-${normWeight}.woff`;
+    if (normStyle === 'italic') {
+      fileName = (normWeight === '700' || normWeight === '900') ? 'roboto-700-italic.woff' : 'roboto-400-italic.woff';
+    } else if (normWeight === '900') {
+      fileName = 'roboto-900.woff';
+    } else if (normWeight === '700') {
+      fileName = 'roboto-700.woff';
+    } else if (normWeight === '300') {
+      fileName = 'roboto-300.woff';
+    } else {
+      fileName = 'roboto-400.woff';
+    }
+
     try {
       let buf = null;
       if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
-        const res = await fetch('./lib/fonts/Roboto-Regular.ttf');
+        const res = await fetch(`./lib/fonts/${fileName}`);
         if (res.ok) buf = await res.arrayBuffer();
       } else {
         // Node environment
         const fs = await import('node:fs');
-        const fontUrl = new URL('../lib/fonts/Roboto-Regular.ttf', import.meta.url);
+        const fontUrl = new URL(`../lib/fonts/${fileName}`, import.meta.url);
         buf = fs.readFileSync(fontUrl).buffer;
       }
       if (buf) {
         const font = ot.parse(buf);
         fontCache.set(cacheKey, font);
-        fontCache.set('roboto_400_normal', font);
         return font;
       }
     } catch (err) {
-      console.warn('Could not load bundled Roboto-Regular.ttf:', err);
+      console.warn(`Could not load bundled ${fileName}:`, err);
     }
   }
 
   // 2. Try fetching from Google Fonts (or web) if in browser
   if (typeof window !== 'undefined' && typeof window.fetch === 'function') {
     try {
-      const cssUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(normFamily)}:wght@400;700`;
+      const isItalic = normStyle === 'italic';
+      const weightNum = parseInt(normWeight, 10) || 400;
+      const cssUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(normFamily)}:ital,wght@${isItalic ? 1 : 0},${weightNum}`;
       const cssRes = await fetch(cssUrl);
       if (cssRes.ok) {
         const cssText = await cssRes.text();
@@ -100,11 +190,11 @@ export async function loadFont(family = 'Roboto', weight = '400', style = 'norma
     }
   }
 
-  // 3. Fallback to bundled Roboto if cached or available
-  if (fontCache.has('roboto_400_normal')) {
-    return fontCache.get('roboto_400_normal');
+  // 3. Fallback to bundled Roboto with matching weight (Bold stays Bold!)
+  if (normWeight === '700' || normWeight === '900') {
+    return loadFont('Roboto', '700', normStyle);
   }
-  return null;
+  return loadFont('Roboto', '400', normStyle);
 }
 
 /**
@@ -224,11 +314,11 @@ export function extractGlyphPaths(font, text, startX, startY, fontSize, options 
 export async function convertTextToOutlines(textElem, doc = document) {
   if (!isTextElement(textElem)) return null;
 
-  // Extract font attributes
+  // Extract font attributes with accurate bold / weight tracking
   const rawFamily = textElem.getAttribute('font-family') || 'Roboto';
   const family = rawFamily.replace(/['"]/g, '').split(',')[0].trim();
-  const weight = textElem.getAttribute('font-weight') || '400';
-  const style = textElem.getAttribute('font-style') || 'normal';
+  const weight = getElementFontWeight(textElem);
+  const style = getElementFontStyle(textElem);
   const fontSize = parseFloat(textElem.getAttribute('font-size')) || 24;
   const letterSpacing = parseFloat(textElem.getAttribute('letter-spacing')) || 0;
   const defaultAnchor = textElem.getAttribute('text-anchor') || 'start';
@@ -342,17 +432,32 @@ export async function convertTextToOutlines(textElem, doc = document) {
   const origId = textElem.getAttribute('id');
   if (origId) group.setAttribute('id', origId);
 
-  // Append individual glyph paths
-  let glyphIdx = 0;
-  for (const item of allGlyphs) {
-    const path = doc.createElementNS(NS, 'path');
-    path.setAttribute('d', item.d);
-    path.setAttribute('class', 'visteras-glyph');
-    path.setAttribute('data-char', item.char);
-    if (origId) {
-      path.setAttribute('id', `${origId}_${glyphIdx++}`);
+  // Check if text has a gradient fill (linearGradient or radialGradient)
+  const fillAttr = textElem.getAttribute('fill') || textElem.style?.fill || group.getAttribute('fill') || '';
+  const hasGradient = fillAttr.includes('url(') || textElem.hasAttribute('data-gradient') || group.hasAttribute('data-gradient');
+
+  if (hasGradient) {
+    // When text has a gradient, all glyphs must be in a single compound path
+    // so gradientUnits="objectBoundingBox" spans across the ENTIRE text continuously.
+    const compoundPath = doc.createElementNS(NS, 'path');
+    compoundPath.setAttribute('d', allGlyphs.map((g) => g.d).join(' '));
+    compoundPath.setAttribute('class', 'visteras-glyph visteras-glyph-compound');
+    compoundPath.setAttribute('data-char', textElem.textContent || '');
+    if (origId) compoundPath.setAttribute('id', `${origId}_0`);
+    group.append(compoundPath);
+  } else {
+    // For solid fills, append individual glyph paths for discrete selection & editing
+    let glyphIdx = 0;
+    for (const item of allGlyphs) {
+      const path = doc.createElementNS(NS, 'path');
+      path.setAttribute('d', item.d);
+      path.setAttribute('class', 'visteras-glyph');
+      path.setAttribute('data-char', item.char);
+      if (origId) {
+        path.setAttribute('id', `${origId}_${glyphIdx++}`);
+      }
+      group.append(path);
     }
-    group.append(path);
   }
 
   return group;

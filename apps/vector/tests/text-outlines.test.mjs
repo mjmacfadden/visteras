@@ -397,6 +397,58 @@ test('Create Outlines: convertSelectionToPath handles both shapes and text seaml
   assert.equal(converted[1].getAttribute('class'), 'visteras-text-outlines');
 });
 
+test('Create Outlines: preserves Bold font-weight and clean non-overlapping outlines', async () => {
+  const boldFont = await T.loadFont('Roboto', 'bold', 'normal');
+  assert.ok(boldFont);
+  assert.equal(boldFont.names.fontSubfamily?.en, 'Bold');
+
+  // Verify glyph L in bold has exactly 1 contour (no overlapping construction rectangles)
+  const glyphL = boldFont.charToGlyph('L');
+  const pathL = glyphL.getPath(0, 0, 100);
+  const dL = pathL.toPathData(2);
+  const mMatches = dL.match(/M/g) || [];
+  assert.equal(mMatches.length, 1, 'Letter L must have exactly 1 continuous outer contour, no overlapping scrap shapes');
+
+  // Verify text element with font-weight="bold" or "700" produces bold outlines
+  const textEl = createMockElement('text', {
+    id: 'bold_headline',
+    x: '0',
+    y: '50',
+    'font-size': '40',
+    'font-weight': 'bold',
+    textContent: 'Lorem',
+  });
+  const doc = { createElementNS: (ns, tag) => createMockElement(tag) };
+  const group = await T.convertTextToOutlines(textEl, doc);
+  assert.ok(group);
+  assert.equal(group.children.length, 5); // L, o, r, e, m
+});
+
+test('Create Outlines: gradient text combines glyphs into compound path to preserve gradient continuity', async () => {
+  const textEl = createMockElement('text', {
+    id: 'grad_text',
+    x: '50',
+    y: '100',
+    'font-size': '36',
+    fill: 'url(#linearGradient_purple_yellow)',
+    textContent: 'Lorem Ipsum',
+  });
+
+  const doc = { createElementNS: (ns, tag) => createMockElement(tag) };
+  const group = await T.convertTextToOutlines(textEl, doc);
+  assert.ok(group);
+
+  // For gradient fills, all letters are merged into a single compound path
+  assert.equal(group.children.length, 1, 'Gradient text must produce a single compound path');
+  const compoundPath = group.children[0];
+  assert.ok(compoundPath.classList.contains('visteras-glyph-compound'));
+  const d = compoundPath.getAttribute('d');
+  assert.ok(d.length > 500, 'Compound path contains all glyph outlines');
+  // 10 letters: L(1) + o(2) + r(1) + e(2) + m(1) + I(1) + p(2) + s(1) + u(1) + m(1) = 13 subpaths
+  const subpaths = (d.match(/M/g) || []).length;
+  assert.equal(subpaths, 13, 'Must have exactly 13 subpaths representing all glyphs and counters');
+});
+
 test('HTML: index.html wires ⇧⌘O shortcut, menu item, and mounts mountTextOutlines', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
 
