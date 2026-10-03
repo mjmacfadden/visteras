@@ -36,6 +36,8 @@
   <script src="./lib/paper-core.min.js"></script>
   <!-- Client-side logo tracer (ImageTracer.js) -->
   <script src="./lib/imagetracer_v1.2.6.js?v=c-support-1"></script>
+  <!-- OpenType.js Font Parser (for Type ▸ Create Outlines) -->
+  <script src="./lib/opentype.min.js?v=ot-1"></script>
 
   <!-- Browser Support Script -->
   <script type="module" src="./browser-not-supported.js"></script>
@@ -122,6 +124,8 @@
           <div class="menu_entry_title">Text</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_type_on_path" title="Place editable text along a path">Type on Path…</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item disabled" id="action_create_outlines">Create Outlines <span class="menu_dropdown_shortcut">⇧⌘O</span></div>
           </div>
         </div>
 
@@ -287,6 +291,7 @@
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-1';
+    import { mountTextOutlines } from './js/visteras-text-outlines.js?v=outlines-1';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -1332,6 +1337,14 @@
             e.preventDefault();
             e.stopPropagation();
             sc.clearSelection?.();
+            return;
+          }
+
+          // Command/Ctrl + Shift + O: Create Outlines
+          if (e.shiftKey && (e.key === 'o' || e.key === 'O' || e.code === 'KeyO')) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.__visterasTextOutlines?.createOutlines();
             return;
           }
 
@@ -2417,7 +2430,7 @@
         // Action buttons
         const toPathBtn = document.getElementById('tool_topath');
         if (toPathBtn) {
-          const canToPath = !['image', 'text', 'path', 'g', 'use'].includes(tagName);
+          const canToPath = !['image', 'path', 'g', 'use'].includes(tagName);
           toPathBtn.style.display = canToPath ? 'inline-flex' : 'none';
         }
 
@@ -2542,6 +2555,8 @@
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌘7), Release (⌥⌘7)
     mountClippingMask(svgEditor);
+    // Type ▸ Create Outlines (⇧⌘O) / Convert to Path
+    mountTextOutlines(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
