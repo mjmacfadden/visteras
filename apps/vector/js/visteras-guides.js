@@ -65,6 +65,32 @@ export class GuideManager {
     this._bindMenuActions();
     this._bindShortcuts();
     this.renderRulerGuides();
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener?.('visteras:canvas-reset', () => this.onCanvasReset());
+      window.addEventListener?.('visteras:document-switched', (e) => {
+        this.onCanvasReset();
+        if (e.detail?.doc?.rulerGuides) {
+          this.setGuides(e.detail.doc.rulerGuides);
+        }
+      });
+    }
+  }
+
+  onCanvasReset() {
+    this.rulerGuidesLayer = null;
+    this.smartGuidesLayer = null;
+    this._ensureLayers();
+    this.renderRulerGuides();
+  }
+
+  getGuides() {
+    return this.rulerGuides.slice();
+  }
+
+  setGuides(guides) {
+    this.rulerGuides = Array.isArray(guides) ? guides.slice() : [];
+    this.renderRulerGuides();
   }
 
   _ensureLayers() {
@@ -72,28 +98,36 @@ export class GuideManager {
     const svgContent = this.sc?.getSvgContent?.() || document.getElementById('svgcontent');
     if (!svgContent) return;
 
-    if (!this.rulerGuidesLayer) {
+    const rulerConnected = typeof this.rulerGuidesLayer?.isConnected === 'boolean' ? this.rulerGuidesLayer.isConnected : true;
+    const rulerContained = typeof svgContent.contains === 'function' && this.rulerGuidesLayer ? svgContent.contains(this.rulerGuidesLayer) : true;
+    if (!this.rulerGuidesLayer || !rulerConnected || !rulerContained) {
       let guidesGroup = document.getElementById('visteras_ruler_guides');
-      if (!guidesGroup) {
-        guidesGroup = document.createElementNS(NS, 'g');
-        guidesGroup.setAttribute('id', 'visteras_ruler_guides');
-        guidesGroup.setAttribute('class', 'visteras-guides-layer');
-        guidesGroup.setAttribute('style', 'pointer-events: all;');
-        svgContent.append(guidesGroup);
+      if (!guidesGroup || (typeof svgContent.contains === 'function' && !svgContent.contains(guidesGroup))) {
+        if (typeof document.createElementNS === 'function') {
+          guidesGroup = document.createElementNS(NS, 'g');
+          guidesGroup.setAttribute('id', 'visteras_ruler_guides');
+          guidesGroup.setAttribute('class', 'visteras-guides-layer');
+          guidesGroup.setAttribute('style', 'pointer-events: all;');
+          svgContent.append(guidesGroup);
+        }
       }
-      this.rulerGuidesLayer = guidesGroup;
+      if (guidesGroup) this.rulerGuidesLayer = guidesGroup;
     }
 
-    if (!this.smartGuidesLayer) {
+    const smartConnected = typeof this.smartGuidesLayer?.isConnected === 'boolean' ? this.smartGuidesLayer.isConnected : true;
+    const smartContained = typeof svgContent.contains === 'function' && this.smartGuidesLayer ? svgContent.contains(this.smartGuidesLayer) : true;
+    if (!this.smartGuidesLayer || !smartConnected || !smartContained) {
       let smartGroup = document.getElementById('visteras_smart_guides');
-      if (!smartGroup) {
-        smartGroup = document.createElementNS(NS, 'g');
-        smartGroup.setAttribute('id', 'visteras_smart_guides');
-        smartGroup.setAttribute('class', 'visteras-smart-guides-layer');
-        smartGroup.setAttribute('style', 'pointer-events: none;');
-        svgContent.append(smartGroup);
+      if (!smartGroup || (typeof svgContent.contains === 'function' && !svgContent.contains(smartGroup))) {
+        if (typeof document.createElementNS === 'function') {
+          smartGroup = document.createElementNS(NS, 'g');
+          smartGroup.setAttribute('id', 'visteras_smart_guides');
+          smartGroup.setAttribute('class', 'visteras-smart-guides-layer');
+          smartGroup.setAttribute('style', 'pointer-events: none;');
+          svgContent.append(smartGroup);
+        }
       }
-      this.smartGuidesLayer = smartGroup;
+      if (smartGroup) this.smartGuidesLayer = smartGroup;
     }
   }
 
@@ -138,25 +172,34 @@ export class GuideManager {
     this.updateUI();
   }
 
-  toggleShowGuides(force = null) {
+  toggleShowGuides(force = null, notify = false) {
     this.showGuides = force !== null ? force : !this.showGuides;
     this._saveSettings();
     this.renderRulerGuides();
     this.updateUI();
+    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
+      window.showStudioToast(this.showGuides ? 'Guides: Visible' : 'Guides: Hidden', 'info', 1500);
+    }
   }
 
-  toggleLockGuides(force = null) {
+  toggleLockGuides(force = null, notify = false) {
     this.lockGuides = force !== null ? force : !this.lockGuides;
     this._saveSettings();
     this.renderRulerGuides();
     this.updateUI();
+    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
+      window.showStudioToast(this.lockGuides ? 'Guides: Locked' : 'Guides: Unlocked', 'info', 1500);
+    }
   }
 
-  toggleSmartGuides(force = null) {
+  toggleSmartGuides(force = null, notify = false) {
     this.smartGuidesEnabled = force !== null ? force : !this.smartGuidesEnabled;
     this._saveSettings();
     this.clearSmartGuides();
     this.updateUI();
+    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
+      window.showStudioToast(this.smartGuidesEnabled ? 'Smart Guides: On' : 'Smart Guides: Off', 'info', 1500);
+    }
   }
 
   renderRulerGuides() {
@@ -244,7 +287,7 @@ export class GuideManager {
           e.preventDefault();
           this._startNewGuideDrag('h', e);
         }
-      });
+      }, true);
     }
 
     if (rulerY) {
@@ -253,7 +296,7 @@ export class GuideManager {
           e.preventDefault();
           this._startNewGuideDrag('v', e);
         }
-      });
+      }, true);
     }
   }
 
@@ -397,8 +440,26 @@ export class GuideManager {
     });
 
     if (typeof window !== 'undefined') {
+      let isMouseDown = false;
+      const workarea = document.getElementById('workarea') || window;
+      workarea.addEventListener('mousedown', (e) => {
+        if (e.button === 0) isMouseDown = true;
+      }, true);
+
       window.addEventListener('mouseup', () => {
+        isMouseDown = false;
         this.clearSmartGuides();
+      }, true);
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isMouseDown || !this.smartGuidesEnabled) return;
+        const mode = this.sc?.getMode?.();
+        if (mode === 'select' && (e.buttons === 1 || e.which === 1)) {
+          const sel = this.sc.getSelectedElements?.() || [];
+          if (sel.length > 0) {
+            this.evaluateSmartSnap(sel);
+          }
+        }
       });
     }
   }
@@ -434,6 +495,43 @@ export class GuideManager {
     this.smartGuidesLayer.append(line);
   }
 
+  _getElementSceneBBox(el) {
+    if (!el || el.nodeType !== 1) return null;
+    try {
+      if (typeof DOMMatrix !== 'undefined' && el.getScreenCTM && this.sc?.getSvgContent) {
+        const svgContent = this.sc.getSvgContent();
+        if (svgContent?.getScreenCTM) {
+          const sRoot = svgContent.getScreenCTM();
+          const sEl = el.getScreenCTM();
+          if (sRoot && sEl) {
+            const rootM = new DOMMatrix([sRoot.a, sRoot.b, sRoot.c, sRoot.d, sRoot.e, sRoot.f]);
+            const elM = new DOMMatrix([sEl.a, sEl.b, sEl.c, sEl.d, sEl.e, sEl.f]);
+            const m = rootM.inverse().multiply(elM);
+            const b = el.getBBox();
+            if (b && (b.width > 0 || b.height > 0)) {
+              const pts = [
+                new DOMPoint(b.x, b.y).matrixTransform(m),
+                new DOMPoint(b.x + b.width, b.y).matrixTransform(m),
+                new DOMPoint(b.x, b.y + b.height).matrixTransform(m),
+                new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(m),
+              ];
+              const minX = Math.min(...pts.map(p => p.x));
+              const maxX = Math.max(...pts.map(p => p.x));
+              const minY = Math.min(...pts.map(p => p.y));
+              const maxY = Math.max(...pts.map(p => p.y));
+              return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    try {
+      const b = el.getBBox?.();
+      if (b) return { x: b.x, y: b.y, width: b.width, height: b.height };
+    } catch (_) {}
+    return null;
+  }
+
   evaluateSmartSnap(movingElements) {
     if (!this.smartGuidesEnabled) return;
     this.clearSmartGuides();
@@ -442,7 +540,7 @@ export class GuideManager {
     const movingBBox = this._getCombinedBBox(movingElements);
     if (!movingBBox) return;
 
-    const zoom = this.sc.getZoom?.() || 1;
+    const zoom = this.sc?.getZoom?.() || 1;
     const snapThreshold = 6 / zoom; // 6 screen pixels tolerance
 
     const movingX = [
@@ -462,7 +560,7 @@ export class GuideManager {
     const candidatesY = [];
 
     // 1. Artboard boundaries & center
-    const res = this.sc.getResolution?.() || { w: 800, h: 600 };
+    const res = this.sc?.getResolution?.() || { w: 800, h: 600 };
     const abW = Number(res.w ?? res.width ?? 800);
     const abH = Number(res.h ?? res.height ?? 600);
 
@@ -482,38 +580,38 @@ export class GuideManager {
       }
     }
 
-    // 3. Other elements on canvas
+    // 3. Other elements on canvas (across all layers and groups)
     const svgContent = this.sc?.getSvgContent?.() || (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('svgcontent') : null);
     if (svgContent) {
-      const siblings = [...svgContent.children];
-      for (const sib of siblings) {
+      const targets = svgContent.querySelectorAll ? svgContent.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, image, g:not(.layer):not(.vclip-group)') : (svgContent.children || []);
+      for (const sib of targets) {
         if (
           movingSet.has(sib) ||
+          movingElements.some(m => m.contains?.(sib) || sib.contains?.(m)) ||
           sib.id === 'visteras_ruler_guides' ||
           sib.id === 'visteras_smart_guides' ||
           sib.id === 'canvasBackground' ||
-          sib.nodeType !== 1
+          sib.nodeType !== 1 ||
+          sib.closest?.('#visteras_ruler_guides, #visteras_smart_guides, #canvasBackground, defs')
         ) {
           continue;
         }
 
-        try {
-          const b = sib.getBBox?.();
-          if (b && (b.width > 0 || b.height > 0)) {
-            const minX = Math.min(movingBBox.x, b.x) - 50;
-            const maxX = Math.max(movingBBox.x + movingBBox.width, b.x + b.width) + 50;
-            const minY = Math.min(movingBBox.y, b.y) - 50;
-            const maxY = Math.max(movingBBox.y + movingBBox.height, b.y + b.height) + 50;
+        const b = this._getElementSceneBBox(sib);
+        if (b && (b.width > 0 || b.height > 0)) {
+          const minX = Math.min(movingBBox.x, b.x) - 50;
+          const maxX = Math.max(movingBBox.x + movingBBox.width, b.x + b.width) + 50;
+          const minY = Math.min(movingBBox.y, b.y) - 50;
+          const maxY = Math.max(movingBBox.y + movingBBox.height, b.y + b.height) + 50;
 
-            candidatesX.push({ val: b.x, min: minY, max: maxY });
-            candidatesX.push({ val: b.x + b.width / 2, min: minY, max: maxY });
-            candidatesX.push({ val: b.x + b.width, min: minY, max: maxY });
+          candidatesX.push({ val: b.x, min: minY, max: maxY });
+          candidatesX.push({ val: b.x + b.width / 2, min: minY, max: maxY });
+          candidatesX.push({ val: b.x + b.width, min: minY, max: maxY });
 
-            candidatesY.push({ val: b.y, min: minX, max: maxX });
-            candidatesY.push({ val: b.y + b.height / 2, min: minX, max: maxX });
-            candidatesY.push({ val: b.y + b.height, min: minX, max: maxX });
-          }
-        } catch (_) {}
+          candidatesY.push({ val: b.y, min: minX, max: maxX });
+          candidatesY.push({ val: b.y + b.height / 2, min: minX, max: maxX });
+          candidatesY.push({ val: b.y + b.height, min: minX, max: maxX });
+        }
       }
     }
 
@@ -556,15 +654,13 @@ export class GuideManager {
     if (!elements || !elements.length) return null;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const el of elements) {
-      try {
-        const b = el.getBBox ? el.getBBox() : null;
-        if (b) {
-          minX = Math.min(minX, b.x);
-          minY = Math.min(minY, b.y);
-          maxX = Math.max(maxX, b.x + b.width);
-          maxY = Math.max(maxY, b.y + b.height);
-        }
-      } catch (_) {}
+      const b = this._getElementSceneBBox(el);
+      if (b && (b.width > 0 || b.height > 0)) {
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+      }
     }
     if (minX === Infinity) return null;
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
@@ -581,7 +677,7 @@ export class GuideManager {
     const smartBtn = document.getElementById('action_smart_guides');
     if (smartBtn) {
       smartBtn.addEventListener('click', () => {
-        this.toggleSmartGuides();
+        this.toggleSmartGuides(null, true);
       });
     }
 
@@ -589,7 +685,7 @@ export class GuideManager {
     const toggleGuidesBtn = document.getElementById('action_toggle_guides');
     if (toggleGuidesBtn) {
       toggleGuidesBtn.addEventListener('click', () => {
-        this.toggleShowGuides();
+        this.toggleShowGuides(null, true);
       });
     }
 
@@ -597,7 +693,7 @@ export class GuideManager {
     const lockGuidesBtn = document.getElementById('action_lock_guides');
     if (lockGuidesBtn) {
       lockGuidesBtn.addEventListener('click', () => {
-        this.toggleLockGuides();
+        this.toggleLockGuides(null, true);
       });
     }
 
@@ -627,7 +723,7 @@ export class GuideManager {
       if ((e.key === 'u' || e.key === 'U' || e.code === 'KeyU') && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleSmartGuides();
+        this.toggleSmartGuides(null, true);
         return;
       }
 
@@ -635,7 +731,7 @@ export class GuideManager {
       if ((e.key === ';' || e.code === 'Semicolon') && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleShowGuides();
+        this.toggleShowGuides(null, true);
         return;
       }
 
@@ -643,7 +739,7 @@ export class GuideManager {
       if ((e.key === ';' || e.code === 'Semicolon') && e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleLockGuides();
+        this.toggleLockGuides(null, true);
         return;
       }
     }, true);

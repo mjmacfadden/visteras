@@ -392,7 +392,7 @@ test('HTML: index.html wires ⌘7 / ⌥⌘7 shortcuts, imports and mounts mountC
   assert.match(html, /window\.__visterasClippingMask\?\.release\(\);/, '⌥⌘7 executes release()');
 
   // 2. Module import and mount
-  assert.match(html, /import\s+\{\s*mountClippingMask\s*\}\s+from\s+'\.\/js\/visteras-clipping-mask\.js\?v=clip-1';/);
+  assert.match(html, /import\s+\{\s*mountClippingMask\s*\}\s+from\s+'\.\/js\/visteras-clipping-mask\.js\?v=clip-\d+';/);
   assert.match(html, /mountClippingMask\(svgEditor\);/);
 
   // 3. Dynamic injection mounts Clipping Mask submenu with Make ⌘7 and Release ⌥⌘7
@@ -401,3 +401,46 @@ test('HTML: index.html wires ⌘7 / ⌥⌘7 shortcuts, imports and mounts mountC
   assert.match(src, /id="action_make_clipping_mask"[^>]*>Make\s+<span class="menu_dropdown_shortcut">⌘7<\/span>/);
   assert.match(src, /id="action_release_clipping_mask"[^>]*>Release\s+<span class="menu_dropdown_shortcut">⌥⌘7<\/span>/);
 });
+
+test('Clipping Mask: placing a raster image over a vector clips image with vector shape (does not disappear)', () => {
+  const sc = createMockSvgCanvas();
+  globalThis.document = sc.doc;
+
+  const vectorRect = createMockElement('rect', { id: 'v_rect', x: '50', y: '50', width: '200', height: '200', fill: '#00ccff' });
+  const rasterImg = createMockElement('image', { id: 'r_img', x: '0', y: '0', width: '400', height: '300', href: 'data:image/png;base64,...' });
+
+  // Raster image is placed OVER the vector (later in DOM)
+  sc.layer.append(vectorRect, rasterImg);
+
+  assert.equal(C.canMake([vectorRect, rasterImg]), true, 'vector + image is a valid clipping mask selection');
+
+  const group = C.makeClippingMask(sc, [vectorRect, rasterImg]);
+  assert.ok(group, 'Clipping mask must be created');
+
+  // Verify vectorRect became the mask shape in <clipPath> inside defs
+  const clipId = group.getAttribute('data-visteras-clip');
+  const clipPath = sc.defs.querySelector(`#${clipId}`);
+  assert.ok(clipPath, 'clipPath must be in defs');
+  assert.equal(clipPath.children.length, 1);
+  assert.equal(clipPath.children[0], vectorRect, 'vector shape MUST be inside clipPath (image cannot clip)');
+
+  // Verify rasterImg is the clipped content inside the group
+  assert.equal(group.children.length, 1);
+  assert.equal(group.children[0], rasterImg, 'raster image MUST be inside clip group to remain visible');
+
+  // Verify releasing restores elements
+  const released = C.releaseClippingMask(sc, [group]);
+  assert.ok(released);
+  assert.equal(released.length, 2);
+  assert.equal(sc.layer.children.length, 2);
+});
+
+test('Clipping Mask: selecting two raster images without any vector shape cannot make clipping mask', () => {
+  const img1 = createMockElement('image', { id: 'img1' });
+  const img2 = createMockElement('image', { id: 'img2' });
+  const parent = createMockElement('g');
+  parent.append(img1, img2);
+
+  assert.equal(C.canMake([img1, img2]), false, 'Two images cannot make clipping mask without vector shape');
+});
+

@@ -211,6 +211,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
     try { svgEditor.topPanel?.updateContextPanel?.(); } catch { /* ignore */ }
     updateRulers();
+    try {
+      window.dispatchEvent(new CustomEvent('visteras:canvas-reset'));
+    } catch { /* ignore */ }
   }
 
   function captureSvg() {
@@ -313,6 +316,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     doc.height = res.h;
     doc.unit = getBaseUnit();
     doc.svg = captureSvg();
+    doc.rulerGuides = window.__visterasGuideManager?.getGuides?.() || [];
   }
 
   function isActiveUntouchedDefault() {
@@ -422,6 +426,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     loadSvg(next.svg, next.width, next.height);
     if (svgEditor) svgEditor.title = next.title;
     try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
+    window.__visterasGuideManager?.setGuides?.(next.rulerGuides || []);
     renderTabs();
     updateStatusBar();
   }
@@ -492,11 +497,16 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         doc.dirty = false;
         doc.isStartupDefault = false;
         doc.fileHandle = null;
+        doc.rulerGuides = [];
         if (svgEditor) svgEditor.title = doc.title;
         try { localStorage.setItem(ACTIVE_TITLE_KEY, doc.title); } catch { /* ignore */ }
       }
+      window.__visterasGuideManager?.clearGuides?.();
       renderTabs();
       updateStatusBar();
+      requestAnimationFrame(() => {
+        window.fitArtboardToWorkspace?.();
+      });
       return doc;
     }
 
@@ -510,6 +520,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       dirty: false,
       isStartupDefault: false,
     });
+    newDoc.rulerGuides = [];
     state.documents.push(newDoc);
     state.activeId = newDoc.id;
     state.suppressDirty = true;
@@ -521,8 +532,12 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     }
     if (svgEditor) svgEditor.title = newDoc.title;
     try { localStorage.setItem(ACTIVE_TITLE_KEY, newDoc.title); } catch { /* ignore */ }
+    window.__visterasGuideManager?.clearGuides?.();
     renderTabs();
     updateStatusBar();
+    requestAnimationFrame(() => {
+      window.fitArtboardToWorkspace?.();
+    });
     return newDoc;
   }
 
@@ -1130,6 +1145,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         state.activeId = initial.id;
         renderTabs();
         updateStatusBar();
+        requestAnimationFrame(() => {
+          window.fitArtboardToWorkspace?.();
+        });
       });
     });
 

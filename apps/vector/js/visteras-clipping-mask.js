@@ -26,16 +26,34 @@ export function getClipId(el) {
   return el.getAttribute(CLIP_ATTR) || el.getAttribute('clip-path')?.match(/#([^)]+)/)?.[1] || null;
 }
 
+export const VALID_CLIP_TAGS = new Set([
+  'path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'text', 'line'
+]);
+
+export function isVectorClipShape(el) {
+  if (!el || el.nodeType !== 1) return false;
+  const tag = (el.tagName || el.localName || '').toLowerCase();
+  if (tag === 'image') return false;
+  if (VALID_CLIP_TAGS.has(tag)) return true;
+  if (tag === 'g' && el.querySelector && el.querySelector('path, rect, circle, ellipse, polygon, polyline, text, line')) {
+    return true;
+  }
+  return false;
+}
+
 const isValidCandidate = (el) => {
   if (!el || el.nodeType !== 1) return false;
-  const tag = (el.tagName || '').toLowerCase();
+  const tag = (el.tagName || el.localName || '').toLowerCase();
   if (tag === 'svg' || tag === 'defs' || tag === 'clippath') return false;
   if (el.classList?.contains('layer')) return false;
   return !!el.parentNode;
 };
 
 export function canMake(elements) {
-  return (elements || []).filter(isValidCandidate).length >= 2;
+  const valid = (elements || []).filter(isValidCandidate);
+  if (valid.length < 2) return false;
+  // Must contain at least one vector shape to serve as the clipping path
+  return valid.some(isVectorClipShape);
 }
 
 export function canRelease(elements) {
@@ -43,7 +61,8 @@ export function canRelease(elements) {
 }
 
 /**
- * Creates a clipping mask from selected elements. Topmost element becomes the mask shape.
+ * Creates a clipping mask from selected elements.
+ * Vector shape becomes the mask shape; raster images and underlying shapes become clipped content.
  * @param {object} sc svgCanvas instance
  * @param {Element[]} [selected] optional elements override
  * @returns {Element|null} the created clip group, or null
@@ -68,10 +87,39 @@ export function makeClippingMask(sc, selected = null) {
     return 0;
   });
 
-  const maskEl = sorted[sorted.length - 1];
-  const contentEls = sorted.slice(0, sorted.length - 1);
-  const parent = maskEl.parentNode;
-  const nextSibling = maskEl.nextSibling;
+  const topmostEl = sorted[sorted.length - 1];
+
+  // In SVG clipping, the mask shape MUST be a vector shape (<path>, <rect>, <circle>, etc.).
+  // Raster images (<image>) inside <clipPath> are invalid in SVG and cause content to disappear.
+  // If the topmost element is a vector shape, it serves as mask (standard Illustrator order).
+  // If a raster image is topmost (e.g. user placed an image over a vector shape),
+  // the topmost vector shape in the selection serves as the mask for the image.
+  let maskIndex = -1;
+  if (isVectorClipShape(topmostEl)) {
+    maskIndex = sorted.length - 1;
+  } else {
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (isVectorClipShape(sorted[i])) {
+        maskIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (maskIndex === -1) {
+    if (typeof window !== 'undefined' && window.showStudioToast) {
+      window.showStudioToast('Clipping mask requires a vector shape to serve as the mask.', 'error', 3500);
+    }
+    return null;
+  }
+
+  const maskEl = sorted[maskIndex];
+  const contentEls = sorted.filter((_, idx) => idx !== maskIndex);
+
+  // The clip group is anchored where the topmost selected element was in the DOM
+  const anchorEl = topmostEl;
+  const parent = anchorEl.parentNode || maskEl.parentNode;
+  const nextSibling = anchorEl.nextSibling;
 
   const doc = maskEl.ownerDocument || document;
   const NS = 'http://www.w3.org/2000/svg';
