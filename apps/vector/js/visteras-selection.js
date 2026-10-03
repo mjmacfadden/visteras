@@ -157,6 +157,16 @@ export function mountSelectionTools(editor) {
     e.stopImmediatePropagation();
     const { dir, b, basis } = drag;
     let start = drag.start, p = position(e);
+    if (dir !== 'rotate') {
+      try {
+        const delta = { dx: p.x - start.x, dy: p.y - start.y };
+        const snapRes = window.__visterasGuideManager?.evaluateSmartSnap?.(drag.items.map((i) => i.el), delta, { applyDirectSnap: false });
+        if (snapRes) {
+          if (/[ew]/.test(dir) && snapRes.snapDx) p.x += snapRes.snapDx;
+          if (/[ns]/.test(dir) && snapRes.snapDy) p.y += snapRes.snapDy;
+        }
+      } catch { /* ignore */ }
+    }
     let transform = new DOMMatrix();
     if (dir === 'rotate') {
       const {x:cx,y:cy} = point(b.x+b.width/2,b.y+b.height/2,basis);
@@ -200,11 +210,6 @@ export function mountSelectionTools(editor) {
     // Keep outside helper / inside clip coincident with body during live grip drag.
     try {
       window.__visterasLiveSyncStrokeAlign?.(drag.items.map((i) => i.el), sc);
-    } catch { /* ignore */ }
-    try {
-      const pCurrent = position(e);
-      const delta = { dx: pCurrent.x - drag.start.x, dy: pCurrent.y - drag.start.y };
-      window.__visterasGuideManager?.evaluateSmartSnap?.(drag.items.map((i) => i.el), delta);
     } catch { /* ignore */ }
     drag.moved = true;
     drag.visualFrame = {b,m:transform.multiply(basis)};

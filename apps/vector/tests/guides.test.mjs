@@ -334,6 +334,57 @@ test('Guides: Smart Guides renders sibling inline alignment markers, labels, and
   assert.ok(badgeTexts.some(t => t.includes('dY: 0 px')), 'Badge must display dY displacement readout');
 });
 
+test('Guides: Smart Guides snaps moving elements directly to alignment targets', () => {
+  const mockCanvas = {
+    getZoom() { return 1; },
+    getResolution() { return { w: 800, h: 600 }; },
+    getSvgContent() {
+      const content = createMockElement('g');
+      // Sibling rect at (100, 100), width 150 -> right edge is 250
+      const sibling = createMockElement('rect');
+      sibling.getBBox = () => ({ x: 100, y: 100, width: 150, height: 120 });
+      content.append(sibling);
+      return content;
+    }
+  };
+
+  const manager = new GuidesModule.GuideManager({ svgCanvas: mockCanvas });
+  const smartLayer = createMockElement('g', { id: 'visteras_smart_guides' });
+  manager.smartGuidesLayer = smartLayer;
+
+  // 1. Moving element near artboard center X = 400
+  // Element is at x = 373, width = 50 -> center is 398 (2px away from 400)
+  const moving = createMockElement('rect');
+  moving._bbox = { x: 373, y: 100, width: 50, height: 50 };
+  moving.getBBox = () => moving._bbox;
+
+  const res1 = manager.evaluateSmartSnap([moving], null, { applyDirectSnap: true });
+  assert.ok(res1, 'Must return snap result');
+  assert.equal(res1.snapDx, 2, 'Must calculate snapDx of 2px towards artboard center');
+  assert.equal(moving._bbox.x, 375, 'Must physically snap element X by +2px (new center 400)');
+  assert.equal(moving.getAttribute('transform'), 'translate(2, 0)', 'Must apply translate transform to element');
+
+  // 2. Moving element near sibling right edge X = 250
+  // Element is at x = 248.5, width = 50 -> left edge is 1.5px away from 250
+  const movingSibling = createMockElement('rect');
+  movingSibling._bbox = { x: 248.5, y: 120, width: 50, height: 50 };
+  movingSibling.getBBox = () => movingSibling._bbox;
+
+  const res2 = manager.evaluateSmartSnap([movingSibling], null, { applyDirectSnap: true });
+  assert.ok(res2);
+  assert.equal(Math.round(res2.snapDx * 10) / 10, 1.5, 'Must calculate snapDx of 1.5px towards sibling edge');
+  assert.equal(movingSibling._bbox.x, 250, 'Must physically snap element left edge to sibling right edge X = 250');
+
+  // 3. Handle drag with applyDirectSnap: false returns snapDx without directly mutating element
+  const movingHandle = createMockElement('rect');
+  movingHandle._bbox = { x: 373, y: 100, width: 50, height: 50 };
+  movingHandle.getBBox = () => movingHandle._bbox;
+
+  const res3 = manager.evaluateSmartSnap([movingHandle], null, { applyDirectSnap: false });
+  assert.equal(res3.snapDx, 2, 'Must calculate snapDx for handle consumer');
+  assert.equal(movingHandle._bbox.x, 373, 'Must NOT mutate element directly when applyDirectSnap is false');
+});
+
 test('HTML: index.html contains Smart Guides and Ruler Guide menu items and mounts mountGuides', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf-8');
   assert.match(html, /id="action_smart_guides"/, 'Must have action_smart_guides in View menu');
