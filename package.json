@@ -8,7 +8,7 @@
     "test": "node scripts/run-tests.mjs",
     "test:vector": "node --test apps/vector/tests/*.test.mjs",
     "test:studio": "node --test apps/studio/tests/*.test.cjs",
-    "test:ui": "node --test packages/ui/tests/*.test.mjs && node packages/ui/scripts/build-static.mjs --check",
+    "test:ui": "node --test packages/ui/tests/*.test.mjs && node packages/ui/scripts/build-static.mjs --check && node packages/icons/scripts/copy-tools.mjs --check",
     "check:storage": "node --test scripts/check-no-doc-localstorage.test.mjs && node scripts/check-no-doc-localstorage.mjs",
     "dev:studio": "npm run server --prefix apps/studio",
     "build:studio": "npm run build --prefix apps/studio",
@@ -23,7 +23,8 @@
     "test:inspire": "node --test apps/inspire/tests/inspire.test.mjs apps/inspire/tests/presentation.test.mjs apps/inspire/tests/unsaved-changes.test.mjs apps/inspire/tests/grid-config.test.mjs apps/inspire/tests/review-bugs.test.mjs",
     "build:site": "bash scripts/build-site.sh",
     "build:fonts": "npm run build:vector --prefix packages/fonts",
-    "build:ui": "node packages/ui/scripts/build-static.mjs"
+    "build:ui": "node packages/ui/scripts/build-static.mjs",
+    "build:icons": "node packages/icons/scripts/copy-tools.mjs"
   },
   "repository": {
     "type": "git",

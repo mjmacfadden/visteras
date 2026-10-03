@@ -53,6 +53,8 @@ npm run build:vector --prefix "$ROOT/packages/fonts"
 
 echo "==> Copying shared UI kit (packages/ui → apps/*/lib/visteras-ui/)"
 node "$ROOT/packages/ui/scripts/build-static.mjs"
+echo "==> Copying shared tool icons (packages/icons/tools → apps/{vector,studio}/images/tools/)"
+node "$ROOT/packages/icons/scripts/copy-tools.mjs"
 
 echo "==> Building Studio (apps/studio → dist/)"
 npm run build --prefix "$STUDIO"

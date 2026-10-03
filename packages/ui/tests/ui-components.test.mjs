@@ -115,3 +115,22 @@ test('tokens.css: menu/tab metrics only, accent left to each app, wired into eve
     assert.match(app(p), /var\(--visteras-accent\)/, p);
   }
 });
+
+test('tool icons: currentColor only, Selection/Direct Selection from Vector, copies in sync', async () => {
+  const dir = new URL('../../icons/tools/', import.meta.url);
+  const names = fs.readdirSync(dir).filter((f) => f.endsWith('.svg')).sort();
+  for (const n of ['selection.svg', 'direct-selection.svg', 'pen.svg', 'text.svg', 'rectangle.svg', 'ellipse.svg', 'eyedropper.svg', 'eraser.svg', 'hand.svg']) {
+    assert.ok(names.includes(n), n);
+  }
+  for (const n of names) {
+    const svg = fs.readFileSync(new URL(n, dir), 'utf8');
+    assert.match(svg, /currentColor/, `${n} uses currentColor`);
+    assert.doesNotMatch(svg, /(?:fill|stroke)\s*[=:]\s*"?(?:#[0-9a-f]{3,8}|black|white|rgb\()/i, `${n} has no hardcoded colour`);
+    assert.doesNotMatch(svg, /<\?xml|<!DOCTYPE/, `${n} is clean`);
+  }
+  const vectorSel = fs.readFileSync(new URL('../../../apps/vector/images/select.svg', import.meta.url), 'utf8');
+  assert.ok(vectorSel.includes('M4 4 L21 12 L12 12 L12 21 Z'), 'Vector select.svg is the source');
+  assert.ok(fs.readFileSync(new URL('selection.svg', dir), 'utf8').includes('M4 4 L21 12 L12 12 L12 21 Z'));
+  const { staleCopies } = await import('../../icons/scripts/copy-tools.mjs');
+  assert.deepEqual(staleCopies(), []);
+});
