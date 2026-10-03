@@ -113,6 +113,7 @@
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_item disabled" id="action_image_trace" title="Trace the selected raster image into vector paths">Image Trace…</div>
             <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_expand" title="Expand objects, fills, and strokes into editable vector paths">Expand</div>
             <div class="menu_dropdown_item" id="action_offset_path">Offset Path… <span class="menu_dropdown_shortcut">⌥⌘O</span></div>
             <div class="menu_dropdown_item" id="action_outline_stroke">Outline Stroke</div>
             <div class="menu_dropdown_item" id="action_scale_strokes" role="menuitemcheckbox" aria-checked="true">Scale Strokes</div>
@@ -146,14 +147,20 @@
             <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_rulers">Toggle Rulers <span class="menu_dropdown_shortcut">⌘R / Ctrl+R</span></div>
+            <div class="menu_dropdown_item" id="action_smart_guides" role="menuitemcheckbox" aria-checked="true">Smart Guides <span class="menu_dropdown_shortcut">⌘U</span></div>
             <div class="menu_dropdown_item" id="action_snap_point" role="menuitemcheckbox" aria-checked="true">Snap to Point</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_toggle_guides">Show Guides <span class="menu_dropdown_shortcut">⌘;</span></div>
+            <div class="menu_dropdown_item" id="action_lock_guides">Lock Guides <span class="menu_dropdown_shortcut">⌥⌘;</span></div>
+            <div class="menu_dropdown_item" id="action_clear_guides">Clear Guides</div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
             <div class="menu_dropdown_item" id="action_toggle_gradient_annotator">Hide Gradient Annotator <span class="menu_dropdown_shortcut">⌥⌘G</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_source">View SVG Source... <span class="menu_dropdown_shortcut">⌘U</span></div>
+            <div class="menu_dropdown_item" id="action_source">View SVG Source...</div>
           </div>
         </div>
 
@@ -292,6 +299,8 @@
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-1';
     import { mountTextOutlines } from './js/visteras-text-outlines.js?v=outlines-1';
+    import { mountExpand } from './js/visteras-expand.js?v=expand-1';
+    import { mountGuides } from './js/visteras-guides.js?v=guides-1';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -350,6 +359,8 @@
     window.svgEditor = svgEditor;
     mountSelectionTools(svgEditor);
     mountScaleStrokes(svgEditor);
+    mountExpand(svgEditor);
+    mountGuides(svgEditor);
 
     if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {
       svgEditor.rulers.updateRulers();

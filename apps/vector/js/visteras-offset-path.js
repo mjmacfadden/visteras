@@ -630,4 +630,5 @@ export function mountOffsetPath(editor) {
   }, true);
 }
 
+export { executeOutlineStroke };
 export default mountOffsetPath;
