@@ -405,7 +405,9 @@ export function mountCollageFontPicker({
     menu.appendChild(add);
   }
 
-  async function selectFamily(family, weight) {
+  // notify: false when syncing the picker to a restored document, so the async
+  // font load doesn't report a user change (and mark the doc dirty) afterwards.
+  async function selectFamily(family, weight, { notify = true } = {}) {
     currentFamily = family;
     setLabel(family);
     const resolvedWeight = updateWeightDropdown(family, weight || currentWeight);
@@ -424,7 +426,7 @@ export function mountCollageFontPicker({
       console.warn('[collage-font-bridge] loadFontFamily', family, e);
     }
 
-    if (typeof onFontChange === 'function') {
+    if (notify && typeof onFontChange === 'function') {
       onFontChange(family, resolvedWeight);
     }
   }
