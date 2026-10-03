@@ -646,6 +646,7 @@
           let docWidth = null;
           let docHeight = null;
           let docUnit = null;
+          let docRaster = null;
 
           if (typeof raw === 'string' && raw.trim().startsWith('{')) {
             try {
@@ -654,6 +655,7 @@
               if (bundle.width) docWidth = bundle.width;
               if (bundle.height) docHeight = bundle.height;
               if (bundle.unit) docUnit = bundle.unit;
+              if (bundle.rasterEffects && typeof bundle.rasterEffects === 'object') docRaster = bundle.rasterEffects;
               if (!base || /^untitled(-\d+)?$/i.test(base)) {
                 if (bundle.title && !/^untitled(-\d+)?$/i.test(bundle.title)) {
                   base = bundle.title;
@@ -674,6 +676,7 @@
               unit: docUnit || 'px',
               svg: svgContent,
               fileHandle: fileHandle,
+              rasterEffects: docRaster,
             });
           } else {
             if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
@@ -796,6 +799,8 @@
           height: res.h,
           unit: unit,
           thumbnail: thumbUrl,
+          // Effect ▸ Document Raster Effects Settings (per document, like Illustrator)
+          rasterEffects: activeDoc?.rasterEffects || undefined,
           svg: svgStr,
         }, null, 2);
 

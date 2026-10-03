@@ -112,7 +112,7 @@ test('Effect menu: Illustrator structure (Apply Last, Last Effect, raster settin
   assert.deepEqual([...idx].sort((a, b) => a - b), idx);
   assert.match(html, /id="action_effect_apply_last"[^>]*><span class="menu_label">Apply Last Effect<\/span><span class="menu_dropdown_shortcut">⇧⌘E<\/span>/);
   assert.match(html, /<span class="menu_dropdown_shortcut">⌥⇧⌘E<\/span>/);
-  assert.match(html, /class="menu_dropdown_item disabled"[^>]*id="action_effect_raster_settings"/);
+  assert.match(html, /class="menu_dropdown_item" role="menuitem" id="action_effect_raster_settings" data-fx-act="rasterSettings"/, 'Document Raster Effects Settings… opens the export module dialog');
   assert.equal((html.match(/menu_has_submenu/g) || []).length, 3);
   assert.doesNotMatch(html, /Inner Shadow/, 'Inner Shadow is legacy: not offered in menus');
   const pop = F.effectMenuHtml({ prefix: 'vfx_menu_', withLast: false });

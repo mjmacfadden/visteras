@@ -462,7 +462,7 @@ export const EFFECT_MENU = [
   { id: 'action_effect_apply_last', label: 'Apply Last Effect', shortcut: '⇧⌘E', act: 'applyLast' },
   { id: 'action_effect_last', label: 'Last Effect…', shortcut: '⌥⇧⌘E', act: 'last' },
   { sep: true },
-  { id: 'action_effect_raster_settings', label: 'Document Raster Effects Settings…', disabled: true, title: 'Coming with the Export dialog' },
+  { id: 'action_effect_raster_settings', label: 'Document Raster Effects Settings…', act: 'rasterSettings' },
   { sep: true },
   { header: 'Illustrator Effects' },
   { submenu: 'Stylize', id: 'stylize', items: ['dropShadow', 'innerGlow', 'outerGlow', 'feather'] },
@@ -655,6 +655,7 @@ export function mountEffects(editor) {
     if (node.dataset.fxType) openType(node.dataset.fxType);
     else if (node.dataset.fxAct === 'applyLast') applyLast();
     else if (node.dataset.fxAct === 'last') lastDialog();
+    else if (node.dataset.fxAct === 'rasterSettings') window.__visterasExport?.openRasterSettings?.();
   };
   const menuList = document.getElementById('menu_effect_list');
   if (menuList) {

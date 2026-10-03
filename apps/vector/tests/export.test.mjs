@@ -40,3 +40,14 @@ test('Export: pipeline — clone, scope viewBox, background inside the SVG, font
   assert.match(src, /e\?\.name !== 'SecurityError'/, 'taint fallback retries without images');
   assert.match(src, /foreignObject/);
 });
+
+test('Export: Document Raster Effects Settings stored per document in .vvd', () => {
+  assert.match(index, /rasterEffects: activeDoc\?\.rasterEffects \|\| undefined,/);
+  assert.match(index, /if \(bundle\.rasterEffects && typeof bundle\.rasterEffects === 'object'\) docRaster = bundle\.rasterEffects;/);
+  assert.match(index, /rasterEffects: docRaster,/);
+  const shell = read('../js/visteras-document-shell.js');
+  assert.match(shell, /targetDoc\.rasterEffects = rasterEffects && typeof rasterEffects === 'object' \? \{ \.\.\.rasterEffects \} : null;/);
+  assert.match(src, /const ppi = docRaster \? raster\.ppi : s\.asPpi;/, 'Export As defaults to the document raster settings');
+  const fonts = read('../js/visteras-font-bridge.js');
+  assert.match(fonts, /window\.__visterasFontBytes = getCustomFontBytes;/, 'uploaded fonts can be inlined');
+});
