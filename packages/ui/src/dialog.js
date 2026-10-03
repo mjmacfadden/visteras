@@ -4,7 +4,7 @@
  * Same contract as Studio's alertify.confirm in base-documents.js
  * close_document() and the Inspire/Vector copies it replaces: title
  * "Unsaved Changes", body "Close <b>name</b>? Unsaved changes will be lost.",
- * buttons Cancel / Close, Cancel focused by default. Escape, the × button and
+ * buttons Cancel / Close, Cancel focused by default (with a visible accent ring). Escape, the × button and
  * a backdrop click cancel; Enter activates the focused button.
  *
  * Styling lives in ui.css and uses only CSS custom properties; the accent
@@ -86,7 +86,18 @@ export function showConfirmDialog({
     doc.body.appendChild(overlay);
     doc.body.appendChild(dialog);
     const focusSel = defaultFocus === 'confirm' ? '.vui-btn-accent' : '.vui-btn-secondary';
-    dialog.querySelector(focusSel)?.focus();
+    const initial = dialog.querySelector(focusSel);
+    if (initial) {
+      // Browsers only show :focus-visible on a programmatic focus when the last input
+      // was the keyboard, so a dialog opened by a mouse click had no ring (Inspire)
+      // while a keyboard-opened one did (Vector). Mark the initial button so the ring
+      // always shows in the app's accent until focus moves or the pointer is used.
+      initial.classList?.add('vui-focus-ring');
+      const clearRing = () => initial.classList?.remove('vui-focus-ring');
+      initial.addEventListener?.('blur', clearRing, { once: true });
+      initial.addEventListener?.('pointerdown', clearRing, { once: true });
+      initial.focus();
+    }
   });
 }
 

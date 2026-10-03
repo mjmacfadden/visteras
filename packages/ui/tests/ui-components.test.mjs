@@ -134,3 +134,17 @@ test('tool icons: currentColor only, Selection/Direct Selection from Vector, cop
   const { staleCopies } = await import('../../icons/scripts/copy-tools.mjs');
   assert.deepEqual(staleCopies(), []);
 });
+
+test('dialog: initial Cancel focus always carries the accent focus ring', async () => {
+  const doc = fakeDom();
+  const p = showUnsavedChangesDialog('Poster', doc);
+  const btn = doc.activeElement;
+  assert.equal(btn.dataset.action, 'cancel');
+  assert.ok(btn.classList.contains('vui-focus-ring'), 'ring class on the initially focused button');
+  btn.fire('blur');
+  assert.ok(!btn.classList.contains('vui-focus-ring'), 'ring class cleared when focus moves');
+  doc.key('Escape');
+  assert.equal(await p, false);
+  const css = fs.readFileSync(new URL('../src/ui.css', import.meta.url), 'utf8');
+  assert.match(css, /\.vui-btn:focus-visible,\n\.vui-btn\.vui-focus-ring:focus \{ outline: 2px solid var\(--visteras-accent\); outline-offset: 2px; \}/);
+});

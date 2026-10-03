@@ -51,7 +51,7 @@ test('unsaved dialog: Vector uses the shared @visteras/ui dialog with its orange
   assert.ok(!/vector_unsaved_/.test(mod), 'local dialog copy removed');
   assert.ok(!/vector_unsaved_/.test(read('../css/visteras-document-shell.css')), 'local dialog CSS removed');
   assert.match(read('../css/visteras-theme.css'), /--visteras-accent: var\(--studio-orange\);/);
-  assert.match(read('../index.html'), /href="\.\/lib\/visteras-ui\/ui\.css\?v=ui-1"/);
+  assert.match(read('../index.html'), /href="\.\/lib\/visteras-ui\/ui\.css\?v=ui-\d+"/);
   assert.match(read('../lib/visteras-ui/dialog.js'), /title: 'Unsaved Changes'/);
 });
 

@@ -42,7 +42,9 @@ export function fakeDom() {
         const m = /\.([\w-]+)/.exec(sel);
         if (!m || !this._html.includes(m[1])) return null;
         const action = m[1].includes('accent') ? 'confirm' : 'cancel';
-        return { className: m[1], dataset: { action }, focus() { doc.activeElement = this; } };
+        const cls = new Set([m[1]]); const ls = {};
+        return { className: m[1], dataset: { action }, classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), contains: (c) => cls.has(c) },
+          addEventListener(t, fn) { (ls[t] ||= []).push(fn); }, fire(t) { (ls[t] || []).forEach((fn) => fn({})); }, focus() { doc.activeElement = this; } };
       },
     };
     return el;
