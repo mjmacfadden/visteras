@@ -64834,7 +64834,7 @@ ${y}`), [3, 7];
 			this.filterHidden = e;
 		}
 		setMode(e) {
-			this.pathActions.clear(!0), this.textActions.clear(), this.curProperties = this.selectedElements[0]?.nodeName === "text" ? this.curText : this.curShape, this.currentMode = e, this.modeEvent && document.dispatchEvent(this.modeEvent);
+			this.pathActions.clear(!0), this.textActions.clear(), this.curProperties = (e === "text" || e === "textedit" || this.selectedElements?.some?.((el) => el?.nodeName === "text" || el?.tagName === "text")) ? this.curText : this.curShape, this.currentMode = e, this.modeEvent && document.dispatchEvent(this.modeEvent);
 		}
 		clear() {
 			this.call("beforeClear"), this.pathActions.clear(), this.clearSelection(), this.clearSvgContentElement(), this.current_drawing_ = new hv(this.svgContent), this.createLayer(), this.undoMgr.resetUndoStack(), this.selectorManager.initGroup(), this.rubberBox = this.selectorManager.getRubberBandBox(), this.call("afterClear");

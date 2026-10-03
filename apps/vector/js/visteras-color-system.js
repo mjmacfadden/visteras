@@ -240,6 +240,45 @@ function flattenPaintTargets(elements, { attr = null } = {}) {
   return out;
 }
 
+function targetHasText(el) {
+  if (!el) return false;
+  const tag = (el.nodeName || el.tagName || '').toLowerCase();
+  if (tag === 'text' || tag === 'tspan') return true;
+  if (tag === 'g' && el.querySelector?.('text, tspan')) return true;
+  return false;
+}
+
+function targetHasShape(el) {
+  if (!el) return false;
+  const tag = (el.nodeName || el.tagName || '').toLowerCase();
+  if (tag === 'text' || tag === 'tspan') return false;
+  if (tag === 'g') {
+    return !el.querySelector?.('text, tspan') || !!el.querySelector?.('path, rect, circle, ellipse, line, polygon, polyline');
+  }
+  return true;
+}
+
+function isTextPaintTarget(sc) {
+  if (!sc) return false;
+  const targets = resolvePaintTargets(sc);
+  if (targets && targets.length > 0) {
+    return targets.some(targetHasText);
+  }
+  const mode = (typeof sc.getMode === 'function' ? sc.getMode() : sc.currentMode) || '';
+  return mode === 'text' || mode === 'textedit';
+}
+
+function hasShapePaintTarget(sc) {
+  if (!sc) return true;
+  const targets = resolvePaintTargets(sc);
+  if (targets && targets.length > 0) {
+    return targets.some(targetHasShape);
+  }
+  const mode = (typeof sc.getMode === 'function' ? sc.getMode() : sc.currentMode) || '';
+  return mode !== 'text' && mode !== 'textedit';
+}
+
+
 /**
  * Apply fill/stroke/stroke-width/opacity to resolved targets.
  *
@@ -1196,15 +1235,22 @@ function createColorController(svgEditor) {
         if (!sc) return;
         state.suppressSync = true;
         try {
+          const isText = isTextPaintTarget(sc);
+          const hasShape = hasShapePaintTarget(sc);
+
           // Update SVG-Edit "current style" only — avoid stock setColor's
           // changeSelectedAttribute under pathedit (throws when path K is null).
-          if (typeof sc.setCurShape === 'function') sc.setCurShape(state.activeTarget, val);
+          if (hasShape) {
+            if (typeof sc.setCurShape === 'function') sc.setCurShape(state.activeTarget, val);
+            if (sc.curShape) sc.curShape[state.activeTarget] = val;
+          }
+          if (isText) {
+            if (sc.curText) sc.curText[state.activeTarget] = val;
+          }
           if (typeof sc.setCurProperties === 'function') {
             sc.setCurProperties(`${state.activeTarget}_paint`, { type: 'solidColor' });
           }
           if (sc.curProperties) sc.curProperties[state.activeTarget] = val;
-          if (sc.curShape) sc.curShape[state.activeTarget] = val;
-          if (sc.curText) sc.curText[state.activeTarget] = val;
           // Paint Selection + Direct Selection targets via safe DOM write.
           applyPaintAttribute(sc, state.activeTarget, val, { noUndo });
           if (!noUndo) {
@@ -1748,15 +1794,23 @@ function readCanvasPaint(svgEditor, which) {
     }
   } catch { /* fall through */ }
 
+  const mode = (typeof sc?.getMode === 'function' ? sc.getMode() : sc?.currentMode) || '';
+  const isTextMode = mode === 'text' || mode === 'textedit';
+  const effectiveFallback = (isTextMode && which === 'fill') ? '#000000' : fallbackHex;
+
   if (!sc || typeof sc.getColor !== 'function') {
-    return { none: false, hex: fallbackHex, fromSelection: false };
+    return { none: false, hex: effectiveFallback, fromSelection: false };
   }
-  const raw = sc.getColor(which);
+
+  const raw = isTextMode && sc.curText && sc.curText[which] !== undefined
+    ? sc.curText[which]
+    : sc.getColor(which);
+
   if (!raw || raw === 'none' || raw === 'transparent') {
-    return { none: true, hex: fallbackHex, fromSelection: false };
+    return { none: true, hex: effectiveFallback, fromSelection: false };
   }
   const hex = normalizeHex(raw);
-  if (!hex || hex === 'none') return { none: true, hex: fallbackHex, fromSelection: false };
+  if (!hex || hex === 'none') return { none: true, hex: effectiveFallback, fromSelection: false };
   return { none: false, hex, fromSelection: false };
 }
 
@@ -2605,6 +2659,7 @@ function mountAppearanceColors(ctrl, svgEditor) {
     chainCanvasEvent(sc, 'elementChanged', syncSelectionUi);
     chainCanvasEvent(sc, 'changed', onChanged);
     chainCanvasEvent(sc, 'transition', onTransition);
+    document.addEventListener('modeChange', syncSelectionUi);
   } catch { /* ignore */ }
 
   // Select-tool mouseup recalculateDimensions bakes transform → x/y WITHOUT
@@ -2880,4 +2935,5 @@ export function mountVisterasColorSystem({ svgEditor } = {}) {
   return ctrl;
 }
 
+export { isTextPaintTarget, hasShapePaintTarget, targetHasText, targetHasShape };
 export default mountVisterasColorSystem;

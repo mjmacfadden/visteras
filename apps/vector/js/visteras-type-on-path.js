@@ -107,7 +107,7 @@ function readTextStyle(svgEditor) {
   let fontStyle = null;
   try { if (typeof sc.getFontFamily === 'function') family = sc.getFontFamily() || family; } catch (_) {}
   try { if (typeof sc.getFontSize === 'function') size = sc.getFontSize() || size; } catch (_) {}
-  try { if (typeof sc.getColor === 'function') fill = sc.getColor('fill') || fill; } catch (_) {}
+  try { if (typeof sc.getCurText === 'function') fill = sc.getCurText('fill') || fill; else if (sc.curText?.fill) fill = sc.curText.fill; else if (typeof sc.getColor === 'function') fill = sc.getColor('fill') || fill; } catch (_) {}
   try {
     if (typeof sc.getCurText === 'function') {
       letterSpacing = sc.getCurText('letter_spacing') ?? sc.getCurText('letter-spacing');

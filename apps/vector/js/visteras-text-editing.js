@@ -427,7 +427,8 @@ export function mountTextEditing(editor) {
     const p=position(e),box=isParagraphDrag(Math.abs(e.clientX-g.screen.x),Math.abs(e.clientY-g.screen.y));
     const width=Math.abs(p.x-g.start.x), height=Math.abs(p.y-g.start.y);
     const text=document.createElementNS(NS,'text');
-    const attrs={id:sc.getNextId(),x:box?Math.min(g.start.x,p.x):g.start.x,y:box?Math.min(g.start.y,p.y):g.start.y,'font-size':sc.getFontSize()||24,'font-family':sc.getFontFamily()||'Roboto',fill:sc.getColor('fill')==='none'?'#000':sc.getColor('fill')||'#000',stroke:'none','text-anchor':'start','xml:space':'preserve'};
+    const textFill = sc.getCurText?.('fill') || sc.curText?.fill || (sc.getColor?.('fill') === 'none' ? '#000000' : sc.getColor?.('fill')) || '#000000';
+    const attrs={id:sc.getNextId(),x:box?Math.min(g.start.x,p.x):g.start.x,y:box?Math.min(g.start.y,p.y):g.start.y,'font-size':sc.getFontSize()||24,'font-family':sc.getFontFamily()||'Roboto',fill:textFill,stroke:'none','text-anchor':'start','xml:space':'preserve'};
     for(const [k,v] of Object.entries(attrs)) text.setAttribute(k,v);
     if(box) {
       text.setAttribute('data-text-width', width);
