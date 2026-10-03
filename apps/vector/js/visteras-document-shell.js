@@ -1156,6 +1156,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     setBaseUnit,
     getBaseUnit,
     getActiveDoc,
+    /** Snapshot of the open documents (used by Open to find a tab with the same FileHandle). */
+    getDocuments: () => state.documents.slice(),
     isActiveUntouchedDefault,
     updateStatusBar,
     showRulerContextMenu,

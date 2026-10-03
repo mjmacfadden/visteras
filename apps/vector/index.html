@@ -255,6 +255,7 @@
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
+    import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle } from './lib/visteras-ui/file.js?v=open-1';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
@@ -660,37 +661,47 @@
         reader.readAsText(file);
       }
 
+      // Open/Save go through the shared @visteras/ui file helper: showOpenFilePicker keeps a
+      // FileHandle on the tab so ⌘S writes back silently; Safari/Firefox use <input type=file>
+      // (no handle) and Save downloads.
+      const VVD_OPEN_TYPES = [{
+        description: 'Visteras Vector Documents (*.vvd, *.svg)',
+        accept: {
+          'application/json': ['.vvd'],
+          'image/svg+xml': ['.svg'],
+        },
+      }];
+      const VVD_SAVE_TYPES = [{
+        description: 'Visteras Vector Document (.vvd)',
+        accept: { 'application/json': ['.vvd'], 'application/x-visteras-vector': ['.vvd'] },
+      }];
+
       document.getElementById('action_open')?.addEventListener('click', async () => {
-        if (window.showOpenFilePicker) {
-          try {
-            const [handle] = await window.showOpenFilePicker({
-              multiple: false,
-              types: [{
-                description: 'Visteras Vector Documents (*.vvd, *.svg)',
-                accept: {
-                  'application/json': ['.vvd'],
-                  'image/svg+xml': ['.svg'],
-                },
-              }],
-            });
-            if (handle) {
-              const file = await handle.getFile();
-              openVectorFile(file, handle);
+        try {
+          const opened = await openFile({
+            types: VVD_OPEN_TYPES,
+            accept: '.vvd,image/svg+xml,.svg,application/json,application/x-visteras-vector',
+          });
+          if (opened.cancelled) return;
+          // Only .vvd handles are kept: Save writes .vvd JSON, so an opened .svg must not be
+          // overwritten in place (Save asks where to put the .vvd instead).
+          const handle = /\.vvd$/i.test(opened.name || '') ? opened.handle : null;
+          if (handle) {
+            // Same file already open (handle.isSameEntry) with no unsaved edits → switch to it.
+            const shell = window.__visterasDocumentShell;
+            const same = await findBySameHandle(shell?.getDocuments?.() || [], handle);
+            const clean = same.find((d) => !d.dirty);
+            if (clean) {
+              shell.switchDocument(clean.id);
+              showStudioToast(`"${clean.title}" is already open`, 'info', 2000);
               return;
             }
-          } catch (err) {
-            if (err && err.name === 'AbortError') return;
-            console.warn('showOpenFilePicker failed, falling back to input:', err);
           }
+          openVectorFile(opened.file, handle);
+        } catch (err) {
+          console.error('Open failed:', err);
+          showStudioToast('Could not open the file: ' + (err.message || err), 'error');
         }
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.vvd,image/svg+xml,.svg,application/json,application/x-visteras-vector';
-        fileInput.onchange = (e) => {
-          const file = e.target.files[0];
-          if (file) openVectorFile(file);
-        };
-        fileInput.click();
       });
 
       window.addEventListener('dragover', (e) => {
@@ -716,37 +727,40 @@
         const svgStr = sc.getSvgString();
         const title = (activeDoc?.title || svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
 
-        let thumbUrl = null;
-        try {
-          const img = new Image();
-          const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-          const blobUrl = URL.createObjectURL(svgBlob);
-          await new Promise((resolve) => {
-            img.onload = () => {
-              const maxSize = 512;
-              const origW = img.naturalWidth || res.w || 512;
-              const origH = img.naturalHeight || res.h || 512;
-              const scale = Math.min(1, maxSize / Math.max(origW, origH));
-              const thumbCanvas = document.createElement('canvas');
-              thumbCanvas.width = Math.max(1, Math.round(origW * scale));
-              thumbCanvas.height = Math.max(1, Math.round(origH * scale));
-              const ctx = thumbCanvas.getContext('2d');
-              ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
-              thumbUrl = thumbCanvas.toDataURL('image/png');
-              URL.revokeObjectURL(blobUrl);
-              resolve();
-            };
-            img.onerror = () => {
-              URL.revokeObjectURL(blobUrl);
-              resolve();
-            };
-            img.src = blobUrl;
-          });
-        } catch (e) {
-          console.warn('Could not generate vvd thumbnail:', e);
-        }
+        const makeThumbnail = async () => {
+          let thumbUrl = null;
+          try {
+            const img = new Image();
+            const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+            const blobUrl = URL.createObjectURL(svgBlob);
+            await new Promise((resolve) => {
+              img.onload = () => {
+                const maxSize = 512;
+                const origW = img.naturalWidth || res.w || 512;
+                const origH = img.naturalHeight || res.h || 512;
+                const scale = Math.min(1, maxSize / Math.max(origW, origH));
+                const thumbCanvas = document.createElement('canvas');
+                thumbCanvas.width = Math.max(1, Math.round(origW * scale));
+                thumbCanvas.height = Math.max(1, Math.round(origH * scale));
+                const ctx = thumbCanvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                thumbUrl = thumbCanvas.toDataURL('image/png');
+                URL.revokeObjectURL(blobUrl);
+                resolve();
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(blobUrl);
+                resolve();
+              };
+              img.src = blobUrl;
+            });
+          } catch (e) {
+            console.warn('Could not generate vvd thumbnail:', e);
+          }
+          return thumbUrl;
+        };
 
-        const buildVvdJson = (docTitle) => JSON.stringify({
+        const buildVvdJson = (docTitle, thumbUrl) => JSON.stringify({
           $schema: 'visteras-vector-document-v1',
           version: 1,
           app: 'visteras-vector',
@@ -759,64 +773,35 @@
           svg: svgStr,
         }, null, 2);
 
-        const fileName = `${title}.vvd`;
+        const baseOf = (name) => fileBaseFromName(name || '', ['vvd', 'svg']).trim() || title;
 
-        if (!forceSaveAs && activeDoc?.fileHandle) {
-          try {
-            const writable = await activeDoc.fileHandle.createWritable();
-            await writable.write(buildVvdJson(title));
-            await writable.close();
-            shell?.clearActiveDirty?.();
-            shell?.renderTabs?.();
-            try { localStorage.setItem('visteras_vector_active_doc_title', title); } catch { /* ignore */ }
-            if (svgEditor) svgEditor.showSaveWarning = false;
-            return;
-          } catch (err) {
-            console.warn('Direct fileHandle write failed, falling back to picker:', err);
+        try {
+          // ⌘S with a handle (opened or saved before) writes back silently; Save As, no handle,
+          // denied permission or a failed write → save picker; no picker → download.
+          // The .vvd embeds the name it is actually saved under (serialized after the picker).
+          const result = await saveFile({
+            data: async (name) => buildVvdJson(baseOf(name), await makeThumbnail()),
+            fileName: safeFileName(title, 'vvd'),
+            mimeType: 'application/json;charset=utf-8',
+            types: VVD_SAVE_TYPES,
+            handle: forceSaveAs ? null : (activeDoc?.fileHandle || null),
+          });
+          if (result.cancelled) return;
+          const savedBase = baseOf(result.name);
+          if (activeDoc) {
+            activeDoc.title = savedBase;
+            activeDoc.fileHandle = result.handle || null;
           }
+          svgEditor.title = savedBase;
+          try { localStorage.setItem('visteras_vector_active_doc_title', savedBase); } catch { /* ignore */ }
+          shell?.clearActiveDirty?.();
+          shell?.renderTabs?.();
+          if (svgEditor) svgEditor.showSaveWarning = false;
+          showStudioToast(`Saved "${result.name || `${savedBase}.vvd`}"`, 'success', 2000);
+        } catch (err) {
+          console.error('Save failed:', err);
+          showStudioToast('Save failed: ' + (err.message || err), 'error');
         }
-
-        if (window.showSaveFilePicker) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: fileName,
-              types: [{
-                description: 'Visteras Vector Document (.vvd)',
-                accept: { 'application/json': ['.vvd'], 'application/x-visteras-vector': ['.vvd'] },
-              }],
-            });
-            const savedBase = handle.name.replace(/\.(vvd|svg)$/i, '');
-            const writable = await handle.createWritable();
-            await writable.write(buildVvdJson(savedBase));
-            await writable.close();
-            if (activeDoc) {
-              activeDoc.title = savedBase;
-              activeDoc.fileHandle = handle;
-            }
-            svgEditor.title = savedBase;
-            try { localStorage.setItem('visteras_vector_active_doc_title', savedBase); } catch { /* ignore */ }
-            shell?.clearActiveDirty?.();
-            shell?.renderTabs?.();
-            if (svgEditor) svgEditor.showSaveWarning = false;
-            return;
-          } catch (err) {
-            if (err && err.name === 'AbortError') return;
-            console.warn('showSaveFilePicker failed, falling back to download:', err);
-          }
-        }
-
-        const vvdJson = buildVvdJson(title);
-        const blob = new Blob([vvdJson], { type: 'application/json;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = fileName;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        // Download started — clear dirty like Studio after save.
-        try { localStorage.setItem('visteras_vector_active_doc_title', title); } catch { /* ignore */ }
-        shell?.clearActiveDirty?.();
-        shell?.renderTabs?.();
-        if (svgEditor) svgEditor.showSaveWarning = false;
       }
 
       document.getElementById('action_save')?.addEventListener('click', () => {

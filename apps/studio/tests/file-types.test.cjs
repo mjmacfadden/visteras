@@ -34,13 +34,13 @@ test('File Types: Vector supports .vvd documents', () => {
 	assert.match(vectorHtml, /id="action_save_as">Save As\.\.\. </);
 	assert.match(vectorHtml, /Export SVG\.\.\./);
 
-	// File input accepts .vvd
-	assert.match(vectorHtml, /accept\s*=\s*['"]\.vvd,/);
+	// File input (or the shared openFile fallback) accepts .vvd
+	assert.match(vectorHtml, /accept\s*[=:]\s*['"]\.vvd,/);
 
 	// Action save generates .vvd bundle with correct schema
 	assert.match(vectorHtml, /visteras-vector-document-v1/);
 	assert.match(vectorHtml, /app:\s*'visteras-vector'/);
-	assert.match(vectorHtml, /\$\{title\}\.vvd/);
+	assert.match(vectorHtml, /fileName: safeFileName\(title, 'vvd'\)/); // <title>.vvd via the shared file helper
 });
 
 test('File Types: Publish supports .vpd documents', () => {

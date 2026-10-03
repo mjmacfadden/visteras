@@ -62,7 +62,23 @@ test('unsaved: shell and index.html wiring', () => {
   assert.match(shell, /addEventListener\('beforeunload', \(e\) => handleBeforeUnload\(e, state\.documents\)\)/);
   const html = read('../index.html');
   assert.match(html, /no_save_warning:\s*true/, "SVG-Edit's undo-stack leave warning is off");
-  // Every .vvd save path clears the active tab's dirty flag.
-  const saveFn = html.slice(html.indexOf('buildVvdJson'));
-  assert.ok((saveFn.match(/clearActiveDirty\?\.\(\)/g) || []).length >= 3);
+  // Every .vvd save path (handle, picker, download) ends in the one saveFile result
+  // handler, which clears the active tab's dirty flag.
+  const saveFn = html.slice(html.indexOf('async function saveVectorDoc'), html.indexOf("getElementById('action_save')"));
+  assert.match(saveFn, /const result = await saveFile\(\{[\s\S]*?if \(result\.cancelled\) return;[\s\S]*?shell\?\.clearActiveDirty\?\.\(\);/);
+});
+
+test('open/save: .vvd goes through the shared file helper with the FileHandle kept on the tab', () => {
+  const html = read('../index.html');
+  assert.match(html, /import \{ openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle \} from '\.\/lib\/visteras-ui\/file\.js/);
+  assert.match(html, /const opened = await openFile\(\{\s*types: VVD_OPEN_TYPES,/);
+  assert.match(html, /const handle = \/\\\.vvd\$\/i\.test\(opened\.name \|\| ''\) \? opened\.handle : null;/, 'only .vvd handles are kept');
+  assert.match(html, /openVectorFile\(opened\.file, handle\);/);
+  assert.match(html, /handle: forceSaveAs \? null : \(activeDoc\?\.fileHandle \|\| null\),/, 'Save reuses the handle; Save As always asks');
+  assert.match(html, /activeDoc\.fileHandle = result\.handle \|\| null;/);
+  assert.match(html, /showStudioToast\(`Saved "/);
+  assert.ok(!/window\.showSaveFilePicker\(|window\.showOpenFilePicker\(/.test(html), 'no direct picker calls left');
+  const shell = read('../js/visteras-document-shell.js');
+  assert.match(shell, /getDocuments: \(\) => state\.documents\.slice\(\),/);
+  assert.match(shell, /targetDoc\.fileHandle = fileHandle \|\| null;/);
 });

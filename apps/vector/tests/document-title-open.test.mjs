@@ -49,9 +49,10 @@ test('Document Title: openVectorFile prioritizes filename over internal bundle t
 test('Document Title: saveVectorDoc syncs internal title to saved handle base name', () => {
   const html = fs.readFileSync(vectorHtmlPath, 'utf8');
 
-  assert.match(html, /const buildVvdJson = \(docTitle\) => JSON\.stringify/);
-  assert.match(html, /const savedBase = handle\.name\.replace\(/);
-  assert.match(html, /await writable\.write\(buildVvdJson\(savedBase\)\);/);
+  assert.match(html, /const buildVvdJson = \(docTitle, thumbUrl\) => JSON\.stringify/);
+  // serialized after the picker resolves, with the name it is saved under
+  assert.match(html, /data: async \(name\) => buildVvdJson\(baseOf\(name\), await makeThumbnail\(\)\),/);
+  assert.match(html, /const savedBase = baseOf\(result\.name\);/);
 });
 
 test('Document Shell: openDocument and switchDocument sync active document title and storage', () => {
