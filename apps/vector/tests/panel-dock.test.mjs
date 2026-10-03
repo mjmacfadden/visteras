@@ -22,12 +22,12 @@ const shapeBuilderJsPath = path.resolve(vectorRoot, 'js/visteras-shape-builder.j
 
 test('HTML: index.html includes visteras-panel-dock.css stylesheet', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-1"[^>]*>/);
+  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-2"[^>]*>/);
 });
 
 test('HTML: index.html imports and mounts visteras-panel-dock', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-1';/);
+  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-2';/);
   assert.match(html, /mountVisterasColorSystem\(\{\s*svgEditor\s*\}\);[\s\S]*?mountVisterasPanelDock\(\{\s*svgEditor\s*\}\);/);
 });
 
@@ -682,6 +682,8 @@ test('Panel Dock: Toolbar has no chevron, displays only pressed panel, highlight
   assert.equal(gradBtn.classList.contains('active'), true);
   const gradPane = env.doc.getElementById('vdock_gradient_panel');
   assert.equal(gradPane.classList.contains('active'), true);
+  // The old "coming in a future update" stub is gone; the real panel mounts into this pane.
+  assert.doesNotMatch(dockJs, /coming in a future update|vdock-gradient-stub-text|vdock-gradient-ramp-preview/);
 });
 
 

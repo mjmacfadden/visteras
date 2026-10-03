@@ -268,17 +268,11 @@ export function mountVisterasPanelDock({ svgEditor }) {
     });
   }
 
-  // (E) Gradient Panel Stub (#vdock_gradient_panel)
+  // (E) Gradient Panel (#vdock_gradient_panel) — empty pane; filled by
+  // js/visteras-gradient-panel.js (mounted from index.html via mountGradient).
   const gradPane = document.createElement('div');
   gradPane.id = 'vdock_gradient_panel';
   gradPane.className = 'vdock-panel-pane';
-  gradPane.innerHTML = `
-    <div class="vdock-gradient-ramp-preview"></div>
-    <div class="vdock-gradient-stub-text">
-      <strong>Gradient</strong>
-      <p style="margin:4px 0 0 0; color:#888;">Interactive gradient editor coming in a future update.</p>
-    </div>
-  `;
   flyoutBody.appendChild(gradPane);
 
   // (F) Layers Panel (#layerpanel)

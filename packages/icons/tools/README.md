@@ -17,6 +17,7 @@ prologs and comments were removed.
 | eyedropper.svg | Studio pick_color.svg |
 | eraser.svg | Studio erase.svg |
 | hand.svg | Studio pan.svg |
+| gradient.svg | Studio gradient.svg (Vector Gradient tool G; square 30×30 viewBox) |
 
 Copy step: `npm run build:icons` (`packages/icons/scripts/copy-tools.mjs`) writes
 `apps/vector/images/tools/` and `apps/studio/images/tools/` (copies committed;

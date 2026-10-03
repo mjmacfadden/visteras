@@ -26,7 +26,8 @@
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-panel-dock.css?v=dock-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-panel-dock.css?v=dock-2" rel="stylesheet" media="all">
+  <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-fx.css?v=gravit-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
@@ -130,6 +131,7 @@
             <div class="menu_dropdown_item" id="action_snap_point" role="menuitemcheckbox" aria-checked="true">Snap to Point</div>
             <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_gradient_annotator">Hide Gradient Annotator <span class="menu_dropdown_shortcut">⌥⌘G</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_unlock_references">Unlock Reference Images</div>
             <div class="menu_dropdown_separator"></div>
@@ -246,7 +248,8 @@
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountEffects } from './js/visteras-effects.js?v=gravit-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
-    import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
+    import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
+    import { mountSelectionTools } from './js/visteras-selection.js?v=gradient-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
     import { mountTextEditing } from './js/visteras-text-editing.js';
@@ -260,9 +263,9 @@
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle } from './lib/visteras-ui/file.js?v=open-1';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=paint-resolver-3';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
-    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-1';
+    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-2';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -1291,7 +1294,7 @@
           }
 
           // Command/Ctrl + Shift + G: Ungroup
-          if (e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+          if (e.shiftKey && !e.altKey && (e.key === 'g' || e.key === 'G')) {
             e.preventDefault();
             e.stopPropagation();
             sc.ungroupSelectedElement?.();
@@ -1299,7 +1302,7 @@
           }
 
           // Command/Ctrl + G: Group
-          if (!e.shiftKey && (e.key === 'g' || e.key === 'G')) {
+          if (!e.shiftKey && !e.altKey && (e.key === 'g' || e.key === 'G')) {
             e.preventDefault();
             e.stopPropagation();
             sc.groupSelectedElements?.();
@@ -2518,6 +2521,8 @@
     // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
     mountParagraph(svgEditor);
+    // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
+    mountGradient(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
