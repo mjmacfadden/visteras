@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   safeFileBase, safeFileName, fileBaseFromName, saveFile, downloadBlob,
+  openFile, ensureWritePermission, isSameFileHandle, findBySameHandle,
   hasAnyDirty, handleBeforeUnload, installBeforeUnloadGuard, markDirty, markClean, confirmCloseIfDirty,
 } from '../src/index.js';
 import { fakeDom } from './fake-dom.mjs';
@@ -158,4 +159,111 @@ test('saveFile: data function is serialized after the picker, with the picked na
   const r2 = await saveFile({ data, fileName: 'A.vid', handle: handle('Kept.vid', log), win: {}, doc: null });
   assert.equal(r2.method, 'handle');
   assert.equal(JSON.parse(log.at(-1).text).fileName, 'Kept.vid');
+});
+
+// ── Open → handle → silent save-back ──
+function diskFile(name, text, log, { perm = 'granted', failWrite = false } = {}) {
+  const h = {
+    name, kind: 'file', text, permRequests: 0,
+    async getFile() { return { name, async text() { return h.text; } }; },
+    async queryPermission() { return perm === 'granted' ? 'granted' : 'prompt'; },
+    async requestPermission() { h.permRequests++; return perm === 'prompt' ? 'granted' : perm; },
+    async isSameEntry(o) { return o === h || (o && o.__path === h.__path); },
+    async createWritable() {
+      if (failWrite) throw new Error('NotAllowedError');
+      let parts = [];
+      return { async write(b) { parts.push(await b.text()); }, async close() { h.text = parts.join(''); log.push({ name, text: h.text }); } };
+    },
+  };
+  h.__path = name;
+  return h;
+}
+
+test('openFile: picker → { file, handle, name } with the app types; cancel → cancelled', async () => {
+  const h = diskFile('Board.vid', '{"a":1}', []);
+  let opts = null;
+  const r = await openFile({ types: [{ description: 'Inspire', accept: { 'application/json': ['.vid'] } }], win: { showOpenFilePicker: async (o) => { opts = o; return [h]; } }, doc: null });
+  assert.equal(r.method, 'picker');
+  assert.equal(r.handle, h);
+  assert.equal(r.name, 'Board.vid');
+  assert.equal(await r.file.text(), '{"a":1}');
+  assert.equal(opts.multiple, false);
+  assert.deepEqual(opts.types[0].accept['application/json'], ['.vid']);
+  const abort = Object.assign(new Error('x'), { name: 'AbortError' });
+  assert.deepEqual(await openFile({ win: { showOpenFilePicker: async () => { throw abort; } }, doc: null }), { cancelled: true });
+});
+
+test('openFile: without the picker → <input type=file> with accept, no handle', async () => {
+  const doc = fakeDom();
+  const p = openFile({ accept: '.vid,application/json', win: {}, doc });
+  const input = doc.body.children.find((c) => c.tagName === 'INPUT');
+  assert.ok(input, 'input mounted');
+  assert.equal(input.type, 'file');
+  assert.equal(input.accept, '.vid,application/json');
+  input.files = [{ name: 'Old.vid' }];
+  input.fire('change');
+  const r = await p;
+  assert.deepEqual({ name: r.name, handle: r.handle, method: r.method }, { name: 'Old.vid', handle: null, method: 'input' });
+  assert.equal(doc.body.children.length, 0, 'input removed');
+  // picker throwing (not cancel) also falls back
+  const doc2 = fakeDom();
+  const p2 = openFile({ accept: '.vvd', win: { showOpenFilePicker: async () => { throw new Error('SecurityError'); } }, doc: doc2, onWarn: () => {} });
+  await new Promise((r) => setTimeout(r, 0));
+  const input2 = doc2.body.children[0];
+  input2.fire('cancel');
+  assert.deepEqual(await p2, { cancelled: true });
+});
+
+test('open then save: writes back to the opened handle without showSaveFilePicker', async () => {
+  const log = [];
+  const h = diskFile('Board.vid', 'old', log, { perm: 'prompt' });
+  const opened = await openFile({ win: { showOpenFilePicker: async () => [h] }, doc: null });
+  let picks = 0;
+  const win = { showSaveFilePicker: async () => { picks++; return diskFile('Other.vid', '', log); } };
+  const r = await saveFile({ data: (name) => `new:${name}`, fileName: 'Board.vid', handle: opened.handle, win, doc: null });
+  assert.equal(r.method, 'handle');
+  assert.equal(r.handle, h);
+  assert.equal(r.name, 'Board.vid');
+  assert.equal(picks, 0, 'no save picker');
+  assert.equal(h.permRequests, 1, 'asked for readwrite once');
+  assert.equal(h.text, 'new:Board.vid');
+});
+
+test('Save As ignores the handle and asks with the picker', async () => {
+  const log = [];
+  const h = diskFile('Board.vid', 'old', log);
+  let picks = 0;
+  const r = await saveFile({ data: 'x', fileName: 'Board.vid', handle: null, win: { showSaveFilePicker: async () => { picks++; return diskFile('Copy.vid', '', log); } }, doc: null });
+  assert.equal(picks, 1);
+  assert.equal(r.method, 'picker');
+  assert.equal(r.name, 'Copy.vid');
+  assert.equal(h.text, 'old', 'original untouched');
+});
+
+test('failed write or denied permission on the handle falls back to the picker', async () => {
+  for (const opts of [{ failWrite: true }, { perm: 'denied' }]) {
+    const log = [];
+    const h = diskFile('Board.vid', 'old', log, opts);
+    let picks = 0;
+    const r = await saveFile({ data: 'x', fileName: 'Board.vid', handle: h, win: { showSaveFilePicker: async () => { picks++; return diskFile('Board.vid', '', log); } }, doc: null, onWarn: () => {} });
+    assert.equal(picks, 1, JSON.stringify(opts));
+    assert.equal(r.method, 'picker');
+    assert.equal(h.text, 'old');
+  }
+});
+
+test('ensureWritePermission / isSameFileHandle / findBySameHandle', async () => {
+  assert.equal(await ensureWritePermission(null), false);
+  assert.equal(await ensureWritePermission({}), true, 'no permission API → allowed');
+  assert.equal(await ensureWritePermission(diskFile('a', '', [], { perm: 'denied' })), false);
+  const a = diskFile('A.vid', '', []);
+  const a2 = diskFile('A.vid', '', []);
+  const b = diskFile('B.vid', '', []);
+  assert.equal(await isSameFileHandle(a, a2), true);
+  assert.equal(await isSameFileHandle(a, b), false);
+  assert.equal(await isSameFileHandle(a, null), false);
+  assert.equal(await isSameFileHandle({ name: 'A.vid' }, a), false, 'no isSameEntry → not the same');
+  const tabs = [{ id: 1, fileHandle: b }, { id: 2, fileHandle: a }, { id: 3, fileHandle: null }];
+  assert.deepEqual((await findBySameHandle(tabs, a2)).map((t) => t.id), [2]);
+  assert.deepEqual(await findBySameHandle(tabs, null), []);
 });

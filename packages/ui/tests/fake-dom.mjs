@@ -21,7 +21,7 @@ export function fakeDom() {
     const elListeners = {};
     const classes = new Set();
     const el = {
-      tagName: String(tag).toUpperCase(), children: [], parent: null, attrs: {}, dataset: {}, textContent: '', _html: '',
+      tagName: String(tag).toUpperCase(), children: [], parent: null, attrs: {}, dataset: {}, textContent: '', _html: '', style: {},
       get id() { return this.attrs.id || ''; },
       set id(v) { this.attrs.id = v; byId.set(v, this); },
       get className() { return [...classes].join(' '); },

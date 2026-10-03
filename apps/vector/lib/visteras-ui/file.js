@@ -13,6 +13,12 @@
  *   2. else showSaveFilePicker → write, return the new handle (tab takes its name);
  *      AbortError (user cancelled) → { cancelled: true }, nothing else happens;
  *   3. picker missing or failing → download via <a download>.
+ *
+ * Open flow (openFile): showOpenFilePicker → { file, handle, name } so the app can
+ * keep the handle on the tab and ⌘S writes back silently; browsers without the
+ * File System Access API (Safari/Firefox) use <input type=file> and get no handle.
+ * Writing to an opened handle asks for readwrite permission first; if that is
+ * denied or the write fails, saveFile asks with the save picker instead.
  */
 
 export const ILLEGAL_FILENAME_CHARS = /[\\/:*?"<>|\u0000-\u001f\u007f]/g;
@@ -83,6 +89,44 @@ export function downloadBlob(data, fileName, {
   return fileName;
 }
 
+/**
+ * Make sure we may write to a handle (handles from showOpenFilePicker start read-only).
+ * Resolves true when writing is allowed or the browser has no permission API.
+ */
+export async function ensureWritePermission(handle) {
+  if (!handle) return false;
+  const opts = { mode: 'readwrite' };
+  try {
+    if (typeof handle.queryPermission === 'function' && (await handle.queryPermission(opts)) === 'granted') return true;
+    if (typeof handle.requestPermission === 'function') return (await handle.requestPermission(opts)) === 'granted';
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+/** True when two file handles point at the same file on disk (handle.isSameEntry). */
+export async function isSameFileHandle(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (typeof a.isSameEntry !== 'function') return false;
+  try {
+    return await a.isSameEntry(b);
+  } catch {
+    return false;
+  }
+}
+
+/** Items whose `handleKey` (default fileHandle) is the same file as `handle`. */
+export async function findBySameHandle(items, handle, handleKey = 'fileHandle') {
+  const out = [];
+  if (!handle) return out;
+  for (const item of items || []) {
+    if (item && item[handleKey] && (await isSameFileHandle(item[handleKey], handle))) out.push(item);
+  }
+  return out;
+}
+
 async function writeToHandle(handle, blob) {
   const writable = await handle.createWritable();
   try {
@@ -121,6 +165,7 @@ export async function saveFile({
 
   if (handle && typeof handle.createWritable === 'function') {
     try {
+      if (!(await ensureWritePermission(handle))) throw new Error('Write permission was not granted');
       await writeToHandle(handle, await blobFor(handle.name || fileName));
       return { method: 'handle', name: handle.name || fileName, handle };
     } catch (err) {
@@ -143,4 +188,62 @@ export async function saveFile({
 
   downloadBlob(await blobFor(fileName), fileName, { mimeType, doc });
   return { method: 'download', name: fileName, handle: null };
+}
+
+function inputOpen({ accept, doc }) {
+  return new Promise((resolve) => {
+    const input = doc.createElement('input');
+    input.type = 'file';
+    if (accept) input.accept = accept;
+    input.style.display = 'none';
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      try { input.remove(); } catch { /* not attached */ }
+      resolve(value);
+    };
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      done(file ? { file, handle: null, name: file.name, method: 'input' } : { cancelled: true });
+    });
+    // Fired by current browsers when the dialog is dismissed.
+    input.addEventListener('cancel', () => done({ cancelled: true }));
+    doc.body.appendChild(input);
+    input.click();
+  });
+}
+
+/**
+ * Ask the user for a file to open.
+ * @param {object} opts
+ * @param {Array}  [opts.types]   showOpenFilePicker `types` (e.g. [{ description, accept: { 'application/json': ['.vid'] } }])
+ * @param {string} [opts.accept]  <input accept> for the fallback (e.g. '.vid,application/json')
+ * @param {boolean} [opts.usePicker=true]
+ * @param {Window} [opts.win] @param {Document} [opts.doc] (tests)
+ * @returns {Promise<{ file: File, handle: FileSystemFileHandle|null, name: string, method: 'picker'|'input' }|{ cancelled: true }>}
+ */
+export async function openFile({
+  types,
+  accept,
+  usePicker = true,
+  win = (typeof window !== 'undefined' ? window : null),
+  doc = (typeof document !== 'undefined' ? document : null),
+  onWarn = (msg, err) => { if (typeof console !== 'undefined') console.warn(msg, err); },
+} = {}) {
+  if (usePicker && win && typeof win.showOpenFilePicker === 'function') {
+    try {
+      const opts = { multiple: false };
+      if (types) opts.types = types;
+      const [handle] = await win.showOpenFilePicker(opts);
+      if (!handle) return { cancelled: true };
+      const file = await handle.getFile();
+      return { file, handle, name: file.name || handle.name, method: 'picker' };
+    } catch (err) {
+      if (err && err.name === 'AbortError') return { cancelled: true };
+      onWarn('Open picker failed, using the file input instead:', err);
+    }
+  }
+  if (!doc) throw new Error('Open is not available in this environment');
+  return inputOpen({ accept, doc });
 }
