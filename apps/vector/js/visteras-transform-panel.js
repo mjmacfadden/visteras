@@ -48,7 +48,9 @@ export function mountTransformPanel(editor) {
   const matrix=m=>new DOMMatrix([m.a,m.b,m.c,m.d,m.e,m.f]);
   const documentMatrix=el=>matrix(sc.getSvgContent().getScreenCTM()).inverse().multiply(matrix(el.getScreenCTM()));
   const bounds=elements=>{
-    const points=elements.flatMap(el=>{const b=el.getBBox(),m=documentMatrix(el);return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));});
+  // Area text reports its frame (data-text-width/height), not its glyphs — Illustrator area type.
+  const frameBBox=el=>{const w=Number(el.getAttribute?.('data-text-width'));return el.tagName==='text'&&w>0?{x:Number(el.getAttribute('x'))||0,y:Number(el.getAttribute('y'))||0,width:w,height:Number(el.getAttribute('data-text-height'))||0}:el.getBBox();};
+    const points=elements.flatMap(el=>{const b=frameBBox(el),m=documentMatrix(el);return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));});
     const x=Math.min(...points.map(p=>p.x)),y=Math.min(...points.map(p=>p.y));return{x,y,width:Math.max(...points.map(p=>p.x))-x,height:Math.max(...points.map(p=>p.y))-y};
   };
   function sync(){

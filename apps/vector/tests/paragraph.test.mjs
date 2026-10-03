@@ -80,3 +80,26 @@ test('Paragraph: newlines in data-text-content are encoded for save', () => {
   const src = fs.readFileSync(new URL('../js/visteras-text-editing.js', import.meta.url), 'utf8');
   assert.match(src, /sc\.svgCanvasToString=function\(\.\.\.args\)\{return encodeTextContentNewlines/);
 });
+
+test('Area text: layout reports overset instead of growing; frame size is never written by layout', () => {
+  const fits = T.computeParagraphLayout({ value: 'aaa bbb', width: 40, size: 20, height: 100 }, mono);
+  assert.equal(fits.overset, false);
+  const over = T.computeParagraphLayout({ value: 'aaa bbb ccc ddd eee fff', width: 40, size: 20, height: 50 }, mono);
+  assert.equal(over.overset, true);
+  assert.equal(over.length, 2, 'only the lines that fit are laid out');
+  // leading / justify / spacing change what fits, never the frame
+  assert.equal(T.computeParagraphLayout({ value: 'aaa bbb', width: 40, size: 20, height: 50, leading: 40, align: 'justify' }, mono).overset, true);
+  const src = fs.readFileSync(new URL('../js/visteras-text-editing.js', import.meta.url), 'utf8');
+  const layoutBody = src.slice(src.indexOf('export function layoutParagraph'), src.indexOf('export function beginTextEdit'));
+  assert.doesNotMatch(layoutBody, /setAttribute\('data-text-(width|height)'/, 'layout must not resize the frame');
+  assert.match(src, /drawOversetMarker/);
+  assert.match(src, /stroke: '#e5191a'/, 'red out-port');
+});
+
+test('Area text: selection bbox (SVG-Edit getBBox) and Transform panel use the frame, not the glyphs', () => {
+  const ed = fs.readFileSync(new URL('../Editor.js', import.meta.url), 'utf8');
+  assert.match(ed, /\/\/ Visteras: area \(paragraph\) text is bounded by its frame[\s\S]{0,300}Number\(t\.getAttribute\("data-text-width"\)\) > 0/);
+  const tp = fs.readFileSync(new URL('../js/visteras-transform-panel.js', import.meta.url), 'utf8');
+  assert.match(tp, /const frameBBox=el=>/);
+  assert.match(tp, /const b=frameBBox\(el\)/);
+});

@@ -37724,6 +37724,17 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		let n = t.nodeName, r = null;
 		switch (n) {
 			case "text":
+				// Visteras: area (paragraph) text is bounded by its frame, not its glyphs, so the
+				// selection box / W·H stay at the dragged size while typing (Illustrator area type).
+				if (Number(t.getAttribute("data-text-width")) > 0) {
+					r = {
+						x: Number(t.getAttribute("x")) || 0,
+						y: Number(t.getAttribute("y")) || 0,
+						width: Number(t.getAttribute("data-text-width")),
+						height: Number(t.getAttribute("data-text-height")) || 0
+					};
+					break;
+				}
 				t.textContent === "" ? (t.textContent = "a", r = t.getBBox(), t.textContent = "") : t.getBBox && (r = t.getBBox());
 				break;
 			case "path":

@@ -74,6 +74,8 @@ export function computeParagraphLayout(opts, measure) {
       sourceIndex += line.length;
     });
   });
+  // Overset (Illustrator's red + out-port): some text did not fit in the frame.
+  out.overset = full;
   return out;
 }
 
@@ -94,6 +96,30 @@ export function encodeTextContentNewlines(svg) {
   return String(svg).replace(/(\sdata-text-content=")([^"]*)"/g, (_, head, v) => `${head}${v.replace(/\r\n|\r|\n/g, '&#10;').replace(/\t/g, '&#9;')}"`);
 }
 
+// Area text whose content overflows its frame (layout state only — never written to the document).
+const oversetTexts = new WeakSet();
+export const isOverset = (text) => oversetTexts.has(text);
+
+/** Corner of the frame where Illustrator draws the out-port, in the text's user space. */
+export function oversetPort(text) {
+  const x = Number(text.getAttribute('x')) || 0, y = Number(text.getAttribute('y')) || 0;
+  return { x: x + (Number(text.getAttribute('data-text-width')) || 0), y: y + (Number(text.getAttribute('data-text-height')) || 0) };
+}
+
+/** Draws the red + square (8px on screen) centred on the frame's bottom-right corner. */
+export function drawOversetMarker(parent, point) {
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('data-text-overset', '');
+  g.setAttribute('pointer-events', 'none');
+  const r = document.createElementNS(NS, 'rect');
+  for (const [k, v] of Object.entries({ x: point.x - 4.5, y: point.y - 4.5, width: 9, height: 9, fill: '#fff', stroke: '#e5191a', 'stroke-width': 1 })) r.setAttribute(k, v);
+  const plus = document.createElementNS(NS, 'path');
+  plus.setAttribute('d', `M${point.x - 2.5},${point.y}H${point.x + 2.5}M${point.x},${point.y - 2.5}V${point.y + 2.5}`);
+  plus.setAttribute('stroke', '#e5191a'); plus.setAttribute('stroke-width', '1.4');
+  g.append(r, plus); parent.append(g);
+  return g;
+}
+
 export function layoutParagraph(text) {
   const width = Number(text.getAttribute('data-text-width'));
   if (!width) return;
@@ -108,6 +134,7 @@ export function layoutParagraph(text) {
     value, width, height: Number(text.getAttribute('data-text-height')), size,
     x: Number(text.getAttribute('x')) || 0, y: Number(text.getAttribute('y')) || 0, ...para,
   }, measure);
+  if (lines.overset) oversetTexts.add(text); else oversetTexts.delete(text);
   const fragment = document.createDocumentFragment();
   for (const line of lines) {
     const span = document.createElementNS(NS, 'tspan');
@@ -158,6 +185,10 @@ export function beginTextEdit(editor, text) {
       const frame=document.createElementNS(NS,'rect');
       for(const [k,v] of Object.entries({x:text.getAttribute('x')||0,y:text.getAttribute('y')||0,width:text.getAttribute('data-text-width'),height:text.getAttribute('data-text-height'),fill:'none',stroke:'#1C79C4','stroke-width':1,'vector-effect':'non-scaling-stroke'}))frame.setAttribute(k,v);
       group.append(frame);
+      if (isOverset(text)) {
+        const p = new DOMPoint(oversetPort(text).x, oversetPort(text).y).matrixTransform(matrix);
+        drawOversetMarker(overlay, p);
+      }
     }
     const sourceIndices = paragraph ? [...text.children].flatMap(span => [...span.textContent].map((_,i)=>Number(span.getAttribute('data-text-start'))+i)) : [...input.value].map((_,i)=>i);
     const start = input.selectionStart, end = input.selectionEnd;
@@ -352,7 +383,22 @@ export function mountTextEditing(editor) {
     sc.svgCanvasToString=function(...args){return encodeTextContentNewlines(toString.apply(this,args));};
     sc.svgCanvasToString.__visterasNewlines=true;
   }
-  const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);};
+  // Overset out-port for selected area text, drawn in the selector layer (screen-sized).
+  const renderOverset=()=>{
+    const parent=sc.selectorManager?.selectorParentGroup;if(!parent)return;
+    parent.querySelector(':scope > [data-text-overset-layer]')?.remove();
+    const texts=(sc.getSelectedElements?.()||[]).filter(t=>t?.tagName==='text'&&t.hasAttribute('data-text-width')&&isOverset(t));
+    if(!texts.length)return;
+    const layer=document.createElementNS(NS,'g');layer.setAttribute('data-text-overset-layer','');parent.append(layer);
+    const rootInv=parent.getScreenCTM()?.inverse();if(!rootInv)return;
+    for(const t of texts){const m=t.getScreenCTM();if(!m)continue;const port=oversetPort(t);drawOversetMarker(layer,new DOMPoint(port.x,port.y).matrixTransform(m).matrixTransform(rootInv));}
+  };
+  let oversetQueued=false;
+  const queueOverset=()=>{if(oversetQueued)return;oversetQueued=true;requestAnimationFrame(()=>{oversetQueued=false;renderOverset();});};
+  const call2=sc.call;
+  sc.call=function(event,...args){const result=call2.call(this,event,...args);if(event==='selected'||event==='changed'||event==='zoomed')queueOverset();return result;};
+  document.getElementById('workarea')?.addEventListener('scroll',queueOverset,{passive:true});
+  const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);queueOverset();};
   const observer=new MutationObserver(relayout);
   // Opening a file (setSvgString) replaces #svgcontent: re-attach and reflow.
   let bound=null;
