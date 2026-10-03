@@ -68887,6 +68887,8 @@ var fz = () => {
 			return t.hasAttribute("data-root") ? this.svgCanvas.leaveContext() : this.svgCanvas.setContext(t.textContent), this.svgCanvas.clearSelection(), !1;
 		}), this.svgCanvas.bind("selected", this.selectedChanged.bind(this)), this.svgCanvas.bind("transition", this.elementTransition.bind(this)), this.svgCanvas.bind("changed", this.elementChanged.bind(this)), this.svgCanvas.bind("exported", this.exportHandler.bind(this)), this.svgCanvas.bind("exportedPDF", function(e, t) {
 			if (!t.output) return;
+			// Visteras: PDF is rendered to a Blob and saved by js/visteras-export.js (no popup).
+			if (window.__visterasExport && t.outputType === "blob") return;
 			let { exportWindowName: n } = t;
 			if (n && (this.exportWindow = window.open("", this.exportWindowName)), !this.exportWindow || this.exportWindow.closed) {
 				seAlert(this.i18next.t("notification.popupWindowBlocked"));
@@ -70241,6 +70243,9 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 		return Object.values(this.shortcuts).find((t) => t.sel === e);
 	}
 	exportHandler(e, t) {
+		// Visteras: no popup window. Export goes through File ▸ Export (js/visteras-export.js);
+		// a stray legacy "exported" event is delivered as a download instead.
+		if (window.__visterasExport) { window.__visterasExport.legacyExported?.(t); return; }
 		let { issues: n, exportWindowName: r } = t;
 		if (this.exportWindow = window.open("", r), !this.exportWindow || this.exportWindow.closed) {
 			seAlert(this.i18next.t("notification.popupWindowBlocked"));

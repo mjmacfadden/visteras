@@ -30,6 +30,7 @@
   <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-fx.css?v=effects-polish-1" rel="stylesheet" media="all">
   <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-export.css?v=export-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -60,9 +61,15 @@
             <div class="menu_dropdown_item" id="action_save">Save <span class="menu_dropdown_shortcut">⌘S</span></div>
             <div class="menu_dropdown_item" id="action_save_as">Save As... <span class="menu_dropdown_shortcut">⌘⇧S</span></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_export_svg">Export SVG...</div>
-            <div class="menu_dropdown_item" id="action_export_png">Export PNG...</div>
-            <div class="menu_dropdown_item" id="action_export_pdf">Export PDF...</div>
+            <!-- File ▸ Export (Illustrator): Export for Screens… ⌥⌘E, Export As… — js/visteras-export.js -->
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_export_menu">Export<span class="menu_submenu_arrow" aria-hidden="true">▶</span><div class="menu_dropdown_list menu_submenu_list" role="menu">
+              <div class="menu_dropdown_item" role="menuitem" id="action_export_screens"><span class="menu_label">Export for Screens…</span><span class="menu_dropdown_shortcut">⌥⌘E</span></div>
+              <div class="menu_dropdown_item" role="menuitem" id="action_export_as"><span class="menu_label">Export As…</span></div>
+            </div></div>
+            <!-- Legacy ids kept as hidden aliases (open Export As with that format) -->
+            <div class="menu_dropdown_item" id="action_export_svg" hidden>Export SVG...</div>
+            <div class="menu_dropdown_item" id="action_export_png" hidden>Export PNG...</div>
+            <div class="menu_dropdown_item" id="action_export_pdf" hidden>Export PDF...</div>
           </div>
         </div>
 
@@ -244,7 +251,7 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=path-text-transforms-1';
+    import Editor from './Editor.js?v=export-1';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
@@ -256,7 +263,7 @@
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
-    import { mountEffects } from './js/visteras-effects.js?v=effects-polish-1';
+    import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
@@ -273,7 +280,8 @@
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
-    import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle } from './lib/visteras-ui/file.js?v=open-1';
+    import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
+    import { mountExport } from './js/visteras-export.js?v=export-1';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
@@ -830,24 +838,8 @@
         void saveVectorDoc(true);
       });
 
-      document.getElementById('action_export_svg')?.addEventListener('click', () => {
-        const svgStr = sc.getSvgString();
-        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        const title = (svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
-        a.download = `${title}.svg`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      });
-
-      document.getElementById('action_export_png')?.addEventListener('click', () => {
-        if (sc.rasterExport) sc.rasterExport('PNG');
-      });
-
-      document.getElementById('action_export_pdf')?.addEventListener('click', () => {
-        if (sc.exportPDF) sc.exportPDF();
-      });
+      // File ▸ Export ▸ … is wired by mountExport (js/visteras-export.js): Export As /
+      // Export for Screens render client-side and save through saveFile (no popup window).
 
       document.getElementById('action_undo')?.addEventListener('click', () => {
         document.getElementById('tool_undo')?.click();
@@ -2532,6 +2524,8 @@
     mountParagraph(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);
+    // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
+    mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {

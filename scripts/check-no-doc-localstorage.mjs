@@ -66,6 +66,7 @@ export const ALLOWLIST = [
   { file: 'apps/vector/js/visteras-gradient.js', key: 'GRADIENT_SWATCHES_KEY', reason: "user gradient swatches ('visteras-vector-gradient-swatches'; separate from colour swatches, which drop non-hex)" },
   { file: 'apps/vector/js/visteras-gradient.js', key: 'GRADIENT_LAST_KEY', reason: "last-used gradient default ('visteras-vector-gradient-last')" },
   { file: 'apps/vector/js/visteras-gradient.js', key: 'GRADIENT_ANNOTATOR_KEY', reason: "View ▸ Show Gradient Annotator on/off ('visteras-vector-gradient-annotator')" },
+  { file: 'apps/vector/js/visteras-export.js', key: 'X.SETTINGS_KEY', reason: "remembered File ▸ Export settings ('visteras-vector-export-settings': formats, scales, background, padding — no document content)" },
   { file: 'apps/vector/js/visteras-pen-auto.js', key: 'PEN_PREF_KEY', reason: 'Pen auto add/delete preference' },
   { file: 'apps/vector/js/visteras-pen-tools.js', key: "'visteras_vector_snap_points'", reason: 'snap-to-point toggle' },
   { file: 'apps/vector/js/visteras-shape-picker.js', key: 'STORE_KEY', reason: 'last shape-library category/shape' },
