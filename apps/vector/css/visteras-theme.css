@@ -518,7 +518,7 @@ html, body {
 #workarea.wireframe #canvasBackground rect {
   fill: #ffffff !important;
   filter: none !important;
-  stroke: #d0d0d0 !important;
+  stroke: #000000 !important;
   stroke-width: 1px !important;
   vector-effect: non-scaling-stroke !important;
 }

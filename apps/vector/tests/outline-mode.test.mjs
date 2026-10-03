@@ -71,3 +71,25 @@ test('Outline Mode: index.html wires Outline Mode menu item and shortcuts (F / â
   assert.match(html, /Command\/Ctrl \+ Y: Toggle Wireframe \/ Outline Mode/);
   assert.match(html, /!e\.shiftKey\s*&&\s*\(e\.key\s*===\s*'y'/);
 });
+
+test('Outline Mode: artboard outline is black (#000000) non-scaling stroke in outline view', () => {
+  const themeCss = fs.readFileSync(path.resolve(vectorRoot, 'css/visteras-theme.css'), 'utf8');
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#canvasBackground\s+rect[\s\S]*?stroke:\s*#000000\s*!important/i,
+    'Theme CSS must set black stroke for canvasBackground rect in outline mode'
+  );
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#canvasBackground\s+rect[\s\S]*?vector-effect:\s*non-scaling-stroke\s*!important/i,
+    'Theme CSS must set non-scaling-stroke for canvasBackground rect'
+  );
+
+  const svgeditCss = fs.readFileSync(path.resolve(vectorRoot, 'svgedit.css'), 'utf8');
+  assert.match(
+    svgeditCss,
+    /#workarea\.wireframe\s+#canvasBackground>rect[\s\S]*?stroke:\s*#000\s*!important/i,
+    'svgedit.css must set black stroke for canvasBackground>rect in outline mode'
+  );
+});
+
