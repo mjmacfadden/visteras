@@ -244,6 +244,7 @@
     import { mountTransformPanel } from './js/visteras-transform-panel.js';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
+    import { mountEffects } from './js/visteras-effects.js?v=gravit-1';
     import { mountSelectionTools } from './js/visteras-selection.js?v=merge-trace-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -1550,6 +1551,26 @@
               </div>
             </div>
 
+            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Color Adjust) -->
+            <div class="prop_section" id="sec_effects" style="display:none;">
+              <div class="prop_section_header" data-target="sec_effects_body">
+                <span class="prop_section_arrow"></span>
+                <span class="prop_section_title">Effects</span>
+              </div>
+              <div class="prop_section_body" id="sec_effects_body">
+                <div id="vfx_list" class="vfx_list" aria-live="polite"></div>
+                <div class="prop_row">
+                  <select id="vfx_add" class="vfx_select vfx_add" aria-label="Add effect" title="Add an effect (fx)">
+                    <option value="">fx  Add Effect…</option>
+                    <option value="dropShadow">Drop Shadow…</option>
+                    <option value="innerShadow">Inner Shadow…</option>
+                    <option value="colorAdjust">Color Adjust…</option>
+                    <option value="gaussianBlur">Gaussian Blur…</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <!-- 3. Align & Distribute Section -->
             <div class="prop_section" id="sec_align">
               <div class="prop_section_header" data-target="sec_align_body">
@@ -2493,6 +2514,8 @@
 
     // Transparency: per-object blending mode (Illustrator list/order)
     mountBlendModes(svgEditor);
+    // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
+    mountEffects(svgEditor);
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {

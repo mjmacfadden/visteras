@@ -12,6 +12,7 @@ export function fakeEl(tag = 'rect', attrs = {}) {
     removeAttribute(k) { delete this.attrs[k]; },
     hasAttribute(k) { return k in this.attrs; },
     classList: { contains: () => false },
+    get id() { return this.attrs.id || ''; },
   };
   return el;
 }

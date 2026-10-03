@@ -12,3 +12,29 @@
 .visteras_blend_select:focus-visible,
 .vfx_select:focus-visible,
 .vpara_input:focus-visible { outline: 1px solid var(--visteras-accent, #fa7c1b); outline-offset: 0; }
+
+/* Effects list (Appearance-style rows) */
+.vfx_list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.vfx_empty { font-size: 11px; color: #888888; padding: 2px 0; }
+.vfx_row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 3px; background: #2a2a2a; }
+.vfx_row.vfx_off .vfx_name, .vfx_row.vfx_off .vfx_summary { opacity: .45; }
+.vfx_toggle { accent-color: var(--visteras-accent, #fa7c1b); margin: 0; }
+.vfx_name { background: none; border: 0; padding: 0; color: #dddddd; font-size: 11px; text-decoration: underline; text-decoration-color: #666; cursor: pointer; }
+.vfx_name:hover { color: var(--visteras-accent, #fa7c1b); }
+.vfx_summary { flex: 1; font-size: 10px; color: #999999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vfx_remove { background: none; border: 0; color: #999999; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.vfx_remove:hover { color: #ffffff; }
+.vfx_add { width: 100%; }
+.vfx_blur_locked { opacity: .45; pointer-events: none; }
+
+/* Effect dialog (Illustrator Effect ▸ Stylize ▸ Drop Shadow layout) */
+.vfx_dialog { width: min(320px, calc(100vw - 40px)); }
+.vfx_body { display: flex; flex-direction: column; gap: 8px; }
+.vfx_field { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 6px; font-size: 12px; color: #cccccc; }
+.vfx_field > span { text-align: right; }
+.vfx_field em { font-style: normal; color: #999999; font-size: 11px; }
+.vfx_field input[type="color"] { width: 44px; height: 22px; padding: 0; border: 1px solid #444; background: #2a2a2a; }
+.vfx_field_range { grid-template-columns: 84px 1fr 56px auto; }
+.vfx_field_range input[type="range"] { accent-color: var(--visteras-accent, #fa7c1b); }
+.vfx_preview { font-size: 12px; color: #cccccc; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.vfx_preview input { accent-color: var(--visteras-accent, #fa7c1b); }
