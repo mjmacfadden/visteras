@@ -139,26 +139,8 @@ export function blendOptionsHtml() {
   return html;
 }
 
-const selectable = (sc) => (sc.getSelectedElements?.() || []).filter((el) => el && el.getAttribute && !el.classList?.contains('layer'));
-
 export function mountBlendModes(editor) {
   const sc = editor.svgCanvas;
-  const slot = document.getElementById('slot_blend_mode');
-  if (!slot) return null;
-  slot.innerHTML = `<label class="visteras_blend_label" for="vector_blend_mode" title="Blending mode (Transparency)">Blending</label>
-    <select id="vector_blend_mode" class="visteras_blend_select" aria-label="Blending mode">${blendOptionsHtml()}</select>`;
-  const select = slot.querySelector('select');
-  const row = document.getElementById('prop_row_blend');
-  const sync = () => {
-    const els = selectable(sc);
-    if (row) row.style.display = els.length ? '' : 'none';
-    if (document.activeElement !== select) select.value = selectionBlendMode(els);
-  };
-  select.addEventListener('change', () => {
-    if (!select.value) return;
-    applyBlendMode(sc, selectable(sc), select.value);
-    sync();
-  });
   // Restore inline styles after load / undo / paste.
   let queued = false;
   const rehydrate = () => {
@@ -174,10 +156,9 @@ export function mountBlendModes(editor) {
   const call = sc.call;
   sc.call = function (event, ...args) {
     const result = call.call(this, event, ...args);
-    if (event === 'selected' || event === 'changed') { sync(); schedule(); }
+    if (event === 'selected' || event === 'changed') { schedule(); }
     return result;
   };
   rehydrate();
-  sync();
-  return { sync, rehydrate };
+  return { rehydrate };
 }

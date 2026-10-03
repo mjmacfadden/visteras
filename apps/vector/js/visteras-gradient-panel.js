@@ -36,7 +36,6 @@ export function mountGradientPanel(editor, core) {
   let shownHasGradient = false;
   let selStop = 0, selMid = -1;
   let session = null;                                // live preview from the panel
-  let colorPop = null;
   const $ = (id) => document.getElementById(id);
 
   if (pane) {
@@ -71,7 +70,7 @@ export function mountGradientPanel(editor, core) {
           <label class="vgrad-field" title="Aspect Ratio (radial)"><span class="vgrad-ic">${ICON.aspect}</span><input id="vgrad_aspect" class="vgrad-input" type="number" min="1" max="10000" step="1" aria-label="Aspect Ratio"><em>%</em></label>
           <datalist id="vgrad_angle_list">${[-180, -135, -90, -45, 0, 45, 90, 135, 180].map((a) => `<option value="${a}"></option>`).join('')}</datalist>
         </div>
-        <div class="vgrad-slider" id="vgrad_slider" tabindex="0" title="Click below the ramp to add a stop · drag a stop down to delete · Alt-drag to duplicate (drop on a stop to swap) · double-click to edit its colour">
+        <div class="vgrad-slider" id="vgrad_slider" tabindex="0" title="Click below the ramp to add a stop · drag a stop down to delete · Alt-drag to duplicate (drop on a stop to swap) · double-click a stop to edit its colour">
           <div class="vgrad-mids" id="vgrad_mids"></div>
           <div class="vgrad-ramp" id="vgrad_ramp"></div>
           <div class="vgrad-stops" id="vgrad_stops"></div>
@@ -173,6 +172,7 @@ export function mountGradientPanel(editor, core) {
   /* ───────────── slider ───────────── */
   function bindSlider() {
     const slider = $('vgrad_slider');
+    let lastClick = null;
     const rampRect = () => $('vgrad_ramp').getBoundingClientRect();
     const offsetAt = (clientX) => { const r = rampRect(); return Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width))); };
     slider.addEventListener('pointerdown', (e) => {
@@ -218,7 +218,14 @@ export function mountGradientPanel(editor, core) {
         const up = (ev) => {
           window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
           slider.classList.remove('vgrad-deleting');
-          if (!moved) return;
+          if (!moved) {
+            const now = performance.now();
+            if (lastClick?.index === index && now - lastClick.time < 400) {
+              lastClick = null;
+              openColorPopover(slider.querySelector(`[data-stop="${selStop}"]`)?.getBoundingClientRect());
+            } else lastClick = { index, time: now };
+            return;
+          }
           if (alt) {
             // Alt-drop onto another stop swaps them instead of duplicating.
             const r = rampRect();
@@ -230,6 +237,7 @@ export function mountGradientPanel(editor, core) {
               return;
             }
           }
+          lastClick = null;
           finish(alt ? 'Duplicate Gradient Stop' : pendingDelete ? 'Delete Gradient Stop' : 'Move Gradient Stop');
           render();
         };
@@ -246,12 +254,6 @@ export function mountGradientPanel(editor, core) {
       };
       window.addEventListener('pointerup', up);
     });
-    slider.addEventListener('dblclick', (e) => {
-      const stopBtn = e.target.closest('[data-stop]');
-      if (!stopBtn) return;
-      selStop = Number(stopBtn.dataset.stop); selMid = -1;
-      openColorPopover(stopBtn.getBoundingClientRect());
-    });
     slider.addEventListener('keydown', (e) => {
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); deleteSelectedStop(); }
       else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && selMid < 0) {
@@ -260,58 +262,31 @@ export function mountGradientPanel(editor, core) {
         const res = moveStop(shown.stops, selStop, shown.stops[selStop].o + step);
         selStop = res.index;
         apply(withStops(res.stops), { label: 'Move Gradient Stop' });
-      } else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); openColorPopover(slider.querySelector(`[data-stop="${selStop}"]`)?.getBoundingClientRect()); }
+      } else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openColorPopover(slider.querySelector(`[data-stop="${selStop}"]`)?.getBoundingClientRect()); }
       else e.stopPropagation();
     });
   }
 
-  /* ───────────── stop colour popover (Color + Swatches) ───────────── */
-  let popDone = null;
-  function closeColorPopover(commit = true) {
-    if (!colorPop) return;
-    colorPop.remove(); colorPop = null;
-    document.removeEventListener('pointerdown', outsidePop, true);
-    const done = popDone; popDone = null;
-    if (done) done(commit); else if (commit) finish('Gradient Stop Color'); else abort();
-    sync();
-  }
-  const outsidePop = (e) => { if (colorPop && !colorPop.contains(e.target)) closeColorPopover(true); };
+  /* ───────────── shared stop color picker ───────────── */
   /**
    * @param {DOMRect} rect anchor
    * @param {{color?: string, onColor?: Function, onDone?: Function}} [hooks] the annotator passes its own session
    */
   function openColorPopover(rect, hooks = {}) {
-    closeColorPopover(true);
     const idx = selStop;
     const st = shown.stops[idx];
     if (!st) return;
-    const setColor = hooks.onColor || ((hex) => apply((m) => ({ ...m, stops: m.stops.map((s, k) => (k === idx ? { ...s, c: hex } : s)) }), { live: true }));
-    popDone = hooks.onDone || null;
-    const state = cs()?.getState?.() || {};
-    const chips = [...new Set([...(state.recent || []), ...((state.userSwatches || []).map((s) => s.hex)), '#000000', '#ffffff', '#fa7c1b', '#ff0000', '#ffcc00', '#00a651', '#0071bc', '#662d91'])].slice(0, 24);
-    colorPop = document.createElement('div');
-    colorPop.className = 'vgrad-pop';
-    colorPop.id = 'vgrad_pop';
-    colorPop.setAttribute('role', 'dialog');
-    colorPop.setAttribute('aria-label', 'Stop colour');
-    colorPop.innerHTML = `<div class="vgrad-pop-head">Stop Color</div>
-      <div class="vgrad-pop-row"><input type="color" id="vgrad_pop_color" value="${hooks.color || st.c}" aria-label="Colour"><input type="text" id="vgrad_pop_hex" class="vgrad-input" value="${(hooks.color || st.c).toUpperCase()}" maxlength="7" aria-label="Hex"></div>
-      <div class="vgrad-pop-swatches">${chips.map((c) => `<button type="button" data-hex="${c}" style="background:${c}" title="${c.toUpperCase()}" aria-label="${c.toUpperCase()}"></button>`).join('')}</div>`;
-    document.body.append(colorPop);
-    const r = rect || $('vgrad_slider')?.getBoundingClientRect() || { left: 100, width: 0, bottom: 100 };
-    const w = 196;
-    colorPop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))}px`;
-    colorPop.style.top = `${Math.max(8, Math.min(window.innerHeight - 170, r.bottom + 8))}px`;
-    const picker = colorPop.querySelector('#vgrad_pop_color'), hexIn = colorPop.querySelector('#vgrad_pop_hex');
-    picker.addEventListener('input', () => { hexIn.value = picker.value.toUpperCase(); setColor(picker.value); });
-    hexIn.addEventListener('keydown', (e) => {
-      e.stopPropagation();
-      if (e.key === 'Enter') { const h = normalizeColor(hexIn.value, null); if (h) { picker.value = h; setColor(h); } closeColorPopover(true); }
-      if (e.key === 'Escape') closeColorPopover(false);
+    const original = normalizeModel(shown);
+    const noTargets = !core.targets(activeAttr()).length;
+    window.__visterasOpenColorPicker?.(null, {
+      color: hooks.color || st.c,
+      onColor: hooks.onColor || ((hex) => apply((m) => ({ ...m, stops: m.stops.map((s, k) => k === idx ? { ...s, c: hex } : s) }), { live: true })),
+      onDone: hooks.onDone || ((commit) => {
+        if (noTargets) { shown = commit ? shown : original; core.setLast(shown); }
+        if (commit) finish('Gradient Stop Color'); else abort();
+        sync();
+      }),
     });
-    colorPop.addEventListener('click', (e) => { const b = e.target.closest('[data-hex]'); if (!b) return; picker.value = b.dataset.hex; hexIn.value = b.dataset.hex.toUpperCase(); setColor(b.dataset.hex); });
-    colorPop.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeColorPopover(false); } });
-    setTimeout(() => document.addEventListener('pointerdown', outsidePop, true), 0);
   }
 
   /* ───────────── swatches ───────────── */

@@ -37,9 +37,9 @@
 .vgrad-mids, .vgrad-stops { position: absolute; left: 0; right: 0; }
 .vgrad-mids { top: 0; height: 12px; }
 .vgrad-stops { top: 29px; height: 20px; }
-.vgrad-midpt { position: absolute; top: 2px; width: 8px; height: 8px; margin-left: -4px; padding: 0; border: 1px solid #111; background: #ddd; transform: rotate(45deg); cursor: ew-resize; }
+.vgrad-midpt { position: absolute; top: 2px; width: 8px; height: 8px; margin-left: -4px; padding: 0; border: 1px solid #111; background: #ddd; transform: rotate(45deg); cursor: default; }
 .vgrad-midpt.selected { background: var(--vg-accent); }
-.vgrad-stop { position: absolute; top: 0; width: 14px; height: 18px; margin-left: -7px; padding: 0; border: none; background: transparent; cursor: ew-resize; }
+.vgrad-stop { position: absolute; top: 0; width: 14px; height: 18px; margin-left: -7px; padding: 0; border: none; background: transparent; cursor: default; }
 .vgrad-stop::before { content: ''; position: absolute; left: 3px; top: 0; border: 4px solid transparent; border-bottom: 5px solid #ddd; border-top: 0; }
 .vgrad-stop > span { position: absolute; left: 1px; top: 5px; width: 10px; height: 10px; border: 1px solid #ddd; box-shadow: 0 0 0 1px #111; }
 .vgrad-stop.selected::before { border-bottom-color: var(--vg-accent); }

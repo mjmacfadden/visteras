@@ -54,7 +54,8 @@ export function mountGradientTool(editor, core, panel) {
   const style = document.createElement('style');
   const M = `body[data-mode="${MODE}"]`;
   style.textContent = `${M} #svgcanvas, ${M} #svgcanvas * { cursor: crosshair !important; }
-    ${M} #vgrad_annotator [data-vgrad-handle="origin"], ${M} #vgrad_annotator [data-vgrad-handle="end"], ${M} #vgrad_annotator [data-vgrad-handle^="stop"] { cursor: move !important; }
+    ${M} #vgrad_annotator [data-vgrad-handle^="stop"] { cursor: default !important; }
+    ${M} #vgrad_annotator [data-vgrad-handle="origin"], ${M} #vgrad_annotator [data-vgrad-handle="end"] { cursor: move !important; }
     ${M} #vgrad_annotator [data-vgrad-handle="rotate"] { cursor: ${ROTATE_CURSOR} !important; }
     ${M} #vgrad_annotator [data-vgrad-handle="ring"], ${M} #vgrad_annotator [data-vgrad-handle="aspect"] { cursor: pointer !important; }
     ${M} #vgrad_annotator [data-vgrad-handle="bar"] { cursor: copy !important; }`;
@@ -177,6 +178,7 @@ export function mountGradientTool(editor, core, panel) {
   document.getElementById('action_toggle_gradient_annotator')?.addEventListener('click', () => setAnnotator(!core.getAnnotator()));
 
   /* ───────────── gestures ───────────── */
+  let lastStopClick = null;
   const begin = (d) => { dragging = d; core.busy = true; };
   const end = () => { dragging = null; core.busy = false; };
 
@@ -293,7 +295,21 @@ export function mountGradientTool(editor, core, panel) {
         panel.setSelectedStop(res.index);
         return;
       }
-      if (!dragging.moved) { fs.cancel(); return; }
+      if (!dragging.moved) {
+        fs.cancel();
+        if (stopIndex >= 0) {
+          const rect = handle.getBoundingClientRect();
+          const now = performance.now();
+          const key = `${fi}:${stopIndex}`;
+          panel.setSelectedStop(stopIndex);
+          if (lastStopClick?.key === key && now - lastStopClick.time < 400) {
+            dragging.openColor = () => openStopColor(frame, stopIndex, rect);
+            lastStopClick = null;
+          } else lastStopClick = { key, time: now };
+        }
+        return;
+      }
+      lastStopClick = null;
       const labels = { origin: 'Move Gradient', end: 'Gradient Vector', rotate: 'Rotate Gradient', ring: 'Gradient Radius', aspect: 'Gradient Aspect Ratio' };
       fs.commit(labels[kind] || (alt ? 'Duplicate Gradient Stop' : dragging.pendingDelete ? 'Delete Gradient Stop' : 'Move Gradient Stop'));
     };
@@ -310,24 +326,16 @@ export function mountGradientTool(editor, core, panel) {
     e.preventDefault(); e.stopImmediatePropagation();
     const d = dragging;
     try { d.up(e); } finally { end(); }
+    d.openColor?.();
     panel.sync();
     scheduleAnnotator();
   }
-  function onDblClick(e) {
-    if (sc.getMode() !== MODE || !inCanvas(e)) return;
-    e.stopImmediatePropagation(); e.preventDefault();
-    const h = e.target.closest?.('[data-vgrad-handle^="stop:"]');
-    if (!h) return;
-    const fi = Number(h.closest('[data-vgrad-frame]')?.getAttribute('data-vgrad-frame') || 0);
-    const src = renderedFrames[fi];
-    if (!src?.model) return;
-    const frame = { ...src };
-    const idx = Number(h.getAttribute('data-vgrad-handle').slice(5));
+  function openStopColor(frame, idx, rect) {
     panel.setShown(frame.model);
     panel.setSelectedStop(idx);
     let fs = null;
     core.busy = true;
-    panel.openColorPopover(h.getBoundingClientRect(), {
+    panel.openColorPopover(rect, {
       color: frame.model.stops[idx]?.c,
       onColor: (hex) => {
         fs ??= frameSession(frame);
@@ -341,7 +349,7 @@ export function mountGradientTool(editor, core, panel) {
   window.addEventListener('mousedown', onDown, true);
   window.addEventListener('mousemove', onMove, true);
   window.addEventListener('mouseup', onUp, true);
-  window.addEventListener('dblclick', onDblClick, true);
+
   window.addEventListener('click', (e) => { if (sc.getMode() === MODE && inCanvas(e)) e.stopImmediatePropagation(); }, true);
   window.addEventListener('keydown', (e) => {
     // ⌥⌘G: View ▸ Hide/Show Gradient Annotator (index.html's ⌘G group ignores Alt).

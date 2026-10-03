@@ -2,8 +2,8 @@
  * Visteras Vector — Window ▸ Transparency panel (⇧⌘F10), Illustrator layout:
  *   [Blend Mode ▾]  Opacity: [100] %  (slider)
  *   ☐ Isolate Blending   (groups: CSS isolation:isolate)
- * Acts on the selection; one undo step per change. The Properties ▸ Appearance
- * opacity spinner and Blending dropdown stay as mirrors (they sync through
+ * Acts on the selection; one undo step per change. Opacity and blending
+ * controls are provided exclusively by this panel (they sync through
  * svgCanvas 'changed'/'selected').
  * Isolation persists in data-visteras-isolate (the SVG-Edit sanitizer drops
  * `style` on Open) and the inline style is restored from it, like blend modes.
@@ -108,9 +108,7 @@ export function mountTransparency(editor) {
       const v = none ? 100 : selectionOpacity(els);
       if (document.activeElement !== op) { op.value = v === '' ? '' : String(v); op.placeholder = v === '' ? 'Mixed' : ''; }
       slider.value = v === '' ? 100 : v;
-      // Keep the Properties ▸ Appearance opacity spinner (SVG-Edit #opacity) as a mirror.
-      const spin = document.getElementById('opacity');
-      if (spin && !none && v !== '' && !spin.contains?.(document.activeElement) && String(spin.value) !== String(v)) spin.value = v;
+
     }
     const groups = els.filter((el) => el.tagName === 'g');
     iso.disabled = none || groups.length !== els.length;

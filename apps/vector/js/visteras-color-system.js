@@ -2689,6 +2689,7 @@ function mountPickerModal(ctrl) {
   let draftHex = '#cccccc';
   let draftNone = false;
   let openSnapshot = { hex: '#cccccc', none: false, target: 'fill' };
+  let externalEdit = null;
   let applying = false;
   let liveApply = true; // live apply while dragging; Cancel restores snapshot
 
@@ -2699,12 +2700,12 @@ function mountPickerModal(ctrl) {
       draftNone = false;
       draftHex = hex;
       refreshDraft();
-      if (liveApply) ctrl.setWorkingColor(hex, { apply: true, recordRecent: false, noUndo: true });
+      if (liveApply) applyDraft(hex, { apply: true, recordRecent: false, noUndo: true });
     },
     onCommit: ({ hex }) => {
       draftHex = hex;
       if (liveApply) {
-        ctrl.setWorkingColor(hex, { apply: true, recordRecent: true, noUndo: false });
+        applyDraft(hex, { apply: true, recordRecent: true, noUndo: false });
       }
     },
   });
@@ -2714,10 +2715,15 @@ function mountPickerModal(ctrl) {
   const preview = modal.querySelector('#vcs_picker_preview');
   const targetLabel = modal.querySelector('#vcs_picker_target_label');
 
+  function applyDraft(hex, options) {
+    if (externalEdit) { if (hex !== 'none') externalEdit.onColor?.(hex); }
+    else ctrl.setWorkingColor(hex, options);
+  }
+
   function refreshDraft() {
     applying = true;
     const target = ctrl.getActiveTarget();
-    targetLabel.textContent = target === 'fill' ? 'Fill' : 'Stroke';
+    targetLabel.textContent = externalEdit ? 'Gradient Stop' : target === 'fill' ? 'Fill' : 'Stroke';
     if (draftNone) {
       preview.classList.add('is-none');
       preview.style.backgroundColor = '';
@@ -2734,18 +2740,22 @@ function mountPickerModal(ctrl) {
   function close() {
     overlay.classList.remove('open');
     modal.classList.remove('open');
+    externalEdit = null;
   }
 
-  function open(target) {
-    if (target) ctrl.setActiveTarget(target, { syncColor: true });
+  function open(target, edit = null) {
+    if (externalEdit) cancel();
+    externalEdit = edit;
+    if (target && !edit) ctrl.setActiveTarget(target, { syncColor: true });
     const st = ctrl.getState();
     openSnapshot = {
       hex: st.workingHex,
       none: st.workingNone,
       target: st.activeTarget,
     };
-    draftHex = st.workingHex;
-    draftNone = st.workingNone;
+    draftHex = edit?.color || st.workingHex;
+    draftNone = edit ? false : st.workingNone;
+    modal.querySelector('#vcs_picker_none').hidden = !!edit;
     refreshDraft();
     overlay.classList.add('open');
     modal.classList.add('open');
@@ -2754,6 +2764,7 @@ function mountPickerModal(ctrl) {
   }
 
   function cancel() {
+    if (externalEdit) { try { externalEdit.onDone?.(false); } finally { close(); } return; }
     try {
       // Restore snapshot
       ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
@@ -2767,6 +2778,12 @@ function mountPickerModal(ctrl) {
   }
 
   function applyAndClose() {
+    const typed = normalizeHex(hexInput.value.trim());
+    if (typed) { draftHex = typed; draftNone = false; }
+    if (externalEdit) {
+      try { externalEdit.onColor?.(draftHex); externalEdit.onDone?.(true); } finally { close(); }
+      return;
+    }
     try {
       if (draftNone) ctrl.setWorkingColor('none');
       else ctrl.setWorkingColor(draftHex, { recordRecent: true });
@@ -2799,7 +2816,7 @@ function mountPickerModal(ctrl) {
       draftHex = hex;
     }
     refreshDraft();
-    if (liveApply) ctrl.setWorkingColor(draftNone ? 'none' : draftHex, { recordRecent: false });
+    if (liveApply) applyDraft(draftNone ? 'none' : draftHex, { recordRecent: false });
   });
 
   document.addEventListener('keydown', (e) => {

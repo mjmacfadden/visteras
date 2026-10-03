@@ -1,15 +1,10 @@
 /* Visteras Vector — Blending mode, Effects (Appearance) and Paragraph controls. */
-.visteras_blend_row #slot_blend_mode { display: flex; align-items: center; gap: 8px; }
-.visteras_blend_label,
 .vfx_label { font-size: 11px; color: #cccccc; user-select: none; white-space: nowrap; }
-.visteras_blend_select,
 .vfx_select,
 .vpara_input {
   background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px;
   font-size: 11px; height: 22px; padding: 0 4px; min-width: 0;
 }
-.visteras_blend_select { flex: 1; }
-.visteras_blend_select:focus-visible,
 .vfx_select:focus-visible,
 .vpara_input:focus-visible { outline: 1px solid var(--visteras-accent, #fa7c1b); outline-offset: 0; }
 
@@ -18,7 +13,10 @@
 .vfx_empty { font-size: 11px; color: #888888; padding: 2px 0; }
 .vfx_row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 3px; background: #2a2a2a; }
 .vfx_row.vfx_off .vfx_name, .vfx_row.vfx_off .vfx_summary { opacity: .45; }
-.vfx_toggle { accent-color: var(--visteras-accent, #fa7c1b); margin: 0; }
+.vfx_toggle { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; margin: 0; padding: 3px; border: 0; border-radius: 3px; background: transparent; color: #ddd; cursor: pointer; }
+.vfx_toggle[aria-pressed="false"] { color: #888; }
+.vfx_toggle:hover { color: #fff; background: #444; }
+.vfx_toggle:focus-visible { outline: 1px solid var(--visteras-accent, #fa7c1b); }
 .vfx_name { background: none; border: 0; padding: 0; color: #dddddd; font-size: 11px; text-decoration: underline; text-decoration-color: #666; cursor: pointer; }
 .vfx_name:hover { color: var(--visteras-accent, #fa7c1b); }
 .vfx_summary { flex: 1; font-size: 10px; color: #999999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -26,9 +24,6 @@
 .vfx_remove:hover { color: #ffffff; }
 .vfx_add { width: 100%; }
 /* Properties fx button (opens a menu mirroring Effect) */
-.vfx_fx_btn { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; background: #2a2a2a; color: #dddddd; border: 1px solid #444444; border-radius: 3px; font-size: 11px; cursor: pointer; }
-.vfx_fx_btn em { font-family: Georgia, serif; font-style: italic; font-weight: 700; color: var(--visteras-accent, #fa7c1b); }
-.vfx_fx_btn:hover, .vfx_fx_btn[aria-expanded="true"] { border-color: var(--visteras-accent, #fa7c1b); color: #ffffff; }
 #vfx_fx_menu { z-index: 3005; min-width: 190px; }
 .vfx_blur_locked { opacity: .45; pointer-events: none; }
 
@@ -76,3 +71,10 @@
 .vfx_color_dark input[type="number"] { width: 56px; }
 .vfx_color_dark input:disabled { opacity: .45; }
 .vfx_note { margin: -2px 0 4px; font-size: 10px; line-height: 1.35; color: #9a9a9a; max-width: 260px; }
+
+#vdock_effects_panel { padding: 12px; }
+.vfx_browser_hint { color: #aaa; font-size: 12px; margin: 0 0 12px; }
+.vfx_browser_group h3 { color: #aaa; font-size: 11px; margin: 14px 0 6px; text-transform: uppercase; }
+.vfx_browser_item { display: block; width: 100%; text-align: left; padding: 8px; color: #ddd; background: #333; border: 1px solid #444; border-radius: 3px; margin: 4px 0; cursor: pointer; }
+.vfx_browser_item:hover:not(:disabled) { border-color: #fa7c1b; }
+.vfx_browser_item:disabled { opacity: .4; cursor: default; }

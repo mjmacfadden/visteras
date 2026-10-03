@@ -71,7 +71,7 @@ test('Effects: apply / toggle / remove are undoable and keep the filter referenc
 test('Effects: wired as an Appearance-area section with the fx menu', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<div class="prop_section" id="sec_effects"/);
-  assert.match(html, /<button type="button" id="vfx_add" class="vfx_fx_btn" aria-haspopup="menu"/, 'fx button opens a menu mirroring Effect');
+  assert.doesNotMatch(html, /id="vfx_add"/, 'effect browser lives in the dock');
   assert.match(html, /mountEffects\(svgEditor\);/);
   const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
   assert.match(src, /if \(!keep\.has\(f\.id\)\) f\.remove\(\);/, 'orphan vfx_ filters are swept');
@@ -190,7 +190,7 @@ test('Effects polish: Inner Shadow is legacy (renders, not offered); old SVG-Edi
   assert.doesNotMatch(F.effectMenuHtml(), /innerShadow/);
   for (const t of ['innerGlow', 'outerGlow', 'feather']) assert.doesNotMatch(F.effectMenuHtml(), new RegExp(`id="action_effect_${t}"[^>]*disabled|disabled[^>]*id="action_effect_${t}"`));
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(index, /<div id="slot_blur" hidden/);
+  assert.match(index, /getElementById\('blur'\)\?\.setAttribute\('hidden', ''\)/);
   const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
   assert.match(src, /migrateLegacyBlur\(content\(\)\); syncAllFx/);
   assert.match(src, /cannot blend with what is behind the object/);

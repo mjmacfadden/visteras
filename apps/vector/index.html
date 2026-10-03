@@ -161,6 +161,7 @@
             <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
             <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
             <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_effects">Effects</div>
             <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
             <div class="menu_dropdown_item disabled" id="action_window_appearance" aria-disabled="true" title="Appearance panel coming">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
             <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
@@ -1550,13 +1551,6 @@
                     </div>
                   </div>
                 </div>
-                <div class="prop_row">
-                  <div id="slot_opacity" style="flex:1;"></div>
-                  <div id="slot_blur" hidden style="display:none;"><!-- SVG-Edit Blur retired: Effect ▸ Blur ▸ Gaussian Blur --></div>
-                </div>
-                <div class="prop_row visteras_blend_row" id="prop_row_blend">
-                  <div id="slot_blend_mode" style="flex:1;"></div>
-                </div>
                 <div class="prop_row rect_panel" id="prop_row_radius" style="display:none;">
                   <div id="slot_radius" style="flex:1;"></div>
                 </div>
@@ -1571,9 +1565,7 @@
               </div>
               <div class="prop_section_body" id="sec_effects_body">
                 <div id="vfx_list" class="vfx_list" aria-live="polite"></div>
-                <div class="prop_row">
-                  <button type="button" id="vfx_add" class="vfx_fx_btn" aria-haspopup="menu" aria-expanded="false" title="Add New Effect (mirrors the Effect menu)"><em>fx</em> Add Effect…</button>
-                </div>
+
               </div>
             </div>
 
@@ -1802,8 +1794,9 @@
       moveEl('tool_flip_v', 'slot_flip');
 
       // Relocate Appearance controls
-      moveEl('opacity', 'slot_opacity');
-      moveEl('blur', 'slot_blur');
+      // Retain SVG-Edit's internal widgets outside the Properties UI.
+      document.getElementById('opacity')?.setAttribute('hidden', '');
+      document.getElementById('blur')?.setAttribute('hidden', '');
       moveEl('rect_rx', 'slot_radius');
 
       // Relocate Alignment controls
@@ -2423,11 +2416,7 @@
           if (blurInput && sc.getBlur) {
             blurInput.value = Math.round((sc.getBlur(curElem) || 0) * 10);
           }
-          const opacityInput = document.getElementById('opacity');
-          if (opacityInput && sc.getOpacity) {
-            const op = sc.getOpacity();
-            if (op !== undefined && !isNaN(op)) opacityInput.value = Math.round(op * 100);
-          }
+
         }
       }
 

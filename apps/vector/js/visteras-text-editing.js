@@ -38,6 +38,71 @@ export const PARA_ATTRS = {
 export const AUTO_LEADING = 1.2;
 const ANCHOR_ALIGN = { start: 'left', middle: 'center', end: 'right' };
 
+export const LOREM_IPSUM = 'Lorem Ipsum';
+export const LOREM_PARAGRAPH = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.';
+
+/**
+ * Returns as much Lorem Ipsum text as will fit in the given area text dimensions
+ * without exceeding the box height (no overset).
+ */
+export function getLoremIpsumForBox(opts, measure) {
+  const { width, height, size = 24, leading = size * AUTO_LEADING } = opts;
+  const words = LOREM_PARAGRAPH.split(/\s+/);
+  if (!words.length || width < 10 || height < 10) return LOREM_IPSUM;
+
+  let m = measure;
+  if (!m) {
+    let font = `${size}px sans-serif`;
+    if (opts.fontFamily) {
+      font = `${opts.fontStyle || ''} ${opts.fontWeight || ''} ${size}px "${opts.fontFamily}"`.trim();
+    }
+    let ctx = null;
+    if (typeof document !== 'undefined') {
+      try {
+        const canvas = document.createElement('canvas');
+        ctx = canvas.getContext('2d');
+        if (ctx) ctx.font = font;
+      } catch (_) {}
+    }
+    const spacing = Number(opts.letterSpacing) || 0;
+    m = s => (ctx ? ctx.measureText(s).width : s.length * (size * 0.6)) + Math.max(0, s.length - 1) * spacing;
+  }
+
+  const getWords = (count) => {
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      list.push(words[i % words.length]);
+    }
+    return list.join(' ');
+  };
+
+  const maxWords = Math.min(1000, Math.max(10, Math.ceil((width * height) / (size * size * 0.25))));
+  let low = 1, high = maxWords, best = 1;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const testText = getWords(mid);
+    const layout = computeParagraphLayout({
+      value: testText,
+      width,
+      height,
+      size,
+      leading,
+      spaceBefore: opts.spaceBefore || 0,
+      spaceAfter: opts.spaceAfter || 0,
+    }, m);
+
+    if (!layout.overset && layout.length > 0) {
+      best = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  return getWords(best) || LOREM_IPSUM;
+}
+
 /**
  * Pure paragraph layout. Returns one entry per visible line:
  * { text, start, x, y, wordSpacing } (wordSpacing only for justified lines).
@@ -360,13 +425,27 @@ export function mountTextEditing(editor) {
   window.addEventListener('mouseup',e=>{
     if(!gesture) {if(e.detail===2 && e.target.closest?.('text'))stop(e);return;}stop(e);const g=gesture;gesture=null;g.frame.remove();
     const p=position(e),box=isParagraphDrag(Math.abs(e.clientX-g.screen.x),Math.abs(e.clientY-g.screen.y));
+    const width=Math.abs(p.x-g.start.x), height=Math.abs(p.y-g.start.y);
     const text=document.createElementNS(NS,'text');
     const attrs={id:sc.getNextId(),x:box?Math.min(g.start.x,p.x):g.start.x,y:box?Math.min(g.start.y,p.y):g.start.y,'font-size':sc.getFontSize()||24,'font-family':sc.getFontFamily()||'Roboto',fill:sc.getColor('fill')==='none'?'#000':sc.getColor('fill')||'#000',stroke:'none','text-anchor':'start','xml:space':'preserve'};
     for(const [k,v] of Object.entries(attrs)) text.setAttribute(k,v);
-    text.textContent='Lorem Ipsum';
-    if(box) {text.setAttribute('data-text-width',Math.abs(p.x-g.start.x));text.setAttribute('data-text-height',Math.abs(p.y-g.start.y));text.setAttribute('data-text-content','Lorem Ipsum');}
-    sc.getCurrentDrawing().getCurrentLayer().append(text);
-    if(box)layoutParagraph(text);
+    if(box) {
+      text.setAttribute('data-text-width', width);
+      text.setAttribute('data-text-height', height);
+      sc.getCurrentDrawing().getCurrentLayer().append(text);
+      const style = typeof getComputedStyle !== 'undefined' ? getComputedStyle(text) : (text.style || {});
+      const size = parseFloat(style.fontSize) || (sc.getFontSize() || 24);
+      const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
+      if (ctx) ctx.font = `${style.fontStyle || ''} ${style.fontWeight || ''} ${size}px ${style.fontFamily || (sc.getFontFamily() || 'Roboto')}`.trim();
+      const spacing = parseFloat(style.letterSpacing) || 0;
+      const measure = s => (ctx ? ctx.measureText(s).width : s.length * (size * 0.6)) + Math.max(0, s.length - 1) * spacing;
+      const content = getLoremIpsumForBox({ width, height, size, leading: size * AUTO_LEADING }, measure);
+      text.setAttribute('data-text-content', content);
+      layoutParagraph(text);
+    } else {
+      text.textContent = 'Lorem Ipsum';
+      sc.getCurrentDrawing().getCurrentLayer().append(text);
+    }
     sc.addCommandToHistory(new sc.history.InsertElementCommand(text));sc.call('changed',[text]);beginTextEdit(editor,text);
   },true);
   window.addEventListener('dblclick',e=>{

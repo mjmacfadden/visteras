@@ -56,10 +56,11 @@ test('Blend modes: stored attribute restores the style after the sanitizer dropp
   assert.equal(imported.getAttribute('data-visteras-blend'), 'hard-light');
 });
 
-test('Blend modes: wired into the Appearance panel and the eyedropper keeps the stored mode', () => {
+test('Blend modes: provided by the Transparency flyout and the eyedropper keeps the stored mode', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /<div class="prop_row visteras_blend_row" id="prop_row_blend">\s*<div id="slot_blend_mode"/);
-  assert.ok(html.indexOf('id="slot_blend_mode"') > html.indexOf('id="slot_opacity"'), 'next to opacity');
+  assert.doesNotMatch(html, /id="slot_blend_mode"|id="slot_opacity"/);
+  const transparency = fs.readFileSync(new URL('../js/visteras-transparency.js', import.meta.url), 'utf8');
+  assert.match(transparency, /applyBlendMode/);
   assert.match(html, /mountBlendModes\(svgEditor\);/);
   const eye = fs.readFileSync(new URL('../js/visteras-eyedropper.js', import.meta.url), 'utf8');
   assert.match(eye, /setAttr\('data-visteras-blend', v == null \|\| v === 'normal' \? null : v\);/);
