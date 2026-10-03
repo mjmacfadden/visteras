@@ -23,6 +23,8 @@
   --visteras-accent: var(--studio-orange);
   --visteras-accent-hover: #ff8f3a;
   --visteras-on-accent: #ffffff;
+  /* @visteras/ui token overrides (packages/ui/src/tokens.css defaults otherwise) */
+  --vui-tab-close-font-size: 11px;
   --studio-text: #cccccc;
   --studio-text-muted: #888888;
   
@@ -68,13 +70,13 @@ html, body {
    ========================================================================== */
 
 #visteras_menu_bar {
-  height: 28px;
-  min-height: 28px;
+  height: var(--vui-menu-bar-height);
+  min-height: var(--vui-menu-bar-height);
   background: var(--studio-header-bg);
   border-bottom: 1px solid #222222;
   display: flex;
   align-items: stretch;
-  padding: 0 8px;
+  padding: 0 var(--vui-menu-bar-padding-x);
   z-index: 3000;
   box-sizing: border-box;
   user-select: none;
@@ -95,8 +97,8 @@ html, body {
 .menu_entry_title {
   height: 100%;
   line-height: normal;
-  padding: 0 8px 1.4px 8px;
-  font-size: 11px;
+  padding: var(--vui-menu-title-padding);
+  font-size: var(--vui-menu-font-size);
   font-weight: 400;
   font-family: var(--ui-font);
   color: #cccccc;
@@ -121,13 +123,13 @@ html, body {
 .menu_dropdown_list {
   display: none;
   position: absolute;
-  top: 28px;
+  top: var(--vui-menu-bar-height);
   left: 0;
   background: #3c3c3c;
   border: 1px solid #505050;
   border-radius: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  padding: 4px 0;
+  padding: var(--vui-menu-dropdown-padding);
   min-width: 180px;
   z-index: 3001;
 }
@@ -137,10 +139,10 @@ html, body {
 }
 
 .menu_dropdown_item {
-  font-size: 11px;
+  font-size: var(--vui-menu-font-size);
   color: #cccccc;
-  padding: 4px 16px;
-  line-height: 18px;
+  padding: var(--vui-menu-item-padding);
+  line-height: var(--vui-menu-item-line-height);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -161,14 +163,14 @@ html, body {
 .menu_dropdown_separator {
   border: none;
   border-top: 1px solid #505050;
-  margin: 4px 0;
+  margin: var(--vui-menu-separator-margin);
   height: 0;
 }
 
 .menu_dropdown_shortcut {
   color: #888888;
-  font-size: 10px;
-  margin-left: 20px;
+  font-size: var(--vui-menu-shortcut-font-size);
+  margin-left: var(--vui-menu-shortcut-gap);
 }
 
 .menu_dropdown_item:hover:not(.disabled) .menu_dropdown_shortcut {

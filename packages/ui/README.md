@@ -25,6 +25,7 @@ hardcodes an accent colour.
 | `file.js` | Studio filename rules (`safeFileBase`, `safeFileName`: keep spaces, replace only illegal chars), `saveFile()` (existing handle → `showSaveFilePicker` → download fallback; cancel = no-op), `downloadBlob` |
 | `dirty.js` | `hasAnyDirty`, `handleBeforeUnload`, `installBeforeUnloadGuard`, `markDirty`/`markClean`, `confirmCloseIfDirty` (reads `dirty`/`isDirty`/`is_dirty`, or a custom reader) |
 | `ui.css` | dialog styles (tokens + `--visteras-accent`) |
+| `tokens.css` | menu bar + document tab metrics/typography as `--vui-*` custom properties; apps override per token, accent stays per app |
 
 ## How apps get it (copy-at-build, same as `tool-free.js` / `@visteras/fonts`)
 

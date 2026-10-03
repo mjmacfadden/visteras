@@ -18,6 +18,12 @@
   --collage-purple-light: #c084fc;
   --collage-purple-dark: #9333ea;
   --collage-purple-bg: rgba(168, 85, 247, 0.18);
+  /* @visteras/ui accent hook + token overrides (packages/ui never hardcodes an accent) */
+  --visteras-accent: var(--collage-purple);
+  --visteras-accent-hover: var(--collage-purple-light);
+  --visteras-on-accent: #ffffff;
+  --vui-tab-font-size: 11px;
+  --vui-new-tab-font-size: 15px;
   
   --page-width: 8.5in;
   --page-height: 11in;
@@ -69,10 +75,10 @@ html {
   grid-area: menu;
   display: flex;
   align-items: stretch;
-  height: 28px;
+  height: var(--vui-menu-bar-height);
   background: var(--studio-header-bg);
   border-bottom: 1px solid #222222;
-  padding: 0 8px;
+  padding: 0 var(--vui-menu-bar-padding-x);
   user-select: none;
   z-index: 3000;
 }
@@ -92,9 +98,9 @@ html {
 .menu_entry_title {
   display: flex;
   align-items: center;
-  padding: 0 8px 1.4px;
+  padding: var(--vui-menu-title-padding);
   font-family: var(--ui-font);
-  font-size: 11px;
+  font-size: var(--vui-menu-font-size);
   font-weight: 400;
   line-height: normal;
   color: #cccccc;
@@ -118,12 +124,12 @@ html {
 .menu_dropdown_list {
   display: none;
   position: absolute;
-  top: 28px;
+  top: var(--vui-menu-bar-height);
   left: 0;
   min-width: 190px;
   background: #3c3c3c;
   border: 1px solid #505050;
-  padding: 4px 0;
+  padding: var(--vui-menu-dropdown-padding);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
   z-index: 3001;
 }
@@ -136,10 +142,10 @@ html {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 16px;
+  padding: var(--vui-menu-item-padding);
   color: #cccccc;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: var(--vui-menu-font-size);
+  line-height: var(--vui-menu-item-line-height);
   cursor: pointer;
   text-decoration: none;
   user-select: none;
@@ -159,13 +165,13 @@ html {
   height: 0;
   border: none;
   border-top: 1px solid #505050;
-  margin: 4px 0;
+  margin: var(--vui-menu-separator-margin);
 }
 
 .menu_dropdown_shortcut {
-  font-size: 10px;
+  font-size: var(--vui-menu-shortcut-font-size);
   color: #888888;
-  margin-left: 20px;
+  margin-left: var(--vui-menu-shortcut-gap);
 }
 
 .menu_dropdown_item:hover:not(.disabled) .menu_dropdown_shortcut {
@@ -384,7 +390,7 @@ html {
   top: 0;
   left: 0;
   right: 0;
-  height: 28px;
+  height: var(--vui-tab-bar-height);
   background-color: #242424;
   border-bottom: 1px solid #181818;
   display: flex;
@@ -411,17 +417,17 @@ html {
 .document_tab {
   display: inline-flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 var(--vui-tab-padding-x);
   height: 100%;
-  font-size: 11px;
+  font-size: var(--vui-tab-font-size);
   color: #999999;
   background-color: #202020;
   border-right: 1px solid #1a1a1a;
-  border-top: 2px solid transparent;
+  border-top: var(--vui-tab-accent-width) solid transparent;
   cursor: pointer !important;
   white-space: nowrap;
-  max-width: 220px;
-  min-width: 100px;
+  max-width: var(--vui-tab-max-width);
+  min-width: var(--vui-tab-min-width);
   box-sizing: border-box;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -438,7 +444,7 @@ html {
 .document_tab.active {
   background-color: #383838;
   color: #ffffff;
-  border-top: 2px solid var(--collage-purple, #a855f7);
+  border-top: var(--vui-tab-accent-width) solid var(--visteras-accent);
 }
 
 .document_tab .tab_title {
@@ -446,11 +452,11 @@ html {
   text-overflow: ellipsis;
   white-space: nowrap;
   flex-grow: 1;
-  margin-right: 6px;
+  margin-right: var(--vui-tab-title-gap);
 }
 
 .document_tab .tab_zoom {
-  font-size: 10px;
+  font-size: var(--vui-tab-zoom-font-size);
   color: #777777;
   margin-right: 6px;
   flex-shrink: 0;
@@ -470,10 +476,10 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: var(--vui-tab-close-size);
+  height: var(--vui-tab-close-size);
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--vui-tab-close-font-size);
   color: #888888;
   flex-shrink: 0;
   cursor: pointer !important;
@@ -489,13 +495,13 @@ html {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--vui-new-tab-size);
+  height: var(--vui-new-tab-size);
   padding: 0;
   border: 0;
   background: transparent;
   color: #888888;
-  font-size: 15px;
+  font-size: var(--vui-new-tab-font-size);
   line-height: 1;
   cursor: pointer !important;
   flex-shrink: 0;

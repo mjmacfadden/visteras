@@ -93,3 +93,25 @@ test('ui.css: accent only via app CSS variables, never a hardcoded accent', () =
     assert.ok(!css.toLowerCase().includes(hex), `no app accent ${hex} in the kit`);
   }
 });
+
+test('tokens.css: menu/tab metrics only, accent left to each app, wired into every app', () => {
+  const css = read('../src/tokens.css');
+  for (const t of ['--vui-menu-bar-height', '--vui-menu-item-padding', '--vui-tab-bar-height', '--vui-tab-font-size', '--vui-tab-close-size', '--vui-new-tab-size']) {
+    assert.match(css, new RegExp(`${t}:`), t);
+  }
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /#[0-9a-f]{3,8}\b|rgba?\(|--visteras-accent\s*:/i, 'no colours in tokens');
+  const app = (p) => read(`../../../apps/${p}`);
+  assert.match(app('vector/index.html'), /lib\/visteras-ui\/tokens\.css/);
+  assert.match(app('inspire/index.html'), /lib\/visteras-ui\/tokens\.css/);
+  assert.match(app('collage/index.html'), /lib\/visteras-ui\/tokens\.css/);
+  assert.match(app('studio/src/js/main.js'), /import '@visteras\/ui\/tokens\.css';/);
+  // Each app supplies its own accent for the active-tab stripe.
+  assert.match(app('vector/css/visteras-theme.css'), /--visteras-accent: var\(--studio-orange\);/);
+  assert.match(app('inspire/css/visteras-inspire-theme.css'), /--visteras-accent: var\(--inspire-amber\);/);
+  assert.match(app('collage/css/visteras-collage-theme.css'), /--visteras-accent: var\(--collage-purple\);/);
+  assert.match(app('studio/src/css/reset.css'), /--visteras-accent: #2f6fae;/);
+  for (const p of ['vector/css/visteras-document-shell.css', 'inspire/css/visteras-inspire-theme.css', 'collage/css/visteras-collage-theme.css', 'studio/src/css/layout.css']) {
+    assert.match(app(p), /var\(--vui-tab-bar-height\)/, p);
+    assert.match(app(p), /var\(--visteras-accent\)/, p);
+  }
+});

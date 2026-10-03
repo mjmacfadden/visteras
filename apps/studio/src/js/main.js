@@ -7,6 +7,7 @@
 import './../css/reset.css';
 import './../css/utility.css';
 import './../css/component.css';
+import '@visteras/ui/tokens.css'; // shared menu/tab metrics (packages/ui)
 import './../css/layout.css';
 import './../css/menu.css';
 import './../css/print.css';

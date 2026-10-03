@@ -405,7 +405,9 @@ test('Document Tabs: Workspace provides tabbed document bar and styling for mult
   // Verify CSS styles document tabs, active state with amber accent, close button, and new tab button
   const css = fs.readFileSync(path.join(inspireRoot, 'css/visteras-inspire-theme.css'), 'utf8');
   assert.match(css, /\.document_tabs\s*\{/, 'Theme CSS must style .document_tabs');
-  assert.match(css, /\.document_tab\.active\s*\{[^}]*var\(--inspire-amber\)/, 'Active document tab must have amber accent border');
+  // Shared @visteras/ui tab tokens: the active stripe reads --visteras-accent, which Inspire maps to amber
+  assert.match(css, /\.document_tab\.active\s*\{[^}]*var\(--visteras-accent\)/, 'Active document tab must use the app accent');
+  assert.match(css, /--visteras-accent: var\(--inspire-amber\);/, 'Inspire accent is amber');
   assert.match(css, /\.document_tabs\s+\.new_tab_btn\s*\{/, 'Theme CSS must style .new_tab_btn');
   assert.match(css, /\.document_tab\s+\.tab_close\s*\{/, 'Theme CSS must style .tab_close button');
   assert.match(css, /\.tab_rename_input\s*\{/, 'Theme CSS must style inline rename input');

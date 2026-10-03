@@ -1825,7 +1825,7 @@ crop handles) win over the default crosshair - not !important so inline styles a
 	top: 0;
 	left: 0;
 	right: 0;
-	height: 28px;
+	height: var(--vui-tab-bar-height);
 	background-color: #242424;
 	border-bottom: 1px solid #181818;
 	display: flex;
@@ -1848,17 +1848,17 @@ crop handles) win over the default crosshair - not !important so inline styles a
 .document_tab {
 	display: inline-flex;
 	align-items: center;
-	padding: 0 10px;
+	padding: 0 var(--vui-tab-padding-x);
 	height: 100%;
-	font-size: 12px;
+	font-size: var(--vui-tab-font-size);
 	color: #999999;
 	background-color: #202020;
 	border-right: 1px solid #1a1a1a;
-	border-top: 2px solid transparent;
+	border-top: var(--vui-tab-accent-width) solid transparent;
 	cursor: pointer !important;
 	white-space: nowrap;
-	max-width: 220px;
-	min-width: 100px;
+	max-width: var(--vui-tab-max-width);
+	min-width: var(--vui-tab-min-width);
 	box-sizing: border-box;
 	transition: background-color 0.15s ease, color 0.15s ease;
 }
@@ -1872,17 +1872,17 @@ crop handles) win over the default crosshair - not !important so inline styles a
 .document_tab.active {
 	background-color: #383838;
 	color: #ffffff;
-	border-top: 2px solid #2f6fae;
+	border-top: var(--vui-tab-accent-width) solid var(--visteras-accent);
 }
 .document_tab .tab_title {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	flex-grow: 1;
-	margin-right: 6px;
+	margin-right: var(--vui-tab-title-gap);
 }
 .document_tab .tab_zoom {
-	font-size: 10px;
+	font-size: var(--vui-tab-zoom-font-size);
 	color: #777777;
 	margin-right: 6px;
 	flex-shrink: 0;
@@ -1894,10 +1894,10 @@ crop handles) win over the default crosshair - not !important so inline styles a
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 16px;
-	height: 16px;
+	width: var(--vui-tab-close-size);
+	height: var(--vui-tab-close-size);
 	border-radius: 50%;
-	font-size: 10px;
+	font-size: var(--vui-tab-close-font-size);
 	color: #888888;
 	flex-shrink: 0;
 	cursor: pointer !important;
@@ -1911,13 +1911,13 @@ crop handles) win over the default crosshair - not !important so inline styles a
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--vui-new-tab-size);
+	height: var(--vui-new-tab-size);
 	padding: 0;
 	border: 0;
 	background: transparent;
 	color: #888888;
-	font-size: 16px;
+	font-size: var(--vui-new-tab-font-size);
 	cursor: pointer !important;
 	flex-shrink: 0;
 	transition: background-color 0.15s, color 0.15s;
