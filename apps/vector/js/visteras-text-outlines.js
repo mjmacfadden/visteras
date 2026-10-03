@@ -256,7 +256,8 @@ function transformCommands(commands, cos, sin, tx, ty) {
 }
 
 /**
- * Merges overlapping component contours within a glyph into a single clean contour.
+ * Merges overlapping component contours within a glyph into a single clean contour
+ * while strictly preserving inner counter holes (in O, P, B, A, e, 8, etc.).
  * Variable fonts (or certain TTF/OTF fonts) construct glyphs with overlapping sub-paths
  * (e.g. stem and arch). When outlined, these appear as overlapping lines unless united.
  */
@@ -266,33 +267,87 @@ export function cleanGlyphPath(pathData) {
   if (!zMatches || zMatches.length <= 1) return pathData;
   if (typeof window === 'undefined' || !window.paper) return pathData;
 
+  let scope = null;
   try {
     const paper = window.paper;
-    const scope = new paper.PaperScope();
+    scope = new paper.PaperScope();
     scope.setup(new paper.Size(2000, 2000));
-    const item = scope.project.importSVG(`<path d="${pathData}" fill-rule="evenodd" />`, { expandShapes: true, insert: false });
-    if (!item) return pathData;
+    const item = new scope.CompoundPath(pathData);
+    if (!item || !item.children || item.children.length <= 1) return pathData;
 
-    let united = null;
-    const parts = item.children ? [...item.children] : [item];
-    if (parts.length > 1) {
-      united = parts.reduce((acc, p) => {
-        if (!acc) return p;
-        try {
-          return acc.unite(p, { insert: false });
-        } catch (_) {
-          return acc;
-        }
-      }, null);
-    } else if (typeof item.unite === 'function') {
-      united = item.unite(item, { insert: false });
+    const children = [...item.children];
+    const pos = children.filter((c) => c.area > 0);
+    const neg = children.filter((c) => c.area < 0);
+
+    let outers = [];
+    let holes = [];
+    if (pos.length > 0 && neg.length > 0) {
+      const maxPos = Math.max(...pos.map((c) => Math.abs(c.area)));
+      const maxNeg = Math.max(...neg.map((c) => Math.abs(c.area)));
+      if (maxPos >= maxNeg) {
+        outers = pos;
+        holes = neg;
+      } else {
+        outers = neg;
+        holes = pos;
+      }
+    } else if (pos.length > 0) {
+      outers = pos;
+    } else if (neg.length > 0) {
+      outers = neg;
+    } else {
+      outers = children;
     }
 
-    if (united && united.pathData && united.pathData.length > 0) {
-      return united.pathData;
+    // If there is at most one outer contour, there are no overlapping outer components to merge.
+    // Retain original pathData directly to preserve exact curve fidelity and counter holes.
+    if (outers.length <= 1) {
+      return pathData;
+    }
+
+    // Check if any outer components actually overlap/intersect each other.
+    let hasOverlap = false;
+    for (let i = 0; i < outers.length; i++) {
+      for (let j = i + 1; j < outers.length; j++) {
+        if (outers[i].bounds.intersects(outers[j].bounds)) {
+          if (
+            outers[i].intersects(outers[j]) ||
+            outers[i].contains(outers[j].bounds.center) ||
+            outers[j].contains(outers[i].bounds.center)
+          ) {
+            hasOverlap = true;
+            break;
+          }
+        }
+      }
+      if (hasOverlap) break;
+    }
+
+    // Disjoint components (e.g. dots on 'i', 'j', exclamation marks, colons) do not overlap.
+    if (!hasOverlap) {
+      return pathData;
+    }
+
+    // Unite overlapping outer contours
+    let base = outers[0];
+    for (let i = 1; i < outers.length; i++) {
+      base = base.unite(outers[i], { insert: false });
+    }
+
+    // Subtract counter holes
+    for (const h of holes) {
+      base = base.subtract(h, { insert: false });
+    }
+
+    if (base && base.pathData && base.pathData.length > 0) {
+      return base.pathData;
     }
   } catch (_) {
     // Fallback to original pathData on any error
+  } finally {
+    try {
+      scope?.remove();
+    } catch (_) {}
   }
   return pathData;
 }

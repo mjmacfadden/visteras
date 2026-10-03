@@ -468,3 +468,62 @@ test('HTML: index.html wires ⇧⌘O shortcut, menu item, and mounts mountTextOu
   // 5. tool_topath allows text in canToPath
   assert.match(html, /const canToPath = !\[(?:'image',|'path',|'g',|'use',|\s)*\]\.includes\(tagName\);|canToPath/);
 });
+
+test('Create Outlines: cleanGlyphPath strictly preserves inner counter holes on O, P, e, B, 0', async () => {
+  const { loadPaper } = await import('./helpers/paper-node.mjs');
+  const paper = loadPaper();
+  globalThis.window = { paper };
+
+  const font = await T.loadFont('Roboto');
+  assert.ok(font);
+
+  // Glyphs with counter holes must never have their holes omitted
+  for (const ch of ['O', 'o', 'P', 'p', 'e', 'B', '0', '8']) {
+    const glyph = font.charToGlyph(ch);
+    const rawD = glyph.getPath(0, 0, 100).toPathData(2);
+    const rawZCount = (rawD.match(/Z/gi) || []).length;
+    assert.ok(rawZCount >= 2, `${ch} must have at least 2 contours (outer + hole) in raw font`);
+
+    const cleanedD = T.cleanGlyphPath(rawD);
+    const cleanedZCount = (cleanedD.match(/Z/gi) || []).length;
+    assert.equal(cleanedZCount, rawZCount, `${ch} must retain all ${rawZCount} contours (outer and inner counter holes)`);
+  }
+
+  // Disjoint parts like 'i', 'j', '!' must also retain all parts
+  for (const ch of ['i', 'j', '!']) {
+    const glyph = font.charToGlyph(ch);
+    const rawD = glyph.getPath(0, 0, 100).toPathData(2);
+    const rawZCount = (rawD.match(/Z/gi) || []).length;
+    const cleanedD = T.cleanGlyphPath(rawD);
+    const cleanedZCount = (cleanedD.match(/Z/gi) || []).length;
+    assert.equal(cleanedZCount, rawZCount, `${ch} must retain both stem and dot`);
+  }
+});
+
+test('Create Outlines: cleanGlyphPath unites overlapping component contours and preserves holes', async () => {
+  const { loadPaper } = await import('./helpers/paper-node.mjs');
+  const paper = loadPaper();
+  globalThis.window = { paper };
+
+  // 1. Two overlapping rectangles (like variable font component overlap)
+  const overlapD = 'M0 0 L10 0 L10 10 L0 10 Z M5 0 L15 0 L15 10 L5 10 Z';
+  const cleanedOverlap = T.cleanGlyphPath(overlapD);
+  const overlapZ = (cleanedOverlap.match(/Z/gi) || []).length;
+  assert.equal(overlapZ, 1, 'Overlapping outer components must be merged into 1 continuous outer contour');
+
+  // 2. Overlapping outer components WITH a counter hole (e.g. stem + bowl outer + bowl hole)
+  const s = new paper.PaperScope();
+  s.setup(new paper.Size(1000, 1000));
+  const stem = new s.Path.Rectangle(new s.Point(0, 0), new s.Size(10, 100));
+  stem.clockwise = true;
+  const bowlOuter = new s.Path.Rectangle(new s.Point(5, 0), new s.Size(35, 50));
+  bowlOuter.clockwise = true;
+  const bowlHole = new s.Path.Rectangle(new s.Point(15, 10), new s.Size(15, 30));
+  bowlHole.clockwise = false;
+  const comp = new s.CompoundPath({ children: [stem, bowlOuter, bowlHole] });
+  const cleanedP = T.cleanGlyphPath(comp.pathData);
+  const pZ = (cleanedP.match(/Z/gi) || []).length;
+  assert.equal(pZ, 2, 'Overlapping stem and bowl outer must unite into 1 outer contour while preserving the 1 inner hole');
+  s.remove();
+});
+
