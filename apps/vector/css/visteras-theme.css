@@ -578,7 +578,18 @@ html, body {
   filter: none !important;
 }
 
-#workarea.wireframe #svgcontent text {
+/* Live text objects remain solid black filled in outline view matching Illustrator */
+#workarea.wireframe #svgcontent text,
+#workarea.wireframe #svgcontent text *,
+#workarea.wireframe #svgcontent tspan {
+  fill: #000000 !important;
+  stroke: none !important;
+  opacity: 1 !important;
+}
+
+/* Converted text outlines (shapes from "Create Outlines") render as hairline outlines */
+#workarea.wireframe #svgcontent .visteras-text-outlines path,
+#workarea.wireframe #svgcontent path.visteras-glyph {
   fill: none !important;
   stroke: #000000 !important;
   stroke-width: 0.75px !important;

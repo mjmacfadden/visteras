@@ -390,9 +390,18 @@ hr {
   filter: none;
 }
 
-#workarea.wireframe #svgcontent text {
+#workarea.wireframe #svgcontent text,
+#workarea.wireframe #svgcontent text *,
+#workarea.wireframe #svgcontent tspan {
+  fill: #000000 !important;
+  stroke: none !important;
+  opacity: 1 !important;
+}
+
+#workarea.wireframe #svgcontent .visteras-text-outlines path,
+#workarea.wireframe #svgcontent path.visteras-glyph {
   fill: none !important;
-  stroke: #000 !important;
+  stroke: #000000 !important;
   stroke-width: 0.75px !important;
   vector-effect: non-scaling-stroke !important;
 }

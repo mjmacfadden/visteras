@@ -25,15 +25,27 @@ test('Outline Mode: visteras-theme.css sets hairline non-scaling stroke matching
     'Theme CSS must set 0.75px hairline stroke-width for wireframe mode'
   );
 
-  // Text elements should also have non-scaling hairline outlines
+  // Live text objects remain solid black filled in outline view matching Illustrator
   assert.match(
     css,
-    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?vector-effect:\s*non-scaling-stroke\s*!important/i,
-    'Theme CSS must set non-scaling-stroke for text elements in wireframe mode'
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?fill:\s*#000000\s*!important/i,
+    'Theme CSS must keep live text filled black in wireframe mode'
+  );
+  assert.match(
+    css,
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?stroke:\s*none\s*!important/i,
+    'Theme CSS must keep live text stroke: none in wireframe mode'
+  );
+
+  // Converted text outlines (Create Outlines) render as hairline outlines
+  assert.match(
+    css,
+    /#workarea\.wireframe\s+#svgcontent\s+\.visteras-text-outlines\s+path[\s\S]*?stroke-width:\s*0\.75px\s*!important/i,
+    'Theme CSS must outline converted text glyph paths in wireframe mode'
   );
 });
 
-test('Outline Mode: svgedit.css enforces non-scaling hairline stroke', () => {
+test('Outline Mode: svgedit.css enforces non-scaling hairline stroke and black filled text', () => {
   const css = fs.readFileSync(path.resolve(vectorRoot, 'svgedit.css'), 'utf8');
 
   assert.match(
@@ -47,15 +59,27 @@ test('Outline Mode: svgedit.css enforces non-scaling hairline stroke', () => {
     /#workarea\.wireframe\s+#svgcontent\s+\*[\s\S]*?stroke-width:\s*0\.75px\s*!important/i,
     'svgedit.css must set 0.75px stroke-width'
   );
+
+  assert.match(
+    css,
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?fill:\s*#000000\s*!important/i,
+    'svgedit.css must keep live text filled black'
+  );
 });
 
-test('Outline Mode: Editor.js updateWireFrame generates non-scaling hairline stroke rules', () => {
+test('Outline Mode: Editor.js updateWireFrame generates non-scaling hairline stroke and text fill rules', () => {
   const js = fs.readFileSync(path.resolve(vectorRoot, 'Editor.js'), 'utf8');
 
   assert.match(
     js,
     /updateWireFrame\(\)\s*\{[\s\S]*?stroke-width:\s*0\.75px\s*!important;[\s\S]*?vector-effect:\s*non-scaling-stroke\s*!important;/i,
     'Editor.js updateWireFrame must set non-scaling-stroke and 0.75px hairline'
+  );
+
+  assert.match(
+    js,
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?fill:\s*#000000\s*!important;/i,
+    'Editor.js updateWireFrame must preserve solid black fill for live text'
   );
 });
 
@@ -104,5 +128,34 @@ test('Outline Mode: clean non-overlapping bundled Roboto fonts are declared in C
   const fontsJs = fs.readFileSync(path.resolve(vectorRoot, 'lib/visteras-fonts.js'), 'utf8');
   assert.match(fontsJs, /name\.toLowerCase\(\)\s*===\s*"roboto"/);
 });
+
+test('Outline Mode: live text remains filled black while converted outline paths render as stroke outlines', () => {
+  const themeCss = fs.readFileSync(path.resolve(vectorRoot, 'css/visteras-theme.css'), 'utf8');
+
+  // 1. Live text objects: fill: #000000 !important, stroke: none !important
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?fill:\s*#000000\s*!important/i
+  );
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#svgcontent\s+text[\s\S]*?stroke:\s*none\s*!important/i
+  );
+
+  // 2. Converted outline paths (.visteras-text-outlines path, path.visteras-glyph): fill: none !important, stroke: #000000 !important
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#svgcontent\s+\.visteras-text-outlines\s+path[\s\S]*?fill:\s*none\s*!important/i
+  );
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#svgcontent\s+\.visteras-text-outlines\s+path[\s\S]*?stroke:\s*#000000\s*!important/i
+  );
+  assert.match(
+    themeCss,
+    /#workarea\.wireframe\s+#svgcontent\s+\.visteras-text-outlines\s+path[\s\S]*?stroke-width:\s*0\.75px\s*!important/i
+  );
+});
+
 
 

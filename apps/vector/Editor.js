@@ -70283,6 +70283,19 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
         stroke-width: 0.75px !important;
         vector-effect: non-scaling-stroke !important;
       }
+      #workarea.wireframe #svgcontent text,
+      #workarea.wireframe #svgcontent text *,
+      #workarea.wireframe #svgcontent tspan {
+        fill: #000000 !important;
+        stroke: none !important;
+      }
+      #workarea.wireframe #svgcontent .visteras-text-outlines path,
+      #workarea.wireframe #svgcontent path.visteras-glyph {
+        fill: none !important;
+        stroke: #000000 !important;
+        stroke-width: 0.75px !important;
+        vector-effect: non-scaling-stroke !important;
+      }
     `;
 		document.querySelectorAll("#wireframe_rules").length > 0 && (document.querySelector("#wireframe_rules").textContent = this.workarea.classList.contains("wireframe") ? e : "");
 	}
