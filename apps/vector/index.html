@@ -26,9 +26,9 @@
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-panel-dock.css?v=dock-2" rel="stylesheet" media="all">
+  <link href="./css/visteras-panel-dock.css?v=dock-3" rel="stylesheet" media="all">
   <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-appearance-fx.css?v=gravit-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-appearance-fx.css?v=transparency-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -147,6 +147,8 @@
             <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
             <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
             <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
+            <div class="menu_dropdown_item disabled" id="action_window_appearance" aria-disabled="true" title="Appearance panel coming">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
             <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_window_properties">Properties</div>
@@ -246,6 +248,7 @@
     import { mountTransformPanel } from './js/visteras-transform-panel.js';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
+    import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
     import { mountEffects } from './js/visteras-effects.js?v=gravit-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
@@ -265,7 +268,7 @@
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle } from './lib/visteras-ui/file.js?v=open-1';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
-    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-2';
+    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
     // Vector's default is the red error toast for 3.5 s, as before.
@@ -2518,6 +2521,8 @@
 
     // Transparency: per-object blending mode (Illustrator list/order)
     mountBlendModes(svgEditor);
+    // Window ▸ Transparency (⇧⌘F10): Blend Mode, Opacity, Isolate Blending
+    mountTransparency(svgEditor);
     // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
     mountParagraph(svgEditor);

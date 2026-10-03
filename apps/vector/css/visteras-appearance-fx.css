@@ -47,3 +47,20 @@
 .vpara_field .vpara_input:disabled { opacity: .45; }
 .vpara_ls_replaced #tool_letter_spacing { display: none !important; }
 #text_align_justify:disabled { opacity: .4; cursor: default !important; }
+
+/* Window ▸ Transparency panel (⇧⌘F10) */
+.vtr { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px; color: #ddd; font-size: 11px; }
+.vtr-row { display: flex; align-items: center; gap: 8px; }
+.vtr-select { flex: 1; min-width: 0; height: 22px; background: #1e1e1e; color: #ddd; border: 1px solid #444; border-radius: 3px; font-size: 11px; }
+.vtr-select:focus { outline: none; border-color: var(--studio-orange, #fa7c1b); }
+.vtr-field { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 4px; background: #1e1e1e; border: 1px solid #444; border-radius: 3px; }
+.vtr-field:focus-within { border-color: var(--studio-orange, #fa7c1b); }
+.vtr-label { color: #8a8a8a; }
+.vtr-field em { font-style: normal; color: #8a8a8a; }
+.vtr-input { width: 38px; background: transparent; border: none; outline: none; color: #ddd; font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.vtr-slider { width: 100%; accent-color: var(--studio-orange, #fa7c1b); }
+.vtr-check { display: inline-flex; align-items: center; gap: 6px; color: #ccc; }
+.vtr-check input { accent-color: var(--studio-orange, #fa7c1b); }
+.vtr-check:has(input:disabled) { color: #666; }
+.vtr-empty { color: #777; }
+.vtr-empty[hidden] { display: none; }

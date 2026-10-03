@@ -5,7 +5,7 @@
  * Dock groups top-to-bottom:
  *   1. Color (F6)
  *   2. Swatches
- *   3. Stroke (Cmd/Ctrl+F10) + Gradient (Cmd/Ctrl+F9 stub)
+ *   3. Stroke (Cmd/Ctrl+F10) + Gradient (Cmd/Ctrl+F9) + Transparency (Shift+Cmd/Ctrl+F10)
  *   4. Layers (F7)
  *
  * Properties panel occupies the dedicated right column (#sidepanels).
@@ -16,6 +16,39 @@ const STORAGE_KEY = 'visteras-vector-dock';
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 240;
+
+/**
+ * Illustrator panel shortcuts → panel id. Shift is significant:
+ * F6 Color · ⇧F6 Appearance · F7 Layers · ⌘F10 Stroke · ⇧⌘F10 Transparency · ⌘F9 Gradient.
+ */
+export function panelForShortcut(e) {
+  const key = e?.key === 'F6' || e?.code === 'F6' ? 'F6' : e?.key === 'F7' || e?.code === 'F7' ? 'F7'
+    : e?.key === 'F9' || e?.code === 'F9' ? 'F9' : e?.key === 'F10' || e?.code === 'F10' ? 'F10' : null;
+  if (!key || e.altKey) return null;
+  const cmd = !!(e.metaKey || e.ctrlKey), shift = !!e.shiftKey;
+  if (key === 'F6' && !cmd) return shift ? 'appearance' : 'color';
+  if (key === 'F7' && !cmd && !shift) return 'layers';
+  if (key === 'F10' && cmd) return shift ? 'transparency' : 'stroke';
+  if (key === 'F9' && cmd && !shift) return 'gradient';
+  return null;
+}
+
+/** Shared toast (bottom centre, orange). Also exposed as window.__visterasToast. */
+export function showToast(msg, ms = 2600) {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById('visteras_toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'visteras_toast';
+    el.setAttribute('role', 'status');
+    el.style.cssText = 'position:fixed;bottom:48px;left:50%;transform:translateX(-50%);z-index:99999;padding:6px 12px;background:#1e1e1e;color:#fa7c1b;border:1px solid #fa7c1b;border-radius:4px;font-size:11px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.5);pointer-events:none;max-width:70vw;text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { el.style.display = 'none'; }, ms);
+}
 
 export function mountVisterasPanelDock({ svgEditor }) {
   if (typeof document === 'undefined') return null;
@@ -114,6 +147,16 @@ export function mountVisterasPanelDock({ svgEditor }) {
             </linearGradient>
           </defs>
           <rect x="1.5" y="3.5" width="17" height="13" rx="1.5" fill="url(#vdock_gradient_ramp_icon)" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Group 4b: Transparency -->
+    <div class="vdock-group" id="vdock_grp_transparency">
+      <button type="button" class="vdock-icon" data-panel="transparency" title="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-label="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-expanded="false" aria-controls="vdock_flyout">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
+          <circle cx="7.5" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="12.5" cy="10" r="5.2" opacity="0.55"/>
         </svg>
       </button>
     </div>
@@ -275,6 +318,12 @@ export function mountVisterasPanelDock({ svgEditor }) {
   gradPane.className = 'vdock-panel-pane';
   flyoutBody.appendChild(gradPane);
 
+  // (E2) Transparency Panel (#vdock_transparency_panel) — filled by js/visteras-transparency.js
+  const transparencyPane = document.createElement('div');
+  transparencyPane.id = 'vdock_transparency_panel';
+  transparencyPane.className = 'vdock-panel-pane';
+  flyoutBody.appendChild(transparencyPane);
+
   // (F) Layers Panel (#layerpanel)
   const layerPanel = document.getElementById('layerpanel');
   if (layerPanel) {
@@ -316,13 +365,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
       swatches: 'Swatches',
       stroke: 'Stroke',
       gradient: 'Gradient',
+      transparency: 'Transparency',
       layers: 'Layers',
     };
     slot.innerHTML = `<span class="vdock-flyout-title">${titles[panelId] || panelId}</span>`;
   }
 
   function updateWindowMenuCheckmarks() {
-    const panels = ['color', 'swatches', 'stroke', 'gradient', 'layers'];
+    const panels = ['color', 'swatches', 'stroke', 'gradient', 'transparency', 'layers'];
     panels.forEach(p => {
       const item = document.getElementById(`action_window_${p}`);
       if (item) {
@@ -391,6 +441,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       swatches: swatchesPane,
       stroke: strokePane,
       gradient: gradPane,
+      transparency: transparencyPane,
       layers: layerPanel,
     };
 
@@ -543,31 +594,16 @@ export function mountVisterasPanelDock({ svgEditor }) {
     // Shortcuts below should not trigger while typing in an input
     if (isTyping) return;
 
-    // F6: Toggle Color
-    if (e.key === 'F6' || e.code === 'F6') {
+    // F6 Color · ⇧F6 Appearance · F7 Layers · ⌘F10 Stroke · ⇧⌘F10 Transparency · ⌘F9 Gradient
+    const shortcutPanel = panelForShortcut(e);
+    if (shortcutPanel) {
       e.preventDefault();
-      toggle('color');
-      return;
-    }
-
-    // F7: Toggle Layers
-    if (e.key === 'F7' || e.code === 'F7') {
-      e.preventDefault();
-      toggle('layers');
-      return;
-    }
-
-    // Cmd+F10 / Ctrl+F10: Toggle Stroke
-    if (isCmdOrCtrl && (e.key === 'F10' || e.code === 'F10')) {
-      e.preventDefault();
-      toggle('stroke');
-      return;
-    }
-
-    // Cmd+F9 / Ctrl+F9: Toggle Gradient
-    if (isCmdOrCtrl && (e.key === 'F9' || e.code === 'F9')) {
-      e.preventDefault();
-      toggle('gradient');
+      if (shortcutPanel === 'appearance') {
+        // No Appearance panel yet: never fall through to Color.
+        (window.__visterasToast || showToast)('Appearance panel coming');
+        return;
+      }
+      toggle(shortcutPanel);
       return;
     }
 
@@ -614,6 +650,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
   };
 
   window.__visterasDock = dockApi;
+  if (!window.__visterasToast) window.__visterasToast = showToast;
 
   // Initial checkmark sync
   updateWindowMenuCheckmarks();
