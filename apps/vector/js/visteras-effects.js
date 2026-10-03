@@ -126,6 +126,71 @@ export function filterPadding(fx) {
   return Math.ceil(pad);
 }
 
+/**
+ * Painted extent of an object's effects, in its own user space. `bbox` is the
+ * object's (stroked) box; Gaussian blur reaches ~3σ = 1.5 × the Illustrator blur
+ * value. Inner shadow stays inside the shape. Pure (used by export scopes).
+ */
+export function visualBounds(fx, bbox) {
+  const b = bbox || { x: 0, y: 0, width: 0, height: 0 };
+  let x0 = b.x, y0 = b.y, x1 = b.x + b.width, y1 = b.y + b.height;
+  const gb = fx?.gaussianBlur;
+  if (gb?.enabled && gb.radius > 0) { const g = gb.radius * 1.5; x0 -= g; y0 -= g; x1 += g; y1 += g; }
+  const ds = fx?.dropShadow;
+  if (ds?.enabled) {
+    const spread = ds.blur * 1.5 + (gb?.enabled ? gb.radius * 1.5 : 0);
+    x0 = Math.min(x0, b.x + ds.x - spread); y0 = Math.min(y0, b.y + ds.y - spread);
+    x1 = Math.max(x1, b.x + b.width + ds.x + spread); y1 = Math.max(y1, b.y + b.height + ds.y + spread);
+  }
+  return { x: r(x0), y: r(y0), width: r(x1 - x0), height: r(y1 - y0) };
+}
+
+const unionRect = (a, b) => {
+  if (!a) return b; if (!b) return a;
+  const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
+  return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y };
+};
+
+/** Half the stroke width (0 when unstroked) so filters and bounds include the stroke. */
+export function strokeOutset(el) {
+  const stroke = el?.getAttribute?.('stroke');
+  if (!stroke || stroke === 'none') return 0;
+  const w = Number.parseFloat(el.getAttribute('stroke-width') ?? '1');
+  return Number.isFinite(w) && w > 0 ? w / 2 : 0;
+}
+
+const outsetRect = (b, d) => (b ? { x: b.x - d, y: b.y - d, width: b.width + d * 2, height: b.height + d * 2 } : b);
+
+/**
+ * Bounds of an element including filter/shadow extents, in #svgcontent user units
+ * (same space as svgCanvas.getStrokedBBox). Groups include effects on descendants.
+ * Export scopes use this so selection exports don't clip shadows.
+ */
+export function getVisualBounds(el, sc = null) {
+  if (!el) return null;
+  let base = null;
+  try { base = sc?.getStrokedBBox?.([el]) || null; } catch { base = null; }
+  if (!base) { try { const b = el.getBBox(); base = outsetRect({ x: b.x, y: b.y, width: b.width, height: b.height }, strokeOutset(el)); } catch { base = null; } }
+  const owners = [el, ...(el.querySelectorAll?.(`[${FX_ATTR}]`) || [])].filter((n) => n.getAttribute?.(FX_ATTR));
+  if (!owners.length) return base;
+  const content = el.ownerSVGElement?.closest?.('#svgcontent') || el.closest?.('#svgcontent') || el.ownerSVGElement;
+  let out = base;
+  for (const owner of owners) {
+    const fx = parseFx(owner.getAttribute(FX_ATTR));
+    if (!hasActiveFx(fx)) continue;
+    let local;
+    try { const b = owner.getBBox(); local = outsetRect({ x: b.x, y: b.y, width: b.width, height: b.height }, strokeOutset(owner)); } catch { continue; }
+    const v = visualBounds(fx, local);
+    let m = null;
+    try { const c = owner.getScreenCTM(), root = content?.getScreenCTM?.(); m = c && root ? root.inverse().multiply(c) : null; } catch { m = null; }
+    const pts = [[v.x, v.y], [v.x + v.width, v.y], [v.x, v.y + v.height], [v.x + v.width, v.y + v.height]]
+      .map(([x, y]) => (m ? [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f] : [x, y]));
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    out = unionRect(out, { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) });
+  }
+  return out && { x: r(out.x), y: r(out.y), width: r(out.width), height: r(out.height) };
+}
+
 /** Filter element attributes for a bbox (user space so thin lines still render). */
 export function filterRegion(fx, bbox) {
   const pad = filterPadding(fx);
@@ -200,7 +265,7 @@ export function syncElementFx(el, defs) {
   }
   if (el.getAttribute('filter') !== filterRef(id)) el.setAttribute('filter', filterRef(id)); // duplicate / reopen
   let bbox = null;
-  try { bbox = el.getBBox(); } catch { bbox = null; }
+  try { const b = el.getBBox(); bbox = outsetRect({ x: b.x, y: b.y, width: b.width, height: b.height }, strokeOutset(el)); } catch { bbox = null; }
   const region = filterRegion(fx, bbox);
   const sig = filterSignature(fx, region);
   let filter = doc.getElementById(id);
@@ -421,7 +486,7 @@ export function mountEffects(editor) {
     if (event === 'selected' || event === 'changed') { render(); schedule(); }
     return result;
   };
-  window.__visterasEffects = { edit, render, sync: syncNow };
+  window.__visterasEffects = { edit, render, sync: syncNow, getVisualBounds: (el) => getVisualBounds(el, sc) };
   syncNow();
   render();
   return window.__visterasEffects;

@@ -76,3 +76,30 @@ test('Effects: wired as an Appearance-area section with the fx menu', () => {
   const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
   assert.match(src, /if \(!keep\.has\(f\.id\)\) f\.remove\(\);/, 'orphan vfx_ filters are swept');
 });
+
+test('Effects: visualBounds includes drop shadow offset + blur and gaussian blur', () => {
+  const box = { x: 10, y: 20, width: 100, height: 50 };
+  assert.deepEqual(F.visualBounds({}, box), box, 'no effects → unchanged');
+  // drop shadow 7,7 blur 5 → spread 7.5 on the shadow copy
+  const ds = F.parseFx({ dropShadow: {} });
+  assert.deepEqual(F.visualBounds(ds, box), { x: 9.5, y: 19.5, width: 115, height: 65 });
+  const neg = F.parseFx({ dropShadow: { x: -20, y: 0, blur: 0 } });
+  assert.deepEqual(F.visualBounds(neg, box), { x: -10, y: 20, width: 120, height: 50 });
+  assert.deepEqual(F.visualBounds(F.parseFx({ gaussianBlur: { radius: 4 } }), box), { x: 4, y: 14, width: 112, height: 62 });
+  assert.deepEqual(F.visualBounds(F.parseFx({ innerShadow: { x: 50, y: 50, blur: 30 } }), box), box, 'inner shadow stays inside');
+  assert.deepEqual(F.visualBounds(F.parseFx({ dropShadow: { enabled: false, x: 99 } }), box), box, 'hidden effects ignored');
+});
+
+test('Effects: getVisualBounds unions the stroked bbox with effect extents', () => {
+  const el = fakeEl('rect', { id: 'r', stroke: '#000', 'stroke-width': '4', 'data-visteras-fx': JSON.stringify({ dropShadow: { x: 10, y: 10, blur: 0 } }) });
+  el.getBBox = () => ({ x: 0, y: 0, width: 100, height: 100 });
+  // no screen CTM in the fake → local space; stroke adds 2 on each side
+  assert.deepEqual(F.getVisualBounds(el), { x: -2, y: -2, width: 114, height: 114 });
+  const sc = { getStrokedBBox: () => ({ x: -2, y: -2, width: 104, height: 104 }) };
+  assert.deepEqual(F.getVisualBounds(el, sc), { x: -2, y: -2, width: 114, height: 114 });
+  const plain = fakeEl('rect', { id: 'p' });
+  assert.deepEqual(F.getVisualBounds(plain, sc), { x: -2, y: -2, width: 104, height: 104 }, 'no effects → stroked bbox');
+  assert.equal(F.strokeOutset(fakeEl('rect', { stroke: 'none', 'stroke-width': '9' })), 0);
+  const src = fs.readFileSync(new URL('../js/visteras-effects.js', import.meta.url), 'utf8');
+  assert.match(src, /getVisualBounds: \(el\) => getVisualBounds\(el, sc\)/, 'exposed on window.__visterasEffects');
+});
