@@ -221,3 +221,16 @@ test('Bug 2: export scale is clamped to safe canvas limits and reports when redu
   assert.match(read('js/app.js'), /scale reduced to \$\{sizing\.scale\}×/);
   assert.doesNotMatch(read('js/app.js'), /scale: 2, \/\/ 2x retina clarity/);
 });
+
+test('Smoke fix 1: a click with no movement is not a transform', () => {
+  const el = { id: 'a', x: 10, y: 20, width: 100, height: 50, rotation: 0, data: { text: 'hi' } };
+  const snap = [{ ...el, data: { ...el.data } }];
+  assert.equal(utils.transformChanged(snap, [el]), false);
+  assert.equal(utils.transformChanged(snap, [{ ...el, x: 11 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, rotation: 15 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, width: 90 }]), true);
+  assert.equal(utils.transformChanged(snap, [{ ...el, data: { text: 'hi', fontSize: 30 } }]), true);
+  assert.equal(utils.transformChanged([], []), false);
+  const src = read('js/canvas.js');
+  assert.match(src, /if \(!transformChanged\(before, this\.board\.getSelectedElements\(\)\)\) return;/);
+});
