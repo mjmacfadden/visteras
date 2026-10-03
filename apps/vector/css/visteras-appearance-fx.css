@@ -69,3 +69,10 @@
 .vtr-check:has(input:disabled) { color: #666; }
 .vtr-empty { color: #777; }
 .vtr-empty[hidden] { display: none; }
+/* Effect dialogs: radio rows (Drop Shadow Color/Darkness, Inner Glow Center/Edge) + backdrop note */
+.vfx_radio { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.vfx_radio label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.vfx_radio input[type="radio"] { accent-color: var(--visteras-accent, #fa7c1b); margin: 0; }
+.vfx_color_dark input[type="number"] { width: 56px; }
+.vfx_color_dark input:disabled { opacity: .45; }
+.vfx_note { margin: -2px 0 4px; font-size: 10px; line-height: 1.35; color: #9a9a9a; max-width: 260px; }
