@@ -39675,7 +39675,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let i = r === 0 ? "fill" : "stroke", a = e.getAttribute(i);
 			if (a && a.startsWith("url(")) {
 				let r = Eg(a);
-				if (r.tagName === "linearGradient") {
+				// Visteras: skip gradients with a per-object gradientTransform (visteras-gradient.js rebases them).
+				if (r && r.tagName === "linearGradient" && !r.hasAttribute("data-visteras-gradient")) {
 					let a = r.getAttribute("x1") || 0, o = r.getAttribute("y1") || 0, s = r.getAttribute("x2") || 1, c = r.getAttribute("y2") || 0;
 					a = n.width * a + n.x, o = n.height * o + n.y, s = n.width * s + n.x, c = n.height * c + n.y;
 					let l = jh(a, o, t), u = jh(s, c, t), d = {
@@ -41982,6 +41983,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				if (!i) return;
 				let a = (i.tagName || "").toLowerCase();
 				if (!["lineargradient", "radialgradient"].includes(a) || i.getAttribute("gradientUnits") === "userSpaceOnUse") return;
+				// Visteras: data-visteras-gradient carries a gradientTransform the fraction mirror ignores; visteras-gradient.js mirrors it after flipSelectedElements.
+				if (i.hasAttribute("data-visteras-gradient")) return;
 				let o = i.cloneNode(!0);
 				n.a < 0 && (a === "lineargradient" ? (kb(o, "x1"), kb(o, "x2")) : (kb(o, "cx"), kb(o, "fx"))), n.d < 0 && (a === "lineargradient" ? (kb(o, "y1"), kb(o, "y2")) : (kb(o, "cy"), kb(o, "fy")));
 				let s = (Db.getCurrentDrawing?.() || Db.getDrawing?.())?.getNextId?.() ?? (i.id ? `${i.id}-mirrored` : `mirrored-grad-${Date.now()}`);
