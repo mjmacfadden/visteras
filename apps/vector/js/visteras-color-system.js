@@ -2286,6 +2286,34 @@ function chainCanvasEvent(sc, name, fn) {
   });
 }
 
+/**
+ * Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → 5 …
+ */
+function stepStrokeWeight(value, dir) {
+  const n = Math.max(0, Number(value) || 0);
+  const quarters = [0, 0.25, 0.5, 0.75, 1];
+  if (dir > 0) {
+    for (const s of quarters) {
+      if (n < s - 1e-9) return s;
+    }
+    return Math.floor(n + 1e-9) + 1;
+  }
+  if (n > 1 + 1e-9) {
+    const floored = Math.floor(n + 1e-9);
+    return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
+  }
+  for (let i = quarters.length - 1; i >= 0; i--) {
+    if (n > quarters[i] + 1e-9) return quarters[i];
+  }
+  return 0;
+}
+
+function formatStrokeWeight(n) {
+  const v = Math.max(0, Number(n) || 0);
+  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+  return String(Math.round(v * 100) / 100);
+}
+
 function mountAppearanceColors(ctrl, svgEditor) {
   const fillChip = document.getElementById('vcs_app_fill_chip');
   const strokeChip = document.getElementById('vcs_app_stroke_chip');
@@ -2347,32 +2375,6 @@ function mountAppearanceColors(ctrl, svgEditor) {
     }
   }
 
-  // Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → …
-  function stepStrokeWeight(value, dir) {
-    const n = Math.max(0, Number(value) || 0);
-    const quarters = [0, 0.25, 0.5, 0.75, 1];
-    if (dir > 0) {
-      for (const s of quarters) {
-        if (n < s - 1e-9) return s;
-      }
-      return Math.floor(n + 1e-9) + 1;
-    }
-    if (n > 1 + 1e-9) {
-      const floored = Math.floor(n + 1e-9);
-      return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
-    }
-    for (let i = quarters.length - 1; i >= 0; i--) {
-      if (n > quarters[i] + 1e-9) return quarters[i];
-    }
-    return 0;
-  }
-
-  function formatStrokeWeight(n) {
-    const v = Math.max(0, Number(n) || 0);
-    if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
-    return String(Math.round(v * 100) / 100);
-  }
-
   function writeStrokeWidth(value, { live = false } = {}) {
     const n = Math.max(0, Number(value));
     if (Number.isNaN(n)) return;
@@ -2413,6 +2415,10 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (weightInput && document.activeElement !== weightInput) {
       weightInput.value = formatStrokeWeight(n);
     }
+    const dkW = document.getElementById('vdock_stroke_weight_input');
+    if (dkW && document.activeElement !== dkW) {
+      dkW.value = formatStrokeWeight(n);
+    }
   }
 
   function writeStrokeAlign(align) {
@@ -2440,6 +2446,10 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (weightInput && document.activeElement !== weightInput) {
       weightInput.value = formatStrokeWeight(w);
     }
+    const dkW = document.getElementById('vdock_stroke_weight_input');
+    if (dkW && document.activeElement !== dkW) {
+      dkW.value = formatStrokeWeight(w);
+    }
   }
 
   function refresh() {
@@ -2453,8 +2463,13 @@ function mountAppearanceColors(ctrl, svgEditor) {
     fillTarget?.classList.toggle('active', active === 'fill');
     strokeTarget?.classList.toggle('active', active === 'stroke');
     const userW = readStrokeWidth();
+    const formattedW = formatStrokeWeight(userW);
     if (weightInput && document.activeElement !== weightInput) {
-      weightInput.value = formatStrokeWeight(userW);
+      weightInput.value = formattedW;
+    }
+    const dkW = document.getElementById('vdock_stroke_weight_input');
+    if (dkW && document.activeElement !== dkW) {
+      dkW.value = formattedW;
     }
     // SVG-Edit's group updateContextPanel may scan wrap children and briefly
     // surface the helper's 2× into #stroke_width / curProperties. Re-assert the
@@ -2464,7 +2479,7 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (sc?.curShape) sc.curShape.stroke_width = userW;
     const native = document.getElementById('stroke_width');
     if (native && document.activeElement !== native) {
-      native.value = formatStrokeWeight(userW);
+      native.value = formattedW;
     }
     setAlignButtons(readStrokeAlign());
   }
@@ -2694,6 +2709,11 @@ function mountAppearanceColors(ctrl, svgEditor) {
       top.__vcsAppearanceHooked = true;
     }
   } catch { /* ignore */ }
+
+  ctrl.writeStrokeWidth = writeStrokeWidth;
+  ctrl.readStrokeWidth = readStrokeWidth;
+  ctrl.stepStrokeWeight = stepStrokeWeight;
+  ctrl.formatStrokeWeight = formatStrokeWeight;
 
   refresh();
 }
@@ -2935,5 +2955,5 @@ export function mountVisterasColorSystem({ svgEditor } = {}) {
   return ctrl;
 }
 
-export { isTextPaintTarget, hasShapePaintTarget, targetHasText, targetHasShape };
+export { isTextPaintTarget, hasShapePaintTarget, targetHasText, targetHasShape, stepStrokeWeight, formatStrokeWeight };
 export default mountVisterasColorSystem;

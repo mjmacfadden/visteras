@@ -686,4 +686,117 @@ test('Panel Dock: Toolbar has no chevron, displays only pressed panel, highlight
   assert.doesNotMatch(dockJs, /coming in a future update|vdock-gradient-stub-text|vdock-gradient-ramp-preview/);
 });
 
+test('Stroke Flyout: stepStrokeWeight increments and decrements in .25, .5, .75, 1, 2, 3, 4, 5 sequence', async () => {
+  const { stepStrokeWeight, formatStrokeWeight } = await import('../js/visteras-panel-dock.js');
+
+  // Increments: 0 → .25 → .5 → .75 → 1 → 2 → 3 → 4 → 5
+  assert.equal(stepStrokeWeight(0, 1), 0.25);
+  assert.equal(stepStrokeWeight(0.25, 1), 0.5);
+  assert.equal(stepStrokeWeight(0.5, 1), 0.75);
+  assert.equal(stepStrokeWeight(0.75, 1), 1);
+  assert.equal(stepStrokeWeight(1, 1), 2);
+  assert.equal(stepStrokeWeight(2, 1), 3);
+  assert.equal(stepStrokeWeight(3, 1), 4);
+  assert.equal(stepStrokeWeight(4, 1), 5);
+  assert.equal(stepStrokeWeight(5, 1), 6);
+
+  // Decrements: 5 → 4 → 3 → 2 → 1 → .75 → .5 → .25 → 0
+  assert.equal(stepStrokeWeight(5, -1), 4);
+  assert.equal(stepStrokeWeight(4, -1), 3);
+  assert.equal(stepStrokeWeight(3, -1), 2);
+  assert.equal(stepStrokeWeight(2, -1), 1);
+  assert.equal(stepStrokeWeight(1, -1), 0.75);
+  assert.equal(stepStrokeWeight(0.75, -1), 0.5);
+  assert.equal(stepStrokeWeight(0.5, -1), 0.25);
+  assert.equal(stepStrokeWeight(0.25, -1), 0);
+  assert.equal(stepStrokeWeight(0, -1), 0);
+
+  // Intermediate values snap to next notch
+  assert.equal(stepStrokeWeight(0.4, 1), 0.5);
+  assert.equal(stepStrokeWeight(0.4, -1), 0.25);
+  assert.equal(stepStrokeWeight(1.5, 1), 2);
+  assert.equal(stepStrokeWeight(1.5, -1), 1);
+
+  // Formatting integers vs decimals
+  assert.equal(formatStrokeWeight(0), '0');
+  assert.equal(formatStrokeWeight(0.25), '0.25');
+  assert.equal(formatStrokeWeight(0.5), '0.5');
+  assert.equal(formatStrokeWeight(1), '1');
+  assert.equal(formatStrokeWeight(3), '3');
+});
+
+test('Stroke Flyout: steppers increment/decrement and synchronize bidirectionally with Properties panel', async () => {
+  const env = setupMockEnvironment();
+  const { mountVisterasPanelDock } = await import('../js/visteras-panel-dock.js');
+
+  const appWeight = env.doc.getElementById('vcs_app_stroke_weight');
+  appWeight.value = '1';
+
+  const dockApi = mountVisterasPanelDock({ svgEditor: {} });
+  dockApi.open('stroke');
+
+  const strokePane = env.doc.getElementById('vdock_stroke_panel');
+  assert.ok(strokePane, 'Stroke panel pane mounted in flyout');
+
+  const dkW = strokePane.querySelector('#vdock_stroke_weight_input');
+  assert.ok(dkW, 'Flyout stroke weight input exists');
+  assert.equal(dkW.value, '1', 'Flyout initializes with properties panel stroke weight');
+
+  const upBtn = strokePane.querySelector('.vdock-stroke-weight-spin-btn[data-dir="1"]');
+  const downBtn = strokePane.querySelector('.vdock-stroke-weight-spin-btn[data-dir="-1"]');
+  assert.ok(upBtn, 'Up stepper button exists in flyout');
+  assert.ok(downBtn, 'Down stepper button exists in flyout');
+
+  // 1. Click Up: 1 → 2; updates both Flyout and Properties panel
+  upBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '2', 'Flyout weight incremented to 2');
+  assert.equal(appWeight.value, '2', 'Properties panel weight updated to 2');
+
+  // 2. Click Up again: 2 → 3
+  upBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '3', 'Flyout weight incremented to 3');
+  assert.equal(appWeight.value, '3', 'Properties panel weight updated to 3');
+
+  // 3. Click Down: 3 → 2 → 1 → 0.75 → 0.5 → 0.25 → 0
+  downBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '2');
+  assert.equal(appWeight.value, '2');
+
+  downBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '1');
+  assert.equal(appWeight.value, '1');
+
+  downBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '0.75', 'Flyout decrements below 1 to 0.75');
+  assert.equal(appWeight.value, '0.75', 'Properties panel updated to 0.75');
+
+  downBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '0.5', 'Flyout decrements to 0.5');
+  assert.equal(appWeight.value, '0.5', 'Properties panel updated to 0.5');
+
+  downBtn.dispatchEvent({ type: 'click' });
+  assert.equal(dkW.value, '0.25', 'Flyout decrements to 0.25');
+  assert.equal(appWeight.value, '0.25', 'Properties panel updated to 0.25');
+
+  // 4. Properties panel updates Flyout:
+  // When Properties panel input changes, Flyout reflects it immediately
+  appWeight.value = '5';
+  appWeight.dispatchEvent({ type: 'input' });
+  assert.equal(dkW.value, '5', 'Flyout immediately receives new value from Properties panel input event');
+
+  appWeight.value = '0.75';
+  appWeight.dispatchEvent({ type: 'change' });
+  assert.equal(dkW.value, '0.75', 'Flyout receives change event from Properties panel');
+
+  // 5. Keydown ArrowUp / ArrowDown on flyout input
+  dkW.dispatchEvent({ type: 'keydown', key: 'ArrowUp' });
+  assert.equal(dkW.value, '1', 'ArrowUp steps 0.75 to 1');
+  assert.equal(appWeight.value, '1', 'Properties panel updated by ArrowUp');
+
+  dkW.dispatchEvent({ type: 'keydown', key: 'ArrowDown' });
+  assert.equal(dkW.value, '0.75', 'ArrowDown steps 1 to 0.75');
+  assert.equal(appWeight.value, '0.75', 'Properties panel updated by ArrowDown');
+});
+
+
 

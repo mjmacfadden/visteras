@@ -361,7 +361,7 @@ export function mountStrokeLink(svgEditor, ctrl = null) {
   }
   const setWeightFields = (w) => {
     const s = String(Math.round(Number(w) * 100) / 100);
-    for (const id of ['stroke_width', 'vcs_app_stroke_weight']) {
+    for (const id of ['stroke_width', 'vcs_app_stroke_weight', 'vdock_stroke_weight_input']) {
       const input = document.getElementById(id);
       if (input) input.value = s;
     }

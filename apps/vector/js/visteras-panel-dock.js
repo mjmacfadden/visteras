@@ -18,6 +18,34 @@ const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 240;
 
 /**
+ * Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → 5 …
+ */
+export function stepStrokeWeight(value, dir) {
+  const n = Math.max(0, Number(value) || 0);
+  const quarters = [0, 0.25, 0.5, 0.75, 1];
+  if (dir > 0) {
+    for (const s of quarters) {
+      if (n < s - 1e-9) return s;
+    }
+    return Math.floor(n + 1e-9) + 1;
+  }
+  if (n > 1 + 1e-9) {
+    const floored = Math.floor(n + 1e-9);
+    return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
+  }
+  for (let i = quarters.length - 1; i >= 0; i--) {
+    if (n > quarters[i] + 1e-9) return quarters[i];
+  }
+  return 0;
+}
+
+export function formatStrokeWeight(n) {
+  const v = Math.max(0, Number(n) || 0);
+  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
+  return String(Math.round(v * 100) / 100);
+}
+
+/**
  * Illustrator panel shortcuts → panel id. Shift is significant:
  * F6 Color · ⇧F6 Appearance · F7 Layers · ⌘F10 Stroke · ⇧⌘F10 Transparency · ⌘F9 Gradient.
  */
@@ -251,6 +279,10 @@ export function mountVisterasPanelDock({ svgEditor }) {
       <div class="vdock-stroke-control">
         <div class="vdock-stroke-weight-box">
           <input type="number" id="vdock_stroke_weight_input" min="0" max="999" step="any" value="1" aria-label="Stroke weight" />
+          <span class="vdock-stroke-weight-spin" role="group" aria-label="Stroke weight steppers">
+            <button type="button" class="vdock-stroke-weight-spin-btn" data-dir="1" tabindex="-1" title="Increase stroke weight" aria-label="Increase stroke weight">▲</button>
+            <button type="button" class="vdock-stroke-weight-spin-btn" data-dir="-1" tabindex="-1" title="Decrease stroke weight" aria-label="Decrease stroke weight">▼</button>
+          </span>
         </div>
         <span style="color:#888; font-size:10px;">px</span>
       </div>
@@ -293,25 +325,144 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
   flyoutBody.appendChild(strokePane);
 
-  // Wire Stroke weight input sync with Appearance weight input
+  // Wire Stroke weight input sync with Appearance weight input & canvas
   const dkW = strokePane.querySelector('#vdock_stroke_weight_input');
   const appW = document.getElementById('vcs_app_stroke_weight');
-  if (dkW && appW) {
-    dkW.value = appW.value || '1';
-    dkW.addEventListener('input', () => {
-      appW.value = dkW.value;
-      appW.dispatchEvent(new Event('input', { bubbles: true }));
+
+  let syncing = false;
+  let lastDkWeight = Number(dkW?.value) || Number(appW?.value) || 1;
+
+  const applyWeight = (val, { live = false, source = 'flyout' } = {}) => {
+    const n = Math.max(0, Number(val));
+    if (Number.isNaN(n)) return;
+    const formatted = formatStrokeWeight(n);
+    lastDkWeight = n;
+
+    if (source === 'flyout') {
+      if (dkW && dkW.value !== formatted && document.activeElement !== dkW) {
+        dkW.value = formatted;
+      }
+      if (appW && appW.value !== formatted) {
+        syncing = true;
+        appW.value = formatted;
+        try {
+          appW.dispatchEvent(new Event('input', { bubbles: true }));
+          if (!live) appW.dispatchEvent(new Event('change', { bubbles: true }));
+        } finally {
+          syncing = false;
+        }
+      }
+      const native = document.getElementById('stroke_width');
+      if (native && native.value !== formatted && document.activeElement !== native) {
+        native.value = formatted;
+      }
+      if (typeof window.__visterasColorSystem?.writeStrokeWidth === 'function') {
+        window.__visterasColorSystem.writeStrokeWidth(n, { live });
+      } else if (sc) {
+        if (typeof sc.setCurProperties === 'function') sc.setCurProperties('stroke_width', n);
+        else if (sc.curProperties) sc.curProperties.stroke_width = n;
+        if (sc.curShape) sc.curShape.stroke_width = n;
+        if (typeof sc.changeSelectedAttribute === 'function') {
+          sc.changeSelectedAttribute('stroke-width', n);
+        } else {
+          const sel = (sc.getSelectedElements?.() || []).filter(Boolean);
+          for (const el of sel) el.setAttribute?.('stroke-width', String(n));
+          sc.call?.('changed', sel);
+        }
+      }
+    } else if (source === 'app') {
+      if (dkW && dkW.value !== formatted && document.activeElement !== dkW) {
+        dkW.value = formatted;
+      }
+    }
+  };
+
+  const stepAndApply = (dir) => {
+    const curVal = dkW ? dkW.value : (appW ? appW.value : 1);
+    const next = stepStrokeWeight(curVal, dir);
+    if (dkW) dkW.value = formatStrokeWeight(next);
+    applyWeight(next, { live: true, source: 'flyout' });
+  };
+
+  if (dkW) {
+    if (appW) dkW.value = formatStrokeWeight(appW.value || '1');
+
+    // Spin buttons ▲ / ▼
+    const spinButtons = strokePane.querySelectorAll('.vdock-stroke-weight-spin-btn');
+    spinButtons.forEach((btn) => {
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dir = Number(btn.dataset.dir) || 0;
+        if (dir) stepAndApply(dir);
+      });
     });
+
+    // ArrowUp / ArrowDown / Enter
+    dkW.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        stepAndApply(e.key === 'ArrowUp' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        applyWeight(dkW.value, { live: false, source: 'flyout' });
+        dkW.blur();
+      }
+    });
+
+    // Wheel
+    dkW.addEventListener('wheel', (e) => {
+      if (document.activeElement !== dkW) return;
+      e.preventDefault();
+      stepAndApply(e.deltaY < 0 ? 1 : -1);
+    }, { passive: false });
+
+    // Typing & native spinner step
+    dkW.addEventListener('input', (e) => {
+      if (syncing) return;
+      const raw = Number(dkW.value);
+      if (!Number.isFinite(raw)) return;
+      const inputType = e instanceof InputEvent ? e.inputType : null;
+      const isTyping = !!inputType && (
+        inputType.startsWith('insert')
+        || inputType.startsWith('delete')
+        || inputType === 'historyUndo'
+        || inputType === 'historyRedo'
+      );
+      if (isTyping) {
+        lastDkWeight = raw;
+        applyWeight(raw, { live: true, source: 'flyout' });
+        return;
+      }
+      const dir = raw > lastDkWeight + 1e-9 ? 1 : raw < lastDkWeight - 1e-9 ? -1 : 0;
+      if (dir) {
+        stepAndApply(dir);
+      } else {
+        lastDkWeight = raw;
+        applyWeight(raw, { live: true, source: 'flyout' });
+      }
+    });
+
     dkW.addEventListener('change', () => {
-      appW.value = dkW.value;
-      appW.dispatchEvent(new Event('change', { bubbles: true }));
+      if (syncing) return;
+      applyWeight(dkW.value, { live: false, source: 'flyout' });
     });
-    appW.addEventListener('input', () => {
-      if (document.activeElement !== dkW) dkW.value = appW.value;
-    });
-    appW.addEventListener('change', () => {
-      if (document.activeElement !== dkW) dkW.value = appW.value;
-    });
+  }
+
+  // Properties panel updates flyout
+  if (appW) {
+    const onAppWChange = () => {
+      if (syncing) return;
+      applyWeight(appW.value, { live: true, source: 'app' });
+    };
+    appW.addEventListener('input', onAppWChange);
+    appW.addEventListener('change', onAppWChange);
   }
 
   // (E) Gradient Panel (#vdock_gradient_panel) — empty pane; filled by
@@ -465,8 +616,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
     });
 
     // Synchronize stroke weight when stroke panel opens
-    if (panelId === 'stroke' && dkW && appW) {
-      dkW.value = appW.value || '1';
+    if (panelId === 'stroke') {
+      const curVal = (typeof window.__visterasColorSystem?.readStrokeWidth === 'function')
+        ? window.__visterasColorSystem.readStrokeWidth()
+        : (appW ? appW.value : (dkW ? dkW.value : 1));
+      const formatted = formatStrokeWeight(curVal);
+      if (dkW) dkW.value = formatted;
+      if (appW && document.activeElement !== appW) appW.value = formatted;
+      lastDkWeight = Number(formatted) || 0;
     }
 
     // Refresh color system views if opening color or swatches

@@ -297,8 +297,13 @@
   border: 1px solid #383838;
   border-radius: 3px;
   height: 24px;
-  padding: 0 4px;
+  padding: 0;
   width: 80px;
+  overflow: hidden;
+}
+
+.vdock-stroke-weight-box:focus-within {
+  border-color: var(--studio-orange, #fa7c1b);
 }
 
 .vdock-stroke-weight-box input {
@@ -309,7 +314,56 @@
   width: 100%;
   outline: none;
   text-align: right;
+  padding: 0 4px;
   font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.vdock-stroke-weight-box input::-webkit-outer-spin-button,
+.vdock-stroke-weight-box input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.vdock-stroke-weight-spin {
+  display: flex;
+  flex-direction: column;
+  width: 14px;
+  height: 100%;
+  border-left: 1px solid #383838;
+  flex-shrink: 0;
+}
+
+.vdock-stroke-weight-spin-btn {
+  flex: 1 1 50%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: #242424;
+  color: #888888;
+  font-size: 6px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.vdock-stroke-weight-spin-btn + .vdock-stroke-weight-spin-btn {
+  border-top: 1px solid #383838;
+}
+
+.vdock-stroke-weight-spin-btn:hover {
+  background: #333333;
+  color: var(--studio-orange, #fa7c1b);
+}
+
+.vdock-stroke-weight-spin-btn:active {
+  background: #444444;
+  color: #ffffff;
 }
 
 /* Gradient panel pane: contents styled in css/visteras-gradient.css */
