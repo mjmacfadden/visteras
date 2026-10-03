@@ -381,7 +381,8 @@ hr {
 #workarea.wireframe #svgcontent * {
   fill: none;
   stroke: #000;
-  stroke-width: 1px;
+  stroke-width: 0.75px !important;
+  vector-effect: non-scaling-stroke !important;
   stroke-opacity: 1.0;
   stroke-dasharray: 0;
   opacity: 1;
@@ -390,8 +391,10 @@ hr {
 }
 
 #workarea.wireframe #svgcontent text {
-  fill: #000;
-  stroke: none;
+  fill: none !important;
+  stroke: #000 !important;
+  stroke-width: 0.75px !important;
+  vector-effect: non-scaling-stroke !important;
 }
 
 #workarea.wireframe #canvasBackground>rect {

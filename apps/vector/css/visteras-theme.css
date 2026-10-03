@@ -509,7 +509,7 @@ html, body {
   filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.5)) !important;
 }
 
-/* Outline / Wireframe Mode (Illustrator Parity: White Workspace Background) */
+/* Outline / Wireframe Mode (Illustrator Parity: non-scaling hairline stroke on white workspace) */
 #workarea.wireframe,
 #workarea.wireframe #svgcanvas {
   background-color: #ffffff !important;
@@ -520,6 +520,26 @@ html, body {
   filter: none !important;
   stroke: #d0d0d0 !important;
   stroke-width: 1px !important;
+  vector-effect: non-scaling-stroke !important;
+}
+
+#workarea.wireframe #svgcontent * {
+  fill: none !important;
+  stroke: #000000 !important;
+  stroke-width: 0.75px !important;
+  vector-effect: non-scaling-stroke !important;
+  stroke-opacity: 1 !important;
+  stroke-dasharray: none !important;
+  opacity: 1 !important;
+  pointer-events: stroke !important;
+  filter: none !important;
+}
+
+#workarea.wireframe #svgcontent text {
+  fill: none !important;
+  stroke: #000000 !important;
+  stroke-width: 0.75px !important;
+  vector-effect: non-scaling-stroke !important;
 }
 
 #ruler_corner {

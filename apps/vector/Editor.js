@@ -70280,7 +70280,8 @@ var { $id: Uz, $click: Wz, decode64: Gz } = JI, Kz = class extends gz {
 	updateWireFrame() {
 		let e = `
       #workarea.wireframe #svgcontent * {
-        stroke-width: ${1 / this.svgCanvas.getZoom()}px;
+        stroke-width: 0.75px !important;
+        vector-effect: non-scaling-stroke !important;
       }
     `;
 		document.querySelectorAll("#wireframe_rules").length > 0 && (document.querySelector("#wireframe_rules").textContent = this.workarea.classList.contains("wireframe") ? e : "");
