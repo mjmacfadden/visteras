@@ -7,10 +7,50 @@ import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import Mask_class from './../mask/mask.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
-import { compute_matte } from './../../libs/bg-auto/index.js';
+import { compute_matte, warm_model } from './../../libs/bg-auto/index.js';
 
 var instance = null;
 var busy = false;
+var prewarmTriggered = false;
+
+export function warm_model_proactive() {
+	if (prewarmTriggered) return;
+	prewarmTriggered = true;
+	try {
+		warm_model({ silent: true }).catch(function (err) {
+			console.debug('[bg-auto] proactive prewarm offline or skipped', err);
+		});
+	} catch (e) {
+		// Ignore
+	}
+}
+
+function setup_prewarm_listeners() {
+	if (typeof window === 'undefined' || typeof document === 'undefined') return;
+	if (setup_prewarm_listeners._installed) return;
+	setup_prewarm_listeners._installed = true;
+
+	// Delegated mouseover / pointerover intent listener for quick actions and menu targets
+	document.addEventListener('mouseover', function (e) {
+		var target = e.target;
+		if (!target || !target.closest) return;
+		if (target.closest('#prop_remove_background, #select_subject, .select_subject, [data-target="tools/bg_auto.select_subject"], [data-target="tools/bg_auto.remove_background"]')) {
+			warm_model_proactive();
+		}
+	}, { passive: true });
+
+	// Idle callback prewarm (after 3 seconds of page load when idle)
+	var scheduleIdle = window.requestIdleCallback || function (cb) { return setTimeout(cb, 1000); };
+	setTimeout(function () {
+		scheduleIdle(function () {
+			warm_model_proactive();
+		});
+	}, 3000);
+}
+
+if (typeof window !== 'undefined') {
+	setup_prewarm_listeners();
+}
 
 class Tools_bg_auto_class {
 
@@ -21,6 +61,7 @@ class Tools_bg_auto_class {
 		instance = this;
 		this.Base_layers = new Base_layers_class();
 		this.Mask = new Mask_class();
+		setup_prewarm_listeners();
 	}
 
 	friendly_error(err) {
@@ -270,7 +311,7 @@ class Tools_bg_auto_class {
 			);
 
 			if (result && result.device) {
-				console.info('[bg-auto] Remove Background device=', result.device, 'timings=', result.timings);
+				console.info('[bg-auto] Remove Background device=', result.device, 'dtype=', result.dtype, 'timings=', result.timings);
 			}
 			alertify.success('Background removed (layer mask).');
 		} catch (err) {
@@ -369,9 +410,11 @@ class Tools_bg_auto_class {
 			);
 
 			if (result && result.device) {
-				console.info('[bg-auto] Select Subject device=', result.device, 'timings=', result.timings);
+				console.info('[bg-auto] Select Subject device=', result.device, 'dtype=', result.dtype, 'timings=', result.timings);
 			}
-			alertify.success('Subject selected.');
+			var isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent);
+			var refineHint = isMac ? ' (⌘⌥R to refine)' : ' (Ctrl+Alt+R to refine)';
+			alertify.success('Subject selected.' + refineHint);
 		} catch (err) {
 			console.error('[bg-auto] select_subject', err);
 			alertify.error(this.friendly_error(err));

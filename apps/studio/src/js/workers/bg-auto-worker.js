@@ -13,6 +13,7 @@ var DEFAULT_ORT_WASM_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.31.0-
 var pipe = null;
 var loadedDevice = null;
 var loadedModelId = null;
+var loadedDtype = null;
 var transformersPromise = null;
 var transformersCdn = DEFAULT_TRANSFORMERS_CDN;
 var ortWasmCdn = DEFAULT_ORT_WASM_CDN;
@@ -51,25 +52,48 @@ function apply_model_location(env, location) {
 	return location;
 }
 
-async function ensure_pipeline(modelLocation, preferDevice, progressPort) {
+function get_pipeline_attempts(preferDevice, preferDtype) {
+	if (preferDevice === 'wasm') {
+		var wasmDtypes = preferDtype ? [preferDtype, 'q8'] : ['q8'];
+		return wasmDtypes.map(function (d) { return { device: 'wasm', dtype: d }; });
+	}
+	if (preferDevice === 'webgpu') {
+		var gpuDtypes = preferDtype ? [preferDtype, 'fp16', 'fp32', 'q8'] : ['fp16', 'fp32', 'q8'];
+		var list = gpuDtypes.map(function (d) { return { device: 'webgpu', dtype: d }; });
+		list.push({ device: 'wasm', dtype: 'q8' });
+		return list;
+	}
+	// 'auto' or unspecified: WebGPU fp16 -> fp32 -> q8 -> WASM q8
+	if (preferDtype) {
+		return [
+			{ device: 'webgpu', dtype: preferDtype },
+			{ device: 'webgpu', dtype: 'fp16' },
+			{ device: 'webgpu', dtype: 'fp32' },
+			{ device: 'wasm', dtype: preferDtype },
+			{ device: 'wasm', dtype: 'q8' },
+		];
+	}
+	return [
+		{ device: 'webgpu', dtype: 'fp16' },
+		{ device: 'webgpu', dtype: 'fp32' },
+		{ device: 'webgpu', dtype: 'q8' },
+		{ device: 'wasm', dtype: 'q8' },
+	];
+}
+
+async function ensure_pipeline(modelLocation, preferDevice, preferDtype, progressPort) {
 	var mod = await load_transformers();
 	var pipeline = mod.pipeline;
 	var env = mod.env;
 	var modelId = apply_model_location(env, modelLocation);
-	var devices = [];
-	if (preferDevice === 'wasm') {
-		devices = ['wasm'];
-	} else if (preferDevice === 'webgpu') {
-		devices = ['webgpu', 'wasm'];
-	} else {
-		devices = ['webgpu', 'wasm'];
-	}
 
-	// Reuse only when the caller asked for this device (or auto). A forced
-	// webgpu/wasm switch must reload so BG_AUTO_DEVICE overrides work.
+	// Reuse only when the caller asked for this device and dtype (or auto). A forced
+	// webgpu/wasm switch or dtype change must reload so overrides work.
 	if (pipe && loadedModelId === modelId) {
-		if (!preferDevice || preferDevice === 'auto' || preferDevice === loadedDevice) {
-			return { device: loadedDevice, modelId: modelId };
+		var deviceMatch = (!preferDevice || preferDevice === 'auto' || preferDevice === loadedDevice);
+		var dtypeMatch = (!preferDtype || preferDtype === loadedDtype);
+		if (deviceMatch && dtypeMatch) {
+			return { device: loadedDevice, modelId: modelId, dtype: loadedDtype };
 		}
 	}
 
@@ -78,24 +102,38 @@ async function ensure_pipeline(modelLocation, preferDevice, progressPort) {
 		pipe = null;
 		loadedDevice = null;
 		loadedModelId = null;
+		loadedDtype = null;
+	}
+
+	var rawAttempts = get_pipeline_attempts(preferDevice, preferDtype);
+	var seen = new Set();
+	var attempts = [];
+	for (var a = 0; a < rawAttempts.length; a++) {
+		var att = rawAttempts[a];
+		var key = att.device + ':' + att.dtype;
+		if (!seen.has(key)) {
+			seen.add(key);
+			attempts.push(att);
+		}
 	}
 
 	var lastError = null;
-	for (var i = 0; i < devices.length; i++) {
-		var device = devices[i];
+	for (var i = 0; i < attempts.length; i++) {
+		var target = attempts[i];
 		try {
 			pipe = await pipeline('background-removal', modelId, {
-				device: device,
-				dtype: 'q8',
+				device: target.device,
+				dtype: target.dtype,
 				progress_callback: function (data) {
 					if (progressPort) {
 						progressPort.postMessage({ type: 'progress', data: data });
 					}
 				},
 			});
-			loadedDevice = device;
+			loadedDevice = target.device;
 			loadedModelId = modelId;
-			return { device: device, modelId: modelId };
+			loadedDtype = target.dtype;
+			return { device: loadedDevice, modelId: modelId, dtype: loadedDtype };
 		} catch (err) {
 			lastError = err;
 			pipe = null;
@@ -146,13 +184,13 @@ self.onmessage = async function (event) {
 			return;
 		}
 		if (msg.type === 'load') {
-			var info = await ensure_pipeline(msg.modelLocation, msg.device, null);
-			self.postMessage({ id: id, type: 'ready', device: info.device, modelId: info.modelId });
+			var info = await ensure_pipeline(msg.modelLocation, msg.device, msg.dtype, null);
+			self.postMessage({ id: id, type: 'ready', device: info.device, modelId: info.modelId, dtype: info.dtype });
 			return;
 		}
 		if (msg.type === 'infer') {
 			var t0 = performance.now();
-			var info2 = await ensure_pipeline(msg.modelLocation, msg.device, {
+			var info2 = await ensure_pipeline(msg.modelLocation, msg.device, msg.dtype, {
 				postMessage: function (payload) {
 					self.postMessage(Object.assign({ id: id }, payload));
 				},
@@ -177,6 +215,7 @@ self.onmessage = async function (event) {
 				matte: matte.data.buffer,
 				device: info2.device,
 				modelId: info2.modelId,
+				dtype: info2.dtype,
 				timings: {
 					ensure_ms: Math.round(tLoad - t0),
 					infer_ms: Math.round(tInfer - tLoad),

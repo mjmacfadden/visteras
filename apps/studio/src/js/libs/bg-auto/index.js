@@ -25,6 +25,11 @@ export async function warm_model(options) {
 	return mod.warm_model(options);
 }
 
+export async function refine_matte_edges(sourceCanvas, maskCanvas, options) {
+	var mod = await load_bg_auto();
+	return mod.refine_matte_edges(sourceCanvas, maskCanvas, options);
+}
+
 export async function get_model_location_setting() {
 	var mod = await load_bg_auto();
 	return mod.get_model_location_setting();
