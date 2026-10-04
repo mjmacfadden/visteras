@@ -201,34 +201,25 @@ export class GuideManager {
     this.updateUI();
   }
 
-  toggleShowGuides(force = null, notify = false) {
+  toggleShowGuides(force = null) {
     this.showGuides = force !== null ? force : !this.showGuides;
     this._saveSettings();
     this.renderRulerGuides();
     this.updateUI();
-    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
-      window.showStudioToast(this.showGuides ? 'Guides: Visible' : 'Guides: Hidden', 'info', 1500);
-    }
   }
 
-  toggleLockGuides(force = null, notify = false) {
+  toggleLockGuides(force = null) {
     this.lockGuides = force !== null ? force : !this.lockGuides;
     this._saveSettings();
     this.renderRulerGuides();
     this.updateUI();
-    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
-      window.showStudioToast(this.lockGuides ? 'Guides: Locked' : 'Guides: Unlocked', 'info', 1500);
-    }
   }
 
-  toggleSmartGuides(force = null, notify = false) {
+  toggleSmartGuides(force = null) {
     this.smartGuidesEnabled = force !== null ? force : !this.smartGuidesEnabled;
     this._saveSettings();
     this.clearSmartGuides();
     this.updateUI();
-    if (notify && typeof window !== 'undefined' && window.showStudioToast) {
-      window.showStudioToast(this.smartGuidesEnabled ? 'Smart Guides: On' : 'Smart Guides: Off', 'info', 1500);
-    }
   }
 
   renderRulerGuides() {
@@ -1377,7 +1368,7 @@ export class GuideManager {
     const smartBtn = document.getElementById('action_smart_guides');
     if (smartBtn) {
       smartBtn.addEventListener('click', () => {
-        this.toggleSmartGuides(null, true);
+        this.toggleSmartGuides();
       });
     }
 
@@ -1385,7 +1376,7 @@ export class GuideManager {
     const toggleGuidesBtn = document.getElementById('action_toggle_guides');
     if (toggleGuidesBtn) {
       toggleGuidesBtn.addEventListener('click', () => {
-        this.toggleShowGuides(null, true);
+        this.toggleShowGuides();
       });
     }
 
@@ -1393,7 +1384,7 @@ export class GuideManager {
     const lockGuidesBtn = document.getElementById('action_lock_guides');
     if (lockGuidesBtn) {
       lockGuidesBtn.addEventListener('click', () => {
-        this.toggleLockGuides(null, true);
+        this.toggleLockGuides();
       });
     }
 
@@ -1416,14 +1407,15 @@ export class GuideManager {
       if (!isCmdOrCtrl) return;
 
       const target = e.target;
-      const isInput = target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.nodeName) || target?.isContentEditable;
+      const isInput = target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.nodeName) || target?.isContentEditable);
       if (isInput) return;
 
       // ⌘U: Smart Guides
       if ((e.key === 'u' || e.key === 'U' || e.code === 'KeyU') && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleSmartGuides(null, true);
+        e.stopImmediatePropagation();
+        this.toggleSmartGuides();
         return;
       }
 
@@ -1431,7 +1423,8 @@ export class GuideManager {
       if ((e.key === ';' || e.code === 'Semicolon') && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleShowGuides(null, true);
+        e.stopImmediatePropagation();
+        this.toggleShowGuides();
         return;
       }
 
@@ -1439,7 +1432,8 @@ export class GuideManager {
       if ((e.key === ';' || e.code === 'Semicolon') && e.altKey) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleLockGuides(null, true);
+        e.stopImmediatePropagation();
+        this.toggleLockGuides();
         return;
       }
     }, true);

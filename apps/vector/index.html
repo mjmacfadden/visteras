@@ -1439,21 +1439,6 @@
             return;
           }
 
-          // Command/Ctrl + U: Smart Guides
-          if (!e.shiftKey && (e.key === 'u' || e.key === 'U' || e.code === 'KeyU')) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.__visterasGuideManager?.toggleSmartGuides(null, true);
-            return;
-          }
-
-          // Command/Ctrl + ;: Toggle Guides
-          if (!e.shiftKey && (e.key === ';' || e.code === 'Semicolon')) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.__visterasGuideManager?.toggleShowGuides(null, true);
-            return;
-          }
         }
 
         // Alt + Command / Control shortcuts
@@ -1463,14 +1448,6 @@
             e.preventDefault();
             e.stopPropagation();
             window.__visterasClippingMask?.release();
-            return;
-          }
-
-          // Alt + Command/Ctrl + ;: Lock Guides
-          if (e.key === ';' || e.code === 'Semicolon') {
-            e.preventDefault();
-            e.stopPropagation();
-            window.__visterasGuideManager?.toggleLockGuides(null, true);
             return;
           }
         }

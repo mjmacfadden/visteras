@@ -497,3 +497,48 @@ test('Guides: evaluateHandleSnap snaps resize handles to alignment targets and r
   assert.ok(marker, 'Must render pink crosshair marker on the handle');
 });
 
+test('Guides: ⌘; toggle keybind operates silently without any toasts', () => {
+  let toastCallCount = 0;
+  globalThis.window = {
+    showStudioToast() {
+      toastCallCount++;
+    },
+    addEventListener(event, handler) {
+      if (event === 'keydown') this._keydownHandler = handler;
+    }
+  };
+
+  const manager = new GuidesModule.GuideManager(null);
+  manager._bindShortcuts();
+
+  assert.equal(manager.showGuides, true, 'Initially guides are shown');
+
+  let defaultPrevented = false;
+  let immediatePropagationStopped = false;
+  const fakeEvent = {
+    key: ';',
+    code: 'Semicolon',
+    metaKey: true,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    target: { nodeName: 'DIV' },
+    preventDefault() { defaultPrevented = true; },
+    stopPropagation() {},
+    stopImmediatePropagation() { immediatePropagationStopped = true; }
+  };
+
+  globalThis.window._keydownHandler(fakeEvent);
+
+  assert.equal(manager.showGuides, false, 'Guides must be toggled to hidden by ⌘;');
+  assert.equal(defaultPrevented, true, 'Must prevent default');
+  assert.equal(immediatePropagationStopped, true, 'Must stop immediate propagation to prevent duplicate handlers');
+  assert.equal(toastCallCount, 0, 'Must NOT display any toast notifications');
+
+  // Toggle again
+  globalThis.window._keydownHandler(fakeEvent);
+  assert.equal(manager.showGuides, true, 'Guides must be toggled back to visible by ⌘;');
+  assert.equal(toastCallCount, 0, 'Must NOT display any toast notifications on toggle back');
+});
+
+
