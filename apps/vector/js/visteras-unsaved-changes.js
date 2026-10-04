@@ -8,7 +8,7 @@
  *     (title, "Close <b>name</b>? Unsaved changes will be lost.", Cancel/Close,
  *     Cancel focused);
  *   - saving a .vvd clears the tab's dirty flag (visteras-document-shell
- *     clearActiveDirty), which also silences the leave warning.
+ *     completeSave), which also silences the leave warning.
  *
  * SVG-Edit's own beforeunload (undo-stack based) is turned off with
  * no_save_warning: true in index.html: it cannot see the per-tab dirty state

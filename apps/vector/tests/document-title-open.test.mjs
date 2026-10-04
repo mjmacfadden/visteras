@@ -49,7 +49,7 @@ test('Document Title: openVectorFile prioritizes filename over internal bundle t
 test('Document Title: saveVectorDoc syncs internal title to saved handle base name', () => {
   const html = fs.readFileSync(vectorHtmlPath, 'utf8');
 
-  assert.match(html, /const buildVvdJson = \(docTitle, thumbUrl\) => JSON\.stringify/);
+  assert.match(html, /const buildVvdJson = \(docTitle, thumbUrl\) => serializeDocumentSnapshot\(snapshot, docTitle, thumbUrl\)/);
   // serialized after the picker resolves, with the name it is saved under
   assert.match(html, /data: async \(name\) => buildVvdJson\(baseOf\(name\), await makeThumbnail\(\)\),/);
   assert.match(html, /const savedBase = baseOf\(result\.name\);/);
@@ -65,7 +65,8 @@ test('Document Shell: openDocument and switchDocument sync active document title
   assert.match(code, /localStorage\.setItem\(ACTIVE_TITLE_KEY, resolvedTitle\)/);
 
   // Verify switchDocument updates svgEditor.title and ACTIVE_TITLE_KEY
-  assert.match(code, /function switchDocument\(id\)[\s\S]*?if \(svgEditor\) svgEditor\.title = next\.title;[\s\S]*?localStorage\.setItem\(ACTIVE_TITLE_KEY, next\.title\);/);
+  assert.match(code, /function switchDocument\(id\)[\s\S]*?activateDocument\(next\)/);
+  assert.match(code, /function activateDocument\(doc\)[\s\S]*?svgEditor\.title = doc\.title;[\s\S]*?localStorage\.setItem\(ACTIVE_TITLE_KEY, doc\.title\)/);
 
   // Verify closeDocument updates svgEditor.title and ACTIVE_TITLE_KEY
   assert.match(code, /if \(svgEditor\) svgEditor\.title = doc\.title;[\s\S]*?localStorage\.setItem\(ACTIVE_TITLE_KEY, doc\.title\);/);

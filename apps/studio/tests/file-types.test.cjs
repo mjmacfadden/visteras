@@ -38,8 +38,11 @@ test('File Types: Vector supports .vvd documents', () => {
 	assert.match(vectorHtml, /accept\s*[=:]\s*['"]\.vvd,/);
 
 	// Action save generates .vvd bundle with correct schema
-	assert.match(vectorHtml, /visteras-vector-document-v1/);
-	assert.match(vectorHtml, /app:\s*'visteras-vector'/);
+	const vectorSaveJs = fs.existsSync(path.join(rootDir, 'apps/vector/js/visteras-document-save.js'))
+		? fs.readFileSync(path.join(rootDir, 'apps/vector/js/visteras-document-save.js'), 'utf8')
+		: '';
+	assert.ok(/visteras-vector-document-v1/.test(vectorHtml) || /visteras-vector-document-v1/.test(vectorSaveJs));
+	assert.ok(/app:\s*'visteras-vector'/.test(vectorHtml) || /app:\s*'visteras-vector'/.test(vectorSaveJs));
 	assert.match(vectorHtml, /fileName: safeFileName\(title, 'vvd'\)/); // <title>.vvd via the shared file helper
 });
 
@@ -86,7 +89,7 @@ test('File Types: All formats support embedded PNG thumbnails for previews', () 
 	assert.match(saveJs, /export_data\.thumbnail\s*=\s*thumbDataUrl/);
 
 	// Vector .vvd embeds thumbnail
-	assert.match(vectorHtml, /thumbnail:\s*thumbUrl/);
+	assert.ok(/thumbnail:\s*thumbUrl/.test(vectorHtml) || /serializeDocumentSnapshot\(snapshot,\s*docTitle,\s*thumbUrl\)/.test(vectorHtml) || fs.readFileSync(path.join(rootDir, 'apps/vector/js/visteras-document-save.js'), 'utf8').includes('thumbnail'));
 
 	// Publish .vpd embeds thumbnail
 	assert.match(docManagerTs, /thumbnail:\s*thumbUrl/);

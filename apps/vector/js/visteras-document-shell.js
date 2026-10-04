@@ -1,3 +1,5 @@
+import { createDocumentSessions } from './visteras-document-sessions.js';
+import { recordDocumentChange, replaceDocumentSession, applyDocumentSave } from './visteras-document-save.js';
 import { normalizeArtboards, createMultipleArtboards } from './visteras-artboard-model.js';
 /**
  * Visteras Vector — document shell
@@ -96,6 +98,12 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   if (window.__visterasDocumentShell) return window.__visterasDocumentShell;
 
   const sc = svgEditor.svgCanvas;
+  const sessions = createDocumentSessions(sc);
+  let dirtyObserver;
+  const isArtworkMutation = record => sc.getSvgContent()?.contains(record.target);
+  function flushPendingChanges() {
+    if (dirtyObserver?.takeRecords().some(isArtworkMutation)) markDirty();
+  }
 
   const state = {
     documents: [],
@@ -355,6 +363,11 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   }
 
   function saveActiveToModel() {
+    window.dispatchEvent(new CustomEvent('visteras:document-deactivate'));
+    sc.setMode('select');
+    sc.clearSelection();
+    sc.leaveContext?.();
+    flushPendingChanges();
     const doc = getActiveDoc();
     if (!doc) return;
     const res = getResolution();
@@ -363,6 +376,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     doc.unit = getBaseUnit();
     doc.svg = captureSvg();
     doc.rulerGuides = window.__visterasGuideManager?.getGuides?.() || [];
+    const area = document.getElementById('workarea');
+    doc.viewport = {left: area?.scrollLeft || 0, top: area?.scrollTop || 0, zoom: sc.getZoom()};
+    sessions.suspend(doc);
   }
 
   function isActiveUntouchedDefault() {
@@ -378,25 +394,26 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   function markDirty() {
     if (state.suppressDirty) return;
     const doc = getActiveDoc();
-    if (!doc || doc.dirty) return;
-    doc.dirty = true;
-    doc.isStartupDefault = false;
-    renderTabs();
+    if (!doc) return;
+    const wasDirty = doc.dirty;
+    recordDocumentChange(doc);
+    if (!wasDirty) renderTabs();
   }
 
   function hasAnyDirty() {
     return state.documents.some((d) => d && d.dirty);
   }
 
-  function clearActiveDirty() {
-    const doc = getActiveDoc();
-    if (!doc) return;
-    if (!doc.dirty) {
-      renderTabs();
-      return;
+  function completeSave(snapshot, result, title) {
+    flushPendingChanges();
+    const saved = applyDocumentSave(state.documents, snapshot, result, title);
+    if (!saved) return;
+    if (saved === getActiveDoc()) {
+      svgEditor.title = saved.title;
+      try { localStorage.setItem(ACTIVE_TITLE_KEY, saved.title); } catch { /* ignore */ }
     }
-    doc.dirty = false;
     renderTabs();
+    updateStatusBar();
   }
 
   /**
@@ -462,19 +479,43 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     bar.innerHTML = `${tabsHtml}<button type="button" class="new_tab_btn" title="New Document">+</button>`;
   }
 
+  function activateDocument(doc) {
+    const previousSuppression = state.suppressDirty;
+    state.suppressDirty = true;
+    try {
+      state.activeId = doc.id;
+      setBaseUnit(doc.unit || 'px');
+      if (!sessions.restore(doc)) {
+        loadSvg(doc.svg, doc.width, doc.height);
+        sc.undoMgr.resetUndoStack();
+      }
+      window.__visterasGuideManager?.setGuides?.(doc.rulerGuides || []);
+      window.__visterasArtboards?.documentChanged?.();
+      if (doc.viewport) {
+        sc.setZoom(doc.viewport.zoom);
+        svgEditor.updateCanvas?.(false);
+        const area = document.getElementById('workarea');
+        if (area) {area.scrollLeft = doc.viewport.left; area.scrollTop = doc.viewport.top;}
+      }
+      svgEditor.layersPanel?.populateLayers?.();
+      svgEditor.topPanel?.updateContextPanel?.();
+      sc.call('sourcechanged', [sc.getSvgContent()]);
+      sc.call('selected', []);
+      updateRulers();
+      svgEditor.title = doc.title;
+      try { localStorage.setItem(ACTIVE_TITLE_KEY, doc.title); } catch { /* ignore */ }
+    } finally {
+      dirtyObserver?.takeRecords();
+      state.suppressDirty = previousSuppression;
+    }
+  }
+
   function switchDocument(id) {
     if (!id || id === state.activeId) return;
     const next = state.documents.find((d) => d.id === id);
     if (!next) return;
     saveActiveToModel();
-    state.activeId = id;
-    setBaseUnit(next.unit || 'px');
-    loadSvg(next.svg, next.width, next.height);
-    svgEditor.svgCanvas.undoMgr.resetUndoStack();
-    window.__visterasArtboards?.documentChanged?.();
-    if (svgEditor) svgEditor.title = next.title;
-    try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
-    window.__visterasGuideManager?.setGuides?.(next.rulerGuides || []);
+    activateDocument(next);
     renderTabs();
     updateStatusBar();
   }
@@ -489,6 +530,9 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     idx = state.documents.indexOf(doc);
     if (idx < 0) return;
     if (state.documents.length === 1) {
+      window.dispatchEvent(new CustomEvent('visteras:document-deactivate'));
+      sc.setMode('select');
+      sessions.discard(doc);
       const { w, h } = computePaddedWorkspaceSize();
       state.suppressDirty = true;
       try {
@@ -496,6 +540,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       } finally {
         setTimeout(() => { state.suppressDirty = false; }, 50);
       }
+      replaceDocumentSession(doc);
       doc.title = `Untitled-${state.autoTitleCount++}`;
       doc.width = w;
       doc.height = h;
@@ -513,16 +558,14 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       return;
     }
     const wasActive = state.activeId === id;
-    state.documents.splice(idx, 1);
     if (wasActive) {
-      const next = state.documents[Math.max(0, idx - 1)];
-      state.activeId = next.id;
-      setBaseUnit(next.unit || 'px');
-      loadSvg(next.svg, next.width, next.height);
-    svgEditor.svgCanvas.undoMgr.resetUndoStack();
-    window.__visterasArtboards?.documentChanged?.();
-      if (svgEditor) svgEditor.title = next.title;
-      try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
+      window.dispatchEvent(new CustomEvent('visteras:document-deactivate'));
+      sc.setMode('select'); sc.clearSelection(); sc.leaveContext?.();
+    }
+    state.documents.splice(idx, 1);
+    sessions.discard(doc);
+    if (wasActive) {
+      activateDocument(state.documents[Math.max(0, idx - 1)]);
     }
     renderTabs();
     updateStatusBar();
@@ -542,6 +585,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         setTimeout(() => { state.suppressDirty = false; }, 50);
       }
       if (doc) {
+        replaceDocumentSession(doc);
         doc.title = title || `Untitled-${state.autoTitleCount++}`;
         doc.width = width;
         doc.height = height;
@@ -626,6 +670,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     }
 
     if (targetDoc) {
+      if (replace) replaceDocumentSession(targetDoc);
       targetDoc.title = resolvedTitle;
       targetDoc.unit = unit || 'px';
       targetDoc.dirty = false;
@@ -1090,8 +1135,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     try {
       const content = sc.getSvgContent?.() || document.getElementById('svgcontent');
       if (content && window.MutationObserver) {
-        const mo = new MutationObserver(() => markDirty());
-        mo.observe(content, { childList: true, subtree: true, attributes: true });
+        dirtyObserver = new MutationObserver(records => { if (records.some(isArtworkMutation)) markDirty(); });
+        dirtyObserver.observe(sc.getSvgRoot(), { childList: true, subtree: true, attributes: true });
       }
     } catch { /* ignore */ }
   }
@@ -1274,7 +1319,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     updateStatusBar,
     showRulerContextMenu,
     markDirty,
-    clearActiveDirty,
+    flushPendingChanges,
+    completeSave,
     hasAnyDirty,
   };
   window.__visterasDocumentShell = api;

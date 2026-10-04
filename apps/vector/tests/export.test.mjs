@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { captureDocumentSnapshot, serializeDocumentSnapshot } from '../js/visteras-document-save.js';
 import { ALLOWLIST } from '../../../scripts/check-no-doc-localstorage.mjs';
 
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8');
@@ -42,7 +43,8 @@ test('Export: pipeline — clone, scope viewBox, background inside the SVG, font
 });
 
 test('Export: Document Raster Effects Settings stored per document in .vvd', () => {
-  assert.match(index, /rasterEffects: activeDoc\?\.rasterEffects \|\| undefined,/);
+  const saved = captureDocumentSnapshot({ id: 'doc', rasterEffects: { ppi: 300, background: 'transparent' } }, { svg: '<svg/>', width: 100, height: 100, unit: 'px' });
+  assert.deepEqual(JSON.parse(serializeDocumentSnapshot(saved, 'Poster', null)).rasterEffects, { ppi: 300, background: 'transparent' });
   assert.match(index, /if \(bundle\.rasterEffects && typeof bundle\.rasterEffects === 'object'\) docRaster = bundle\.rasterEffects;/);
   assert.match(index, /rasterEffects: docRaster,/);
   const shell = read('../js/visteras-document-shell.js');

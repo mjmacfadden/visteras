@@ -63,9 +63,9 @@ test('unsaved: shell and index.html wiring', () => {
   const html = read('../index.html');
   assert.match(html, /no_save_warning:\s*true/, "SVG-Edit's undo-stack leave warning is off");
   // Every .vvd save path (handle, picker, download) ends in the one saveFile result
-  // handler, which clears the active tab's dirty flag.
+  // handler, which completes the captured document revision.
   const saveFn = html.slice(html.indexOf('async function saveVectorDoc'), html.indexOf("getElementById('action_save')"));
-  assert.match(saveFn, /const result = await saveFile\(\{[\s\S]*?if \(result\.cancelled\) return;[\s\S]*?shell\?\.clearActiveDirty\?\.\(\);/);
+  assert.match(saveFn, /const result = await documentSaves\.run\(activeDoc,[\s\S]*?if \(result\.cancelled\) return;[\s\S]*?shell\.completeSave\(snapshot, result, savedBase\);/);
 });
 
 test('open/save: .vvd goes through the shared file helper with the FileHandle kept on the tab', () => {
@@ -75,7 +75,7 @@ test('open/save: .vvd goes through the shared file helper with the FileHandle ke
   assert.match(html, /const handle = \/\\\.vvd\$\/i\.test\(opened\.name \|\| ''\) \? opened\.handle : null;/, 'only .vvd handles are kept');
   assert.match(html, /openVectorFile\(opened\.file, handle\);/);
   assert.match(html, /handle: forceSaveAs \? null : \(activeDoc\?\.fileHandle \|\| null\),/, 'Save reuses the handle; Save As always asks');
-  assert.match(html, /activeDoc\.fileHandle = result\.handle \|\| null;/);
+  assert.match(read('../js/visteras-document-save.js'), /doc\.fileHandle = result\.handle \|\| null;/);
   assert.match(html, /showStudioToast\(`Saved "/);
   assert.ok(!/window\.showSaveFilePicker\(|window\.showOpenFilePicker\(/.test(html), 'no direct picker calls left');
   const shell = read('../js/visteras-document-shell.js');

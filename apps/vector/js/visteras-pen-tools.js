@@ -57,6 +57,7 @@ export function mountPenTools(editor) {
     sc.call('changed',[path]);
     sc.setMode('path');
   }
+  window.addEventListener('visteras:document-deactivate', finishPath);
   // Window capture runs before SVGEdit's document-level cancel/shortcut handlers.
   window.addEventListener('keydown',e=>{
     if(e.isComposing||e.composedPath().some(el=>el?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(el?.nodeName)))return;

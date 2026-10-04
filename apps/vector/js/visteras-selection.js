@@ -139,7 +139,10 @@ export function mountSelectionTools(editor) {
   window.addEventListener('resize', schedule);
   document.addEventListener('modeChange', () => { if(drag?.external&&!adapter?.enabled())finish(true); schedule(); });
   sc.getSvgRoot().addEventListener('mouseup', schedule);
-  new MutationObserver(schedule).observe(sc.getSvgContent(), { attributes: true, childList: true, subtree: true });
+  new MutationObserver(records => {
+    if (records.some(r => sc.getSvgContent().contains(r.target))) schedule();
+  }).observe(sc.getSvgRoot(), { attributes: true, childList: true, subtree: true });
+  window.addEventListener('visteras:document-deactivate', () => finish(true));
   const position = e => point(e.clientX, e.clientY, sc.getSvgContent().getScreenCTM().inverse());
   function begin(e, dir) {
     if (!dir || e.button !== 0) return;

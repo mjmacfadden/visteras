@@ -293,6 +293,7 @@
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js?v=trace-dialog-2';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-png-1';
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=guides-2';
+    import { captureDocumentSnapshot, serializeDocumentSnapshot, createDocumentSaveQueue } from './js/visteras-document-save.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
     import { initLogoEasterEgg } from './lib/visteras-ui/easter-egg.js';
@@ -775,12 +776,16 @@
         window.__visterasOpenImagePicker?.();
       });
 
+      const documentSaves = createDocumentSaveQueue();
       async function saveVectorDoc(forceSaveAs = false) {
         const shell = window.__visterasDocumentShell;
         const activeDoc = shell?.getActiveDoc?.();
+        if (!activeDoc) return;
         const res = (sc.getResolution && sc.getResolution()) || { w: activeDoc?.width || 800, h: activeDoc?.height || 600 };
         const unit = (svgEditor?.configObj?.curConfig?.baseUnit) || activeDoc?.unit || 'px';
         const svgStr = sc.getSvgString();
+        shell.flushPendingChanges();
+        const snapshot = captureDocumentSnapshot(activeDoc, { svg: svgStr, width: res.w, height: res.h, unit });
         const title = (activeDoc?.title || svgEditor.title || 'untitled').replace(/\.(vvd|svg)$/i, '');
 
         const makeThumbnail = async () => {
@@ -816,22 +821,7 @@
           return thumbUrl;
         };
 
-        const buildVvdJson = (docTitle, thumbUrl) => JSON.stringify({
-          $schema: 'visteras-vector-document-v1',
-          version: 1,
-          app: 'visteras-vector',
-          exportedAt: new Date().toISOString(),
-          title: docTitle,
-          width: res.w,
-          height: res.h,
-          unit: unit,
-          thumbnail: thumbUrl,
-          // Effect ▸ Document Raster Effects Settings (per document, like Illustrator)
-          rasterEffects: activeDoc?.rasterEffects || undefined,
-          artboards: activeDoc?.artboards,
-          activeArtboardId: activeDoc?.activeArtboardId,
-          svg: svgStr,
-        }, null, 2);
+        const buildVvdJson = (docTitle, thumbUrl) => serializeDocumentSnapshot(snapshot, docTitle, thumbUrl);
 
         const baseOf = (name) => fileBaseFromName(name || '', ['vvd', 'svg']).trim() || title;
 
@@ -839,24 +829,17 @@
           // ⌘S with a handle (opened or saved before) writes back silently; Save As, no handle,
           // denied permission or a failed write → save picker; no picker → download.
           // The .vvd embeds the name it is actually saved under (serialized after the picker).
-          const result = await saveFile({
+          const result = await documentSaves.run(activeDoc, () => saveFile({
             data: async (name) => buildVvdJson(baseOf(name), await makeThumbnail()),
             fileName: safeFileName(title, 'vvd'),
             mimeType: 'application/json;charset=utf-8',
             types: VVD_SAVE_TYPES,
             handle: forceSaveAs ? null : (activeDoc?.fileHandle || null),
-          });
+          }));
+          if (result.busy) { showStudioToast('This document is already being saved', 'info', 2000); return; }
           if (result.cancelled) return;
           const savedBase = baseOf(result.name);
-          if (activeDoc) {
-            activeDoc.title = savedBase;
-            activeDoc.fileHandle = result.handle || null;
-          }
-          svgEditor.title = savedBase;
-          try { localStorage.setItem('visteras_vector_active_doc_title', savedBase); } catch { /* ignore */ }
-          shell?.clearActiveDirty?.();
-          shell?.renderTabs?.();
-          if (svgEditor) svgEditor.showSaveWarning = false;
+          shell.completeSave(snapshot, result, savedBase);
           showStudioToast(`Saved "${result.name || `${savedBase}.vvd`}"`, 'success', 2000);
         } catch (err) {
           console.error('Save failed:', err);
