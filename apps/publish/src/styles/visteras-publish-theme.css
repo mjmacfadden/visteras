@@ -25,13 +25,16 @@
   --news-teal-light: #2dd4bf;
   --news-teal-dark: #0f766e;
   --news-teal-bg: rgba(20, 184, 166, 0.15);
+  --visteras-accent: var(--news-teal, #14b8a6);
 }
 
-/* Omarchy Logo Easter Egg Blue Accent Overlay */
+/* Omarchy Logo Easter Egg Teal Accent Overlay */
 .logo-omarchy-active img,
 img.logo-omarchy-active,
-a.logo-omarchy-active img {
-  filter: brightness(0) saturate(100%) invert(35%) sepia(90%) saturate(2000%) hue-rotate(210deg) brightness(98%) contrast(96%) !important;
+a.logo-omarchy-active img,
+.visteras_publish_logo_wrap.logo-omarchy-active img,
+.visteras_publish_logo_wrap img.logo-omarchy-active {
+  filter: brightness(0) saturate(100%) invert(57%) sepia(61%) saturate(2182%) hue-rotate(134deg) brightness(97%) contrast(85%) !important;
 }
 
 /* Base Reset */

@@ -686,6 +686,7 @@ class GUI_shortcuts_class {
 			img.src = 'images/omarchy-logo.png';
 			img.alt = 'Omarchy';
 			img.classList.add('logo-omarchy-active');
+			img.style.setProperty('--omarchy-logo-url', 'url("images/omarchy-logo.png")');
 			if (logoLink) {
 				logoLink.title = 'Omarchy';
 				logoLink.classList.add('logo-omarchy-active');
@@ -696,6 +697,7 @@ class GUI_shortcuts_class {
 			img.src = 'images/visteras_logo.png';
 			img.alt = 'Visteras';
 			img.classList.remove('logo-omarchy-active');
+			img.style.removeProperty('--omarchy-logo-url');
 			if (logoLink) {
 				logoLink.title = 'Visteras Studio';
 				logoLink.classList.remove('logo-omarchy-active');
@@ -736,6 +738,7 @@ class GUI_shortcuts_class {
 				img.src = 'images/omarchy-logo.png';
 				img.alt = 'Omarchy';
 				img.classList.add('logo-omarchy-active');
+				img.style.setProperty('--omarchy-logo-url', 'url("images/omarchy-logo.png")');
 				if (logoLink) {
 					logoLink.title = 'Omarchy';
 					logoLink.classList.add('logo-omarchy-active');
@@ -744,6 +747,7 @@ class GUI_shortcuts_class {
 				img.src = 'images/visteras_logo.png';
 				img.alt = 'Visteras';
 				img.classList.remove('logo-omarchy-active');
+				img.style.removeProperty('--omarchy-logo-url');
 				if (logoLink) {
 					logoLink.title = 'Visteras Studio';
 					logoLink.classList.remove('logo-omarchy-active');

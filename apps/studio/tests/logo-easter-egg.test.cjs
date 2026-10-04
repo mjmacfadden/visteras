@@ -26,5 +26,5 @@ test('logo easter egg: packages/ui easter-egg module and CSS rules exist', () =>
 
   const uiCss = fs.readFileSync(path.join(rootDir, 'packages/ui/src/ui.css'), 'utf8');
   assert.ok(uiCss.includes('.logo-omarchy-active'), 'ui.css must define .logo-omarchy-active rule');
-  assert.ok(uiCss.includes('filter: brightness(0) saturate(100%) invert'), 'ui.css must apply blue accent color filter');
+  assert.ok(uiCss.includes('var(--visteras-accent'), 'ui.css must apply app accent color to logo');
 });

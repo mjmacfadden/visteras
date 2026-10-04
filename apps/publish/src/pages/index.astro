@@ -2829,10 +2829,9 @@ const hasWireStories =
         initLogoEasterEgg({
           appName: 'Visteras Publish',
           selector: '.visteras_publish_logo_wrap img',
-          containerSelector: '.visteras_publish_logo_wrap'
+          containerSelector: '.visteras_publish_logo_wrap',
+          omarchySrc: `${import.meta.env.BASE_URL.replace(/\/$/, '')}/images/omarchy-logo.png`
         });
-      </script>
-    
       </script>
 <script is:inline src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/tool-free.js?v=tab-icon-2`}></script>
   </body>

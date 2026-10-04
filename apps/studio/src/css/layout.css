@@ -288,6 +288,10 @@ body .sp-preview{
 	visibility: hidden;
 	flex-shrink: 0;
 }
+.logo img.logo-omarchy-active,
+.logo.logo-omarchy-active img {
+	filter: brightness(0) saturate(100%) invert(32%) sepia(98%) saturate(2250%) hue-rotate(212deg) brightness(98%) contrast(97%) !important;
+}
 .logo .logo_text{
 	color: #ffffff;
 	font-size: 14px;

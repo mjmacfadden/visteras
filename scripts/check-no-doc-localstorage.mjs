@@ -40,6 +40,7 @@ export const ALLOWLIST = [
   { file: 'apps/studio/src/js/core/font-manager.js', key: "'photochop_local_fonts'", reason: 'cached list of local font family names' },
   { file: 'apps/studio/src/js/core/font-manager.js', key: "'photochop_selected_local_fonts'", reason: 'chosen local font names' },
   { file: 'apps/studio/src/js/core/gui/gui-shortcuts.js', key: "'photochop_logo'", reason: 'logo variant preference' },
+  { file: 'packages/ui/src/easter-egg.js', key: "'photochop_logo'", reason: 'logo variant preference' },
   { file: 'apps/studio/src/js/core/gui/gui-swatches.js', key: '"vantage_recent_colors"', reason: 'recent colours' },
   { file: 'apps/studio/src/js/core/gui/gui-swatches.js', key: '"vantage_swatch_collapsed"', reason: 'collapsed swatch groups' },
   { file: 'apps/studio/src/js/modules/file/new.js', key: 'RECENT_STORAGE_KEY', reason: 'recent New Document size presets' },

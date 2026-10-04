@@ -395,6 +395,11 @@ html, body {
   flex-shrink: 0;
 }
 
+.visteras_vector_logo_wrap.logo-omarchy-active img,
+.visteras_vector_logo_wrap img.logo-omarchy-active {
+  filter: brightness(0) saturate(100%) invert(54%) sepia(74%) saturate(2333%) hue-rotate(345deg) brightness(101%) contrast(97%) !important;
+}
+
 .visteras_vector_logo_wrap .logo_text {
   color: #ffffff;
   font-size: 14px;

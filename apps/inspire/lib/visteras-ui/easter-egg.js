@@ -40,6 +40,7 @@ export function initLogoEasterEgg(options = {}) {
       img.src = omarchySrc;
       img.alt = 'Omarchy';
       img.classList.add('logo-omarchy-active');
+      img.style.setProperty('--omarchy-logo-url', `url("${omarchySrc}")`);
       if (container) {
         container.title = 'Omarchy';
         container.classList.add('logo-omarchy-active');
@@ -50,6 +51,7 @@ export function initLogoEasterEgg(options = {}) {
       }
       img.alt = appName;
       img.classList.remove('logo-omarchy-active');
+      img.style.removeProperty('--omarchy-logo-url');
       if (container) {
         container.title = container.dataset.defaultTitle || appName;
         container.classList.remove('logo-omarchy-active');
