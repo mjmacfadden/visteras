@@ -22,6 +22,8 @@ import {
 	applyShiftEdge,
 	applyDecontaminateColors,
 } from './../../libs/refine-edge/matting.js';
+import Mask_class from './../mask/mask.js';
+import { renderSmart } from './../../libs/smart-effects.js';
 import {
 	BRUSH_SIZE_STEPS,
 	BRUSH_HARDNESS_STEPS,
@@ -129,13 +131,30 @@ class Tools_refineEdge_class {
 		this._imgCanvas.height = this._height;
 		const imgCtx = this._imgCanvas.getContext('2d');
 
-		const layerSrc = layer.link_canvas || layer.link;
-		if (layer.type === 'image' && layerSrc) {
+		let layerSrc = null;
+		if (layer.type === 'smart') {
+			try {
+				if (typeof renderSmart === 'function') {
+					layerSrc = renderSmart(layer);
+				}
+			} catch (e) {
+				console.warn('Error rendering smart object for refine edge:', e);
+			}
+			if (!layerSrc) {
+				const source = config.smart_sources && config.smart_sources[layer.smart_source_id];
+				layerSrc = (source && source.link) || layer.link_canvas || layer.link || null;
+			}
+		} else if (layer.type === 'image') {
+			layerSrc = layer.link_canvas || layer.link;
+		}
+
+		if (layerSrc) {
 			imgCtx.drawImage(layerSrc, 0, 0, this._width, this._height);
 		} else {
 			const savedMask = layer.mask;
 			layer.mask = null;
-			this.Base_layers.render_object(imgCtx, layer);
+			const localLayer = { ...layer, x: 0, y: 0, rotate: 0, mask: null };
+			this.Base_layers.render_object(imgCtx, localLayer);
 			layer.mask = savedMask;
 		}
 
@@ -148,10 +167,14 @@ class Tools_refineEdge_class {
 		if (maskSource) {
 			origCtx.drawImage(maskSource, 0, 0, this._width, this._height);
 		} else if (app.Layers.Base_selection && app.Layers.Base_selection.has_selection) {
-			const selMask = app.Layers.Base_selection.mask_canvas;
-			const layerX = layer.x || 0;
-			const layerY = layer.y || 0;
-			origCtx.drawImage(selMask, -layerX, -layerY);
+			const Mask = new Mask_class();
+			const selectionMask = Mask.create_mask_from_selection(layer, true);
+			if (selectionMask && selectionMask.link) {
+				origCtx.drawImage(selectionMask.link, 0, 0, this._width, this._height);
+			} else {
+				origCtx.fillStyle = '#ffffff';
+				origCtx.fillRect(0, 0, this._width, this._height);
+			}
 		} else {
 			origCtx.fillStyle = '#ffffff';
 			origCtx.fillRect(0, 0, this._width, this._height);
@@ -1407,7 +1430,11 @@ class Tools_refineEdge_class {
 				// Apply directly to layer mask
 				const actions = [];
 				if (this._decontaminate) {
-					actions.push(new app.Actions.Update_layer_image_action(finalImgCanvas, this._layerId));
+					if (targetLayer.type === 'smart') {
+						alertify.warning('Color decontamination cannot modify embedded Smart Object pixels directly; applied to mask only.');
+					} else {
+						actions.push(new app.Actions.Update_layer_image_action(finalImgCanvas, this._layerId));
+					}
 				}
 				if (targetLayer.mask) {
 					actions.push(new app.Actions.Update_layer_mask_image_action(finalMask, this._layerId, this._origMaskCanvas));
@@ -1434,14 +1461,16 @@ class Tools_refineEdge_class {
 				maskCopy.getContext('2d').drawImage(finalMask, 0, 0);
 
 				const newName = `${targetLayer.name} (Refined)`;
-				const newLayerAction = new app.Actions.Insert_layer_action({
+				const isSmart = targetLayer.type === 'smart';
+				const layerSettings = {
 					name: newName,
-					type: targetLayer.type,
+					type: (isSmart && !this._decontaminate) ? 'smart' : 'image',
 					data: finalImgCanvas.toDataURL(),
 					x: targetLayer.x,
 					y: targetLayer.y,
 					width: targetLayer.width,
 					height: targetLayer.height,
+					rotate: targetLayer.rotate || 0,
 					mask: {
 						link: maskCopy,
 						x: targetLayer.x || 0,
@@ -1451,7 +1480,17 @@ class Tools_refineEdge_class {
 						enabled: true,
 						linked: true,
 					},
-				});
+				};
+				if (isSmart && !this._decontaminate) {
+					layerSettings.smart_source_id = targetLayer.smart_source_id;
+					layerSettings.smart_filter_mask = targetLayer.smart_filter_mask;
+					layerSettings.smart_filters_enabled = targetLayer.smart_filters_enabled;
+					layerSettings.width_original = targetLayer.width_original;
+					layerSettings.height_original = targetLayer.height_original;
+					layerSettings.link = targetLayer.link;
+					layerSettings.filters = targetLayer.filters ? JSON.parse(JSON.stringify(targetLayer.filters)) : [];
+				}
+				const newLayerAction = new app.Actions.Insert_layer_action(layerSettings);
 				const actions = [newLayerAction];
 				if (app.Layers.Base_selection && app.Layers.Base_selection.has_selection && app.Actions.Reset_selection_action) {
 					actions.push(new app.Actions.Reset_selection_action());
