@@ -2823,6 +2823,15 @@ const hasWireStories =
           }
         }
       });
+      </script>
+      <script>
+        import { initLogoEasterEgg } from '../../../../packages/ui/src/easter-egg.js';
+        initLogoEasterEgg({
+          appName: 'Visteras Publish',
+          selector: '.visteras_publish_logo_wrap img',
+          containerSelector: '.visteras_publish_logo_wrap'
+        });
+      </script>
     
       </script>
 <script is:inline src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/tool-free.js?v=tab-icon-2`}></script>

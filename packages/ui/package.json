@@ -11,6 +11,7 @@
     "./dialog": "./src/dialog.js",
     "./file": "./src/file.js",
     "./dirty": "./src/dirty.js",
+    "./easter-egg": "./src/easter-egg.js",
     "./tokens.css": "./src/tokens.css",
     "./ui.css": "./src/ui.css"
   },

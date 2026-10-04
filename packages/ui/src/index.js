@@ -13,3 +13,4 @@ export {
 export {
   defaultIsDirty, hasAnyDirty, handleBeforeUnload, installBeforeUnloadGuard, markDirty, markClean, defaultDocTitle, confirmCloseIfDirty,
 } from './dirty.js';
+export { initLogoEasterEgg } from './easter-egg.js';

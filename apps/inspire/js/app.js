@@ -19,6 +19,7 @@ import { MoodboardLayouts } from './moodboard-layouts.js';
 import { zoomPercent, applyFileMeta, safeVidFileName, safeFileBase } from './inspire-utils.js';
 import { resolveOpenTarget } from './open-match.js';
 import { showToast } from '../lib/visteras-ui/toast.js';
+import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 import { saveFile, openFile, findBySameHandle } from '../lib/visteras-ui/file.js';
 
 /** showSaveFilePicker types for Inspire documents (.vid stays Inspire's own type). */
@@ -2254,4 +2255,5 @@ class InspireApp {
 // Bootstrap on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   window.inspireApp = new InspireApp();
+  initLogoEasterEgg({ appName: 'Visteras Inspire' });
 });

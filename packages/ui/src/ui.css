@@ -113,3 +113,10 @@
 .vui-btn-accent:hover { background-color: var(--visteras-accent-hover, var(--visteras-accent)); }
 .vui-btn:focus-visible,
 .vui-btn.vui-focus-ring:focus { outline: 2px solid var(--visteras-accent); outline-offset: 2px; }
+
+/* Omarchy Logo Easter Egg Blue Accent Overlay */
+.logo-omarchy-active img,
+img.logo-omarchy-active,
+a.logo-omarchy-active img {
+  filter: brightness(0) saturate(100%) invert(35%) sepia(90%) saturate(2000%) hue-rotate(210deg) brightness(98%) contrast(96%) !important;
+}

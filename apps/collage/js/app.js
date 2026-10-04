@@ -4,6 +4,7 @@ import {
   DEFAULT_FONT_FAMILY,
   isSystemFontFamily,
 } from './visteras-font-bridge.js';
+import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 
 (function() {
   'use strict';
@@ -2587,6 +2588,7 @@ import {
     renderSavedList();
     initTextInteract();
     setupEvents();
+    initLogoEasterEgg({ appName: 'Visteras Collage' });
     selectTool('layout');
 
     // Initialize document tabs

@@ -295,6 +295,7 @@
     import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=guides-2';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
+    import { initLogoEasterEgg } from './lib/visteras-ui/easter-egg.js';
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
     import { mountExport } from './js/visteras-export.js?v=export-1';
     import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
@@ -388,6 +389,7 @@
 
         toolsTop.prepend(divider);
         toolsTop.prepend(logoWrap);
+        initLogoEasterEgg({ appName: 'Visteras Vector' });
       }
 
       // Hide default SVG-Edit main menu button (handled cleanly by our top menu bar)

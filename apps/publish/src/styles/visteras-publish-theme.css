@@ -27,6 +27,13 @@
   --news-teal-bg: rgba(20, 184, 166, 0.15);
 }
 
+/* Omarchy Logo Easter Egg Blue Accent Overlay */
+.logo-omarchy-active img,
+img.logo-omarchy-active,
+a.logo-omarchy-active img {
+  filter: brightness(0) saturate(100%) invert(35%) sepia(90%) saturate(2000%) hue-rotate(210deg) brightness(98%) contrast(96%) !important;
+}
+
 /* Base Reset */
 *, *::before, *::after {
   box-sizing: border-box;

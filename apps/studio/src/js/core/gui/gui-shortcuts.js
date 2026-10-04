@@ -271,26 +271,15 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Command/Super/Ctrl/Option/Alt + 4 = Toggle logo easter egg
-			const hasCmdCtrlSuper = event.ctrlKey || event.metaKey || this.is_meta_down || this.is_ctrl_down
-				|| (typeof event.getModifierState === 'function' && (
-					event.getModifierState('Control')
-					|| event.getModifierState('Meta')
-					|| event.getModifierState('Super')
-					|| event.getModifierState('Hyper')
-					|| event.getModifierState('OS')
-				));
-			const hasAlt = event.altKey || this.is_alt_down
-				|| (typeof event.getModifierState === 'function' && (
-					event.getModifierState('Alt')
-					|| event.getModifierState('AltGraph')
-				));
+			// Ctrl/Cmd + Shift + 4 = Toggle logo easter egg
+			const hasCmdCtrlSuper = event.ctrlKey || event.metaKey || this.is_meta_down || this.is_ctrl_down;
+			const hasShift = event.shiftKey;
 			const isDigit4 = event.code === 'Digit4' || event.code === 'Numpad4'
 				|| event.key === '4' || event.key === '¢' || event.key === '$' || event.key === '§' || event.key === '¼' || event.key === '¤'
 				|| event.keyCode === 52 || event.keyCode === 100
 				|| event.which === 52 || event.which === 100;
 
-			if ((hasCmdCtrlSuper || hasAlt) && isDigit4) {
+			if (hasCmdCtrlSuper && hasShift && isDigit4) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				this.toggle_logo();
@@ -689,21 +678,29 @@ class GUI_shortcuts_class {
 		if (img == null) {
 			return;
 		}
+		var logoLink = document.querySelector('.logo');
+		this.logo_omarchy = !this.logo_omarchy;
+
 		if (this.logo_omarchy) {
+			//easter egg: show the Omarchy logo in blue accent color
+			img.src = 'images/omarchy-logo.png';
+			img.alt = 'Omarchy';
+			img.classList.add('logo-omarchy-active');
+			if (logoLink) {
+				logoLink.title = 'Omarchy';
+				logoLink.classList.add('logo-omarchy-active');
+			}
+		}
+		else {
 			//switch back to the original Visteras logo
 			img.src = 'images/visteras_logo.png';
 			img.alt = 'Visteras';
-			var logoLink = document.querySelector('.logo');
-			if (logoLink) logoLink.title = 'Visteras Studio';
+			img.classList.remove('logo-omarchy-active');
+			if (logoLink) {
+				logoLink.title = 'Visteras Studio';
+				logoLink.classList.remove('logo-omarchy-active');
+			}
 		}
-		else {
-			//easter egg: show the Omarchy logo
-			img.src = 'images/omarchy-logo.png';
-			img.alt = 'Omarchy';
-			var logoLink = document.querySelector('.logo');
-			if (logoLink) logoLink.title = 'Omarchy';
-		}
-		this.logo_omarchy = !this.logo_omarchy;
 		this.save_logo_preference();
 	}
 
@@ -733,30 +730,26 @@ class GUI_shortcuts_class {
 		this.logo_omarchy = show_omarchy;
 
 		var img = document.querySelector('.logo img, a.logo img');
+		var logoLink = document.querySelector('.logo');
 		if (img != null) {
 			if (show_omarchy) {
 				img.src = 'images/omarchy-logo.png';
 				img.alt = 'Omarchy';
-				var logoLink = document.querySelector('.logo');
-				if (logoLink) logoLink.title = 'Omarchy';
+				img.classList.add('logo-omarchy-active');
+				if (logoLink) {
+					logoLink.title = 'Omarchy';
+					logoLink.classList.add('logo-omarchy-active');
+				}
 			} else {
 				img.src = 'images/visteras_logo.png';
 				img.alt = 'Visteras';
-				var logoLink = document.querySelector('.logo');
-				if (logoLink) logoLink.title = 'Visteras Studio';
+				img.classList.remove('logo-omarchy-active');
+				if (logoLink) {
+					logoLink.title = 'Visteras Studio';
+					logoLink.classList.remove('logo-omarchy-active');
+				}
 			}
-			//reveal the logo (CSS keeps it hidden until the preference is applied,
-			//so the default logo never flashes when Omarchy is selected)
 			img.style.visibility = 'visible';
-		}
-
-		var logoAnchor = document.querySelector('.logo');
-		if (logoAnchor && !logoAnchor._omarchy_click_bound) {
-			logoAnchor._omarchy_click_bound = true;
-			logoAnchor.addEventListener('click', (e) => {
-				e.preventDefault();
-				this.toggle_logo();
-			});
 		}
 	}
 
