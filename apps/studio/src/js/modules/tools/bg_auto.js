@@ -8,6 +8,7 @@ import Base_layers_class from './../../core/base-layers.js';
 import Mask_class from './../mask/mask.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
 import { compute_matte, warm_model } from './../../libs/bg-auto/index.js';
+import { renderSmart } from './../../libs/smart-effects.js';
 
 var instance = null;
 var busy = false;
@@ -68,7 +69,7 @@ class Tools_bg_auto_class {
 		var code = err && err.code;
 		var message = (err && err.message) ? err.message : String(err || 'Unknown error');
 		if (code === 'non_raster' || /must contain an image|convert it to raster/i.test(message)) {
-			return 'Remove Background works on raster image layers. Convert the layer to raster and try again.';
+			return 'Remove Background works on raster image layers and smart objects. Convert the layer to raster and try again.';
 		}
 		if (code === 'download_failed' || /fetch|network|Failed to fetch|Load failed|HTTP/i.test(message)) {
 			return 'Could not download the background-removal model. Check your connection and try again.';
@@ -101,15 +102,32 @@ class Tools_bg_auto_class {
 			alertify.error('No active layer.');
 			return null;
 		}
-		if (config.layer.type != 'image') {
-			alertify.error('This layer must contain an image. Please convert it to raster to apply this tool.');
+		if (config.layer.type !== 'image' && config.layer.type !== 'smart') {
+			alertify.error('This layer must contain an image or smart object. Please convert it to raster to apply this tool.');
 			return null;
 		}
-		if (!config.layer.link || !(config.layer.width > 0) || !(config.layer.height > 0)) {
+		var src = this.get_layer_source(config.layer);
+		if (!src || !(config.layer.width > 0) || !(config.layer.height > 0)) {
 			alertify.error('This layer has no image data.');
 			return null;
 		}
 		return config.layer;
+	}
+
+	get_layer_source(layer) {
+		if (!layer) return null;
+		if (layer.type === 'smart') {
+			try {
+				if (typeof renderSmart === 'function') {
+					var smartCanvas = renderSmart(layer);
+					if (smartCanvas) return smartCanvas;
+				}
+			} catch (e) {}
+			var source = config.smart_sources && config.smart_sources[layer.smart_source_id];
+			if (source && source.link) return source.link;
+			return layer.link_canvas || layer.link || null;
+		}
+		return layer.link_canvas || layer.link || null;
 	}
 
 	layer_source_canvas(layer) {
@@ -119,7 +137,7 @@ class Tools_bg_auto_class {
 		canvas.width = Math.max(1, Math.round(layer.width));
 		canvas.height = Math.max(1, Math.round(layer.height));
 		var ctx = canvas.getContext('2d');
-		var src = layer.link_canvas || layer.link;
+		var src = this.get_layer_source(layer);
 		if (!src) {
 			throw Object.assign(new Error('This layer has no image data.'), { code: 'no_image' });
 		}

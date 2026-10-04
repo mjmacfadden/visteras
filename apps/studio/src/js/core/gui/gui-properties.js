@@ -125,7 +125,7 @@ class GUI_properties_class {
 			return;
 		}
 
-		if (layer && layer.type === 'image') {
+		if (layer && (layer.type === 'image' || layer.type === 'smart')) {
 			this.render_image_properties(target, layer, bind_events);
 			return;
 		}
@@ -1082,15 +1082,15 @@ class GUI_properties_class {
 	 * Raster image layer Properties: Quick Actions (Remove Background, etc.).
 	 */
 	render_image_properties(target, layer, bind_events = false) {
-		const sig = String(layer.id) + ':image';
-		if (!bind_events && this.bound_kind === 'image' && this.bound_layer_id === layer.id
+		const kind = layer.type || 'image';
+		if (!bind_events && this.bound_kind === kind && this.bound_layer_id === layer.id
 			&& target.querySelector('.properties_image_controls')) {
 			return;
 		}
 
 		let html = '<div class="properties_controls properties_image_controls">';
-		html += '<div class="properties_title trn">Layer</div>';
-		html += `<div class="properties_row"><span class="properties_subinfo_text">${this.esc(layer.name || 'Image')}</span></div>`;
+		html += '<div class="properties_title trn">' + (layer.type === 'smart' ? 'Smart Object' : 'Layer') + '</div>';
+		html += `<div class="properties_row"><span class="properties_subinfo_text">${this.esc(layer.name || (layer.type === 'smart' ? 'Smart Object' : 'Image'))}</span></div>`;
 		html += '<div class="properties_group_title trn">Quick Actions</div>';
 		html += `<div class="properties_row">
 			<button type="button" class="button trn" id="prop_remove_background">Remove Background</button>
@@ -1099,7 +1099,7 @@ class GUI_properties_class {
 		html += '</div>';
 		target.innerHTML = html;
 		this.bound_layer_id = layer.id;
-		this.bound_kind = 'image';
+		this.bound_kind = kind;
 		delete target.dataset.adjType;
 		delete target.dataset.textSig;
 
