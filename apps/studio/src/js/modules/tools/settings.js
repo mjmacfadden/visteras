@@ -72,6 +72,7 @@ class Tools_settings_class {
 		//save
 		this.save_setting('theme', params.theme);
 		this.save_setting('transparency', params.transparency);
+		this.save_setting('transparency_grid', params.transparency ? 1 : 0);
 		this.save_setting('transparency_type', params.transparency_type);
 		this.save_setting('snap', params.snap);
 		this.save_setting('guides', params.guides);

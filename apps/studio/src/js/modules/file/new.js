@@ -630,6 +630,8 @@ class File_new_class {
 				width: width,
 				height: height,
 				transparency: transparency,
+				backgroundColor: bgColor,
+				doc_transparency: true,
 				resolution: ppi,
 				force_new: true
 			});
@@ -642,6 +644,7 @@ class File_new_class {
 						const ctx = firstLayer.link.getContext('2d');
 						ctx.fillStyle = bgColor;
 						ctx.fillRect(0, 0, width, height);
+						firstLayer.data = firstLayer.link.toDataURL();
 					}
 				}
 			}
@@ -660,7 +663,7 @@ class File_new_class {
 					new app.Actions.Refresh_action_attributes_action('undo'),
 					new app.Actions.Prepare_canvas_action('undo'),
 					new app.Actions.Update_config_action({
-						TRANSPARENCY: transparency,
+						TRANSPARENCY: true,
 						WIDTH: width,
 						HEIGHT: height,
 						ALPHA: 255,
@@ -709,7 +712,7 @@ class File_new_class {
 					doc.width = width;
 					doc.height = height;
 					doc.resolution = ppi;
-					doc.transparency = transparency;
+					doc.transparency = true;
 					doc.action_history = [];
 					doc.action_history_index = 0;
 					doc.is_dirty = false;
@@ -740,11 +743,9 @@ class File_new_class {
 			}
 		}
 
-		if (transparency) {
-			this.Helper.setCookie('transparency', 1);
-		} else {
-			this.Helper.setCookie('transparency', 0);
-		}
+		config.TRANSPARENCY = true;
+		this.Helper.setCookie('transparency', 1);
+		this.Helper.setCookie('transparency_grid', 1);
 	}
 
 	blob_to_data_url(blob) {

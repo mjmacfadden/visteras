@@ -88,7 +88,7 @@ class Base_documents_class {
 			bgCanvas.height = h;
 			var bgCtx = bgCanvas.getContext('2d');
 			if (!transp) {
-				bgCtx.fillStyle = '#ffffff';
+				bgCtx.fillStyle = options.backgroundColor || '#ffffff';
 				bgCtx.fillRect(0, 0, w, h);
 			}
 
@@ -133,7 +133,9 @@ class Base_documents_class {
 			auto_increment: options.auto_increment || 2,
 			vectors: options.vectors || [],
 			active_vector_id: options.active_vector_id || null,
-			transparency: transp,
+			transparency: (options.doc_transparency !== undefined)
+				? (options.doc_transparency !== false)
+				: true,
 			is_dirty: options.is_dirty || false,
 			selection: options.selection || null,
 			selection_mask: options.selection_mask || null,
@@ -464,7 +466,7 @@ class Base_documents_class {
 			if (options.width) doc.width = options.width;
 			if (options.height) doc.height = options.height;
 			if (options.resolution) doc.resolution = options.resolution;
-			if (options.transparency != null) doc.transparency = options.transparency;
+			doc.transparency = (options.doc_transparency !== undefined) ? (options.doc_transparency !== false) : true;
 			await this.restore_state(doc);
 			this.render_tabs();
 			return doc;
@@ -705,7 +707,7 @@ class Base_documents_class {
 		const defaultFormat = isExplicitJson ? 'JSON' : 'VSD';
 		const defaultExt = isExplicitJson ? '.json' : '.vsd';
 		const docTitle = filename ? filename.replace(/\.(json|vsd)$/i, '') : (json.info.name || ('Untitled-' + this.auto_title_count++));
-		const docTransp = (json.info.transparency !== false);
+		const docTransp = true;
 
 		let max_id_order = 0;
 		const layers = [];
@@ -1094,6 +1096,7 @@ class Base_documents_class {
 			doc.layer = bgLayer;
 			doc.selected_layer_ids = [1];
 			doc.auto_increment = 2;
+			doc.transparency = true;
 
 			const selectTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['select'])
 				? app.GUI.GUI_tools.tools_modules['select'].object

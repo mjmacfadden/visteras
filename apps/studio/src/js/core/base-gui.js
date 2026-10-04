@@ -111,12 +111,16 @@ class Base_gui_class {
 	}
 
 	load_default_values() {
-		//transparency
-		var transparency_cookie = this.Helper.getCookie('transparency');
+		//transparency - default to showing checkerboard
+		var transparency_cookie = this.Helper.getCookie('transparency_grid');
 		if (transparency_cookie === null) {
-			//no saved preference - default to showing checkerboard
+			var legacy_cookie = this.Helper.getCookie('transparency');
+			if (legacy_cookie === '0' || legacy_cookie === 0) {
+				this.Helper.setCookie('transparency', 1);
+				this.Helper.setCookie('transparency_grid', 1);
+			}
 			config.TRANSPARENCY = true;
-		} else if (transparency_cookie) {
+		} else if (transparency_cookie && transparency_cookie !== '0') {
 			config.TRANSPARENCY = true;
 		} else {
 			config.TRANSPARENCY = false;

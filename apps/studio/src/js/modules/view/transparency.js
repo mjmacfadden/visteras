@@ -21,6 +21,7 @@ class View_transparency_class {
 	toggle() {
 		config.TRANSPARENCY = !config.TRANSPARENCY;
 		this.Helper.setCookie('transparency', config.TRANSPARENCY ? 1 : 0);
+		this.Helper.setCookie('transparency_grid', config.TRANSPARENCY ? 1 : 0);
 		if (app.Documents) {
 			const doc = app.Documents.get_active_document();
 			if (doc) {
