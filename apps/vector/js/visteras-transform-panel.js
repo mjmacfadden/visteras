@@ -1,3 +1,4 @@
+import {convertToPixels,convertFromPixels} from './visteras-document-presets.js';
 export function referencePosition(bounds, reference) {
   return {x:bounds.x+bounds.width*reference.x,y:bounds.y+bounds.height*reference.y};
 }
@@ -54,21 +55,24 @@ export function mountTransformPanel(editor) {
     const x=Math.min(...points.map(p=>p.x)),y=Math.min(...points.map(p=>p.y));return{x,y,width:Math.max(...points.map(p=>p.x))-x,height:Math.max(...points.map(p=>p.y))-y};
   };
   function sync(){
-    pending=null;const elements=selected();if(!elements.length)return;
-    const b=bounds(elements),p=referencePosition(b,reference),values={x:p.x,y:p.y,w:b.width,h:b.height};
-    for(const [key,input]of Object.entries(fields)){input.disabled=(key==='w'&&!b.width)||(key==='h'&&!b.height);if(document.activeElement!==input)input.value=String(Number(values[key].toFixed(3)));}
+    pending=null;const elements=selected(),boards=window.__visterasArtboards,board=boards?.propertyMode()?boards.active():null;if(!elements.length&&!board)return;
+    const b=board||bounds(elements),p=referencePosition(b,reference),values={x:p.x,y:p.y,w:b.width,h:b.height};
+    for(const [key,input]of Object.entries(fields)){input.disabled=(key==='w'&&!b.width)||(key==='h'&&!b.height);if(document.activeElement!==input)input.value=String(Number((board?convertFromPixels(values[key],window.__visterasDocumentShell.getBaseUnit()):values[key]).toFixed(3)));}
   }
   function change(key,value){
-    const elements=selected();if(!elements.length||!Number.isFinite(value)){sync();return;}
-    const b=bounds(elements),p=referencePosition(b,reference);let transform=new DOMMatrix();
+    const elements=selected(),boards=window.__visterasArtboards,board=boards?.propertyMode()?boards.active():null;if((!elements.length&&!board)||!Number.isFinite(value)){sync();return;}
+    if(board)value=convertToPixels(value,window.__visterasDocumentShell.getBaseUnit());
+    const b=board||bounds(elements),p=referencePosition(b,reference);let transform=new DOMMatrix();
     if(key==='x'||key==='y')transform=transform.translate(key==='x'?value-p.x:0,key==='y'?value-p.y:0);
     else {if(value<=0||!b.width||!b.height){sync();return;}const {sx,sy}=dimensionScale(b,key,value,locked);transform=transform.translate(p.x,p.y).scale(sx,sy).translate(-p.x,-p.y);}
+    if(board){boards.transformBounds(transform,key==='x'||key==='y');sync();return;}
     const batch=new sc.history.BatchCommand('Transform selection');
     for(const el of elements){const old=el.getAttribute('transform'),parent=documentMatrix(el.parentNode);let local=new DOMMatrix();for(let i=0;i<el.transform.baseVal.numberOfItems;i++)local=local.multiply(matrix(el.transform.baseVal.getItem(i).matrix));
       const result=parent.inverse().multiply(transform).multiply(parent).multiply(local);el.setAttribute('transform',result.toString());batch.addSubCommand(new sc.history.ChangeElementCommand(el,{transform:old}));}
     window.__visterasLiveSyncStrokeAlign?.(elements,sc);
     sc.addCommandToHistory(batch);sc.call('changed',elements);sync();
   }
+  window.addEventListener('visteras:artboard-properties',sync);
   const call=sc.call;sc.call=function(event,...args){const result=call.call(this,event,...args);if(event==='selected'||event==='changed')sync();return result;};
   new MutationObserver(()=>{if(!pending)pending=requestAnimationFrame(sync);}).observe(sc.getSvgContent(),{subtree:true,attributes:true,childList:true});sync();
 }

@@ -2798,7 +2798,7 @@ function mountPickerModal(ctrl) {
   function refreshDraft() {
     applying = true;
     const target = ctrl.getActiveTarget();
-    targetLabel.textContent = externalEdit ? 'Gradient Stop' : target === 'fill' ? 'Fill' : 'Stroke';
+    targetLabel.textContent = externalEdit ? (externalEdit.label || 'Gradient Stop') : target === 'fill' ? 'Fill' : 'Stroke';
     if (draftNone) {
       preview.classList.add('is-none');
       preview.style.backgroundColor = '';

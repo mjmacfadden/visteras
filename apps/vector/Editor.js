@@ -42788,8 +42788,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					a = e.x, s = e.y, o = e.x + e.width, c = e.y + e.height;
 				}
 				break;
-			case "page":
-				a = 0, s = 0, o = Y.getContentW(), c = Y.getContentH();
+			case "page": {
+				const board = window.__visterasArtboards?.active();
+				a = board?.x || 0, s = board?.y || 0, o = a + (board?.width || Y.getContentW()), c = s + (board?.height || Y.getContentH());
+			}
 				break;
 			default:
 				a = Math.min(...r.map((e) => e.x)), s = Math.min(...r.map((e) => e.y)), o = Math.max(...r.map((e) => e.x + e.width)), c = Math.max(...r.map((e) => e.y + e.height));
@@ -42805,13 +42807,13 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			return n === r ? 0 : n > r ? 1 : -1;
 		});
 		e === "page" && (l.unshift({
-			x: 0,
-			y: 0,
+			x: r,
+			y: a,
 			width: 0,
 			height: o
 		}), l.push({
 			x: i,
-			y: 0,
+			y: a,
 			width: 0,
 			height: o
 		}));
@@ -42833,12 +42835,12 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			return n === r ? 0 : n > r ? 1 : -1;
 		});
 		e === "page" && (l.unshift({
-			x: 0,
-			y: 0,
+			x: r,
+			y: a,
 			width: i,
 			height: 0
 		}), l.push({
-			x: 0,
+			x: r,
 			y: o,
 			width: i,
 			height: 0
@@ -64021,8 +64023,9 @@ ${y}`), [3, 7];
 				console.error("Failed to load SVG into image element:", e), a(e);
 			}, v.src = f;
 		}).catch(a);
-	}), DI = (e = "svg.pdf", t = Gv() ? "save" : "dataurlstring") => new Promise((n, r) => {
-		let i = Z.getResolution(), a = i.w > i.h ? "landscape" : "portrait", o = Z.getSvgContent().cloneNode(!0);
+	}), DI = (e = "svg.pdf", t = Gv() ? "save" : "dataurlstring", options = {}) => new Promise((n, r) => {
+		// Export a prepared, cropped SVG without changing the live document.
+		let i = options.size || Z.getResolution(), a = i.w > i.h ? "landscape" : "portrait", o = options.svg ? new DOMParser().parseFromString(options.svg, "image/svg+xml").documentElement : Z.getSvgContent().cloneNode(!0);
 		TI(o).then(() => {
 			let s = new XMLSerializer().serializeToString(o), c = new Blob([s], { type: "image/svg+xml;charset=utf-8" }), l = URL.createObjectURL(c), u = document.createElement("canvas"), d = u.getContext("2d");
 			u.width = i.w, u.height = i.h;

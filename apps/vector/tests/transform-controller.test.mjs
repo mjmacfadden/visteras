@@ -38,7 +38,7 @@ function setup(mode='select', count=1) {
   const flush=()=>{while(frames.length)frames.shift()();};flush();
   const fire=(type,props={})=>{const e={button:0,clientX:100,clientY:50,preventDefault(){},stopImmediatePropagation(){this.stopped=true;},...props};for(const fn of events[type]||[]){fn(e);if(e.stopped)break;}};
   const handle=dir=>overlay.children[0].children.find(n=>n.attrs['data-selection-handle']===dir);
-  return {elements,history,native,grips,fire,flush,handle,overlay};
+  return {elements,history,native,grips,fire,flush,handle,overlay,controller:context.window.__visterasSelectionController};
 }
 for(const [mode,count] of [['select',1],['rect',1],['select',2]]) test(`${mode}: ${count} objects use one transform controller and history entry`,()=>{
   const s=setup(mode,count);
@@ -68,4 +68,16 @@ test('bounding outline rotates with the object during rotation',()=>{
   const points=s.overlay.children[0].children[0].attrs.points.split(' ').map(p=>p.split(',').map(Number));
   assert.ok(Math.abs(points[0][0]-points[1][0])<1e-9);
   assert.ok(Math.abs(Math.abs(points[0][1]-points[1][1])-100)<1e-9);
+});
+
+test('Artboards reuse eight handles and delegate resize / cancel without transforming artwork',()=>{
+ const s=setup('artboard');const seen=[];const adapter={enabled:()=>true,element:()=>s.elements[0],begin:(dir)=>seen.push(dir),preview:(b,m)=>seen.push([m.a,m.d]),finish:cancel=>seen.push(cancel)};s.controller.setAdapter(adapter);s.flush();
+ assert.equal(s.overlay.children[0].children.filter(n=>n.attrs['data-selection-handle']).length,8);
+ assert.equal(s.handle('rotate'),undefined);
+ s.fire('mousedown',{target:s.handle('se')});s.fire('mousemove',{clientX:200,clientY:100});s.fire('mouseup');s.flush();
+ assert.deepEqual(seen,['se',[2,2],false]);assert.equal(s.elements[0].getAttribute('transform'),null);assert.equal(s.history.length,0);
+ s.fire('mousedown',{target:s.handle('se')});s.fire('mousemove',{clientX:150,clientY:75});s.fire('keydown',{key:'Escape'});assert.equal(seen.at(-1),true);
+});
+test('Shared controller sends artboard movement as translation, not scaling',()=>{
+ const s=setup('artboard');let result;s.controller.setAdapter({enabled:()=>true,element:()=>s.elements[0],begin(){},preview:(b,m)=>result=m,finish(){}});s.flush();s.controller.begin({button:0,clientX:20,clientY:20,preventDefault(){},stopImmediatePropagation(){}},'move');s.fire('mousemove',{clientX:70,clientY:40});s.fire('mouseup');assert.deepEqual([result.a,result.d,result.e,result.f],[1,1,50,20]);
 });

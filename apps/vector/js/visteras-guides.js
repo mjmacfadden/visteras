@@ -787,78 +787,83 @@ export class GuideManager {
     const res = this.sc?.getResolution?.() || { w: 800, h: 600 };
     const abW = Number(res.w ?? res.width ?? 800);
     const abH = Number(res.h ?? res.height ?? 600);
+    const boards = (typeof window !== 'undefined' ? window.__visterasArtboards?.all?.() : null) || [];
+    const targetBoards = boards.length ? boards : [{ id: 'default', x: 0, y: 0, width: abW, height: abH }];
 
-    // Artboard Left
-    candidatesX.push({
-      val: 0,
-      label: 'artboard',
-      type: 'artboard',
-      min: Math.min(0, movingBBox.y) - 20,
-      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
-      markers: [
-        { x: 0, y: 0, label: 'artboard' },
-        { x: 0, y: abH, label: 'artboard' }
-      ]
-    });
-    // Artboard Center
-    candidatesX.push({
-      val: abW / 2,
-      label: 'center',
-      type: 'center',
-      min: Math.min(0, movingBBox.y) - 20,
-      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
-      markers: [
-        { x: abW / 2, y: abH / 2, label: 'center' }
-      ]
-    });
-    // Artboard Right
-    candidatesX.push({
-      val: abW,
-      label: 'artboard',
-      type: 'artboard',
-      min: Math.min(0, movingBBox.y) - 20,
-      max: Math.max(abH, movingBBox.y + movingBBox.height) + 20,
-      markers: [
-        { x: abW, y: 0, label: 'artboard' },
-        { x: abW, y: abH, label: 'artboard' }
-      ]
-    });
+    for (const b of targetBoards) {
+      const bx = b.x, by = b.y, bw = b.width, bh = b.height;
+      // Artboard Left
+      candidatesX.push({
+        val: bx,
+        label: 'artboard',
+        type: 'artboard',
+        min: Math.min(by, movingBBox.y) - 20,
+        max: Math.max(by + bh, movingBBox.y + movingBBox.height) + 20,
+        markers: [
+          { x: bx, y: by, label: 'artboard' },
+          { x: bx, y: by + bh, label: 'artboard' }
+        ]
+      });
+      // Artboard Center
+      candidatesX.push({
+        val: bx + bw / 2,
+        label: 'center',
+        type: 'center',
+        min: Math.min(by, movingBBox.y) - 20,
+        max: Math.max(by + bh, movingBBox.y + movingBBox.height) + 20,
+        markers: [
+          { x: bx + bw / 2, y: by + bh / 2, label: 'center' }
+        ]
+      });
+      // Artboard Right
+      candidatesX.push({
+        val: bx + bw,
+        label: 'artboard',
+        type: 'artboard',
+        min: Math.min(by, movingBBox.y) - 20,
+        max: Math.max(by + bh, movingBBox.y + movingBBox.height) + 20,
+        markers: [
+          { x: bx + bw, y: by, label: 'artboard' },
+          { x: bx + bw, y: by + bh, label: 'artboard' }
+        ]
+      });
 
-    // Artboard Top
-    candidatesY.push({
-      val: 0,
-      label: 'artboard',
-      type: 'artboard',
-      min: Math.min(0, movingBBox.x) - 20,
-      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
-      markers: [
-        { x: 0, y: 0, label: 'artboard' },
-        { x: abW, y: 0, label: 'artboard' }
-      ]
-    });
-    // Artboard Middle (Center)
-    candidatesY.push({
-      val: abH / 2,
-      label: 'center',
-      type: 'center',
-      min: Math.min(0, movingBBox.x) - 20,
-      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
-      markers: [
-        { x: abW / 2, y: abH / 2, label: 'center' }
-      ]
-    });
-    // Artboard Bottom
-    candidatesY.push({
-      val: abH,
-      label: 'artboard',
-      type: 'artboard',
-      min: Math.min(0, movingBBox.x) - 20,
-      max: Math.max(abW, movingBBox.x + movingBBox.width) + 20,
-      markers: [
-        { x: 0, y: abH, label: 'artboard' },
-        { x: abW, y: abH, label: 'artboard' }
-      ]
-    });
+      // Artboard Top
+      candidatesY.push({
+        val: by,
+        label: 'artboard',
+        type: 'artboard',
+        min: Math.min(bx, movingBBox.x) - 20,
+        max: Math.max(bx + bw, movingBBox.x + movingBBox.width) + 20,
+        markers: [
+          { x: bx, y: by, label: 'artboard' },
+          { x: bx + bw, y: by, label: 'artboard' }
+        ]
+      });
+      // Artboard Middle (Center)
+      candidatesY.push({
+        val: by + bh / 2,
+        label: 'center',
+        type: 'center',
+        min: Math.min(bx, movingBBox.x) - 20,
+        max: Math.max(bx + bw, movingBBox.x + movingBBox.width) + 20,
+        markers: [
+          { x: bx + bw / 2, y: by + bh / 2, label: 'center' }
+        ]
+      });
+      // Artboard Bottom
+      candidatesY.push({
+        val: by + bh,
+        label: 'artboard',
+        type: 'artboard',
+        min: Math.min(bx, movingBBox.x) - 20,
+        max: Math.max(bx + bw, movingBBox.x + movingBBox.width) + 20,
+        markers: [
+          { x: bx, y: by + bh, label: 'artboard' },
+          { x: bx + bw, y: by + bh, label: 'artboard' }
+        ]
+      });
+    }
 
     // 2. Active Ruler Guides
     if (this.showGuides) {
@@ -1226,19 +1231,25 @@ export class GuideManager {
       : baseSnapThreshold;
 
     const res = this.sc?.getResolution?.() || { w: 800, h: 600 };
-    const abW = Number(res.w ?? res.width ?? 800);
-    const abH = Number(res.h ?? res.height ?? 600);
+    const defaultW = Number(res.w ?? res.width ?? 800);
+    const defaultH = Number(res.h ?? res.height ?? 600);
+    const boards = (typeof window !== 'undefined' ? window.__visterasArtboards?.all?.() : null) || [];
+    const targetBoards = boards.length ? boards : [{ id: 'default', x: 0, y: 0, width: defaultW, height: defaultH }];
 
-    const candidatesX = [
-      { val: 0, label: 'artboard', type: 'artboard' },
-      { val: abW / 2, label: 'center', type: 'center' },
-      { val: abW, label: 'artboard', type: 'artboard' }
-    ];
-    const candidatesY = [
-      { val: 0, label: 'artboard', type: 'artboard' },
-      { val: abH / 2, label: 'center', type: 'center' },
-      { val: abH, label: 'artboard', type: 'artboard' }
-    ];
+    const candidatesX = [];
+    const candidatesY = [];
+    for (const b of targetBoards) {
+      candidatesX.push(
+        { val: b.x, label: 'artboard', type: 'artboard' },
+        { val: b.x + b.width / 2, label: 'center', type: 'center' },
+        { val: b.x + b.width, label: 'artboard', type: 'artboard' }
+      );
+      candidatesY.push(
+        { val: b.y, label: 'artboard', type: 'artboard' },
+        { val: b.y + b.height / 2, label: 'center', type: 'center' },
+        { val: b.y + b.height, label: 'artboard', type: 'artboard' }
+      );
+    }
 
     if (this.showGuides) {
       for (const g of this.rulerGuides) {

@@ -12,14 +12,14 @@ export function mountSelectionTools(editor) {
   style.textContent = '#selectorParentGroup > g[id^="selectorGroup"], #selectorParentGroup [id^="selectorGrip_"] { display:none !important; }';
   document.head.append(style);
   const shapeModes = new Set(['rect', 'square', 'ellipse', 'circle', 'line', 'fhrect', 'fhellipse', 'star', 'polygon', 'shapelib']);
-  let overlay, frame, drag;
+  let overlay, frame, drag, adapter;
   const create = (name, attrs, parent) => {
     const el = document.createElementNS(ns, name);
     for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
     parent?.append(el);
     return el;
   };
-  const selected = () => sc.getSelectedElements().filter(el => el?.isConnected);
+  const selected = () => adapter?.enabled() ? [adapter.element()].filter(Boolean) : sc.getSelectedElements().filter(el => el?.isConnected);
   const asMatrix = m => new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f]);
   const matrix = el => asMatrix(sc.getSvgContent().getScreenCTM()).inverse().multiply(asMatrix(el.getScreenCTM()));
   const localMatrix = el => {
@@ -84,7 +84,7 @@ export function mountSelectionTools(editor) {
     // Eyedropper: keep the box + handles visible (display only, not
     // interactive) so it's clear which objects receive the sampled paint.
     const passive = mode === 'eyedropper';
-    const show = passive || ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
+    const show = adapter?.enabled() || passive || ['select', 'resize', 'rotate', 'multiselect'].includes(mode) || (shapeMode && (!sc.getStarted() || drag));
     for (const selector of manager.selectors) {
       selector.selectorGroup.setAttribute('display', 'none');
     }
@@ -108,7 +108,7 @@ export function mountSelectionTools(editor) {
     create('polygon', { points: corners.map(p=>p.join(',')).join(' '), fill: 'none', stroke: '#3f8ff7', 'stroke-width': 1, 'pointer-events': 'none' }, overlay);
     const grips = { nw: [x, y], n: [x+w/2, y], ne: [x+w, y], e: [x+w, y+h/2], se: [x+w, y+h], s: [x+w/2, y+h], sw: [x, y+h], w: [x, y+h/2] };
     const center = screen(x+w/2,y+h/2);
-    for (const [cx,cy] of corners) {
+    for (const [cx,cy] of (adapter?.enabled() ? [] : corners)) {
       const dx=cx-center[0], dy=cy-center[1], length=Math.hypot(dx,dy)||1;
       create('circle', { cx:cx+dx/length*13, cy:cy+dy/length*13, r:10, fill:'transparent', 'pointer-events':'all', 'data-selection-handle':'rotate', style:`cursor:${rotationCursor}` }, overlay);
     }
@@ -137,27 +137,30 @@ export function mountSelectionTools(editor) {
     return result;
   };
   window.addEventListener('resize', schedule);
-  document.addEventListener('modeChange', schedule);
+  document.addEventListener('modeChange', () => { if(drag?.external&&!adapter?.enabled())finish(true); schedule(); });
   sc.getSvgRoot().addEventListener('mouseup', schedule);
   new MutationObserver(schedule).observe(sc.getSvgContent(), { attributes: true, childList: true, subtree: true });
   const position = e => point(e.clientX, e.clientY, sc.getSvgContent().getScreenCTM().inverse());
-  document.addEventListener('mousedown', e => {
-    const dir = e.target.getAttribute?.('data-selection-handle');
+  function begin(e, dir) {
     if (!dir || e.button !== 0) return;
+    document.activeElement?.blur?.();
+    const external = adapter?.enabled() ? adapter : null;
+    external?.begin(dir, e);
     const elements = selected();
     if (!elements.length) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
+    e.preventDefault(); e.stopImmediatePropagation();
     const {b,m} = selectionFrame(elements);
-    drag = { dir, b, basis:m, start: position(e), moved: false, area: areaTextFrame(elements, dir), items: elements.map(el => ({ el, original: el.getAttribute('transform'), local: localMatrix(el), parent: matrix(el.parentNode) })) };
-  }, true);
+    drag = { external, dir, b, basis:m, start: position(e), moved:false, area:external ? null : areaTextFrame(elements,dir), items:elements.map(el=>({el,original:el.getAttribute('transform'),local:localMatrix(el),parent:matrix(el.parentNode)})) };
+  }
+  window.__visterasSelectionController = { setAdapter(value){adapter=value; schedule();}, begin, refresh:schedule };
+  document.addEventListener('mousedown', e => begin(e, e.target.getAttribute?.('data-selection-handle')), true);
   document.addEventListener('mousemove', e => {
     if (!drag) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     const { dir, b, basis } = drag;
     let start = drag.start, p = position(e);
-    if (dir !== 'rotate') {
+    if (dir !== 'rotate' && dir !== 'move') {
       try {
         const snapRes = window.__visterasGuideManager?.evaluateHandleSnap?.({
           dir,
@@ -174,7 +177,9 @@ export function mountSelectionTools(editor) {
       } catch { /* ignore */ }
     }
     let transform = new DOMMatrix();
-    if (dir === 'rotate') {
+    if (dir === 'move') {
+      transform = transform.translate(p.x-start.x, p.y-start.y);
+    } else if (dir === 'rotate') {
       const {x:cx,y:cy} = point(b.x+b.width/2,b.y+b.height/2,basis);
       let angle = (Math.atan2(p.y-cy, p.x-cx) - Math.atan2(start.y-cy, start.x-cx)) * 180 / Math.PI;
       if (e.shiftKey) angle = Math.round(angle / 45) * 45;
@@ -195,6 +200,10 @@ export function mountSelectionTools(editor) {
       if (Math.abs(sy) < 1e-6) sy = 1e-6;
       transform = transform.translate(ax, ay).scale(sx, sy).translate(-ax, -ay);
       transform = basis.multiply(transform).multiply(basis.inverse());
+    }
+    if (drag.external) {
+      drag.external.preview(b, transform.multiply(basis));
+      drag.moved = true; schedule(); return;
     }
     if (drag.area) {
       // Resize the frame; the text-editing observer reflows the lines (font size unchanged).
@@ -226,8 +235,9 @@ export function mountSelectionTools(editor) {
     try {
       window.__visterasGuideManager?.clearSmartGuides?.();
     } catch { /* ignore */ }
-    const { items, moved, visualFrame, area } = drag;
+    const { items, moved, visualFrame, area, external } = drag;
     drag = null;
+    if (external) {external.finish(cancel || !moved); schedule(); return;}
     if (area) {
       const restore = () => { for (const [k, v] of Object.entries(area.attrs)) v === null ? area.el.removeAttribute(k) : area.el.setAttribute(k, v); };
       if (cancel || !moved) restore();

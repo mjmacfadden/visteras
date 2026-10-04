@@ -180,6 +180,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     </div>
 
     <!-- Group 4b: Transparency -->
+    <div class="vdock-group" id="vdock_grp_artboards"><button type="button" class="vdock-icon" data-panel="artboards" title="Artboards" aria-label="Artboards" aria-expanded="false" aria-controls="vdock_flyout"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="8"/><rect x="9" y="14" width="12" height="7"/></svg></button></div>
     <div class="vdock-group" id="vdock_grp_effects">
       <button type="button" class="vdock-icon" data-panel="effects" title="Effects" aria-label="Effects" aria-expanded="false" aria-controls="vdock_flyout"><em aria-hidden="true">fx</em></button>
     </div>
@@ -472,6 +473,10 @@ export function mountVisterasPanelDock({ svgEditor }) {
   gradPane.className = 'vdock-panel-pane';
   flyoutBody.appendChild(gradPane);
 
+  const artboardsPane = document.createElement('div');
+  artboardsPane.id = 'vdock_artboards_panel';
+  artboardsPane.className = 'vdock-panel-pane';
+  flyoutBody.appendChild(artboardsPane);
   const effectsPane = document.createElement('div');
   effectsPane.id = 'vdock_effects_panel';
   effectsPane.className = 'vdock-panel-pane';
@@ -524,6 +529,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       swatches: 'Swatches',
       stroke: 'Stroke',
       gradient: 'Gradient',
+      artboards: 'Artboards',
       effects: 'Effects',
       transparency: 'Transparency',
       layers: 'Layers',
@@ -532,7 +538,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
   }
 
   function updateWindowMenuCheckmarks() {
-    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers'];
+    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers', 'artboards'];
     panels.forEach(p => {
       const item = document.getElementById(`action_window_${p}`);
       if (item) {
@@ -601,6 +607,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       swatches: swatchesPane,
       stroke: strokePane,
       gradient: gradPane,
+      artboards: artboardsPane,
       effects: effectsPane,
       transparency: transparencyPane,
       layers: layerPanel,

@@ -186,7 +186,7 @@ export function backgroundColor(choice, { bgColor = '#ffffff', artboard = '#ffff
   let c = null;
   if (choice === 'white') c = '#ffffff';
   else if (choice === 'black') c = '#000000';
-  else if (choice === 'artboard') c = artboard || '#ffffff';
+  else if (choice === 'artboard') c = artboard;
   else if (choice === 'other') c = hex6(bgColor, '#ffffff');
   if (!c && opaque) c = '#ffffff';
   return c;

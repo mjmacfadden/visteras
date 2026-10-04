@@ -1,3 +1,4 @@
+import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
 /**
  * Visteras Vector — File ▸ Export (Export for Screens… ⌥⌘E, Export As…) and
  * Effect ▸ Document Raster Effects Settings….
@@ -41,14 +42,15 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     doc.rasterEffects = X.normalizeRaster(v);
     try { shell()?.markDirty?.(); } catch { /* ignore */ }
   };
-  const artboardColor = () => {
+  const artboardColor = (board = artboard()) => {
+    if(board.backgroundColor)return board.backgroundColor==='none'?null:board.backgroundColor;
     let c = String(editor.configObj?.pref?.('bkgd_color') || '#ffffff');
     if (/^#[0-9a-f]{3}$/i.test(c)) c = `#${c.slice(1).split('').map((x) => x + x).join('')}`;
     return /^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : '#ffffff';
   };
 
   /* ───────── bounds ───────── */
-  const artboard = () => { const r = sc.getResolution(); return { x: 0, y: 0, width: Number(r.w) || 800, height: Number(r.h) || 600 }; };
+  const artboard = () => { const board=window.__visterasArtboards?.active();if(board)return board; const r = sc.getResolution(); return { x: 0, y: 0, width: Number(r.w) || 800, height: Number(r.h) || 600 }; };
   const selected = () => (sc.getSelectedElements?.() || []).filter((el) => el?.isConnected && el.id && !el.classList?.contains('layer'));
   const vb = (el) => {
     try { const b = window.__visterasEffects?.getVisualBounds?.(el); if (b && b.width >= 0) return b; } catch { /* fall through */ }
@@ -66,7 +68,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     return out;
   };
   const fullBounds = () => unionOf(visibleTop());
-  const scopeRect = (scope, padding) => X.scopeRect({ scope, padding, artboard: artboard(), selection: scope === 'selection' ? selectionBounds() : null, full: scope === 'full' ? fullBounds() : null });
+  const scopeRect = (scope, padding, board) => X.scopeRect({ scope, padding, artboard: board || (scope==='full'?artboardUnion(activeDoc()?.artboards||[artboard()]):artboard()), selection: scope === 'selection' ? selectionBounds() : null, full: scope === 'full' ? fullBounds() : null });
 
   /* ───────── SVG building ───────── */
   function prune(root, ids) {
@@ -171,9 +173,9 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
    * Standalone SVG for a scope. background = CSS colour or null. Returns
    * { svg, rect, w, h, warnings, fonts }.
    */
-  async function buildExportSvg({ scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false } = {}) {
+  async function buildExportSvg({ board, scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false } = {}) {
     const warnings = [];
-    const rect = scopeRect(scope, padding);
+    const rect = scopeRect(scope, padding, board);
     if (!rect) throw new Error(scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export');
     const { w, h } = forSvgFile ? { w: X.pixelSize(rect, 1).w, h: X.pixelSize(rect, 1).h } : X.pixelSize(rect, scale);
     const clone = sc.getSvgContent().cloneNode(true);
@@ -258,21 +260,22 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const info = X.formatInfo(job.format);
     const warnings = [];
     if (info.ext === 'svg') {
-      if (job.scope === 'artboard') return { blob: new Blob([artboardSvgString(null)], { type: info.mime }), warnings };
+      if (job.scope === 'artboard') return { blob: new Blob([artboardSvgString(scopeRect('artboard',job.padding,job.board))], { type: info.mime }), warnings };
       if (job.scope === 'full') return { blob: new Blob([artboardSvgString(scopeRect('full', job.padding))], { type: info.mime }), warnings };
       const out = await buildExportSvg({ scope: 'selection', padding: job.padding, fonts: false, images: false, forSvgFile: true });
       return { blob: new Blob([out.svg], { type: info.mime }), warnings };
     }
     if (info.ext === 'pdf') {
       if (job.scope !== 'artboard') warnings.push('PDF (raster) always exports the artboard');
-      const m = await sc.exportPDF(`${X.safeBase(title())}.pdf`, 'blob');
+      const built = await buildExportSvg({board:job.board,scope:'artboard',background:artboardColor(job.board)});
+      const m = await sc.exportPDF(`${X.safeBase(title())}.pdf`, 'blob', {svg:built.svg,size:{w:built.w,h:built.h}});
       return { blob: m.output instanceof Blob ? m.output : new Blob([m.output], { type: info.mime }), warnings };
     }
     const scale = Number(job.scale) || X.scaleForPpi(job.ppi);
-    const background = X.backgroundColor(job.background, { bgColor: job.bgColor, artboard: artboardColor(), opaque: !!info.opaque });
+    const background = X.backgroundColor(job.background, { bgColor: job.bgColor, artboard: artboardColor(job.board), opaque: !!info.opaque });
     const quality = info.ext === 'jpg' ? (job.quality ?? info.quality) : undefined;
     const run = async (dropImages) => {
-      const built = await buildExportSvg({ scope: job.scope, padding: job.padding, background, scale, dropImages });
+      const built = await buildExportSvg({ board:job.board, scope: job.scope, padding: job.padding, background, scale, dropImages });
       warnings.push(...built.warnings);
       if (!X.checkSize(built.w, built.h, limits())) throw Object.assign(new Error(X.tooLargeMessage(built.rect, scale, limits())), { code: 'size' });
       return rasterize(built.svg, built.w, built.h, info.mime, quality, { fonts: built.fonts });
@@ -299,7 +302,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
   function sizeProblem(job) {
     const info = X.formatInfo(job.format);
     if (!info.raster) return null;
-    const rect = scopeRect(job.scope, job.padding);
+    const rect = scopeRect(job.scope, job.padding, job.board);
     if (!rect) return job.scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export';
     const scale = Number(job.scale) || X.scaleForPpi(job.ppi);
     const { w, h } = X.pixelSize(rect, scale);
@@ -438,6 +441,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       <label class="vexp_row"><span>Format:</span><select id="vexp_as_format">${[['png', 'PNG (png)'], ['jpg', 'JPEG (jpg)'], ['svg', 'SVG (svg)'], ['pdf', 'PDF (raster)']].map(([k, l]) => `<option value="${k}"${k === fmt ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="vexp_row vexp_checks"><label><input type="checkbox" id="vexp_as_artboard"${s.asUseArtboard ? ' checked' : ''}> Use Artboard</label>
         <label title="${hasSel ? '' : 'Select something first'}"><input type="checkbox" id="vexp_as_selection"${hasSel && s.asSelection ? ' checked' : ''}${hasSel ? '' : ' disabled'}> Selection Only</label></div>
+      ${boardControls()}
       <fieldset class="vexp_raster"><legend>Options</legend>
         <label class="vexp_row"><span>Resolution:</span><select id="vexp_as_ppi"><option value="72"${ppiSel === '72' ? ' selected' : ''}>Screen (72 ppi)</option><option value="150"${ppiSel === '150' ? ' selected' : ''}>Medium (150 ppi)</option><option value="300"${ppiSel === '300' ? ' selected' : ''}>High (300 ppi)</option><option value="other"${ppiSel === 'other' ? ' selected' : ''}>Other</option></select>
           <input type="number" id="vexp_as_ppi_other" class="vpara_input" min="1" max="2400" step="1" value="${ppi}" aria-label="Resolution (ppi)"${ppiSel === 'other' ? '' : ' hidden'}><em>ppi</em></label>
@@ -455,6 +459,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     };
     const sync = () => {
       const v = read();
+      syncBoardControls(st,v.scope);
       const raster = v.format === 'png' || v.format === 'jpg';
       st.dlg.querySelector('.vexp_raster').hidden = !raster;
       for (const n of st.dlg.querySelectorAll('.vexp_jpeg')) n.hidden = v.format !== 'jpg';
@@ -476,21 +481,40 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       saveSettings({ ...loadSettings(), asFormat: v.format, asPpi: v.ppi, asQuality: v.quality, asUseArtboard: $('vexp_as_artboard').checked, asSelection: $('vexp_as_selection').checked, background: v.background, bgColor: v.bgColor });
       const info = X.formatInfo(v.format);
       const job = { scope: v.scope, padding: 0, scale: 0, ppi: v.ppi, format: v.format, background: v.background, bgColor: v.bgColor, quality: v.format === 'jpg' ? X.jpegQuality(v.quality) : undefined };
-      const problem = sizeProblem(job);
+      let boards;try{boards=exportBoards(st,v.format==='pdf'?'artboard':v.scope);}catch(e){toast(e.message,'error');return;}
+      const problem = boards.map(board=>sizeProblem({...job,board})).find(Boolean);
       if (problem) { toast(problem, 'error'); return; }
       busy(st, true);
       progress(st, `Rendering ${X.exportFileName({ title: title(), scope: v.scope, ext: info.ext })}`, 0.5);
       try {
-        const res = await deliverOne(job, X.exportFileName({ title: title(), scope: v.scope, ext: info.ext }));
+        const paths=X.uniquePaths(boards.map(board=>X.exportFileName({title:board?.name||title(),scope:v.scope,ext:info.ext})));
+        const jobs=boards.map((board,i)=>({path:paths[i],job:{...job,board}}));
+        const res = jobs.length===1?await deliverOne(jobs[0].job,jobs[0].path):await deliverMany(jobs,{isCancelled:()=>st.cancelled});
         if (res.cancelled) { busy(st, false); st.dlg.querySelector('.vexp_progress').hidden = true; return; }
         closeDialog();
-        toast(`Exported "${res.name}"`, 'success');
+        toast(res.name?`Exported "${res.name}"`:`Exported ${res.done} artboards`, 'success');
+        for(const failure of res.failed||[])toast(failure,'error');
       } catch (e) {
         busy(st, false);
         toast(`Export failed: ${errorText(e, X.scaleForPpi(v.ppi))}`, 'error');
       }
     };
     return st;
+  }
+
+  function boardControls() {
+    return `<label class="vexp_row"><span>Artboards:</span><select class="vexp_boards" aria-label="Artboards to export"><option value="active">Active Artboard</option><option value="all">All Artboards</option><option value="selected">Selected Artboards (panel)</option><option value="range">Range</option></select></label><label class="vexp_row"><span>Range:</span><input class="vexp_board_range" aria-label="Artboard range" placeholder="1-3, 6" disabled></label>`;
+  }
+  function exportBoards(st,scope) {
+    if(scope!=='artboard')return [null];
+    const boards=activeDoc()?.artboards||[artboard()], mode=st.dlg.querySelector('.vexp_boards').value;
+    const result=artboardsForExport(boards,mode,{activeId:artboard().id,selectedIds:window.__visterasArtboards?.selectedIds()||[],range:st.dlg.querySelector('.vexp_board_range').value});
+    if(!result.length)throw new Error('Select artboards in the Artboards panel before exporting.');
+    return result.map(b=>({...b}));
+  }
+  function syncBoardControls(st,scope) {
+    const mode=st.dlg.querySelector('.vexp_boards'); mode.disabled=scope!=='artboard';
+    st.dlg.querySelector('.vexp_board_range').disabled=scope!=='artboard'||mode.value!=='range';
   }
 
   /* Export for Screens… */
@@ -512,6 +536,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
         <div class="vexp_left">
           <div class="vexp_thumb"><img id="vexp_thumb" alt="Preview"></div>
           ${[['artboard', 'Artboard'], ['selection', 'Selection'], ['full', 'Full Document']].map(([k, l]) => `<label class="vexp_scope"><input type="radio" name="vexp_scope" value="${k}"${k === scope0 ? ' checked' : ''}${k === 'selection' && !hasSel ? ' disabled' : ''}> ${l}</label>`).join('')}
+          ${boardControls()}
           <label class="vexp_row"><span>Padding:</span><input type="number" id="vexp_padding" class="vpara_input" min="0" max="2000" step="1" value="${s.padding}"><em>px</em></label>
           <p class="vexp_info" id="vexp_size"></p>
         </div>
@@ -547,7 +572,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
         $('vexp_thumb').src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(built.svg)}`;
       } catch { /* thumbnail is best effort */ }
     };
-    const sync = () => { $('vexp_bgcolor').hidden = $('vexp_bg').value !== 'other'; thumb(); };
+    const sync = () => { syncBoardControls(st,read().scope); $('vexp_bgcolor').hidden = $('vexp_bg').value !== 'other'; thumb(); };
     st.dlg.addEventListener('change', (e) => {
       if (e.target.classList.contains('vexp_scale')) {
         const row = e.target.closest('.vexp_scale_row'), suf = row.querySelector('.vexp_suffix');
@@ -568,16 +593,13 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     st.onOk = async () => {
       const v = read();
       saveSettings({ ...loadSettings(), ...v });
-      const paths = X.uniquePaths(v.rows.map((r) => {
-        const info = X.formatInfo(r.format);
-        return X.exportFileName({ prefix: v.prefix, title: title(), scope: v.scope, suffix: r.suffix, ext: info.ext, subfolder: v.subfolders && v.rows.length > 1 ? X.subfolderFor(r) : '' });
-      }));
+      let boards;try{boards=exportBoards(st,v.scope);}catch(e){toast(e.message,'error');return;}
+      const requests=boards.flatMap(board=>v.rows.map(r=>({board,r})));
+      const paths=X.uniquePaths(requests.map(({board,r})=>X.exportFileName({prefix:v.prefix,title:board?.name||title(),scope:v.scope,suffix:r.suffix,ext:X.formatInfo(r.format).ext,subfolder:v.subfolders&&v.rows.length>1?X.subfolderFor(r):''})));
       const jobs = [], skipped = [];
-      v.rows.forEach((r, i) => {
-        const info = X.formatInfo(r.format);
-        const job = { scope: v.scope, padding: v.padding, scale: r.scale, ppi: 72 * r.scale, format: r.format, background: v.background, bgColor: v.bgColor, quality: info.quality };
-        const problem = sizeProblem(job);
-        if (problem) skipped.push(`${paths[i]}: ${problem}`); else jobs.push({ path: paths[i], job });
+      requests.forEach(({board,r},i)=>{
+        const info=X.formatInfo(r.format),job={board,scope:v.scope,padding:v.padding,scale:r.scale,ppi:72*r.scale,format:r.format,background:v.background,bgColor:v.bgColor,quality:info.quality};
+        const problem=sizeProblem(job);if(problem)skipped.push(`${paths[i]}: ${problem}`);else jobs.push({path:paths[i],job});
       });
       if (!jobs.length) { toast(skipped[0] || 'Nothing to export', 'error'); return; }
       busy(st, true);

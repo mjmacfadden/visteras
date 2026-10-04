@@ -436,7 +436,7 @@ function setupMockEnvironment() {
   });
 
   // Window menu items
-  ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers', 'properties', 'pathfinder'].forEach(id => {
+  ['color', 'swatches', 'stroke', 'gradient', 'artboards', 'effects', 'transparency', 'layers', 'properties', 'pathfinder'].forEach(id => {
     const item = new MockElement('div');
     item.id = `action_window_${id}`;
     item.className = 'menu_dropdown_item';
@@ -496,7 +496,7 @@ function setupMockEnvironment() {
   return { doc, body, svgEditorEl, sidepanels, storage };
 }
 
-test('Panel Dock: mounts #vdock strip and #vdock_flyout with 4 groups', async () => {
+test('Panel Dock: mounts #vdock strip and #vdock_flyout with the shared panel groups', async () => {
   const env = setupMockEnvironment();
   const { mountVisterasPanelDock } = await import('../js/visteras-panel-dock.js');
 
@@ -510,10 +510,10 @@ test('Panel Dock: mounts #vdock strip and #vdock_flyout with 4 groups', async ()
   assert.ok(vdock, '#vdock created');
   assert.equal(vdock.getAttribute('role'), 'toolbar');
 
-  // Verify 5 groups: color, swatches, stroke, gradient, layers
+  // Verify every dock panel, including Artboards.
   const icons = vdock.querySelectorAll('.vdock-icon');
   const panels = icons.map(i => i.dataset.panel);
-  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers']);
+  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'artboards', 'effects', 'transparency', 'layers']);
 
   // Verify flyout exists
   const flyout = env.doc.getElementById('vdock_flyout');

@@ -140,7 +140,8 @@
         <div class="menu_entry" id="menu_view">
           <div class="menu_entry_title">View</div>
           <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item" id="action_fit_workspace">Fit to Workspace <span class="menu_dropdown_shortcut">⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_fit_all_artboards">Fit All Artboards in Window <span class="menu_dropdown_shortcut">⌥⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_fit_workspace">Fit Artboard in Window <span class="menu_dropdown_shortcut">⌘0</span></div>
             <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
@@ -172,6 +173,7 @@
             <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
             <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
             <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_artboards">Artboards</div>
             <div class="menu_dropdown_item" id="action_window_effects">Effects</div>
             <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
             <div class="menu_dropdown_item disabled" id="action_window_appearance" aria-disabled="true" title="Appearance panel coming">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
@@ -275,6 +277,7 @@
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
+    import { mountArtboards } from './js/visteras-artboards.js';
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
@@ -665,11 +668,13 @@
           let docHeight = null;
           let docUnit = null;
           let docRaster = null;
+          let docArtboards = null, docActiveArtboard = null;
 
           if (typeof raw === 'string' && raw.trim().startsWith('{')) {
             try {
               const bundle = JSON.parse(raw);
               if (bundle.svg) svgContent = bundle.svg;
+              docArtboards = bundle.artboards; docActiveArtboard = bundle.activeArtboardId;
               if (bundle.width) docWidth = bundle.width;
               if (bundle.height) docHeight = bundle.height;
               if (bundle.unit) docUnit = bundle.unit;
@@ -695,6 +700,7 @@
               svg: svgContent,
               fileHandle: fileHandle,
               rasterEffects: docRaster,
+              artboards: docArtboards, activeArtboardId: docActiveArtboard,
             });
           } else {
             if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
@@ -819,6 +825,8 @@
           thumbnail: thumbUrl,
           // Effect ▸ Document Raster Effects Settings (per document, like Illustrator)
           rasterEffects: activeDoc?.rasterEffects || undefined,
+          artboards: activeDoc?.artboards,
+          activeArtboardId: activeDoc?.activeArtboardId,
           svg: svgStr,
         }, null, 2);
 
@@ -1177,6 +1185,7 @@
 
       function fitArtboardToWorkspace() {
         if (!svgEditor) return;
+        if (window.__visterasArtboards) return window.__visterasArtboards.fit();
         if (svgEditor.bottomPanel && typeof svgEditor.bottomPanel.changeZoom === 'function') {
           svgEditor.bottomPanel.changeZoom('canvas');
         } else if (typeof svgEditor.zoomChanged === 'function') {
@@ -2563,6 +2572,7 @@
     mountParagraph(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);
+    mountArtboards(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌘7), Release (⌥⌘7)

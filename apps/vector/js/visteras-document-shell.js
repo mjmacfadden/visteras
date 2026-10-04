@@ -1,3 +1,4 @@
+import { normalizeArtboards, createMultipleArtboards } from './visteras-artboard-model.js';
 /**
  * Visteras Vector — document shell
  *
@@ -276,6 +277,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     if (doc) {
       doc.width = w;
       doc.height = h;
+      doc.artboards = normalizeArtboards(null, w, h);
+      doc.activeArtboardId = doc.artboards[0].id;
       doc.svg = captureSvg();
     }
     updateStatusBar();
@@ -305,6 +308,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       svg,
       dirty,
       isStartupDefault,
+      artboards: normalizeArtboards(null, width, height),
+      activeArtboardId: null,
     };
   }
 
@@ -424,6 +429,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     state.activeId = id;
     setBaseUnit(next.unit || 'px');
     loadSvg(next.svg, next.width, next.height);
+    svgEditor.svgCanvas.undoMgr.resetUndoStack();
+    window.__visterasArtboards?.documentChanged?.();
     if (svgEditor) svgEditor.title = next.title;
     try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
     window.__visterasGuideManager?.setGuides?.(next.rulerGuides || []);
@@ -451,6 +458,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       doc.title = `Untitled-${state.autoTitleCount++}`;
       doc.width = w;
       doc.height = h;
+      doc.artboards = normalizeArtboards(null, w, h);
+      doc.activeArtboardId = doc.artboards[0].id;
       doc.unit = getBaseUnit();
       doc.svg = captureSvg();
       doc.dirty = false;
@@ -469,6 +478,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       state.activeId = next.id;
       setBaseUnit(next.unit || 'px');
       loadSvg(next.svg, next.width, next.height);
+    svgEditor.svgCanvas.undoMgr.resetUndoStack();
+    window.__visterasArtboards?.documentChanged?.();
       if (svgEditor) svgEditor.title = next.title;
       try { localStorage.setItem(ACTIVE_TITLE_KEY, next.title); } catch { /* ignore */ }
     }
@@ -476,9 +487,10 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     updateStatusBar();
   }
 
-  function createDocument({ title, width, height, unit = 'px', forceNew = false } = {}) {
+  function createDocument({ title, width, height, unit = 'px', forceNew = false, artboardCount = 1, artboards = null } = {}) {
     const replace = !forceNew && isActiveUntouchedDefault();
     setBaseUnit(unit);
+    const initialBoards = artboards || createMultipleArtboards(artboardCount, width, height);
 
     if (replace) {
       const doc = getActiveDoc();
@@ -492,6 +504,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         doc.title = title || `Untitled-${state.autoTitleCount++}`;
         doc.width = width;
         doc.height = height;
+        doc.artboards = normalizeArtboards(initialBoards, width, height);
+        doc.activeArtboardId = doc.artboards[0].id;
         doc.unit = unit;
         doc.svg = captureSvg();
         doc.dirty = false;
@@ -501,11 +515,13 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         if (svgEditor) svgEditor.title = doc.title;
         try { localStorage.setItem(ACTIVE_TITLE_KEY, doc.title); } catch { /* ignore */ }
       }
+      window.__visterasArtboards?.documentChanged?.();
       window.__visterasGuideManager?.clearGuides?.();
       renderTabs();
       updateStatusBar();
       requestAnimationFrame(() => {
-        window.fitArtboardToWorkspace?.();
+        if (doc?.artboards?.length > 1) window.__visterasArtboards?.fit?.(true);
+        else window.fitArtboardToWorkspace?.();
       });
       return doc;
     }
@@ -519,6 +535,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       svg: EMPTY_SVG,
       dirty: false,
       isStartupDefault: false,
+      artboards: initialBoards,
     });
     newDoc.rulerGuides = [];
     state.documents.push(newDoc);
@@ -532,16 +549,18 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     }
     if (svgEditor) svgEditor.title = newDoc.title;
     try { localStorage.setItem(ACTIVE_TITLE_KEY, newDoc.title); } catch { /* ignore */ }
+    window.__visterasArtboards?.documentChanged?.();
     window.__visterasGuideManager?.clearGuides?.();
     renderTabs();
     updateStatusBar();
     requestAnimationFrame(() => {
-      window.fitArtboardToWorkspace?.();
+      if (newDoc?.artboards?.length > 1) window.__visterasArtboards?.fit?.(true);
+      else window.fitArtboardToWorkspace?.();
     });
     return newDoc;
   }
 
-  function openDocument({ title, width, height, unit = 'px', svg, fileHandle = null, forceNew = false, rasterEffects = null } = {}) {
+  function openDocument({ title, width, height, unit = 'px', svg, fileHandle = null, forceNew = false, rasterEffects = null, artboards = null, activeArtboardId = null } = {}) {
     const replace = !forceNew && isActiveUntouchedDefault();
     setBaseUnit(unit || 'px');
 
@@ -608,6 +627,12 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       setTimeout(() => { state.suppressDirty = false; }, 80);
     }
 
+    if (targetDoc) {
+      targetDoc.artboards = normalizeArtboards(artboards, targetDoc.width, targetDoc.height);
+      targetDoc.activeArtboardId = activeArtboardId;
+    }
+    sc.undoMgr?.resetUndoStack();
+    window.__visterasArtboards?.documentChanged?.();
     renderTabs();
     updateStatusBar();
     return targetDoc;
@@ -659,7 +684,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     const unit = getBaseUnit();
     const doc = getActiveDoc();
     if (zoomEl) zoomEl.textContent = `${getZoomPercent()}%`;
-    if (sizeEl) sizeEl.textContent = formatSize(res.w, res.h, unit);
+    if (sizeEl) { const b = window.__visterasArtboards?.active?.(); sizeEl.textContent = formatSize(b?.width || res.w, b?.height || res.h, unit); }
     if (docEl) docEl.textContent = doc?.title || '—';
     if (unitSel && unitSel.value !== unit) unitSel.value = unit;
   }
@@ -786,9 +811,15 @@ export function mountVisterasDocumentShell({ svgEditor }) {
                   <input type="number" step="any" min="1" id="vector_new_doc_height" class="new_doc_input" value="${m.height}" />
                 </div>
               </div>
-              <div class="new_doc_form_group">
-                <label for="vector_new_doc_unit">Units</label>
-                <select id="vector_new_doc_unit" class="new_doc_select">${unitOpts}</select>
+              <div class="new_doc_row">
+                <div class="new_doc_form_group">
+                  <label for="vector_new_doc_unit">Units</label>
+                  <select id="vector_new_doc_unit" class="new_doc_select">${unitOpts}</select>
+                </div>
+                <div class="new_doc_form_group">
+                  <label for="vector_new_doc_artboards">Artboards</label>
+                  <input type="number" min="1" max="100" step="1" id="vector_new_doc_artboards" class="new_doc_input" value="${m.artboardCount || 1}" />
+                </div>
               </div>
               <div class="new_doc_form_group">
                 <label>Orientation</label>
@@ -867,7 +898,8 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       const unit = modal.querySelector('#vector_new_doc_unit')?.value || 'px';
       const rawW = parseFloat(modal.querySelector('#vector_new_doc_width')?.value) || 800;
       const rawH = parseFloat(modal.querySelector('#vector_new_doc_height')?.value) || 600;
-      createFromModal({ name, unit, rawW, rawH });
+      const artboardCount = parseInt(modal.querySelector('#vector_new_doc_artboards')?.value, 10) || 1;
+      createFromModal({ name, unit, rawW, rawH, artboardCount });
     });
   }
 
@@ -875,6 +907,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     ensureModal();
     state.modal.name = `Untitled-${state.autoTitleCount}`;
     state.modal.category = 'web';
+    state.modal.artboardCount = 1;
     try {
       const last = JSON.parse(localStorage.getItem(LAST_PRESET_KEY) || 'null');
       if (last?.width && last?.height) {
@@ -899,12 +932,12 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     state.modal.open = false;
   }
 
-  function createFromModal({ name, unit, rawW, rawH }) {
+  function createFromModal({ name, unit, rawW, rawH, artboardCount = 1 }) {
     const widthPx = Math.max(1, Math.round(convertToPixels(rawW, unit, PX_PER_INCH)));
     const heightPx = Math.max(1, Math.round(convertToPixels(rawH, unit, PX_PER_INCH)));
     saveRecentPreset({ name, width: rawW, height: rawH, unit });
     closeNewModal();
-    createDocument({ title: name, width: widthPx, height: heightPx, unit });
+    createDocument({ title: name, width: widthPx, height: heightPx, unit, artboardCount });
   }
 
 

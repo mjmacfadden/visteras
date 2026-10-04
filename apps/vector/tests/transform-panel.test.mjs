@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const source=fs.readFileSync(new URL('../js/visteras-transform-panel.js',import.meta.url),'utf8');
-const {referencePosition,dimensionScale}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+const {referencePosition,dimensionScale}=await import('../js/visteras-transform-panel.js');
 test('Nine reference points track document bounds',()=>{
  const b={x:10,y:20,width:100,height:60};
  assert.deepEqual(referencePosition(b,{x:0,y:0}),{x:10,y:20});
