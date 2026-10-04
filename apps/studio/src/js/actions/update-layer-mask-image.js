@@ -36,6 +36,27 @@ export class Update_layer_mask_image_action extends Base_action {
 			throw new Error('Aborted - layer has no mask');
 		}
 
+		// Assign mask content immediately from canvas if available (optimistic render)
+		if (this.canvas) {
+			const ctx = this.reference_layer.mask.link.getContext('2d');
+			if (this.reference_layer.mask.link.width !== this.canvas.width
+				|| this.reference_layer.mask.link.height !== this.canvas.height) {
+				this.reference_layer.mask.link.width = this.canvas.width;
+				this.reference_layer.mask.link.height = this.canvas.height;
+			}
+			ctx.clearRect(0, 0, this.reference_layer.mask.link.width, this.reference_layer.mask.link.height);
+			ctx.drawImage(this.canvas, 0, 0);
+			if (this.reference_layer.mask.link_canvas) {
+				delete this.reference_layer.mask.link_canvas;
+			}
+			config.need_render = true;
+			app.GUI.GUI_layers.render_layers();
+			app.Layers.notify_mask_changed(this.layer_id);
+			if (app.Layers && typeof app.Layers.render === 'function') {
+				app.Layers.render();
+			}
+		}
+
 		let data_url;
 		if (this.new_image_id) {
 			try {
@@ -74,17 +95,8 @@ export class Update_layer_mask_image_action extends Base_action {
 			}
 		} catch (e) {}
 
-		// Assign mask content immediately from canvas if available, or decode data_url
-		if (this.canvas) {
-			const ctx = this.reference_layer.mask.link.getContext('2d');
-			if (this.reference_layer.mask.link.width !== this.canvas.width
-				|| this.reference_layer.mask.link.height !== this.canvas.height) {
-				this.reference_layer.mask.link.width = this.canvas.width;
-				this.reference_layer.mask.link.height = this.canvas.height;
-			}
-			ctx.clearRect(0, 0, this.reference_layer.mask.link.width, this.reference_layer.mask.link.height);
-			ctx.drawImage(this.canvas, 0, 0);
-		} else if (data_url) {
+		// Assign mask content from decoded data_url if canvas was not available
+		if (!this.canvas && data_url) {
 			const img = new Image();
 			await new Promise((resolve, reject) => {
 				img.onload = resolve;

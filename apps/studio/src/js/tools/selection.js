@@ -521,23 +521,26 @@ class Selection_class extends Base_tools_class {
 			originalSnapshot.height = oh;
 			originalSnapshot.getContext('2d').drawImage(delCanvas, 0, 0);
 
-			var editedCanvas = document.createElement('canvas');
-			editedCanvas.width = ow;
-			editedCanvas.height = oh;
-			var ectx = editedCanvas.getContext('2d');
-			ectx.drawImage(delCanvas, 0, 0);
-			ectx.fillStyle = bgColor;
-			ectx.fillRect(0, 0, ow, oh);
+			delCtx.fillStyle = bgColor;
+			delCtx.fillRect(0, 0, ow, oh);
 
-			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
-			delCtx.clearRect(0, 0, ow, oh);
-			delCtx.drawImage(editedCanvas, 0, 0);
+			this.Base_selection.restore_outside_selection(delCanvas, originalSnapshot, layer);
+			originalSnapshot.width = 1;
+			originalSnapshot.height = 1;
 		} else {
 			delCtx.save();
 			delCtx.globalCompositeOperation = 'destination-out';
 			delCtx.drawImage(mask, 0, 0);
 			delCtx.restore();
 		}
+
+		mask.width = 1;
+		mask.height = 1;
+
+		layer.link_canvas = delCanvas;
+		delete layer._content_bounds_local;
+		config.need_render = true;
+		app.Layers.render();
 
 		app.State.do_action(
 			new app.Actions.Bundle_action('delete_selection', 'Delete Selection', [
@@ -589,15 +592,10 @@ class Selection_class extends Base_tools_class {
 					originalMask.height = source.height;
 					originalMask.getContext('2d').drawImage(source, 0, 0);
 
-					const editedMask = document.createElement('canvas');
-					editedMask.width = source.width;
-					editedMask.height = source.height;
-					const emctx = editedMask.getContext('2d');
-					emctx.drawImage(source, 0, 0);
-					emctx.fillStyle = fillStyle;
-					emctx.fillRect(0, 0, source.width, source.height);
+					mctx.fillStyle = fillStyle;
+					mctx.fillRect(0, 0, source.width, source.height);
 
-					this.Base_selection.restore_outside_selection(editedMask, originalMask, {
+					this.Base_selection.restore_outside_selection(maskCanvas, originalMask, {
 						x: layer.mask.x || 0,
 						y: layer.mask.y || 0,
 						width: source.width,
@@ -605,11 +603,26 @@ class Selection_class extends Base_tools_class {
 						width_original: source.width,
 						height_original: source.height,
 					});
-					mctx.clearRect(0, 0, source.width, source.height);
-					mctx.drawImage(editedMask, 0, 0);
+					originalMask.width = 1;
+					originalMask.height = 1;
 				} else {
 					mctx.fillStyle = fillStyle;
 					mctx.fillRect(0, 0, source.width, source.height);
+				}
+
+				if (layer.mask.link && layer.mask.link.getContext) {
+					const lctx = layer.mask.link.getContext('2d');
+					if (layer.mask.link.width !== maskCanvas.width || layer.mask.link.height !== maskCanvas.height) {
+						layer.mask.link.width = maskCanvas.width;
+						layer.mask.link.height = maskCanvas.height;
+					}
+					lctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+					lctx.drawImage(maskCanvas, 0, 0);
+				}
+				layer.mask.link_canvas = maskCanvas;
+				config.need_render = true;
+				if (app.Layers && typeof app.Layers.render === 'function') {
+					app.Layers.render();
 				}
 
 				app.State.do_action(
@@ -674,21 +687,21 @@ class Selection_class extends Base_tools_class {
 			originalSnapshot.height = oh;
 			originalSnapshot.getContext('2d').drawImage(fillCanvas, 0, 0);
 
-			var editedCanvas = document.createElement('canvas');
-			editedCanvas.width = ow;
-			editedCanvas.height = oh;
-			var ectx = editedCanvas.getContext('2d');
-			ectx.drawImage(fillCanvas, 0, 0);
-			ectx.fillStyle = color;
-			ectx.fillRect(0, 0, ow, oh);
+			fillCtx.fillStyle = color;
+			fillCtx.fillRect(0, 0, ow, oh);
 
-			this.Base_selection.restore_outside_selection(editedCanvas, originalSnapshot, layer);
-			fillCtx.clearRect(0, 0, ow, oh);
-			fillCtx.drawImage(editedCanvas, 0, 0);
+			this.Base_selection.restore_outside_selection(fillCanvas, originalSnapshot, layer);
+			originalSnapshot.width = 1;
+			originalSnapshot.height = 1;
 		} else {
 			fillCtx.fillStyle = color;
 			fillCtx.fillRect(0, 0, ow, oh);
 		}
+
+		layer.link_canvas = fillCanvas;
+		delete layer._content_bounds_local;
+		config.need_render = true;
+		app.Layers.render();
 
 		app.State.do_action(
 			new app.Actions.Bundle_action('fill_layer', 'Fill', [

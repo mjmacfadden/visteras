@@ -1543,67 +1543,17 @@ class Base_selection_class {
 		if (!this.has_selection)
 			return;
 
-		var W = edited.width;
-		var H = edited.height;
 		var clip = this.create_layer_selection_alpha(layer);
-
 		var ectx = edited.getContext('2d');
-		var octx = original.getContext('2d');
-		var cctx = clip.getContext('2d');
 
-		var eImg = ectx.getImageData(0, 0, W, H);
-		var oImg = octx.getImageData(0, 0, W, H);
-		var cImg = cctx.getImageData(0, 0, W, H);
-
-		var ed = eImg.data;
-		var od = oImg.data;
-		var cd = cImg.data;
-
-		for (var i = 0; i < ed.length; i += 4) {
-			var maskVal = cd[i + 3];
-			if (maskVal === 0) {
-				ed[i] = od[i];
-				ed[i + 1] = od[i + 1];
-				ed[i + 2] = od[i + 2];
-				ed[i + 3] = od[i + 3];
-			} else if (maskVal === 255) {
-				continue;
-			} else {
-				var s = maskVal / 255;
-				var invS = 1 - s;
-
-				var a0 = od[i + 3] / 255;
-				var a1 = ed[i + 3] / 255;
-
-				var out_a = a0 * invS + a1 * s;
-
-				if (out_a <= 0.0001) {
-					ed[i] = 0;
-					ed[i + 1] = 0;
-					ed[i + 2] = 0;
-					ed[i + 3] = 0;
-				} else {
-					var pr0 = od[i] * a0;
-					var pg0 = od[i + 1] * a0;
-					var pb0 = od[i + 2] * a0;
-
-					var pr1 = ed[i] * a1;
-					var pg1 = ed[i + 1] * a1;
-					var pb1 = ed[i + 2] * a1;
-
-					var out_pr = pr0 * invS + pr1 * s;
-					var out_pg = pg0 * invS + pg1 * s;
-					var out_pb = pb0 * invS + pb1 * s;
-
-					ed[i] = Math.round(Math.min(255, Math.max(0, out_pr / out_a)));
-					ed[i + 1] = Math.round(Math.min(255, Math.max(0, out_pg / out_a)));
-					ed[i + 2] = Math.round(Math.min(255, Math.max(0, out_pb / out_a)));
-					ed[i + 3] = Math.round(Math.min(255, Math.max(0, out_a * 255)));
-				}
-			}
-		}
-
-		ectx.putImageData(eImg, 0, 0);
+		ectx.save();
+		// Mask edited content strictly within selection
+		ectx.globalCompositeOperation = 'destination-in';
+		ectx.drawImage(clip, 0, 0);
+		// Composite original content behind the edited selection
+		ectx.globalCompositeOperation = 'destination-over';
+		ectx.drawImage(original, 0, 0);
+		ectx.restore();
 
 		clip.width = 1;
 		clip.height = 1;

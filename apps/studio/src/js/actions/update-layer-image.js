@@ -50,6 +50,25 @@ export class Update_layer_image_action extends Base_action {
 			}
 		}
 
+		// Optimistic bridge assignment: render immediately so visual feedback is instantaneous (0ms)
+		const committed_canvas = this.canvas;
+		const layer = this.reference_layer;
+		// Monotonic apply id: rapid overlapping strokes can race a newer live
+		// link_canvas. Only the latest apply may clear the bridge on decode.
+		layer._link_apply_gen = (layer._link_apply_gen || 0) + 1;
+		const apply_gen = layer._link_apply_gen;
+		this._link_apply_gen = apply_gen;
+
+		delete layer._content_bounds_local;
+
+		if (committed_canvas) {
+			if (layer.link_canvas == null || layer.link_canvas === committed_canvas) {
+				layer.link_canvas = committed_canvas;
+			}
+			config.need_render = true;
+			app.Layers.render();
+		}
+
 		// Get data url representation of image
 		let canvas_data_url;
 		if (this.new_image_id) {
@@ -109,24 +128,6 @@ export class Update_layer_image_action extends Base_action {
 		try {
 			this.database_estimate = new Blob([await image_store.get(this.old_image_id)]).size;
 		} catch (e) {}
-
-		// Assign layer properties
-		const committed_canvas = this.canvas;
-		const layer = this.reference_layer;
-		// Monotonic apply id: rapid overlapping strokes can race a newer live
-		// link_canvas. Only the latest apply may clear the bridge on decode.
-		layer._link_apply_gen = (layer._link_apply_gen || 0) + 1;
-		const apply_gen = layer._link_apply_gen;
-		this._link_apply_gen = apply_gen;
-
-		delete layer._content_bounds_local;
-
-		// Never stomp a newer stroke's live bridge canvas with this older commit.
-		if (committed_canvas) {
-			if (layer.link_canvas == null || layer.link_canvas === committed_canvas) {
-				layer.link_canvas = committed_canvas;
-			}
-		}
 		if (!layer.link || !(layer.link instanceof HTMLImageElement)) {
 			layer.link = new Image();
 		}
