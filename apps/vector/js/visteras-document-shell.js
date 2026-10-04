@@ -221,6 +221,46 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     try { return sc.getSvgString?.() || EMPTY_SVG; } catch { return EMPTY_SVG; }
   }
 
+  function ensureDocumentLayersInteractive() {
+    try {
+      const drawing = sc.getCurrentDrawing?.();
+      if (drawing) {
+        if (typeof drawing.identifyLayers === 'function') {
+          drawing.identifyLayers();
+        }
+        if (Array.isArray(drawing.all_layers)) {
+          for (const layer of drawing.all_layers) {
+            layer.activate?.();
+            const grp = layer.getGroup?.();
+            if (grp) {
+              const locked = grp.getAttribute('data-locked') === 'true';
+              grp.style.pointerEvents = locked ? 'none' : 'all';
+            }
+          }
+        }
+        const first = drawing.getLayerName?.(0);
+        if (first) {
+          drawing.setCurrentLayer?.(first);
+        }
+      }
+      const content = sc.getSvgContent?.() || document.getElementById('svgcontent');
+      if (content) {
+        content.querySelectorAll('g.layer').forEach(layer => {
+          const locked = layer.getAttribute('data-locked') === 'true';
+          layer.style.pointerEvents = locked ? 'none' : 'all';
+          layer.querySelectorAll('*').forEach(child => {
+            if (child.style?.pointerEvents === 'none') {
+              child.style.removeProperty('pointer-events');
+            }
+          });
+        });
+      }
+    } catch (e) {
+      console.warn('[visteras-document-shell] ensureDocumentLayersInteractive failed', e);
+    }
+  }
+  window.__visterasEnsureDocumentLayersInteractive = ensureDocumentLayersInteractive;
+
   function loadSvg(svgString, width, height) {
     state.suppressDirty = true;
     try {
@@ -233,6 +273,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
         if (ok === false) {
           resetCanvas(width, height);
         } else {
+          ensureDocumentLayersInteractive();
           try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
           try { svgEditor.layersPanel?.populateLayers?.(); } catch { /* ignore */ }
           updateRulers();
@@ -604,6 +645,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       }
       if (svg) {
         sc.setSvgString(svg);
+        ensureDocumentLayersInteractive();
         const res = sc.getResolution?.() || { w: sc.contentW || 800, h: sc.contentH || 600 };
         const finalW = width || res.w || 800;
         const finalH = height || res.h || 600;

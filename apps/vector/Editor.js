@@ -39778,7 +39778,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			}
 			rv(this.group_), og(this.group_, function(e) {
 				e.style.pointerEvents = "inherit";
-			}), this.group_.style.pointerEvents = n ? "all" : "none";
+			}), this.group_.style.pointerEvents = this.group_.getAttribute("data-locked") === "true" ? "none" : "all";
 		}
 		getName() {
 			return this.name_;
@@ -39787,10 +39787,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			return this.group_;
 		}
 		activate() {
-			this.group_.style.pointerEvents = "all";
+			this.group_.style.pointerEvents = this.group_.getAttribute("data-locked") === "true" ? "none" : "all";
 		}
 		deactivate() {
-			this.group_.style.pointerEvents = "none";
+			this.group_.style.pointerEvents = this.group_.getAttribute("data-locked") === "true" ? "none" : "all";
 		}
 		setVisible(e) {
 			let t = e === void 0 || e ? "inline" : "none";
@@ -40045,17 +40045,24 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let e = this.svgElem_.childNodes.length, t = [], n = [], r = null, i = !1;
 			for (let a = 0; a < e; ++a) {
 				let e = this.svgElem_.childNodes.item(a);
-				if (e?.nodeType === 1) if (e.tagName === "g") if (i = !0, pv(e)) {
-					let t = fv(e);
-					n.push(t), r = new nv(t, e), this.all_layers.push(r), this.layer_map[t] = r;
-				} else t.push(e);
-				else sv.includes(e.nodeName) && t.push(e);
+				if (e?.nodeType === 1) {
+					if (e.id === "visteras_ruler_guides" || e.id === "visteras_smart_guides" || e.classList?.contains("visteras-guides-layer") || e.classList?.contains("visteras-smart-guides-layer")) {
+						continue;
+					}
+					if (e.tagName === "g") {
+						if (i = !0, pv(e)) {
+							let t = fv(e);
+							n.push(t), r = new nv(t, e), this.all_layers.push(r), this.layer_map[t] = r;
+						} else t.push(e);
+					} else sv.includes(e.nodeName) && t.push(e);
+				}
 			}
 			if (t.length > 0 || !i) {
 				let e = mv(n);
 				r = new nv(e, null, this.svgElem_), r.appendChildren(t), this.all_layers.push(r), this.layer_map[e] = r;
-			} else r.activate();
-			this.current_layer = r;
+			}
+			this.all_layers.forEach(l => l.activate());
+			this.current_layer = this.all_layers[0] || r;
 		}
 		createLayer(e, t) {
 			this.current_layer && this.current_layer.deactivate(), (e == null || e === "" || this.layer_map[e]) && (e = mv(Object.keys(this.layer_map)));
@@ -40478,7 +40485,24 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			n
 		].includes(t)) return ny.getSvgRoot();
 		if (Wh(t.parentNode, "#selectorParentGroup")) return ny.selectorManager.selectorParentGroup;
-		for (; !t?.parentNode?.isSameNode(ny.getCurrentGroup() || n);) t = t.parentNode;
+		let curGroup = ny.getCurrentGroup(), svgContent = ny.getSvgContent();
+		if (curGroup) {
+			for (; t && t.parentNode && !t.parentNode.isSameNode(curGroup);) t = t.parentNode;
+			return t || ny.getSvgRoot();
+		}
+		for (; t && t.parentNode && !nv.isLayer(t.parentNode) && !t.parentNode.isSameNode(svgContent);) {
+			if (t.parentNode.isSameNode(ny.getSvgRoot()) || t.parentNode.isSameNode(ny.getDOMContainer())) {
+				return ny.getSvgRoot();
+			}
+			t = t.parentNode;
+		}
+		if (!t || !t.parentNode || t.isSameNode(svgContent)) return ny.getSvgRoot();
+		if (nv.isLayer(t.parentNode)) {
+			let layerName = fv(t.parentNode);
+			if (layerName && ny.getCurrentDrawing().getCurrentLayerName() !== layerName) {
+				ny.getCurrentDrawing().setCurrentLayer(layerName);
+			}
+		}
 		return t;
 	}, sy = (e, t, n) => {
 		let r = n ? [] : !1;
@@ -40491,14 +40515,28 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		} else a[e] && (n ? r.push(a[e](t)) : r = a[e](t));
 		return r;
 	}, cy = (e) => {
-		e ||= ny.getSvgContent().children;
-		let t = [], n = e.children;
-		return Array.from(n).forEach((e) => {
-			e.getBBox && t.push({
-				elem: e,
-				bbox: Cg([e])
-			});
-		}), t.reverse();
+		let t = [];
+		let collect = (parent) => {
+			if (!parent?.children) return;
+			for (let child of parent.children) {
+				if (nv.isLayer(child)) {
+					if (child.getAttribute("display") !== "none" && child.getAttribute("data-locked") !== "true") {
+						collect(child);
+					}
+				} else if (child.getBBox && !["title", "defs", "desc", "metadata"].includes(child.localName)) {
+					t.push({
+						elem: child,
+						bbox: Cg([child])
+					});
+				}
+			}
+		};
+		if (e && !e.isSameNode(ny.getSvgContent())) {
+			collect(e);
+		} else {
+			collect(ny.getSvgContent());
+		}
+		return t.reverse();
 	}, ly = (e) => {
 		let t = ny.getZoom();
 		if (!ny.getRubberBox()) return null;
@@ -63763,6 +63801,7 @@ ${y}`), [3, 7];
 				}
 			} else {
 				if (e.nodeName === "defs" && !e.firstChild) return "";
+				if (e.id === "visteras_ruler_guides" || e.id === "visteras_smart_guides" || e.classList?.contains("visteras-guides-layer") || e.classList?.contains("visteras-smart-guides-layer")) return "";
 				let t = ["-moz-math-font-style", "_moz-math-font-style"];
 				for (let n = s.length - 1; n >= 0; n--) {
 					let c = s[n], l = Zh(c.value);

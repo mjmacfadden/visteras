@@ -705,6 +705,7 @@
           } else {
             if (docWidth && docHeight) sc.setResolution(docWidth, docHeight);
             sc.setSvgString(svgContent);
+            window.__visterasEnsureDocumentLayersInteractive?.();
             if (base) svgEditor.title = base;
             try { localStorage.setItem('visteras_vector_active_doc_title', base); } catch { /* ignore */ }
             try { svgEditor.updateCanvas?.(true); } catch { /* ignore */ }
