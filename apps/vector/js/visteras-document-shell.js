@@ -784,6 +784,16 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       `<option value="${u.id}"${u.id === m.unit ? ' selected' : ''}>${u.label}</option>`
     )).join('');
 
+    const curNameEl = modal.querySelector('#vector_new_doc_name');
+    if (curNameEl && curNameEl.value) {
+      state.modal.name = curNameEl.value;
+    }
+    const curArtboardsEl = modal.querySelector('#vector_new_doc_artboards');
+    if (curArtboardsEl) {
+      const parsed = parseInt(curArtboardsEl.value, 10);
+      if (!isNaN(parsed) && parsed >= 1) state.modal.artboardCount = parsed;
+    }
+
     modal.innerHTML = `
       <div class="new_doc_container">
         <div class="new_doc_header">
@@ -890,6 +900,13 @@ export function mountVisterasDocumentShell({ svgEditor }) {
       state.modal.height = h;
       if (wEl) wEl.value = w;
       if (hEl) hEl.value = h;
+    });
+    modal.querySelector('#vector_new_doc_name')?.addEventListener('input', (e) => {
+      state.modal.name = e.target.value;
+    });
+    modal.querySelector('#vector_new_doc_artboards')?.addEventListener('input', (e) => {
+      const val = parseInt(e.target.value, 10);
+      if (!isNaN(val) && val >= 1) state.modal.artboardCount = val;
     });
     modal.querySelectorAll('[data-action="close"]').forEach((b) => b.addEventListener('click', closeNewModal));
     modal.querySelector('[data-action="create"]')?.addEventListener('click', () => {
