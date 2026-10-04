@@ -1391,6 +1391,24 @@ elix-dialog {
   cursor: inherit;
 }
 
+/* Panning (Hand) Mode Cursors */
+.mode-ext-panning #workarea,
+[data-mode="ext-panning"] #workarea,
+.mode-ext-panning #svgcanvas,
+[data-mode="ext-panning"] #svgcanvas,
+[data-mode="ext-panning"] #svgcontent * {
+  cursor: grab !important;
+}
+
+body.pan-dragging #workarea,
+body.pan-dragging #svgcanvas,
+body.pan-dragging #svgcontent *,
+[data-mode="ext-panning"].pan-dragging #workarea,
+[data-mode="ext-panning"].pan-dragging #svgcanvas,
+[data-mode="ext-panning"].pan-dragging #svgcontent * {
+  cursor: grabbing !important;
+}
+
 /* Direct Selection Base Cursor (Canvas & Empty Space) */
 .mode-pathedit #workarea,
 [data-mode="pathedit"] #workarea,

@@ -68935,15 +68935,104 @@ var fz = () => {
 			this.svgCanvas.setGroupTitle(e.currentTarget.value);
 		});
 		let o = null, s = null, c = !1, l = !1, u = "select";
-		pz("svgcanvas").addEventListener("mouseup", (e) => c === !1 ? !0 : (this.workarea.scrollLeft -= e.clientX - o, this.workarea.scrollTop -= e.clientY - s, o = e.clientX, s = e.clientY, e.type === "mouseup" && (c = !1), !1)), pz("svgcanvas").addEventListener("mousemove", (e) => c === !1 ? !0 : (this.workarea.scrollLeft -= e.clientX - o, this.workarea.scrollTop -= e.clientY - s, o = e.clientX, s = e.clientY, e.type === "mouseup" && (c = !1), !1)), pz("svgcanvas").addEventListener("mousedown", (e) => (this.enableToolCancel = !1, e.button === 1 || l === !0 ? (e.preventDefault(), c = !0, u = this.svgCanvas.getMode(), this.svgCanvas.setMode("ext-panning"), this.workarea.style.cursor = "grab", o = e.clientX, s = e.clientY, !1) : !0)), this.$container.addEventListener("wheel", (e) => {
+		const isEditingText = (e) => {
+			if (window.__visterasIsTypingDirectly) return true;
+			if (document.body?.hasAttribute("data-vector-editing-text")) return true;
+			if (this.svgCanvas.getMode() === "textedit") return true;
+			const target = e?.target;
+			if (target && typeof target.closest === "function" && target.closest("input, textarea, select, [contenteditable='true']")) return true;
+			const path = typeof e?.composedPath === "function" ? e.composedPath() : [];
+			if (path.some((el) => el?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el?.nodeName))) return true;
+			const active = document.activeElement;
+			if (active && typeof active.closest === "function" && active.closest("input, textarea, select, [contenteditable='true']")) return true;
+			if (document.querySelector(".new_doc_overlay, .vtrace_overlay, .vexp_overlay, .visteras_modal_overlay")) return true;
+			return false;
+		};
+		const onPanMove = (e) => {
+			if (!c) return true;
+			this.workarea.scrollLeft -= e.clientX - o;
+			this.workarea.scrollTop -= e.clientY - s;
+			o = e.clientX;
+			s = e.clientY;
+			return false;
+		};
+		const onPanUp = () => {
+			if (!c) return;
+			c = false;
+			document.body?.classList.remove("pan-dragging");
+			if (l === true || this.svgCanvas.getMode() === "ext-panning") {
+				this.workarea.style.cursor = "grab";
+				let el = pz("svgcanvas");
+				if (el) el.style.cursor = "grab";
+			}
+		};
+		pz("svgcanvas").addEventListener("mouseup", onPanUp);
+		pz("svgcanvas").addEventListener("mousemove", onPanMove);
+		window.addEventListener("mousemove", (e) => {
+			if (c) onPanMove(e);
+		});
+		pz("svgcanvas").addEventListener("mousedown", (e) => {
+			this.enableToolCancel = false;
+			if (e.button === 1 || l === true || this.svgCanvas.getMode() === "ext-panning") {
+				e.preventDefault();
+				c = true;
+				if (this.svgCanvas.getMode() !== "ext-panning") {
+					u = this.svgCanvas.getMode();
+					this.svgCanvas.setMode("ext-panning");
+				}
+				document.body?.classList.add("pan-dragging");
+				this.workarea.style.cursor = "grabbing";
+				let el = pz("svgcanvas");
+				if (el) el.style.cursor = "grabbing";
+				o = e.clientX;
+				s = e.clientY;
+				return false;
+			}
+			return true;
+		});
+		this.$container.addEventListener("wheel", (e) => {
 			(e.ctrlKey || e.metaKey || e.altKey) && e.preventDefault();
-		}, { passive: false }), window.addEventListener("mouseup", (e) => {
-			this.enableToolCancel = !0, e.button === 1 && this.svgCanvas.setMode(u ?? "select"), c = !1;
-		}), this.workarea.addEventListener("dblclick", (e) => {
+		}, { passive: false });
+		window.addEventListener("mouseup", (e) => {
+			this.enableToolCancel = true;
+			if (c) onPanUp();
+			if (e.button === 1) {
+				const restoreMode = (u === "ext-panning" ? "select" : u) || "select";
+				this.svgCanvas.setMode(restoreMode);
+				this.setCursorStyle(restoreMode);
+			}
+		});
+		window.addEventListener("blur", () => {
+			if (l) {
+				this.svgCanvas.spaceKey = l = false;
+				c = false;
+				document.body?.classList.remove("pan-dragging");
+				const restoreMode = (u === "ext-panning" ? "select" : u) || "select";
+				this.svgCanvas.setMode(restoreMode);
+				this.setCursorStyle(restoreMode);
+			}
+		});
+		this.workarea.addEventListener("dblclick", (e) => {
 			this.svgCanvas.getMode() === "ext-panning" && this.leftPanel.clickSelect();
-		}), document.addEventListener("keydown", (e) => {
-			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (!l && (u = this.svgCanvas.getMode()), this.svgCanvas.spaceKey = l = !0, e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
-		}), this.workarea.addEventListener("wheel", (e) => {
+		});
+		document.addEventListener("keydown", (e) => {
+			if (e.code.toLowerCase() === "space" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+				if (isEditingText(e)) return;
+				e.preventDefault();
+				if (!l) {
+					const curMode = this.svgCanvas.getMode();
+					if (curMode !== "ext-panning") u = curMode;
+					this.svgCanvas.spaceKey = l = true;
+					this.svgCanvas.setMode("ext-panning");
+					this.setCursorStyle("ext-panning");
+				}
+				return;
+			}
+			if (e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom") {
+				this.workarea.style.cursor = "crosshair";
+				e.preventDefault();
+			}
+		}); this.workarea.addEventListener("wheel", (e) => {
 			if (e.altKey) {
 				e.preventDefault();
 				let oldZoom = this.svgCanvas.getZoom();
@@ -68997,9 +69086,37 @@ var fz = () => {
 				this.workarea.scrollLeft += delta;
 			}
 		}, { passive: false }), document.addEventListener("keyup", (e) => {
-			e.target.nodeName === "BODY" && (e.code.toLowerCase() === "space" ? (this.svgCanvas.spaceKey = l = !1, this.svgCanvas.setMode(u === "ext-panning" ? "select" : u ?? "select"), e.preventDefault()) : e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom" && (this.workarea.style.cursor = "crosshair", e.preventDefault()));
+			if (e.code.toLowerCase() === "space") {
+				if (l) {
+					this.svgCanvas.spaceKey = l = false;
+					c = false;
+					document.body?.classList.remove("pan-dragging");
+					const restoreMode = (u === "ext-panning" ? "select" : u) || "select";
+					this.svgCanvas.setMode(restoreMode);
+					this.setCursorStyle(restoreMode);
+					e.preventDefault();
+				}
+				return;
+			}
+			if (e.key.toLowerCase() === "shift" && this.svgCanvas.getMode() === "zoom") {
+				this.workarea.style.cursor = "crosshair";
+				e.preventDefault();
+			}
 		}), this.setPanning = (e) => {
 			this.svgCanvas.spaceKey = l = e;
+			if (e) {
+				document.body?.classList.add("pan-dragging");
+				this.workarea.style.cursor = "grabbing";
+				let el = pz("svgcanvas");
+				if (el) el.style.cursor = "grabbing";
+			} else {
+				document.body?.classList.remove("pan-dragging");
+				if (this.svgCanvas.getMode() === "ext-panning") {
+					this.workarea.style.cursor = "grab";
+					let el = pz("svgcanvas");
+					if (el) el.style.cursor = "grab";
+				}
+			}
 		};
 		let d, f = () => {
 			d.blur();
