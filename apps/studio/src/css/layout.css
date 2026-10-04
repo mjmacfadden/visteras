@@ -1303,14 +1303,14 @@ button.ui_icon_button img[src*="align-"]{
 	margin-right: 4px;
 	width: 18px;
 	height: 18px;
-	opacity: 0;
+	opacity: 0.45;
 	border: none;
 	background: transparent;
 	box-shadow: none;
 	transition: opacity 0.1s ease;
 }
 .layers_list .visibility:hover{
-	opacity: 0.45;
+	opacity: 0.8;
 }
 .layers_list .visibility:after{
 	position: absolute;
@@ -1319,13 +1319,16 @@ button.ui_icon_button img[src*="align-"]{
 	top: 0;
 	bottom: 0;
 	right: 0;
-	background: url('../images/icons/view.svg') no-repeat center center;
+	background: url('../images/icons/view-off.svg') no-repeat center center;
 	background-size: 16px auto;
 	filter: invert(1);
 }
-/* Compound selector beats base .visibility { opacity: 0 } so visible layers always show the eye. */
+/* Compound selector beats base .visibility so visible layers always show the eye. */
 .layers_list .visibility.visible{ opacity: 0.9; }
 .layers_list .visibility.visible:hover{ opacity: 1; }
+.layers_list .visibility.visible:after{
+	background-image: url('../images/icons/view.svg');
+}
 .layers_list .visible{ opacity: 0.9; }
 .layers_list .visible:hover{ opacity: 1; }
 .layers_list .layer_thumb{
@@ -3075,13 +3078,18 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	height: 16px;
 	background: url('../images/icons/view.svg') no-repeat center center;
 	background-size: 16px;
+	filter: invert(1);
 	opacity: 0.85;
 }
 .vector_vis_icon:hover {
 	opacity: 1;
 }
 .vector_vis_icon.hidden_eye {
-	opacity: 0.2;
+	background-image: url('../images/icons/view-off.svg');
+	opacity: 0.45;
+}
+.vector_vis_icon.hidden_eye:hover {
+	opacity: 0.8;
 }
 .vector_col_thumb {
 	width: 24px;
