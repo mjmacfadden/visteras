@@ -310,7 +310,7 @@ class File_save_class {
 		canvas.width = config.WIDTH;
 		canvas.height = config.HEIGHT;
 
-		this.disable_canvas_smooth(ctx);
+		this.configure_canvas_sampling(ctx);
 
 		//ask data
 		this.Base_layers.convert_layers_to_canvas(ctx, null, false);
@@ -416,7 +416,7 @@ class File_save_class {
 			var ctx = canvas.getContext("2d");
 			canvas.width = config.WIDTH;
 			canvas.height = config.HEIGHT;
-			this.disable_canvas_smooth(ctx);
+			this.configure_canvas_sampling(ctx);
 
 			//ask data
 			if (user_response.layers == 'Selected' && type != 'GIF' && config.layer.type != null) {
@@ -585,7 +585,7 @@ class File_save_class {
 				ctx = canvas.getContext("2d");
 				canvas.width = config.WIDTH;
 				canvas.height = config.HEIGHT;
-				this.disable_canvas_smooth(ctx);
+				this.configure_canvas_sampling(ctx);
 				
 				this.Base_layers.convert_layers_to_canvas(ctx, null, false);
 			}
@@ -877,7 +877,7 @@ class File_save_class {
 					var canvas = document.createElement('canvas');
 					canvas.width = layerObj.width_original || layerObj.width || config.WIDTH;
 					canvas.height = layerObj.height_original || layerObj.height || config.HEIGHT;
-					this.disable_canvas_smooth(canvas.getContext("2d"));
+					this.configure_canvas_sampling(canvas.getContext("2d"));
 
 					canvas.getContext('2d').drawImage(imgSource, 0, 0);
 
@@ -907,16 +907,10 @@ class File_save_class {
 		return JSON.stringify(export_data, null, "\t");
 	}
 	
-	/**
-	 * removes smoothing, because it look ugly during zoom
-	 * 
-	 * @param {ctx} ctx
-	 */
-	disable_canvas_smooth(ctx) {
-		ctx.webkitImageSmoothingEnabled = false;
-		ctx.oImageSmoothingEnabled = false;
-		ctx.msImageSmoothingEnabled = false;
-		ctx.imageSmoothingEnabled = false;
+	/** Configure resampling for exports, independently of editor zoom. */
+	configure_canvas_sampling(ctx) {
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = 'high';
 	}
 
 }

@@ -1,3 +1,4 @@
+import { resampleRaster } from '../../libs/raster-resample.js';
 /*
  * WebGL Renderer for PhotoChop.
  *
@@ -1610,6 +1611,19 @@ class WebGL_renderer_class {
 
 	// ---- Texture Management ----
 
+	/** Resample source pixels into document pixels; zoom is applied to the composite. */
+	_configure_layer_sampling(width, height) {
+		const gl = this.gl;
+		// WebGL1 requires power-of-two dimensions for mipmaps. WebGL2 does not.
+		const powerOfTwo = (value) => value > 0 && (value & (value - 1)) === 0;
+		const mipmaps = typeof gl.texStorage2D === 'function' ||
+			(powerOfTwo(width) && powerOfTwo(height));
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER,
+			mipmaps ? gl.LINEAR_MIPMAP_LINEAR : gl.LINEAR);
+		if (mipmaps) gl.generateMipmap(gl.TEXTURE_2D);
+	}
+
 	/**
 	 * Get or create a GPU texture for a layer.
 	 * Reuses cached texture if the source hasn't changed.
@@ -1679,7 +1693,7 @@ class WebGL_renderer_class {
 		if (cached &&
 			!layer.render_function &&
 			!layer.link_canvas &&
-			cached.width === srcWidth &&
+			cached.source === sourceFull && cached.width === srcWidth &&
 			cached.height === srcHeight &&
 			(cached.filterSig || '') === filterSig) {
 			// Reuse existing texture
@@ -1694,6 +1708,7 @@ class WebGL_renderer_class {
 				gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
 				gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+				this._configure_layer_sampling(srcWidth, srcHeight);
 				return cached;
 			} catch (e) {
 				return null;
@@ -1728,22 +1743,11 @@ class WebGL_renderer_class {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-		// Render-function layers are supersampled at 2x, so always use LINEAR
-		// to get smooth anti-aliased downscaling. Image layers use NEAREST
-		// at high zoom for pixel-perfect rendering.
-		if (layer.render_function) {
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		} else if (config.ZOOM >= 1) {
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-		} else {
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-			gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		}
+		this._configure_layer_sampling(srcWidth, srcHeight);
 
 		var texInfo = {
 			texture: texture,
+			source: sourceFull,
 			width: srcWidth,
 			height: srcHeight,
 			pad: source._pad || 0,
@@ -2115,7 +2119,8 @@ class WebGL_renderer_class {
 	_get_layer_source(layer) {
 		// Image layers: use the stored canvas or image
 		if (layer.type === 'image' || layer.type === 'smart') {
-			return layer.link_canvas || layer.link || null;
+			const source = layer.link_canvas || layer.link || null;
+			return source ? resampleRaster(source, Math.abs(layer.width), Math.abs(layer.height)) : null;
 		}
 
 		// Non-image layers: render to offscreen canvas using the tool's render function

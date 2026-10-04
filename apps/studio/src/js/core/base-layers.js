@@ -1,3 +1,4 @@
+import { resampleRaster } from '../libs/raster-resample.js';
 import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
@@ -835,13 +836,31 @@ class Base_layers_class {
 		}
 
 		if (object.type == "image" || object.type === "smart") {
+			// Resample layer content independently of the document zoom policy.
+			ctx.save();
+			let source = object.type === 'smart' ? renderSmart(object, null, this.disabled_filter_id) : (object.link_canvas != null ? object.link_canvas : object.link);
+			let width = source.naturalWidth || source.width;
+			let height = source.naturalHeight || source.height;
+			const transform = ctx.getTransform();
+			const targetWidth = Math.max(1, Math.round(Math.abs(object.width) * Math.hypot(transform.a, transform.b)));
+			const targetHeight = Math.max(1, Math.round(Math.abs(object.height) * Math.hypot(transform.c, transform.d)));
+			source = resampleRaster(source, targetWidth, targetHeight);
+			width = source.naturalWidth || source.width;
+			height = source.naturalHeight || source.height;
+			const nativePixels = width === Math.abs(object.width * transform.a) &&
+				height === Math.abs(object.height * transform.d) && transform.b === 0 && transform.c === 0 &&
+				Number.isInteger((object.x || 0) * transform.a + transform.e) &&
+				Number.isInteger((object.y || 0) * transform.d + transform.f);
+			ctx.imageSmoothingEnabled = !nativePixels;
+			ctx.imageSmoothingQuality = 'high';
 			ctx.drawImage(
-				object.type === 'smart' ? renderSmart(object, null, this.disabled_filter_id) : (object.link_canvas != null ? object.link_canvas : object.link),
+				source,
 				object.x || 0,
 				object.y || 0,
 				object.width,
 				object.height
 			);
+			ctx.restore();
 		} else if (object.render_function) {
 			var render_class = object.render_function[0];
 			var render_function = object.render_function[1];
