@@ -197,8 +197,8 @@ export class WorkspaceCanvas {
       this.viewport.classList.add('mode-infinite');
       this.viewport.style.backgroundColor = bg;
       this.artboardFrame.classList.add('infinite-mode');
-      this.artboardTitle.textContent = 'Infinite Canvas';
-      this.artboardDims.textContent = '∞';
+      if (this.artboardTitle) this.artboardTitle.textContent = 'Infinite Canvas';
+      if (this.artboardDims) this.artboardDims.textContent = '∞';
       this.artboard.style.width = '0px';
       this.artboard.style.height = '0px';
       this.artboard.style.transform = 'none';
@@ -217,8 +217,8 @@ export class WorkspaceCanvas {
       this.artboard.style.transform = 'none';
       this.artboard.style.backgroundColor = bg;
       const presetInfo = CANVAS_PRESETS[this.doc.preset] || { name: 'Custom' };
-      this.artboardTitle.textContent = `${this.doc.title} — ${presetInfo.name}`;
-      this.artboardDims.textContent = `${this.doc.width} × ${this.doc.height} px`;
+      if (this.artboardTitle) this.artboardTitle.textContent = `${this.doc.title} — ${presetInfo.name}`;
+      if (this.artboardDims) this.artboardDims.textContent = `${this.doc.width} × ${this.doc.height} px`;
       this.artboard.className = `inspire-artboard pattern-${pattern}`;
     }
     this.applyGridBackground();
