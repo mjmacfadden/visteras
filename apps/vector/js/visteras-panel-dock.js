@@ -179,8 +179,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       </button>
     </div>
 
-    <!-- Group 4b: Transparency -->
-    <div class="vdock-group" id="vdock_grp_artboards"><button type="button" class="vdock-icon" data-panel="artboards" title="Artboards" aria-label="Artboards" aria-expanded="false" aria-controls="vdock_flyout"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"><rect x="3" y="3" width="11" height="8"/><rect x="9" y="14" width="12" height="7"/></svg></button></div>
+    <!-- Group 4b: Effects & Transparency -->
     <div class="vdock-group" id="vdock_grp_effects">
       <button type="button" class="vdock-icon" data-panel="effects" title="Effects" aria-label="Effects" aria-expanded="false" aria-controls="vdock_flyout"><em aria-hidden="true">fx</em></button>
     </div>
