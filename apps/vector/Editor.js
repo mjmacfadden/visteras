@@ -1,3 +1,4 @@
+import { penHandles } from "./js/visteras-pen-handles.js";
 import { normalizeEditablePath } from "./js/visteras-path-geometry.js";
 //#region \0rolldown/runtime.js
 var e = Object.defineProperty, t = (e, t, n) => () => {
@@ -39082,7 +39083,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			let i;
 			if (p_.getCurrentMode() === "path") {
 				let t = n, a = r, o = p_.getZoom(), s = t / o, c = a / o, l = Og("path_stretch_line");
-				this.#t = [s, c], p_.getGridSnapping() && (s = jg(s), c = jg(c), t = jg(t), a = jg(a)), l || (l = document.createElementNS(Eh.SVG, "path"), kg(l, {
+				this.#n = null, this.#t = [s, c], p_.getGridSnapping() && (s = jg(s), c = jg(c), t = jg(t), a = jg(a)), l || (l = document.createElementNS(Eh.SVG, "path"), kg(l, {
 					id: "path_stretch_line",
 					stroke: "#22C",
 					"stroke-width": "0.5",
@@ -39228,7 +39229,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				}
 			}
 		}
-		mouseMove(e, t) {
+		mouseMove(e, t, event = {}) {
 			let n = p_.getZoom();
 			this.#i = !0;
 			let r = p_.getDrawnPath();
@@ -39238,31 +39239,25 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				if (this.#t) {
 					let o = p_.addCtrlGrip("1c1"), s = p_.addCtrlGrip("0c2");
 					o.setAttribute("cx", e), o.setAttribute("cy", t), o.setAttribute("display", "inline");
-					let c = this.#t[0], l = this.#t[1], u = e / n, d = t / n, f = c + (c - u), p = l + (l - d);
-					if (s.setAttribute("cx", f * n), s.setAttribute("cy", p * n), s.setAttribute("display", "inline"), kg(p_.getCtrlLine(1), {
-						x1: e,
-						y1: t,
-						x2: f * n,
-						y2: p * n,
-						display: "inline"
-					}), a === 0) this.#n = [e, t];
-					else {
-						let e = i.getItem(a - 1), t = e.x, o = e.y;
-						e.pathSegType === 6 ? (t += t - e.x2, o += o - e.y2) : this.#n && (t = this.#n[0] / n, o = this.#n[1] / n), p_.replacePathSeg(6, a, [
-							c,
-							l,
-							t,
-							o,
-							f,
-							p
-						], r);
+					const c = this.#t[0], l = this.#t[1], current = i.getItem(a);
+					const handles = penHandles({x:c,y:l}, {x:e/n,y:t/n},
+						current.pathSegType === 6 ? {x:current.x2,y:current.y2} : null, event.altKey);
+					const f = handles.incoming.x, p = handles.incoming.y;
+					this.#n = [e, t];
+					s.setAttribute("cx", f*n); s.setAttribute("cy", p*n); s.setAttribute("display", "inline");
+					kg(p_.getCtrlLine(1), {x1:c*n,y1:l*n,x2:e,y2:t,display:"inline"});
+					kg(p_.getCtrlLine(2), {x1:c*n,y1:l*n,x2:f*n,y2:p*n,display:"inline"});
+					if (a > 0) {
+						const previous = i.getItem(a-1);
+						// Preserve the previous anchor's outgoing control from the preview.
+						p_.replacePathSeg(6, a, [c,l,current.x1 ?? previous.x,current.y1 ?? previous.y,f,p], r);
 					}
 				} else {
 					let r = Og("path_stretch_line");
 					if (r) {
 						let o = i.getItem(a);
 						if (o.pathSegType === 6) {
-							let i = o.x + (o.x - o.x2), a = o.y + (o.y - o.y2);
+							let i = this.#n ? this.#n[0]/n : o.x + (o.x - o.x2), a = this.#n ? this.#n[1]/n : o.y + (o.y - o.y2);
 							p_.replacePathSeg(6, 1, [
 								e,
 								t,
@@ -39329,6 +39324,36 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				a.setAttribute("display", "none");
 			}
 			this.#i = !1;
+		}
+		getDrawingState() {
+			const path = p_.getDrawnPath();
+			return path ? { path, parent: path.parentNode, d: path.getAttribute("d"),
+				control: this.#n ? this.#n.map(v => v / p_.getZoom()) : null } : null;
+		}
+		restoreDrawingState(state) {
+			const current = p_.getDrawnPath();
+			if (current && current !== state?.path) current.remove();
+			Og("path_stretch_line")?.remove();
+			Og("pathpointgrip_container")?.remove();
+			this.#t = null;
+			this.#n = state?.control ? state.control.map(v => v * p_.getZoom()) : null;
+			p_.setDrawnPath(state?.path || null);
+			p_.setStarted(!!state);
+			if (!state) return;
+			const { path, parent, d } = state, zoom = p_.getZoom();
+			if (!path.isConnected) parent.append(path);
+			path.setAttribute("d", d);
+			const segments = path.pathSegList;
+			for (let i = 0; i < segments.numberOfItems; i++) {
+				const point = segments.getItem(i);
+				kg(p_.addPointGrip(i), { cx: point.x * zoom, cy: point.y * zoom, display: "inline" });
+			}
+			const last = segments.getItem(segments.numberOfItems - 1);
+			const stretch = document.createElementNS(Eh.SVG, "path");
+			kg(stretch, { id: "path_stretch_line", stroke: "#22C", "stroke-width": "0.5", fill: "none",
+				d: `M${last.x * zoom} ${last.y * zoom} L${last.x * zoom} ${last.y * zoom}` });
+			Og("selectorParentGroup").append(stretch);
+			this.mouseMove(last.x * zoom, last.y * zoom);
 		}
 		resetDrawingState() {
 			this.#n = null; this.#t = null; this.#e = false;
@@ -41001,7 +41026,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					width: Math.abs(v - q.getRStartX() * n),
 					height: Math.abs(b - q.getRStartY() * n)
 				}, 100));
-				q.pathActions.mouseMove(y, x);
+				q.pathActions.mouseMove(y, x, e);
 				break;
 			case "textedit":
 				y *= n, x *= n, q.textActions.mouseMove(h, g);

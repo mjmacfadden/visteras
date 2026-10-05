@@ -1,3 +1,4 @@
+import { clipExportToRect } from './visteras-export-clip.js';
 import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
 /**
  * Visteras Vector — File ▸ Export (Export for Screens… ⌥⌘E, Export As…) and
@@ -197,6 +198,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     }
     if (images || dropImages) await inlineImages(clone, warnings, dropImages);
     const nFonts = fonts ? await embedFonts(clone, warnings) : 0;
+    clipExportToRect(clone, rect);
     let svg = new XMLSerializer().serializeToString(clone);
     if (forSvgFile) svg = `<?xml version="1.0" encoding="UTF-8"?>\n${svg}`;
     return { svg, rect, w, h, warnings, fonts: nFonts };
@@ -249,6 +251,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const root = doc.documentElement;
     root.setAttribute('viewBox', `${rect.x} ${rect.y} ${rect.width} ${rect.height}`);
     root.setAttribute('width', rect.width); root.setAttribute('height', rect.height);
+    clipExportToRect(root, rect);
     return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(root)}`;
   };
 
@@ -260,9 +263,18 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const info = X.formatInfo(job.format);
     const warnings = [];
     if (info.ext === 'svg') {
-      if (job.scope === 'artboard') return { blob: new Blob([artboardSvgString(scopeRect('artboard',job.padding,job.board))], { type: info.mime }), warnings };
-      if (job.scope === 'full') return { blob: new Blob([artboardSvgString(scopeRect('full', job.padding))], { type: info.mime }), warnings };
-      const out = await buildExportSvg({ scope: 'selection', padding: job.padding, fonts: false, images: false, forSvgFile: true });
+      // Use the clone pipeline for every SVG scope. The legacy serializer used
+      // for artboard/full exports preserved external image hrefs, which made
+      // Illustrator prompt for missing local files instead of showing them.
+      const out = await buildExportSvg({
+        board: job.board,
+        scope: job.scope,
+        padding: job.padding,
+        fonts: false,
+        images: true,
+        forSvgFile: true,
+      });
+      warnings.push(...out.warnings);
       return { blob: new Blob([out.svg], { type: info.mime }), warnings };
     }
     if (info.ext === 'pdf') {

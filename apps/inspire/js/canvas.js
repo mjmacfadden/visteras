@@ -405,6 +405,12 @@ export class WorkspaceCanvas {
   }
 
   renderElements() {
+    const edit = this.inlineEdit && !this.inlineEdit.committed ? this.inlineEdit : null;
+    const hadFocus = edit && document.activeElement === edit.textarea;
+    const selStart = edit?.textarea.selectionStart;
+    const selEnd = edit?.textarea.selectionEnd;
+    this.reattachingInlineEditor = !!edit;
+
     this.elementsLayer.innerHTML = '';
     this.connectorsSvg.innerHTML = '';
 
@@ -418,6 +424,25 @@ export class WorkspaceCanvas {
         this.elementsLayer.appendChild(dom);
       }
     }
+
+    if (edit) {
+      const dom = this.elementsLayer.querySelector(`.inspire-element[data-id="${edit.id}"]`);
+      if (dom) {
+        edit.dom = dom;
+        const inner = dom.querySelector('.el-inner-text');
+        if (inner) inner.style.visibility = 'hidden';
+        dom.appendChild(edit.textarea);
+        if (hadFocus) {
+          edit.textarea.focus();
+          try { edit.textarea.setSelectionRange(selStart, selEnd); } catch (_) { /* ignore */ }
+        }
+      } else {
+        // Element was deleted while editing.
+        edit.committed = true;
+        this.inlineEdit = null;
+      }
+    }
+    this.reattachingInlineEditor = false;
   }
 
   createDomElement(el) {
@@ -800,15 +825,17 @@ export class WorkspaceCanvas {
 
       // Text tool interaction (Point Text on click, Textbox on drag, or edit clicked text)
       if (this.activeTool === 'text') {
-        const clickedEl = e.target.closest('.inspire-element');
-        if (clickedEl) {
-          const id = clickedEl.dataset.id;
-          const el = this.board.getElementById(id);
-          if (el && el.type === 'text') {
-            this.board.select(id);
-            this.openInlineEditor(el, clickedEl);
-            return;
-          }
+        // Clicking inside the open editor just moves the caret.
+        if (e.target.closest('.inspire-inline-editor')) return;
+
+        const textEl = this.textElementAtPoint(e.clientX, e.clientY, e.target);
+        if (textEl) {
+          // Open on pointerup: opening now would lose focus to the viewport
+          // (mousedown default) and the selection re-render would detach the editor.
+          e.preventDefault();
+          this.pendingTextEditId = textEl.id;
+          vp.setPointerCapture(e.pointerId);
+          return;
         }
 
         const canvasPt = this.screenToCanvas(e.clientX, e.clientY);
@@ -957,6 +984,13 @@ export class WorkspaceCanvas {
         this.endTransform();
       }
 
+      if (this.pendingTextEditId) {
+        const id = this.pendingTextEditId;
+        this.pendingTextEditId = null;
+        this.editTextElement(id);
+        return;
+      }
+
       if (this.isTextCreating && this.textCreateStart) {
         const cur = this.screenToCanvas(e.clientX, e.clientY);
         const start = this.textCreateStart;
@@ -1004,11 +1038,7 @@ export class WorkspaceCanvas {
           });
         }
 
-        this.board.select(el.id);
-        const cardDom = document.getElementById(`dom_${el.id}`);
-        if (cardDom) {
-          this.openInlineEditor(el, cardDom);
-        }
+        this.editTextElement(el.id);
         return;
       }
 
@@ -1137,13 +1167,20 @@ export class WorkspaceCanvas {
 
     // Double-click inline text edit
     this.container.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.inspire-inline-editor')) return;
       const elDom = e.target.closest('.inspire-element');
-      if (!elDom) return;
+      if (!elDom) {
+        const textEl = this.textElementAtPoint(e.clientX, e.clientY, e.target);
+        if (textEl) this.editTextElement(textEl.id);
+        return;
+      }
       const id = elDom.dataset.id;
       const el = this.board.getElementById(id);
       if (!el) return;
 
-      if (el.type === 'text' || el.type === 'sticky' || el.type === 'quote' || (el.type === 'image' && el.data?.polaroid)) {
+      if (el.type === 'text') {
+        this.editTextElement(id);
+      } else if (el.type === 'sticky' || el.type === 'quote' || (el.type === 'image' && el.data?.polaroid)) {
         this.openInlineEditor(el, elDom);
       }
     });
@@ -1218,6 +1255,39 @@ export class WorkspaceCanvas {
     }
   }
 
+  /** Text object under the pointer, looking through selection handles/overlays. */
+  textElementAtPoint(clientX, clientY, target) {
+    const asText = (node) => {
+      const card = node?.closest?.('.inspire-element');
+      const el = card && this.board.getElementById(card.dataset.id);
+      return el && el.type === 'text' ? el : null;
+    };
+    const direct = asText(target);
+    if (direct) return direct;
+    const stack = typeof document.elementsFromPoint === 'function' ? document.elementsFromPoint(clientX, clientY) : [];
+    for (const node of stack) {
+      if (!this.elementsLayer.contains(node)) continue;
+      const el = asText(node);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  /** Select a text object and open its inline editor on the current DOM node. */
+  editTextElement(id) {
+    const el = this.board.getElementById(id);
+    if (!el || el.type !== 'text') return;
+    if (this.inlineEdit?.id === id && this.inlineEdit.textarea.isConnected) {
+      this.inlineEdit.textarea.focus();
+      return;
+    }
+    if (!(this.board.selectedIds.size === 1 && this.board.selectedIds.has(id))) {
+      this.board.select(id); // re-renders: look the node up afterwards
+    }
+    const dom = this.elementsLayer.querySelector(`.inspire-element[data-id="${id}"]`);
+    if (dom) this.openInlineEditor(el, dom);
+  }
+
   openInlineEditor(el, dom) {
     if (el.type === 'sticky') {
       const stickyTa = dom.querySelector('.sticky-note-textarea');
@@ -1228,10 +1298,16 @@ export class WorkspaceCanvas {
       }
     }
 
-    // Dismiss any existing inline editor
-    const existing = document.querySelector('.inspire-inline-editor');
-    if (existing) {
-      existing.blur();
+    // Dismiss any existing inline editor. Its commit re-renders the board,
+    // so resolve this element's node again afterwards.
+    if (this.inlineEdit) {
+      this.inlineEdit.commit();
+    } else {
+      document.querySelector('.inspire-inline-editor')?.blur();
+    }
+    if (!dom.isConnected) {
+      dom = this.elementsLayer.querySelector(`.inspire-element[data-id="${el.id}"]`);
+      if (!dom) return;
     }
 
     const isQuote = el.type === 'quote';
@@ -1307,6 +1383,10 @@ export class WorkspaceCanvas {
       textarea.style.fontFamily = 'inherit';
     }
 
+    // `edit.dom` is refreshed by renderElements() if the board re-renders while editing.
+    const edit = { id: el.id, textarea, dom, committed: false, commit: null };
+    this.inlineEdit = edit;
+
     const innerText = dom.querySelector('.el-inner-text');
     if (innerText) innerText.style.visibility = 'hidden';
 
@@ -1314,26 +1394,28 @@ export class WorkspaceCanvas {
     textarea.focus();
     textarea.select();
 
+    const fitPointText = (value) => {
+      const d = el.data || {};
+      if (d.boundary === 'box') return;
+      const measured = measureTextBounds(value || ' ', {
+        fontFamily: d.fontFamily,
+        fontSize: d.fontSize,
+        fontWeight: d.fontWeight,
+        letterSpacing: d.letterSpacing,
+        lineHeight: d.lineHeight
+      });
+      el.width = measured.width;
+      el.height = measured.height;
+      edit.dom.style.width = `${el.width}px`;
+      edit.dom.style.height = `${el.height}px`;
+    };
+
     // Live measurement for point text during typing
     if (isText) {
-      const d = el.data || {};
-      const isBox = d.boundary === 'box';
       textarea.addEventListener('input', () => {
         el.data.text = textarea.value;
-        if (!isBox) {
-          const measured = measureTextBounds(textarea.value || ' ', {
-            fontFamily: d.fontFamily,
-            fontSize: d.fontSize,
-            fontWeight: d.fontWeight,
-            letterSpacing: d.letterSpacing,
-            lineHeight: d.lineHeight
-          });
-          el.width = measured.width;
-          el.height = measured.height;
-          dom.style.width = `${el.width}px`;
-          dom.style.height = `${el.height}px`;
-          this.updateSelectionHandles();
-        }
+        fitPointText(textarea.value);
+        this.updateSelectionHandles();
         const inspContent = document.querySelector('#inp_text_content');
         if (inspContent && inspContent.value !== textarea.value) {
           inspContent.value = textarea.value;
@@ -1342,27 +1424,13 @@ export class WorkspaceCanvas {
     }
 
     const commit = () => {
+      if (edit.committed) return;
+      edit.committed = true;
+      if (this.inlineEdit === edit) this.inlineEdit = null;
       const val = textarea.value;
       if (isText) {
         el.data.text = val;
-        const d = el.data || {};
-        if (d.boundary !== 'box') {
-          const measured = measureTextBounds(val || ' ', {
-            fontFamily: d.fontFamily,
-            fontSize: d.fontSize,
-            fontWeight: d.fontWeight,
-            letterSpacing: d.letterSpacing,
-            lineHeight: d.lineHeight
-          });
-          el.width = measured.width;
-          el.height = measured.height;
-          dom.style.width = `${el.width}px`;
-          dom.style.height = `${el.height}px`;
-        }
-        if (innerText) {
-          innerText.textContent = val;
-          innerText.style.visibility = '';
-        }
+        fitPointText(val);
         const inspContent = document.querySelector('#inp_text_content');
         if (inspContent && inspContent.value !== val) {
           inspContent.value = val;
@@ -1375,12 +1443,18 @@ export class WorkspaceCanvas {
         const inspCap = document.querySelector('#inp_img_caption');
         if (inspCap && inspCap.value !== val) inspCap.value = val;
       }
+      if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
+      edit.dom.querySelector('.el-inner-text')?.style.removeProperty('visibility');
       this.board.saveHistory(`Edit text in ${el.type}`);
       this.board.notify({ type: 'update', element: el });
-      if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
     };
+    edit.commit = commit;
 
-    textarea.addEventListener('blur', commit);
+    textarea.addEventListener('blur', () => {
+      // Re-renders detach and reattach the editor; that blur is not a commit.
+      if (this.reattachingInlineEditor) return;
+      commit();
+    });
     textarea.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Escape' || (isPolaroid && e.key === 'Enter') || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {

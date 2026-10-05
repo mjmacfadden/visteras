@@ -231,7 +231,18 @@ class File_open_class {
 		}
 	}
 
-	open_file() {
+	async open_file() {
+		if (typeof window.showOpenFilePicker === 'function') {
+			try {
+				const handles = await window.showOpenFilePicker({ multiple: true });
+				const files = await Promise.all(handles.map(handle => handle.getFile()));
+				await this.open_handler({ target: { files }, fileHandles: handles });
+				return;
+			} catch (err) {
+				if (err && err.name === 'AbortError') return;
+				console.warn('File System Access open failed; using file input:', err);
+			}
+		}
 		var _this = this;
 
 		alertify.success('You can also drag and drop items into browser.');
@@ -611,7 +622,18 @@ class File_open_class {
 
 	async open_handler(e) {
 		var _this = this;
-		var files = e.target.files;
+		var files = e.target?.files;
+		let fileHandles = e.fileHandles || [];
+		// Capture dropped handles during the drop event, before awaiting file reads.
+		if (!e.fileHandles && e.dataTransfer?.items) {
+			const requests = Array.from(e.dataTransfer.items)
+				.filter(item => item.kind === 'file')
+				.map(item => {
+					try { return item.getAsFileSystemHandle ? item.getAsFileSystemHandle() : null; }
+					catch (err) { return null; }
+				});
+			fileHandles = await Promise.all(requests.map(request => Promise.resolve(request).catch(() => null)));
+		}
 
 		var auto_increment = this.Base_layers.auto_increment;
 
@@ -706,13 +728,13 @@ class File_open_class {
 						var piskelMod = await import(/* webpackChunkName: "piskel" */ './../../core/timeline/piskel-importer.js');
 						await piskelMod.default.load_piskel_file(parsedJson, f.name);
 					} else if (app.Documents) {
-						await app.Documents.create_document_from_json(content, f.name);
+						await app.Documents.create_document_from_json(content, f.name, { fileHandle: fileHandles[i] || null });
 					} else {
 						await _this.load_json(content, f.name);
 					}
 				} else if (isPsd) {
 					var psdMod = await import(/* webpackChunkName: "psd" */ './../../libs/psd.js');
-					await psdMod.load_psd(readResult.result, f.name);
+					await psdMod.load_psd(readResult.result, f.name, { fileHandle: fileHandles[i] || null });
 				} else if (f.type.match('image.*') || (f.type == '' && f.name.match(/\.(png|jpg|jpeg|webp|gif|avif)/i))) {
 					if (app.Documents) {
 						await app.Documents.create_document_from_image({

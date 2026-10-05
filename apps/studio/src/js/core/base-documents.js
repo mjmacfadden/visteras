@@ -808,7 +808,7 @@ class Base_documents_class {
 			doc.selection = null;
 			doc.save_format = defaultFormat;
 			doc.source_filename = filename || (docTitle + defaultExt);
-			doc.fileHandle = null;
+			doc.fileHandle = options.fileHandle || null;
 
 			await this.restore_state(doc);
 			this.render_tabs();
@@ -833,7 +833,7 @@ class Base_documents_class {
 			newDoc.smart_sources = smart_sources;
 			newDoc.save_format = defaultFormat;
 			newDoc.source_filename = filename || (docTitle + defaultExt);
-			newDoc.fileHandle = null;
+			newDoc.fileHandle = options.fileHandle || null;
 
 			this.documents.push(newDoc);
 			this.active_id = newDoc.id;
@@ -876,7 +876,7 @@ class Base_documents_class {
 			doc.selection = null;
 			doc.save_format = 'PSD';
 			doc.source_filename = (docTitle && /\.psd$/i.test(docTitle)) ? docTitle : (docTitle + '.psd');
-			doc.fileHandle = null;
+			doc.fileHandle = docData.fileHandle || null;
 
 			await this.restore_state(doc);
 			this.render_tabs();
@@ -901,7 +901,7 @@ class Base_documents_class {
 			});
 			newDoc.save_format = 'PSD';
 			newDoc.source_filename = (docTitle && /\.psd$/i.test(docTitle)) ? docTitle : (docTitle + '.psd');
-			newDoc.fileHandle = null;
+			newDoc.fileHandle = docData.fileHandle || null;
 
 			this.documents.push(newDoc);
 			this.active_id = newDoc.id;

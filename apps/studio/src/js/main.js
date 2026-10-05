@@ -30,6 +30,9 @@ import File_save_class from './modules/file/save.js';
 import Font_manager_class from './core/font-manager.js';
 import * as Actions from './actions/index.js';
 import alertify from './../../node_modules/alertifyjs/build/alertify.min.js';
+import { install_toast_dedup } from './libs/toast-dedup.js';
+
+install_toast_dedup(alertify);
 
 window.addEventListener('load', function (e) {
 	// Toasts: middle top (keep success/error styles)

@@ -1,4 +1,5 @@
 import { resampleRaster } from '../libs/raster-resample.js';
+import { composite_group_layers } from '../libs/group-composite.js';
 import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
@@ -53,8 +54,8 @@ var instance = null;
  * - render_function (function)
  *
  * Groups are first-class layers (type==="group") nested via parent_id.
- * See src/js/libs/layer-tree.js. Compositor skips group nodes (pass-through);
- * child paint order follows global `order`.
+ * Unstyled groups pass through; styled groups composite their children before
+ * applying effects. Child paint order follows global `order`.
  */
 class Base_layers_class {
 	constructor() {
@@ -627,6 +628,10 @@ class Base_layers_class {
 	 * @param {Function} shouldSkip - An optional boolean function for skipping those layers which are not needed to be rendered
 	 */
 	render_objects(ctx, tempCanvas, layers, prepare, shouldSkip) {
+		// Style effects operate on the union of the group's children, once.
+		layers = composite_group_layers(layers, config.layers, config.WIDTH, config.HEIGHT,
+			(width, height) => this.create_new_canvas(null, width, height),
+			(groupCtx, groupTemp, children) => this.render_objects(groupCtx, groupTemp, children, () => groupCtx.save(), shouldSkip));
 		const tempCtx = tempCanvas.getContext("2d");
 		// Prepare the temporary canvas if needed
 		prepare && prepare();
@@ -937,7 +942,8 @@ class Base_layers_class {
 			return;
 		}
 
-		var effectiveFilters = this.get_effective_filters(object);
+		// Ancestor effects are applied by render_objects to the group composite.
+		var effectiveFilters = object.filters || [];
 		var effectiveObject = (effectiveFilters !== object.filters)
 			? Object.assign({}, object, { filters: effectiveFilters })
 			: object;

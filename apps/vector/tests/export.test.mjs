@@ -42,6 +42,11 @@ test('Export: pipeline — clone, scope viewBox, background inside the SVG, font
   assert.match(src, /foreignObject/);
 });
 
+test('Export: SVG artboard and full-document paths use the image-embedding clone pipeline', () => {
+  assert.match(src, /if \(info\.ext === 'svg'\) \{[\s\S]*?buildExportSvg\(\{[\s\S]*?images: true,[\s\S]*?forSvgFile: true/);
+  assert.doesNotMatch(src, /if \(job\.scope === 'artboard'\) return \{ blob: new Blob\(\[artboardSvgString/);
+});
+
 test('Export: Document Raster Effects Settings stored per document in .vvd', () => {
   const saved = captureDocumentSnapshot({ id: 'doc', rasterEffects: { ppi: 300, background: 'transparent' } }, { svg: '<svg/>', width: 100, height: 100, unit: 'px' });
   assert.deepEqual(JSON.parse(serializeDocumentSnapshot(saved, 'Poster', null)).rasterEffects, { ppi: 300, background: 'transparent' });

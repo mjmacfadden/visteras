@@ -1135,6 +1135,17 @@ html, body {
 .vector-layer-disclosure[aria-expanded="true"]::before { transform: rotate(90deg); }
 .vector-layer-disclosure:focus-visible { outline: 1px solid currentColor; }
 .vector-object-eye[aria-pressed="false"] { opacity: .3; }
+.vector-object-lock {
+  width: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: .75;
+}
+.vector-object-lock[aria-pressed="true"] { opacity: 1; }
+.vector-object-lock[aria-pressed="true"] img { opacity: .72; }
 #layerlist tr[data-drop="above"] td { border-top: 2px solid #fa7c1b; }
 #layerlist tr[data-drop="below"] td { border-bottom: 2px solid #fa7c1b; }
 
@@ -1143,6 +1154,13 @@ html, body {
   text-align: center !important;
   padding: 4px !important;
 }
+#layerlist tr.vector-object-row td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  width: 52px !important;
+}
+.vector-object-lock img { width: 14px; height: 14px; display: block; }
 
 #layerlist td.layername {
   padding: 4px 8px !important;
@@ -1825,3 +1843,19 @@ body.pan-dragging #svgcontent *,
   pointer-events: none !important;
 }
 
+
+/* Outline view contains monochrome geometry, including raster/artboard bounds. */
+#workarea.wireframe #svgcontent image {
+  opacity: 0 !important;
+  pointer-events: all !important;
+}
+#workarea.wireframe #visteras-artboard-backgrounds rect {
+  fill: #ffffff !important;
+  stroke: #000000 !important;
+  stroke-width: 0.75px !important;
+  vector-effect: non-scaling-stroke !important;
+  filter: none !important;
+}
+#workarea.wireframe #visteras-artboard-backgrounds text {
+  fill: #000000 !important;
+}
