@@ -288,9 +288,6 @@ async function loadFontFamily({ family, source, variants } = {}) {
   if (!family || typeof family !== "string") return false;
   const name = family.trim();
   if (!name) return false;
-  if (name.toLowerCase() === "roboto") {
-    return true;
-  }
   let src = source;
   if (!src) {
     const entry = findGoogleFontEntry(name);

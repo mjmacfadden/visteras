@@ -1,3 +1,7 @@
+import { syncPenPaintDefaults } from './visteras-color-system.js?v=gradient-1';
+import { penHandles } from './visteras-pen-handles.js';
+import { artboardSnapTarget } from './visteras-artboard-snap.js';
+import { mountPenDrawingHistory } from './visteras-pen-history.js';
 import { readSegments, serializeSegments, anchors, contours } from './visteras-anchor-model.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
 import { hitSegment, splitSegment, simplifyStraightSegments, reverseOpenContour, evaluateSegment, explicitClosing, deleteAnchorSmooth } from './visteras-pen-geometry.js?v=pen-auto-1';
@@ -5,6 +9,12 @@ import { resolvePenHover, getDisableAutoAddDelete, setDisableAutoAddDelete } fro
 
 export function mountPenTools(editor) {
   const sc=editor.svgCanvas, ns='http://www.w3.org/2000/svg';
+  mountPenDrawingHistory(sc);
+  window.addEventListener('mousedown', event => {
+    if (event.button === 0 && sc.getMode() === 'path' && !sc.getDrawnPath() && sc.getSvgRoot().contains(event.target)) {
+      syncPenPaintDefaults(editor);
+    }
+  }, true);
   document.querySelectorAll('#visteras-pen-anchors,#visteras-pen-path-hover,#visteras-pen-continuation-hover').forEach(node=>node.remove());
   const old=document.getElementById('tool_path');
   const flyout=document.createElement('se-flyingbutton');
@@ -46,6 +56,7 @@ export function mountPenTools(editor) {
     showAnchors(null);
     const path=sc.getDrawnPath?.();
     if(!path)return;
+    if (sc.pathActions.finishDrawingHistory?.(path)) return;
     sc.setDrawnPath(null);sc.setStarted(false);
     sc.pathActions.resetDrawingState();
     document.getElementById('path_stretch_line')?.remove();
@@ -151,6 +162,11 @@ export function mountPenTools(editor) {
     }
     hover = resolvePenHover({pointer,shift:!!event.shiftKey,autoDisabled:getDisableAutoAddDelete(),drawing,targets});
     autoEdit = hover.state === 'add' ? 'add_anchor' : hover.state === 'delete' ? 'delete_anchor' : null;
+    // Object anchors retain priority; edges are coordinate targets, not edits.
+    if (!closest && snapEnabled && !autoEdit && hover.state !== 'close') {
+      const edge = artboardSnapTarget(sc, pointer);
+      if (edge) closest = { point:new DOMPoint(edge.screenPt.x, edge.screenPt.y), distance:edge.dist };
+    }
     snapMarker.dataset.target = closest ? `${closest.point.x},${closest.point.y}` : 'none';
     snapMarker.dataset.state = hover.state;
     // While drawing, another object's anchor is a coordinate target, never an
@@ -381,7 +397,7 @@ export function mountPenTools(editor) {
         const dx=p.x-prev.x,dy=p.y-prev.y,len=Math.hypot(dx,dy),ang=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4);
         target={x:prev.x+len*Math.cos(ang),y:prev.y+len*Math.sin(ang)};
       }
-      const segment=prev.type===6?{type:6,x1:2*prev.x-prev.x2,y1:2*prev.y-prev.y2,x2:target.x,y2:target.y,x:target.x,y:target.y}:{type:4,x:target.x,y:target.y};
+      const segment=prev.type===6?{type:6,x1:continuation.outgoing?.x??2*prev.x-prev.x2,y1:continuation.outgoing?.y??2*prev.y-prev.y2,x2:target.x,y2:target.y,x:target.x,y:target.y}:{type:4,x:target.x,y:target.y};
       const next=[...data.slice(0,end+1),segment,...(close?[{type:1}]:[]),...data.slice(end+1)];
       extending={el,before:el.getAttribute('d'),next,index:end+1,point:target,close};
       el.setAttribute('d',serializeSegments(next));
@@ -410,15 +426,17 @@ export function mountPenTools(editor) {
     showContinuationPreview(el,next[index-1],e);
     if(Math.hypot(p.x-point.x,p.y-point.y)<2)return;
     const prev=next[index-1],s=next[index];
-    next[index]={type:6,x1:s.x1??prev.x,y1:s.y1??prev.y,x2:2*point.x-p.x,y2:2*point.y-p.y,x:point.x,y:point.y};
+    const handles=penHandles(point,p,s.type===6?{x:s.x2,y:s.y2}:null,e.altKey);
+    extending.outgoing=handles.outgoing;
+    next[index]={type:6,x1:s.x1??prev.x,y1:s.y1??prev.y,x2:handles.incoming.x,y2:handles.incoming.y,x:point.x,y:point.y};
     el.setAttribute('d',serializeSegments(next));
   },true);
   window.addEventListener('mouseup',e=>{
     if(!extending)return;
-    const {el,before,next,index,close}=extending;
+    const {el,before,next,index,close,outgoing}=extending;
     sc.addCommandToHistory(new sc.history.ChangeElementCommand(el,{d:before},'Continue path'));
     sc.call('changed',[el]);
-    if(close)continuation=null;else continuation={...continuation,data:next,end:index};
+    if(close)continuation=null;else continuation={...continuation,data:next,end:index,outgoing};
     extending=null;showAnchors(el);
     continuationHoverLayer?.replaceChildren(); continuationHoverLayer?.style.setProperty('display','none');
   },true);

@@ -666,11 +666,11 @@ html {
 }
 
 .inspire-artboard-header {
+  display: none !important;
   position: absolute;
   bottom: 100%;
   left: 0;
   margin-bottom: 8px;
-  display: flex;
   align-items: center;
   gap: 10px;
   color: #8c93a0;

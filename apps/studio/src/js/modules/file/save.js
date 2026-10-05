@@ -81,15 +81,18 @@ class File_save_class {
 		const doc = app.Documents ? app.Documents.get_active_document() : null;
 		const format = doc && doc.save_format ? String(doc.save_format).toUpperCase() : 'VSD';
 		const handle = doc && doc.fileHandle ? doc.fileHandle : null;
+		let snapshot;
+		try {
+			snapshot = this._save_snapshot(format);
+		} catch (err) {
+			alertify.error('Save failed: ' + (err?.message || 'Unknown error'));
+			return;
+		}
 
 		if (handle && (format === 'VSD' || format === 'PSD' || format === 'JSON')) {
 			try {
-				await this._write_document_to_handle(handle, format);
-				if (app.Documents && typeof app.Documents.clear_active_dirty === 'function') {
-					app.Documents.clear_active_dirty();
-				} else if (doc) {
-					doc.is_dirty = false;
-				}
+				await this._write_document_to_handle(handle, format, snapshot);
+				this._mark_document_saved(doc);
 				alertify.success('Saved.');
 				return;
 			} catch (err) {
@@ -119,21 +122,14 @@ class File_save_class {
 						accept: { 'application/json': ['.vsd'], 'application/x-visteras-studio': ['.vsd'] },
 					}],
 				});
-				if (app.Documents && typeof app.Documents.set_active_file_meta === 'function') {
-					app.Documents.set_active_file_meta({ fileHandle: newHandle, save_format: effectiveFormat, source_filename: newHandle.name });
-				} else if (doc) {
+				await this._write_document_to_handle(newHandle, effectiveFormat, snapshot);
+				if (doc) {
 					doc.fileHandle = newHandle;
 					doc.save_format = effectiveFormat;
+					doc.source_filename = newHandle.name;
+					doc.title = newHandle.name;
 				}
-				await this._write_document_to_handle(newHandle, effectiveFormat);
-				if (app.Documents && typeof app.Documents.clear_active_dirty === 'function') {
-					app.Documents.clear_active_dirty();
-				} else if (doc) {
-					doc.is_dirty = false;
-				}
-				if (newHandle && newHandle.name) {
-					app.Documents && app.Documents.update_active_title(newHandle.name);
-				}
+				this._mark_document_saved(doc);
 				alertify.success('Saved.');
 				return;
 			} catch (err) {
@@ -146,22 +142,44 @@ class File_save_class {
 		this.save();
 	}
 
-	async _write_document_to_handle(handle, format) {
+	_mark_document_saved(doc) {
+		if (!doc) return;
+		doc.is_dirty = false;
+		app.Documents?.render_tabs();
+	}
+
+	_save_snapshot(format) {
+		return { layers: config.layers, width: config.WIDTH, height: config.HEIGHT,
+			json: (format === 'VSD' || format === 'JSON') ? this.export_as_json() : null };
+	}
+
+	async _write_document_to_handle(handle, format, snapshot = this._save_snapshot(format)) {
+		const { layers, width, height, json } = snapshot;
+		if (typeof handle.queryPermission === 'function' &&
+			await handle.queryPermission({ mode: 'readwrite' }) !== 'granted') {
+			if (typeof handle.requestPermission !== 'function' ||
+				await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+				throw new Error('Write permission was not granted for this file.');
+			}
+		}
+		// Finish serialization before opening a write stream to the original file.
+		let blob;
+		if (format === 'VSD' || format === 'JSON') {
+			blob = new Blob([json], { type: 'application/json' });
+		} else if (format === 'PSD') {
+			const psdMod = await import(/* webpackChunkName: "psd" */ './../../libs/psd.js');
+			blob = await psdMod.export_psd_blob(layers, width, height, { filename: handle.name || 'image.psd' });
+			if (!blob) throw new Error('Failed to export PSD.');
+		} else {
+			throw new Error('Unsupported save format: ' + format);
+		}
 		const writable = await handle.createWritable();
 		try {
-			if (format === 'VSD' || format === 'JSON') {
-				const data_json = this.export_as_json();
-				await writable.write(new Blob([data_json], { type: 'application/json' }));
-			} else if (format === 'PSD') {
-				const psdMod = await import(/* webpackChunkName: "psd" */ './../../libs/psd.js');
-				const fname = (handle && handle.name) || 'image.psd';
-				const blob = await psdMod.export_psd_blob(config.layers, config.WIDTH, config.HEIGHT, { filename: fname });
-				await writable.write(blob);
-			} else {
-				throw new Error('Unsupported save format: ' + format);
-			}
-		} finally {
+			await writable.write(blob);
 			await writable.close();
+		} catch (err) {
+			try { await writable.abort(); } catch (abortError) {}
+			throw err;
 		}
 	}
 

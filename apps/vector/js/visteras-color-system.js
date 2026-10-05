@@ -15,7 +15,7 @@
 
 import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
 import { mountStrokeLink } from './visteras-stroke-link.js?v=stroke-link-2';
-import { resolveSelectionPaint } from './visteras-paint-resolver.js?v=paint-resolver-3';
+import { resolveSelectionPaint, parseCssPaint } from './visteras-paint-resolver.js?v=paint-resolver-3';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
@@ -1809,9 +1809,26 @@ function readCanvasPaint(svgEditor, which) {
   if (!raw || raw === 'none' || raw === 'transparent') {
     return { none: true, hex: effectiveFallback, fromSelection: false };
   }
+  const parsed = parseCssPaint(raw);
+  if (parsed?.gradient) return { ...parsed, fromSelection: false };
   const hex = normalizeHex(raw);
   if (!hex || hex === 'none') return { none: true, hex: effectiveFallback, fromSelection: false };
   return { none: false, hex, fromSelection: false };
+}
+
+/** Adopt the paint shown by the wells before the Pen clears its selection. */
+export function syncPenPaintDefaults(svgEditor) {
+  const sc = svgEditor.svgCanvas;
+  const paints = ['fill', 'stroke'].map(which => [which, readCanvasPaint(svgEditor, which)]);
+  for (const [which, paint] of paints) {
+    const value = paint.none ? 'none' : paint.gradient
+      ? (paint.ref ? `url(#${paint.ref})` : sc.getColor(which)) : paint.hex;
+    if (value == null) continue;
+    sc.setCurShape?.(which, value);
+    if (sc.curShape) sc.curShape[which] = value;
+  }
+  // Shape drawing must not keep writing into the text style selected earlier.
+  if (sc.curShape) sc.curProperties = sc.curShape;
 }
 
 /** Paint a well element. Inline !important: the chip CSS uses !important backgrounds. */

@@ -192,7 +192,7 @@ export async function load_psd(buffer, filename, options = {}) {
 						height: null,
 						data: null,
 						link: null,
-						filters: [],
+						filters: convert_psd_effects_to_filters(node),
 						mask: null,
 					});
 					import_psd_nodes(node.children || [], groupId);
@@ -262,6 +262,7 @@ export async function load_psd(buffer, filename, options = {}) {
 		width: docWidth,
 		height: docHeight,
 		layers: layers,
+		fileHandle: options.fileHandle || null,
 	};
 
 	if (app.Documents && typeof app.Documents.create_document_from_psd_data === 'function') {
@@ -275,7 +276,7 @@ export async function load_psd(buffer, filename, options = {}) {
 				transparency: true,
 			},
 			layers: layers,
-		}, filename);
+		}, filename, { fileHandle: options.fileHandle || null });
 	} else {
 		config.WIDTH = docWidth;
 		config.HEIGHT = docHeight;
@@ -998,7 +999,6 @@ export async function export_psd(layers, docWidth, docHeight, options = {}) {
 	}
 
 	if (layers.some(l => l.type === 'smart')) alertify.warning('PSD exports Smart Layers as pixels. Save JSON to preserve editable Smart Layers.');
-	alertify.message('Generating Photoshop Document...');
 
 	let compositeCanvas = null;
 	if (app.Layers && app.Layers.Composite_cache && app.Layers.Composite_cache.documentCanvas) {
@@ -1080,7 +1080,7 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
 				blendMode = 'normal';
 			}
 			const opacity = (layer.opacity != null ? layer.opacity : 100) / 100;
-			out.push({
+			const psdGroup = {
 				name: layer.name || 'Group',
 				opened: layer.opened !== false,
 				hidden: layer.visible === false,
@@ -1088,7 +1088,9 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
 				clipping: isClipping,
 				blendMode: blendMode,
 				children: build_psd_children_tree(layers, layer.id, docWidth, docHeight),
-			});
+			};
+			export_layer_effects(layer, psdGroup);
+			out.push(psdGroup);
 		} else {
 			const psdLayer = export_layer_to_psd(layer, docWidth, docHeight);
 			if (psdLayer) out.push(psdLayer);
@@ -1260,7 +1262,17 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 		}
 	}
 
-	// Export layer effects (Drop Shadow, Outer/Inner Glow, Stroke, Color Overlay)
+	export_layer_effects(layer, psdLayer);
+
+	if (layer.type === 'text' && Array.isArray(layer.data)) {
+		const built = build_psd_text_from_layer(layer);
+		if (built) psdLayer.text = built;
+	}
+	return psdLayer;
+}
+
+function export_layer_effects(layer, psdLayer) {
+	// Shared by leaf layers and groups for PSD round-trip fidelity.
 	if (layer.filters && layer.filters.length > 0) {
 		for (const f of layer.filters) {
 			const p = f.params || {};
@@ -1342,14 +1354,6 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 		}
 	}
 
-	if (layer.type === 'text' && Array.isArray(layer.data)) {
-		const built = build_psd_text_from_layer(layer);
-		if (built) {
-			psdLayer.text = built;
-		}
-	}
-
-	return psdLayer;
 }
 
 

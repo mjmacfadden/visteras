@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "test": "node scripts/run-tests.mjs",
+    "test:hygiene": "node --test scripts/build-site-hygiene.test.mjs",
     "test:vector": "node --test apps/vector/tests/*.test.mjs",
     "test:studio": "node --test apps/studio/tests/*.test.cjs",
     "test:ui": "node --test packages/ui/tests/*.test.mjs && node packages/ui/scripts/build-static.mjs --check && node packages/icons/scripts/copy-tools.mjs --check",

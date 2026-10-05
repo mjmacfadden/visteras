@@ -15,6 +15,20 @@ copy_tree() {
   # copy_tree <src_dir> <dest_dir> [--exclude pattern ...]
   local src="$1" dest="$2"
   shift 2
+  # Git ignores do not apply to rsync/tar. Never publish local configuration,
+  # credentials, tooling caches, or test sources from a developer's checkout.
+  set -- \
+    --exclude '.git' --exclude '.gitignore' --exclude '.DS_Store' \
+    --exclude '.env' --exclude '.env.*' --exclude '*.pem' --exclude '*.key' \
+    --exclude 'secrets' --exclude '*service-account*.json' \
+    --exclude '*serviceAccount*.json' --exclude 'credentials.json' \
+    --exclude 'config.keys.local.js' --exclude '.vscode' --exclude '.idea' \
+    --exclude '.firebase' --exclude '.vercel' --exclude '.netlify' \
+    --exclude '.astro' --exclude '.vite' --exclude '.cache' \
+    --exclude 'node_modules' --exclude 'tests' --exclude 'coverage' \
+    --exclude 'playwright-report' --exclude 'test-results' \
+    --exclude '*.log' --exclude '*.tmp' --exclude '*.bak' \
+    --exclude '*.orig' --exclude '*.rej' "$@"
   mkdir -p "$dest"
   if command -v rsync >/dev/null 2>&1; then
     local args=(-a)

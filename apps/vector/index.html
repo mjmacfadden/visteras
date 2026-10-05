@@ -266,6 +266,7 @@
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
     import Editor from './Editor.js?v=export-1';
+    import { mountOutlineImages } from './js/visteras-outline-images.js';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=selection-api-2';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
@@ -2501,6 +2502,7 @@
     mountMenus();
     setupPropertiesPanel();
     mountVectorWorkspace(svgEditor);
+    mountOutlineImages(svgEditor);
     mountPenTools(svgEditor);
     mountScissorsTool(svgEditor);
     mountEraserTool(svgEditor);
@@ -2599,6 +2601,6 @@
       }
     });
   </script>
-<script src="tool-free.js"></script>
+<script src="tool-free.js?v=tool-free-8"></script>
 </body>
 </html>

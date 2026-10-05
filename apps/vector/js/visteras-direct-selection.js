@@ -1,4 +1,5 @@
 import { cutAnchors } from './visteras-pen-geometry.js';
+import { artboardSnapTarget } from './visteras-artboard-snap.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
 import { anchors, readSegments, serializeSegments, moveAnchors, deleteAnchors, moveControl, convertAnchors } from './visteras-anchor-model.js';
 
@@ -532,7 +533,8 @@ export function mountDirectSelection(editor) {
         rec.selected.has(index) ? rec.selected.delete(index) : rec.selected.add(index);
         schedule(); return;
       }
-      if (!control) keepOnly(rec);
+      // Dragging an already selected anchor preserves selections on other objects.
+      if (!control && !rec.selected.has(index)) keepOnly(rec);
       const collapse = !control && rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
       if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
       gesture = { type: control ? 'control' : 'anchors', rec, index, control, start: position(e), before: snapshot(), collapse };
@@ -546,7 +548,7 @@ export function mountDirectSelection(editor) {
         rec.selected.has(index) ? rec.selected.delete(index) : rec.selected.add(index);
         schedule(); return;
       }
-      keepOnly(rec);
+      if (!rec.selected.has(index)) keepOnly(rec);
       const collapse = rec.selected.has(index) && !e.shiftKey ? { rec, index } : null;
       if (!rec.selected.has(index)) { clearPoints(); rec.selected.add(index); }
       gesture = { type: 'anchors', rec, index, control: null, start: position(e), before: snapshot(), collapse };
@@ -646,7 +648,7 @@ export function mountDirectSelection(editor) {
             if (leaderOrigContent) {
               const proposedContent = { x: leaderOrigContent.x + dx, y: leaderOrigContent.y + dy };
               const proposedScreen = new DOMPoint(proposedContent.x, proposedContent.y).matrixTransform(contentScreenCTM);
-              const snap = findSnapTarget(proposedScreen, excludeAnchors);
+              const snap = findSnapTarget(proposedScreen, excludeAnchors) || artboardSnapTarget(sc, proposedScreen);
               if (snap) {
                 dx = snap.contentPt.x - leaderOrigContent.x;
                 dy = snap.contentPt.y - leaderOrigContent.y;
