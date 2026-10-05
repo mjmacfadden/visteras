@@ -8,6 +8,7 @@
 import { spawnSync } from 'node:child_process';
 
 const SUITES = [
+  ['hygiene', 'test:hygiene'],
   ['ui', 'test:ui'],
   ['vector', 'test:vector'],
   ['inspire', 'test:inspire'],

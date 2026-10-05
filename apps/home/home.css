@@ -16,7 +16,7 @@
 .vector-art .artboard img{width:100%;height:100%;object-fit:contain}
 .publish-art .paper{background:#f4f0e5;color:#272c2a;margin:17px auto 0 auto;width:85%;height:335px;overflow:hidden;font-family:Georgia,serif;display:flex;align-items:flex-end;justify-content:center;padding:0}
 .publish-art .paper img{width:auto;height:auto;max-width:100%;object-fit:none}
-.collage-art .collage-board{height:350px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.collage-art .collage-board{height:350px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:20px;background:#555}
 .collage-art .collage-board img{width:100%;height:100%;object-fit:contain}
 .inspire-art .inspire-board{height:350px;background:#18191f;overflow:hidden}
 @media(max-width:620px){.studio-art .workspace,.vector-art>svg,.collage-art .collage-board,.inspire-art .inspire-board,.publish-art .paper{height:265px}}
