@@ -938,8 +938,9 @@ test('Studio-Style Text Tool UX: Pre-filled highlighted Lorem Ipsum, dashed text
   // 5. Verify text tool does not forcefully switch back to 'select' after creating text
   assert.match(canvasJs, /this\.activeTool === 'text'[\s\S]*?openInlineEditor/, 'canvas.js must open inline editor without resetting tool to select');
 
-  // 6. Verify clicking on existing text element with text tool active immediately opens inline editor
-  assert.match(canvasJs, /if\s*\(this\.activeTool === 'text'\)[\s\S]*?this\.openInlineEditor\(el,\s*clickedEl\)/, 'Clicking text element with text tool must immediately open editor');
+  // 6. Defer editing until pointerup so mousedown cannot steal editor focus.
+  assert.match(canvasJs, /if\s*\(this\.activeTool === 'text'\)[\s\S]*?this\.pendingTextEditId = textEl\.id/, 'Text tool click must queue editing the hit text element');
+  assert.match(canvasJs, /if\s*\(this\.pendingTextEditId\)\s*\{[\s\S]*?this\.pendingTextEditId = null;\s*this\.editTextElement\(id\)/, 'Pointer release must clear pending state and open the text editor');
 
   // 7. Verify Enter key opens inline editor for selected text, sticky, and quote elements in app.js
   const appJs = fs.readFileSync(path.join(inspireRoot, 'js/app.js'), 'utf8');
@@ -1052,5 +1053,4 @@ test('Document Naming: New documents are titled Untitled-# and increment up, nev
   assert.match(indexHtml, /<div class="menu_dropdown_item" id="action_menu_new">\s*New\s*<span class="menu_dropdown_shortcut">⌘N<\/span><\/div>/, 'File menu item must say "New"');
   assert.doesNotMatch(indexHtml, /New Moodboard/, 'index.html must not contain "New Moodboard"');
 });
-
 

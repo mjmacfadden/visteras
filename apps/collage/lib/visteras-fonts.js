@@ -288,6 +288,16 @@ async function loadFontFamily({ family, source, variants } = {}) {
   if (!family || typeof family !== "string") return false;
   const name = family.trim();
   if (!name) return false;
+  if (name.toLowerCase() === "roboto" && source !== "local" && typeof document !== "undefined" && document.fonts?.[Symbol.iterator]) {
+    const bundled = [...document.fonts].some((face) => face.family.replace(/["']/g, "").toLowerCase() === "roboto");
+    if (bundled) {
+      const requested = variants?.length ? variants : ["regular", "700"];
+      await Promise.all(requested.map((variant) => document.fonts.load(
+        `${/italic/i.test(variant) ? "italic" : "normal"} ${styleNameToCssWeight(variant)} 16px "Roboto"`
+      )));
+      return true;
+    }
+  }
   let src = source;
   if (!src) {
     const entry = findGoogleFontEntry(name);

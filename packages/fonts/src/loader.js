@@ -163,6 +163,21 @@ export async function loadFontFamily({ family, source, variants } = {}) {
 	const name = family.trim();
 	if (!name) return false;
 
+	// Vector declares static Roboto faces in its theme. Do not replace those
+	// with Google's variable font (its contours differ when creating outlines).
+	// Other hosts without bundled faces still use the normal loader below.
+	if (name.toLowerCase() === 'roboto' && source !== 'local' &&
+		typeof document !== 'undefined' && document.fonts?.[Symbol.iterator]) {
+		const bundled = [...document.fonts].some(face =>
+			face.family.replace(/["']/g, '').toLowerCase() === 'roboto');
+		if (bundled) {
+			const requested = variants?.length ? variants : ['regular', '700'];
+			await Promise.all(requested.map(variant => document.fonts.load(
+				`${/italic/i.test(variant) ? 'italic' : 'normal'} ${styleNameToCssWeight(variant)} 16px "Roboto"`)));
+			return true;
+		}
+	}
+
 	let src = source;
 	if (!src) {
 		const entry = findGoogleFontEntry(name);
