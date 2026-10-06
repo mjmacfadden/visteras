@@ -109,18 +109,20 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     }
   ];
 
+  const DEFAULT_PRESET = THEME_PRESETS.find(preset => preset.id === 'vintage_news');
+
   // --- State Management ---
   const state = {
     activeTool: 'layout',
     activeLayoutId: 'grid-2x2',
-    activePresetId: 'autumn_mix',
+    activePresetId: DEFAULT_PRESET.id,
     
     // Search & Harmony Parameters
-    imageSource: 'both', // 'both', 'pixabay', 'loc'
-    searchQuery: 'autumn vintage leaves',
+    imageSource: DEFAULT_PRESET.source, // 'both', 'pixabay', 'loc'
+    searchQuery: DEFAULT_PRESET.q,
     selectedStyle: 'all',
     selectedCategory: '',
-    selectedColors: ['red', 'orange', 'yellow', 'brown'], // Multi-select colors
+    selectedColors: [...DEFAULT_PRESET.colors], // Multi-select colors
     editorsChoice: false,
     
     // API Configuration
@@ -311,9 +313,9 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       this.items = options.items ? JSON.parse(JSON.stringify(options.items)) : [];
       this.onlinePool = options.onlinePool ? [...options.onlinePool] : [];
       this.assetsGenerated = options.assetsGenerated != null ? options.assetsGenerated : (this.items.length > 0);
-      this.searchQuery = options.searchQuery || 'vintage';
-      this.imageSource = options.imageSource || 'both';
-      this.selectedColors = options.selectedColors ? [...options.selectedColors] : ['red', 'orange', 'yellow', 'brown'];
+      this.searchQuery = options.searchQuery ?? DEFAULT_PRESET.q;
+      this.imageSource = options.imageSource || DEFAULT_PRESET.source;
+      this.selectedColors = options.selectedColors ? [...options.selectedColors] : [...DEFAULT_PRESET.colors];
       this.selectedStyle = options.selectedStyle || 'all';
       this.selectedCategory = options.selectedCategory || '';
       this.editorsChoice = !!options.editorsChoice;
@@ -390,7 +392,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       this.isRestoring = true;
       try {
         state.activeLayoutId = doc.activeLayoutId || 'grid-2x2';
-        state.searchQuery = doc.searchQuery || 'vintage';
+        state.searchQuery = doc.searchQuery ?? '';
         state.imageSource = doc.imageSource || 'both';
         state.selectedColors = doc.selectedColors ? [...doc.selectedColors] : ['red', 'orange', 'yellow', 'brown'];
         state.selectedStyle = doc.selectedStyle || 'all';
@@ -465,6 +467,11 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       renderLayoutList();
 
       // 2. Theme / Search
+      state.activePresetId = THEME_PRESETS.find(preset =>
+        preset.q === state.searchQuery && preset.source === state.imageSource &&
+        preset.style === state.selectedStyle &&
+        JSON.stringify(preset.colors) === JSON.stringify(state.selectedColors)
+      )?.id || null;
       if (el.queryInput) el.queryInput.value = state.searchQuery;
       if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
       if (el.imageSourceSelect) el.imageSourceSelect.value = state.imageSource;
@@ -816,7 +823,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
         is_dirty: false,
         thumbnail: data.thumbnail || null,
         activeLayoutId: data.activeLayoutId || data.layoutId || 'grid-2x2',
-        searchQuery: data.searchQuery || data.query || 'vintage',
+        searchQuery: data.searchQuery ?? data.query ?? '',
         imageSource: data.imageSource || data.source || 'both',
         selectedColors: data.selectedColors || data.colors || [],
         selectedStyle: data.selectedStyle || data.style || 'all',
@@ -1076,7 +1083,11 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     if (!list) return;
     list.innerHTML = '';
 
-    THEME_PRESETS.forEach(preset => {
+    [...THEME_PRESETS].sort((a, b) => {
+      if (a.id === 'vintage_news') return -1;
+      if (b.id === 'vintage_news') return 1;
+      return 0;
+    }).forEach(preset => {
       const card = document.createElement('div');
       card.className = `preset-card ${state.activePresetId === preset.id ? 'active' : ''}`;
       card.innerHTML = `
@@ -1150,13 +1161,8 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
         if (prevItems[i].locked !== undefined) prevLocked = prevItems[i].locked;
       }
 
-      if (!chosenImg) {
-        if (pool.length > 0) {
-          chosenImg = pool[i % pool.length];
-        } else {
-          chosenImg = { path: '', largePath: '', attribution: 'None' };
-        }
-      }
+      if (chosenImg && state.items.some(item => sameAsset(item.image, chosenImg))) chosenImg = null;
+      if (!chosenImg) chosenImg = nextPoolImage(pool) || { path: '', largePath: '', attribution: 'No unused image available' };
 
       const itemData = {
         index: i,
@@ -1388,7 +1394,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
   }
 
   async function fetchPixabayImagesFast() {
-    const query = state.searchQuery || 'vintage';
+    const query = state.searchQuery.trim();
     const colors = state.selectedColors || [];
     const imageType = state.selectedStyle || 'all';
     const category = state.selectedCategory || '';
@@ -1433,24 +1439,101 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     return unique;
   }
 
-  // --- Fast Library of Congress API Engine with Strict Timeout ---
+  // --- Library of Congress newspaper page search ---
+  const locRequests = new Map();
+  const poolPositions = new WeakMap();
+  const warmedPreviews = new Set();
+  const previewQueue = [];
+  let activePreviews = 0;
+
+  // Warm a small look-ahead, not every full-resolution newspaper scan.
+  function warmPreviews(pool, start = 0) {
+    for (let i = 0; i < Math.min(12, pool.length); i++) {
+      const path = pool[(start + i) % pool.length].path;
+      if (!path || warmedPreviews.has(path)) continue;
+      warmedPreviews.add(path);
+      previewQueue.push(path);
+    }
+    while (warmedPreviews.size > 300) warmedPreviews.delete(warmedPreviews.values().next().value);
+    for (const path of previewQueue.splice(0, Math.max(0, previewQueue.length - 24))) warmedPreviews.delete(path);
+    pumpPreviews();
+  }
+
+  function pumpPreviews() {
+    while (activePreviews < 2 && previewQueue.length) {
+      const image = new Image();
+      image.crossOrigin = 'anonymous';
+      const path = previewQueue.shift();
+      activePreviews++;
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        image.onload = image.onerror = null;
+        activePreviews--;
+        pumpPreviews();
+      };
+      const timer = setTimeout(() => { warmedPreviews.delete(path); image.src = ''; finish(); }, 15000);
+      image.onload = finish;
+      image.onerror = () => { warmedPreviews.delete(path); finish(); };
+      image.src = path;
+    }
+  }
+
+  function sameAsset(a, b) {
+    return !!((a.id && b.id && a.id === b.id) ||
+      (a.path && a.path === b.path) ||
+      (a.largePath && b.largePath && a.largePath === b.largePath));
+  }
+
+  function nextPoolImage(pool) {
+    if (!pool.length) return null;
+    let position = poolPositions.get(pool) || 0;
+    let next = null;
+    for (let i = 0; i < pool.length; i++) {
+      const candidate = pool[position % pool.length];
+      position++;
+      if (candidate.path && !state.items.some(item => sameAsset(item.image, candidate))) {
+        next = candidate;
+        break;
+      }
+    }
+    poolPositions.set(pool, position % pool.length);
+    warmPreviews(pool, position % pool.length);
+    return next;
+  }
+
   async function fetchChroniclingAmericaImagesFast(query) {
-    const q = query || 'newspaper vintage';
+    const key = (query || '').trim();
+    if (locRequests.has(key)) return locRequests.get(key);
+    const request = requestLocImages(key).then(hits => {
+      warmPreviews(hits);
+      return hits;
+    }).finally(() => locRequests.delete(key));
+    locRequests.set(key, request);
+    return request;
+  }
+
+  async function requestLocImages(query) {
+    const q = (query || '').trim();
     const cacheKey = `loc|${q}`;
     if (state.apiCache[cacheKey]) {
       return state.apiCache[cacheKey];
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 2500); // 2.5s max timeout to prevent UI lag
+    const timer = setTimeout(() => controller.abort(), 15000);
 
-    const url = `https://www.loc.gov/collections/chronicling-america/?fo=json&q=${encodeURIComponent(q)}&c=20`;
+    const params = new URLSearchParams({ fo: 'json', dl: 'page', c: '100' });
+    if (q) { params.set('qs', q); params.set('ops', 'AND'); }
+    const url = `https://www.loc.gov/collections/chronicling-america/?${params}`;
     try {
       const res = await fetch(url, {
         headers: { 'Accept': 'application/json' },
         signal: controller.signal
       });
-      clearTimeout(timer);
+      if (!res.ok) throw new Error(`Library of Congress returned HTTP ${res.status}. Please try again later.`);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.results) && data.results.length > 0) {
@@ -1461,24 +1544,44 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
             if (jpgs.length === 0) continue;
 
             const preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
-            const large = preview.replace(/pct:\d+(\.\d+)?/, 'pct:25');
+            const large = jpgs[jpgs.length - 1].split('#')[0];
 
+            const link = item.url || 'https://www.loc.gov/collections/chronicling-america/';
+            // Chronicling America URLs contain the newspaper's LCCN (sn########)
+            // before the issue date. Keep it so the pool can be diversified.
+            const sourceMatch = `${item.id || ''} ${link}`.match(/(?:resource\/|\/)(sn\d{6,})\//i);
+            const sourceLabel = item.partof_title || item.title || 'unknown source';
+            const sourceKey = sourceMatch ? sourceMatch[1].toLowerCase() :
+              String(sourceLabel).trim().toLowerCase();
             mapped.push({
               id: `loc-${item.id || item.date || Math.random()}`,
               path: preview,
               largePath: large,
               attribution: item.title ? `${item.title.slice(0, 40)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
-              link: item.url || 'https://www.loc.gov/collections/chronicling-america/',
+              link,
+              sourceKey,
               source: 'loc'
             });
           }
           if (mapped.length > 0) {
-            state.apiCache[cacheKey] = mapped;
-            return mapped;
+            const varied = [];
+            const usedSources = new Set();
+            for (const hit of mapped) {
+              if (usedSources.has(hit.sourceKey)) continue;
+              usedSources.add(hit.sourceKey);
+              varied.push(hit);
+            }
+            // Keep additional pages after every available newspaper is represented.
+            for (const hit of mapped) if (!varied.includes(hit)) varied.push(hit);
+            state.apiCache[cacheKey] = varied;
+            return varied;
           }
         }
       }
     } catch (err) {
+      if (err.name === 'AbortError') throw new Error('Library of Congress search timed out. Please try again.');
+      throw err;
+    } finally {
       clearTimeout(timer);
     }
     return [];
@@ -1621,38 +1724,59 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     controls.className = 'image-controls';
     controls.setAttribute('data-html2canvas-ignore', 'true');
     controls.innerHTML = `
-      <button class="tile-icon-btn btn-replace" title="Replace tile">
-        <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+      <button class="tile-icon-btn btn-previous" title="Previous asset" aria-label="Previous asset">
+        <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+      </button>
+      <button class="tile-icon-btn btn-next" title="Next asset" aria-label="Next asset">
+        <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></svg>
       </button>
       <button class="tile-icon-btn btn-zoom" title="Zoom & Position">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
       </button>
     `;
 
-    // Replace Button Event
-    const btnReplace = controls.querySelector('.btn-replace');
-    btnReplace.addEventListener('click', (e) => {
-      e.stopPropagation();
+    if (!Array.isArray(itemData.assetHistory) || !itemData.assetHistory.length) {
+      itemData.assetHistory = itemData.image?.path ? [itemData.image] : [];
+      itemData.assetHistoryIndex = Math.max(0, itemData.assetHistory.length - 1);
+    }
+    const setAsset = (next) => {
+      if (!next) return;
+      itemData.image = next;
+      itemData.locked = true;
+      itemData.zoom = 1.0;
+      itemData.panX = 0;
+      itemData.panY = 0;
+      zoomSlider.value = 1;
+      zoomValText.textContent = '100%';
+      img.src = next.path;
+      img.dataset.largeSrc = next.largePath || next.path;
+      img.alt = next.attribution || `Collage tile ${i + 1}`;
+      bindTileImageEvents(img, spinner, itemData, tile);
+      updateTileTransform(img, itemData, tile);
+      docManager.markDirty();
+    };
+    const cycleAsset = (direction) => {
       const pool = (state.onlinePool && state.onlinePool.length > 0) ? state.onlinePool : availablePool;
-      if (pool && pool.length > 0) {
-        const next = pool[Math.floor(Math.random() * pool.length)];
-        if (next) {
-          itemData.image = next;
-          itemData.locked = true;
-          itemData.zoom = 1.0;
-          itemData.panX = 0;
-          itemData.panY = 0;
-          zoomSlider.value = 1;
-          zoomValText.textContent = '100%';
-          img.src = next.path;
-          img.dataset.largeSrc = next.largePath || next.path;
-          img.alt = next.attribution || `Collage tile ${i + 1}`;
-          bindTileImageEvents(img, spinner, itemData, tile);
-          updateTileTransform(img, itemData, tile);
-          docManager.markDirty();
+      if (!pool.length) return;
+      let index = itemData.assetHistoryIndex ?? 0;
+      if (direction > 0) {
+        if (index < itemData.assetHistory.length - 1) index++;
+        else {
+          const next = nextPoolImage(pool);
+          if (!next) return showToast('All available assets are already on the sheet.');
+          itemData.assetHistory = itemData.assetHistory.slice(0, index + 1);
+          itemData.assetHistory.push(next);
+          index++;
         }
-      }
+      } else if (index > 0) index--;
+      itemData.assetHistoryIndex = index;
+      setAsset(itemData.assetHistory[index]);
+    };
+    controls.querySelector('.btn-previous').addEventListener('click', (e) => {
+      e.stopPropagation();
+      cycleAsset(-1);
     });
+    controls.querySelector('.btn-next').addEventListener('click', (e) => { e.stopPropagation(); cycleAsset(1); });
 
     // Zoom Button Event (Toggles Popover)
     const btnZoom = controls.querySelector('.btn-zoom');
@@ -1783,7 +1907,6 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     }
 
     const availablePool = (pool && pool.length > 0) ? pool : [];
-    const shuffledPool = [...availablePool].sort(() => 0.5 - Math.random());
 
     for (let i = 0; i < layout.count; i++) {
       const span = layout.spans[i] || { c: 1, r: 1 };
@@ -1791,10 +1914,14 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 
       if (state.customImageUrl && i === 0) {
         chosenImg = { path: state.customImageUrl, largePath: state.customImageUrl, attribution: 'Custom URL' };
-      } else if (shuffledPool.length > 0) {
-        chosenImg = shuffledPool[i % shuffledPool.length];
+      } else if (availablePool.length > 0) {
+        chosenImg = nextPoolImage(availablePool);
       } else {
         chosenImg = { path: '', largePath: '', attribution: 'No API image' };
+      }
+      if (!chosenImg) {
+        if (isLiveUpdate && state.items[i]) continue;
+        chosenImg = { path: '', largePath: '', attribution: 'No unused image available' };
       }
 
       if (isLiveUpdate && state.items[i]) {
@@ -1899,12 +2026,17 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
   async function generateFodder() {
     const genId = ++currentGenerationId;
     initElements();
+    // Every entry point must use the current form, not a previously applied preset.
+    if (el.queryInput) state.searchQuery = el.queryInput.value.trim();
+    if (el.imageSourceSelect) state.imageSource = el.imageSourceSelect.value;
+    if (el.styleSelect) state.selectedStyle = el.styleSelect.value;
+    if (el.editorsChoiceToggle) state.editorsChoice = el.editorsChoiceToggle.checked;
     if (el.generateOverlay) el.generateOverlay.classList.add('hidden');
     state.assetsGenerated = true;
 
-    const query = state.searchQuery || 'vintage';
+    const query = state.searchQuery.trim();
     const src = state.imageSource || 'both';
-    const masterCacheKey = `${src}|${query}|${state.selectedColors.join(',')}|${state.selectedStyle}|${state.selectedCategory}`;
+    const masterCacheKey = `${src}|${query}|${state.selectedColors.join(',')}|${state.selectedStyle}|${state.selectedCategory}|${state.editorsChoice}`;
 
     // If already in API cache from this session, render immediately
     const cachedHits = state.apiCache[masterCacheKey];
@@ -1923,6 +2055,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 
     try {
       let liveHits = [];
+      let locError = null;
 
       if (src === 'pixabay') {
         liveHits = await fetchPixabayImagesFast();
@@ -1937,6 +2070,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 
         const pHits = (pResult.status === 'fulfilled' && Array.isArray(pResult.value)) ? pResult.value : [];
         const lHits = (lResult.status === 'fulfilled' && Array.isArray(lResult.value)) ? lResult.value : [];
+        if (lResult.status === 'rejected') locError = lResult.reason;
 
         // Interleave
         const maxLen = Math.max(pHits.length, lHits.length);
@@ -1947,14 +2081,15 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       }
 
       if (genId !== currentGenerationId) return;
+      if (locError && liveHits.length === 0) throw locError;
 
       if (liveHits && liveHits.length > 0) {
         state.onlinePool = liveHits;
-        state.apiCache[masterCacheKey] = liveHits;
+        if (!locError) state.apiCache[masterCacheKey] = liveHits;
 
         renderTilesWithPool(liveHits, false);
         if (el.statusBarStatus) {
-          el.statusBarStatus.textContent = `Ready (${liveHits.length} live API images)`;
+          el.statusBarStatus.textContent = `Ready (${liveHits.length} live API images)${locError ? ' • Library of Congress unavailable; showing Pixabay only.' : ''}`;
         }
       } else {
         state.onlinePool = [];
@@ -1966,9 +2101,14 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
         el.container.querySelectorAll('.tile-spinner').forEach(s => s.classList.add('hidden'));
       }
     } catch (err) {
+      if (genId !== currentGenerationId) return;
       console.warn('API fodder fetch error:', err);
+      state.onlinePool = [];
+      const message = err.message && err.message.startsWith('Library of Congress')
+        ? err.message : 'Image search could not connect. Please try again.';
+      showToast(message);
       if (el.statusBarStatus) {
-        el.statusBarStatus.textContent = `Error loading from API. Check connection.`;
+        el.statusBarStatus.textContent = message;
       }
       el.container.querySelectorAll('.tile-spinner').forEach(s => s.classList.add('hidden'));
     }
@@ -2206,6 +2346,16 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       el.imageSourceSelect.value = state.imageSource;
       el.imageSourceSelect.addEventListener('change', (e) => {
         state.imageSource = e.target.value;
+      });
+    }
+
+    if (el.queryInput) {
+      el.queryInput.addEventListener('input', () => {
+        state.searchQuery = el.queryInput.value.trim();
+        docManager.markDirty();
+      });
+      el.queryInput.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); generateFodder(); }
       });
     }
 
@@ -2593,6 +2743,11 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
 
     // Initialize document tabs
     docManager.createDocument({ title: 'Untitled-1' });
+
+    // Populate only the session cache; never replace the sheet or show background errors.
+    if (state.imageSource !== 'pixabay') {
+      fetchChroniclingAmericaImagesFast(state.searchQuery).catch(() => {});
+    }
 
     if (el.queryInput) el.queryInput.value = state.searchQuery;
     if (el.styleSelect) el.styleSelect.value = state.selectedStyle;
