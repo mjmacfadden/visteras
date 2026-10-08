@@ -109,6 +109,33 @@ export function contextMenuItems(sc, { mac = detectMac() } = {}) {
   }
   sep();
 
+  // Transform submenu (reuse Object ▸ Transform actions)
+  if (n >= 1) {
+    const transformChildren = [];
+    if (actionEnabled('action_transform_again')) {
+      transformChildren.push({ id: 'xf_again', label: 'Transform Again', actionId: 'action_transform_again', shortcut: formatShortcut({ meta: true, key: 'D', mac }) });
+    }
+    if (actionEnabled('action_transform_move')) {
+      transformChildren.push({ id: 'xf_move', label: 'Move…', actionId: 'action_transform_move', shortcut: formatShortcut({ meta: true, shift: true, key: 'M', mac }) });
+    }
+    if (actionEnabled('action_transform_rotate')) {
+      transformChildren.push({ id: 'xf_rotate', label: 'Rotate…', actionId: 'action_transform_rotate' });
+    }
+    if (actionEnabled('action_transform_reflect')) {
+      transformChildren.push({ id: 'xf_reflect', label: 'Reflect…', actionId: 'action_transform_reflect' });
+    }
+    if (actionEnabled('action_transform_scale')) {
+      transformChildren.push({ id: 'xf_scale', label: 'Scale…', actionId: 'action_transform_scale' });
+    }
+    if (actionEnabled('action_reset_bounding_box')) {
+      transformChildren.push({ id: 'xf_reset_bb', label: 'Reset Bounding Box', actionId: 'action_reset_bounding_box' });
+    }
+    if (transformChildren.length) {
+      add({ id: 'transform', label: 'Transform', submenu: transformChildren });
+    }
+  }
+  sep();
+
   // Clipping mask — reuse Object menu actions when present
   if (n >= 2 && actionEnabled('action_make_clipping_mask')) {
     add({ id: 'make_clip', label: 'Make Clipping Mask', actionId: 'action_make_clipping_mask', shortcut: formatShortcut({ meta: true, key: '7', mac }) });
@@ -116,10 +143,38 @@ export function contextMenuItems(sc, { mac = detectMac() } = {}) {
   if (n >= 1 && (isClipGroup(elements[0]) || elements.some(isClipGroup)) && actionEnabled('action_release_clipping_mask')) {
     add({ id: 'release_clip', label: 'Release Clipping Mask', actionId: 'action_release_clipping_mask', shortcut: formatShortcut({ meta: true, alt: true, key: '7', mac }) });
   }
+
+  // Compound Path
+  if (n >= 2 && actionEnabled('action_compound_make')) {
+    add({ id: 'compound_make', label: 'Make Compound Path', actionId: 'action_compound_make', shortcut: formatShortcut({ meta: true, key: '8', mac }) });
+  }
+  if (n === 1 && actionEnabled('action_compound_release')) {
+    add({ id: 'compound_release', label: 'Release Compound Path', actionId: 'action_compound_release', shortcut: formatShortcut({ meta: true, alt: true, shift: true, key: '8', mac }) });
+  }
   sep();
 
   add({ id: 'select_all', label: 'Select All', actionId: 'action_select_all', shortcut: formatShortcut({ meta: true, key: 'A', mac }) });
   if (n >= 1) add({ id: 'deselect', label: 'Deselect', actionId: 'action_deselect_all', shortcut: formatShortcut({ meta: true, shift: true, key: 'A', mac }) });
+  if (n >= 1 && actionEnabled('action_select_inverse')) {
+    add({ id: 'select_inverse', label: 'Inverse', actionId: 'action_select_inverse', shortcut: formatShortcut({ meta: true, shift: true, key: 'I', mac }) });
+  }
+  if (n >= 1) {
+    const sameChildren = [];
+    const sameMap = [
+      ['action_select_same_fill', 'same_fill', 'Fill Color'],
+      ['action_select_same_stroke', 'same_stroke', 'Stroke Color'],
+      ['action_select_same_weight', 'same_weight', 'Stroke Weight'],
+      ['action_select_same_fillstroke', 'same_fillstroke', 'Fill & Stroke'],
+      ['action_select_same_opacity', 'same_opacity', 'Opacity'],
+      ['action_select_same_appearance', 'same_appearance', 'Appearance'],
+    ];
+    for (const [aid, id, label] of sameMap) {
+      if (actionEnabled(aid)) sameChildren.push({ id, label, actionId: aid });
+    }
+    if (sameChildren.length) {
+      add({ id: 'select_same', label: 'Same', submenu: sameChildren });
+    }
+  }
 
   // Drop trailing separators / collapse doubles
   const cleaned = [];
@@ -181,6 +236,17 @@ export function mountContextMenu(editor) {
       .visteras-context-menu .vcm-shortcut { color: #999; font-size: 11px; }
       .visteras-context-menu .vcm-item:hover .vcm-shortcut { color: #333; }
       .visteras-context-menu .vcm-sep { height: 1px; background: #444; margin: 4px 8px; }
+      .visteras-context-menu .vcm-submenu-wrap { position: relative; }
+      .visteras-context-menu .vcm-submenu-wrap > .vcm-item { width: 100%; }
+      .visteras-context-menu .vcm-arrow { color: #999; margin-left: 12px; }
+      .visteras-context-menu .vcm-item:hover .vcm-arrow { color: #333; }
+      .visteras-context-menu .vcm-submenu {
+        display: none; position: absolute; left: 100%; top: -4px; min-width: 200px;
+        background: #2b2b2b; color: #eee; border: 1px solid #111; border-radius: 6px;
+        box-shadow: 0 8px 28px rgba(0,0,0,.45); padding: 4px 0; z-index: 2;
+      }
+      .visteras-context-menu .vcm-submenu-wrap:hover > .vcm-submenu,
+      .visteras-context-menu .vcm-submenu-wrap:focus-within > .vcm-submenu { display: block; }
       se-cmenu_canvas-dialog[data-visteras-replaced="1"] { display: none !important; }
     `;
     document.head.append(st);
@@ -190,12 +256,25 @@ export function mountContextMenu(editor) {
   const showAt = (x, y) => {
     const items = contextMenuItems(sc);
     if (!items.length) { hide(); return; }
-    menu.innerHTML = items.map((it) => {
+    const renderItem = (it) => {
       if (it.separator) return '<div class="vcm-sep" role="separator"></div>';
+      if (it.submenu?.length) {
+        const kids = it.submenu.map((child) => {
+          const scLabel = child.shortcut ? `<span class="vcm-shortcut">${child.shortcut}</span>` : '';
+          return `<button type="button" class="vcm-item" role="menuitem" data-action="${child.actionId}" data-id="${child.id}">
+            <span class="vcm-label">${child.label}</span>${scLabel}</button>`;
+        }).join('');
+        return `<div class="vcm-submenu-wrap">
+          <button type="button" class="vcm-item" role="menuitem" aria-haspopup="true" data-id="${it.id}" data-submenu="1">
+            <span class="vcm-label">${it.label}</span><span class="vcm-arrow">▸</span></button>
+          <div class="vcm-submenu" role="menu">${kids}</div>
+        </div>`;
+      }
       const scLabel = it.shortcut ? `<span class="vcm-shortcut">${it.shortcut}</span>` : '';
       return `<button type="button" class="vcm-item" role="menuitem" data-action="${it.actionId}" data-id="${it.id}">
         <span class="vcm-label">${it.label}</span>${scLabel}</button>`;
-    }).join('');
+    };
+    menu.innerHTML = items.map(renderItem).join('');
     menu.hidden = false;
     // Position, keep on-screen
     const pad = 8;
@@ -211,11 +290,16 @@ export function mountContextMenu(editor) {
   menu.addEventListener('click', (e) => {
     const btn = e.target.closest('.vcm-item');
     if (!btn) return;
+    if (btn.dataset.submenu === '1') {
+      e.preventDefault();
+      e.stopPropagation();
+      return; // open via hover; don't dismiss
+    }
     e.preventDefault();
     e.stopPropagation();
     const actionId = btn.dataset.action;
     hide();
-    runAction(actionId);
+    if (actionId) runAction(actionId);
   });
 
   const work = document.getElementById('workarea') || document.getElementById('svgcanvas') || document.body;
