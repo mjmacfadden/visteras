@@ -6,6 +6,7 @@
  */
 
 import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
+import { formatBrowserSafeShortcut, eventMatchesChord } from './visteras-browser-shortcuts.js';
 
 function selected(sc) {
   return (sc?.getSelectedElements?.() || []).filter(Boolean);
@@ -187,22 +188,87 @@ export function selectSame(sc, kind) {
   return next;
 }
 
+
+/** Select every selectable top-level object associated with the active artboard. */
+export function selectAllOnActiveArtboard(sc) {
+  const api = (typeof window !== 'undefined') ? window.__visterasArtboards : null;
+  const board = api?.active?.();
+  const all = listSelectableInDocument(sc);
+  if (!board) {
+    // No artboards API — fall back to Select All
+    sc.clearSelection?.();
+    if (all.length) sc.addToSelection?.(all, true);
+    sc.call?.('selected', all);
+    return all;
+  }
+  const next = all.filter((el) => {
+    try {
+      const b = sc.getStrokedBBox?.([el]) || el.getBBox?.();
+      if (!b) return false;
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      return cx >= board.x && cx <= board.x + board.width && cy >= board.y && cy <= board.y + board.height;
+    } catch {
+      return false;
+    }
+  });
+  sc.clearSelection?.();
+  if (next.length) sc.addToSelection?.(next, true);
+  sc.call?.('selected', next);
+  return next;
+}
+
+/** Last non-empty selection snapshot for Reselect (⌘6 → browser-safe). */
+let lastSelectionSnapshot = [];
+
+export function rememberSelection(sc) {
+  const sel = selected(sc);
+  if (sel.length) {
+    lastSelectionSnapshot = sel.map((el) => el.id).filter(Boolean);
+  }
+}
+
+export function reselectLast(sc) {
+  if (!lastSelectionSnapshot.length) {
+    window.showStudioToast?.('Nothing to reselect.', 'info', 2000);
+    return [];
+  }
+  const root = sc?.getSvgContent?.() || document.getElementById('svgcontent');
+  const next = lastSelectionSnapshot
+    .map((id) => root?.querySelector?.(`#${CSS.escape(id)}`) || document.getElementById(id))
+    .filter((el) => el && isSelectableTarget(el));
+  sc.clearSelection?.();
+  if (next.length) sc.addToSelection?.(next, true);
+  sc.call?.('selected', next);
+  return next;
+}
+
 function injectSelectMenu() {
   if (document.getElementById('menu_select')) return;
   const mac = detectMac();
-  // Illustrator order: after Object (or Text). Place after #menu_object.
-  const objectMenu = document.getElementById('menu_object');
-  if (!objectMenu?.parentNode) return;
+  // Illustrator order: File, Edit, Object, Type/Text, Select, Effect, …
+  const textMenu = document.getElementById('menu_text');
+  const effectMenu = document.getElementById('menu_effect');
+  const anchor = textMenu || document.getElementById('menu_object');
+  if (!anchor?.parentNode) return;
 
   const entry = document.createElement('div');
   entry.className = 'menu_entry';
   entry.id = 'menu_select';
+  const scAll = formatShortcut({ meta: true, key: 'A', mac });
+  const scAllArtboard = formatShortcut({ meta: true, alt: true, key: 'A', mac });
+  const scDeselect = formatShortcut({ meta: true, shift: true, key: 'A', mac });
+  // Reselect is Illustrator ⌘6 — browser tab key; remap via browser-safe rule
+  const scReselect = formatBrowserSafeShortcut({ meta: true, key: '6', mac });
+  const scInverse = formatShortcut({ meta: true, shift: true, key: 'I', mac });
   entry.innerHTML = `
     <div class="menu_entry_title">Select</div>
     <div class="menu_dropdown_list">
-      <div class="menu_dropdown_item" id="action_select_all_menu">All <span class="menu_dropdown_shortcut" data-shortcut="Meta+A">${formatShortcut({ meta: true, key: 'A', mac })}</span></div>
-      <div class="menu_dropdown_item" id="action_deselect_all_menu">Deselect <span class="menu_dropdown_shortcut" data-shortcut="Shift+Meta+A">${formatShortcut({ meta: true, shift: true, key: 'A', mac })}</span></div>
-      <div class="menu_dropdown_item" id="action_select_inverse">Inverse <span class="menu_dropdown_shortcut" data-shortcut="Shift+Meta+I">${formatShortcut({ meta: true, shift: true, key: 'I', mac })}</span></div>
+      <div class="menu_dropdown_item" id="action_select_all_menu">All <span class="menu_dropdown_shortcut" data-shortcut="Meta+A">${scAll}</span></div>
+      <div class="menu_dropdown_item" id="action_select_all_artboard">All on Active Artboard <span class="menu_dropdown_shortcut" data-shortcut="Alt+Meta+A">${scAllArtboard}</span></div>
+      <div class="menu_dropdown_item" id="action_deselect_all_menu">Deselect <span class="menu_dropdown_shortcut" data-shortcut="Shift+Meta+A">${scDeselect}</span></div>
+      <div class="menu_dropdown_item disabled" id="action_select_reselect">Reselect <span class="menu_dropdown_shortcut" data-shortcut="Ctrl+Meta+6">${scReselect}</span></div>
+      <div class="menu_dropdown_item" id="action_select_inverse">Inverse <span class="menu_dropdown_shortcut" data-shortcut="Shift+Meta+I">${scInverse}</span></div>
       <div class="menu_dropdown_separator"></div>
       <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="menu_select_same">
         Same<span class="menu_submenu_arrow" aria-hidden="true">▸</span>
@@ -217,8 +283,12 @@ function injectSelectMenu() {
       </div>
     </div>
   `;
-  // Insert after Object
-  objectMenu.after(entry);
+  // Insert after Text/Type, before Effect (Illustrator order)
+  if (effectMenu && effectMenu.parentNode === anchor.parentNode) {
+    effectMenu.before(entry);
+  } else {
+    anchor.after(entry);
+  }
 }
 
 function syncSelectMenu(sc) {
@@ -233,6 +303,8 @@ function syncSelectMenu(sc) {
   ]) {
     document.getElementById(id)?.classList.toggle('disabled', n < 1);
   }
+  const re = document.getElementById('action_select_reselect');
+  if (re) re.classList.toggle('disabled', lastSelectionSnapshot.length < 1);
 }
 
 export function mountSelectSame(editor) {
@@ -251,7 +323,9 @@ export function mountSelectSame(editor) {
   };
 
   click('action_select_all_menu', () => document.getElementById('action_select_all')?.click());
+  click('action_select_all_artboard', () => selectAllOnActiveArtboard(sc));
   click('action_deselect_all_menu', () => document.getElementById('action_deselect_all')?.click());
+  click('action_select_reselect', () => reselectLast(sc));
   click('action_select_inverse', () => selectInverse(sc));
   click('action_select_same_fill', () => selectSame(sc, 'fill'));
   click('action_select_same_stroke', () => selectSame(sc, 'stroke'));
@@ -261,13 +335,29 @@ export function mountSelectSame(editor) {
   click('action_select_same_appearance', () => selectSame(sc, 'appearance'));
 
   window.addEventListener('keydown', (e) => {
-    if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey) return;
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase())) return;
     if (window.__visterasIsTypingDirectly) return;
-    if (e.key === 'i' || e.key === 'I') {
+    // Inverse ⇧⌘I
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && (e.key === 'i' || e.key === 'I')) {
       e.preventDefault();
       e.stopPropagation();
       selectInverse(sc);
+      syncSelectMenu(sc);
+      return;
+    }
+    // All on Active Artboard ⌥⌘A
+    if ((e.metaKey || e.ctrlKey) && e.altKey && !e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectAllOnActiveArtboard(sc);
+      syncSelectMenu(sc);
+      return;
+    }
+    // Reselect — Illustrator ⌘6 remapped (browser tab key)
+    if (eventMatchesChord(e, { meta: true, key: '6' })) {
+      e.preventDefault();
+      e.stopPropagation();
+      reselectLast(sc);
       syncSelectMenu(sc);
     }
   }, true);
@@ -275,6 +365,7 @@ export function mountSelectSame(editor) {
   const origCall = sc.call;
   sc.call = function (event, ...args) {
     const result = origCall.call(this, event, ...args);
+    if (event === 'selected') rememberSelection(sc);
     if (event === 'selected' || event === 'changed') syncSelectMenu(sc);
     return result;
   };
@@ -283,6 +374,9 @@ export function mountSelectSame(editor) {
   const api = {
     selectInverse: () => selectInverse(sc),
     selectSame: (kind) => selectSame(sc, kind),
+    selectAllOnActiveArtboard: () => selectAllOnActiveArtboard(sc),
+    reselectLast: () => reselectLast(sc),
+    rememberSelection: () => rememberSelection(sc),
     normalizeColor,
     paintSignature,
     sameKey,
