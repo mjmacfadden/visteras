@@ -183,6 +183,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
     <div class="vdock-group" id="vdock_grp_effects">
       <button type="button" class="vdock-icon" data-panel="effects" title="Effects" aria-label="Effects" aria-expanded="false" aria-controls="vdock_flyout"><em aria-hidden="true">fx</em></button>
     </div>
+    <div class="vdock-group" id="vdock_grp_appearance">
+      <button type="button" class="vdock-icon" data-panel="appearance" title="Appearance (⇧F6)" aria-label="Appearance (⇧F6)" aria-expanded="false" aria-controls="vdock_flyout">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <path d="M3 8h14M8 3v14"/>
+        </svg>
+      </button>
+    </div>
     <div class="vdock-group" id="vdock_grp_transparency">
       <button type="button" class="vdock-icon" data-panel="transparency" title="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-label="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-expanded="false" aria-controls="vdock_flyout">
         <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
@@ -480,6 +488,10 @@ export function mountVisterasPanelDock({ svgEditor }) {
   effectsPane.id = 'vdock_effects_panel';
   effectsPane.className = 'vdock-panel-pane';
   flyoutBody.appendChild(effectsPane);
+  const appearancePane = document.createElement('div');
+  appearancePane.id = 'vdock_appearance_panel';
+  appearancePane.className = 'vdock-panel-pane';
+  flyoutBody.appendChild(appearancePane);
 
   // (E2) Transparency Panel (#vdock_transparency_panel) — filled by js/visteras-transparency.js
   const transparencyPane = document.createElement('div');
@@ -530,6 +542,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       gradient: 'Gradient',
       artboards: 'Artboards',
       effects: 'Effects',
+      appearance: 'Appearance',
       transparency: 'Transparency',
       layers: 'Layers',
     };
@@ -537,7 +550,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
   }
 
   function updateWindowMenuCheckmarks() {
-    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers', 'artboards'];
+    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers', 'artboards'];
     panels.forEach(p => {
       const item = document.getElementById(`action_window_${p}`);
       if (item) {
@@ -608,6 +621,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       gradient: gradPane,
       artboards: artboardsPane,
       effects: effectsPane,
+      appearance: appearancePane,
       transparency: transparencyPane,
       layers: layerPanel,
     };
@@ -772,8 +786,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     if (shortcutPanel) {
       e.preventDefault();
       if (shortcutPanel === 'appearance') {
-        // No Appearance panel yet: never fall through to Color.
-        (window.__visterasToast || showToast)('Appearance panel coming');
+        toggle('appearance');
         return;
       }
       toggle(shortcutPanel);
