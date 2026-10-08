@@ -111,6 +111,19 @@
             <div class="menu_dropdown_item" id="action_flip_h">Flip Horizontal</div>
             <div class="menu_dropdown_item" id="action_flip_v">Flip Vertical</div>
             <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_lock_menu">Lock<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_lock_selection">Selection <span class="menu_dropdown_shortcut">⌘2</span></div>
+              </div>
+            </div>
+            <div class="menu_dropdown_item" id="action_unlock_all">Unlock All <span class="menu_dropdown_shortcut">⌥⌘2</span></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_hide_menu">Hide<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_hide_selection">Selection <span class="menu_dropdown_shortcut">⌘3</span></div>
+              </div>
+            </div>
+            <div class="menu_dropdown_item" id="action_show_all">Show All <span class="menu_dropdown_shortcut">⌥⌘3</span></div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_item disabled" id="action_image_trace" title="Trace the selected raster image into vector paths">Image Trace…</div>
             <div class="menu_dropdown_separator"></div>
@@ -282,6 +295,7 @@
     import { mountArtboards } from './js/visteras-artboards.js';
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-1';
+    import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-1';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
@@ -2560,6 +2574,7 @@
     // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
     mountAppearance(svgEditor);
+    mountObjectLock(svgEditor);
     mountParagraph(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);

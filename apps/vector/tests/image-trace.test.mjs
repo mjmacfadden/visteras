@@ -817,7 +817,7 @@ test('Object menu has a single "Image Trace…" item (no Make/Release/Expand sub
   assert.deepEqual(items, ['id="action_image_trace"']);
   assert.match(html, /<div class="menu_dropdown_item disabled" id="action_image_trace"[^>]*>Image Trace…<\/div>/);
   assert.ok(!/menu_image_trace/.test(html), 'old submenu is gone');
-  assert.equal((html.match(/menu_submenu_list/g) || []).length, 1, 'the only static submenu is File ▸ Export');
+  assert.equal((html.match(/menu_submenu_list/g) || []).length, 3, 'File ▸ Export + Object ▸ Lock + Object ▸ Hide');
   const js = fs.readFileSync(path.resolve(import.meta.dirname, '../js/visteras-image-trace.js'), 'utf8');
   assert.ok(!/image_trace_panel|action_image_trace_(make|release|expand|panel)|vit_trace\b/.test(js), 'old panel / submenu wiring is gone');
   assert.match(html, /visteras-image-trace\.js\?v=trace-dialog-2/);
