@@ -88,10 +88,13 @@ export function chooseIiifSize(regionW, regionH, targetW, targetH, { maxEdge = M
 }
 
 /**
- * Visible tile crop in *preview* image natural pixels (cover-fit + pan/zoom).
- * Mirrors Collage updateTileTransform / getTileDimensions.
+ * On-screen visible rectangle in *normalized* source coordinates (0–1).
+ * Mirrors Collage updateTileTransform: cover-fit base size, then
+ * translate(-50%,-50%) translate(pan) scale(zoom) with origin at center.
+ * Rotation/flip: Collage tiles do not flip/rotate the img today; IIIF
+ * rotation from the preview URL is preserved on the print request.
  */
-export function visibleRegionInPreview({
+export function normalizedVisibleRect({
   tileW, tileH, naturalW, naturalH, zoom = 1, panX = 0, panY = 0,
 }) {
   const tw = Math.max(1, Number(tileW) || 1);
@@ -112,18 +115,44 @@ export function visibleRegionInPreview({
   const visTop = Math.max(0, -imgOffsetY);
   const visRight = Math.min(renderedW, tw - imgOffsetX);
   const visBottom = Math.min(renderedH, th - imgOffsetY);
-  const visW = Math.max(1, visRight - visLeft);
-  const visH = Math.max(1, visBottom - visTop);
-  const natX = (visLeft / renderedW) * nw;
-  const natY = (visTop / renderedH) * nh;
-  const natW = (visW / renderedW) * nw;
-  const natH = (visH / renderedH) * nh;
-  return {
-    x: Math.max(0, Math.floor(natX)),
-    y: Math.max(0, Math.floor(natY)),
-    w: Math.max(1, Math.ceil(natW)),
-    h: Math.max(1, Math.ceil(natH)),
-  };
+  const visW = Math.max(0, visRight - visLeft);
+  const visH = Math.max(0, visBottom - visTop);
+  // Fraction of the *image* (not the tile) that is visible
+  let x = visLeft / renderedW;
+  let y = visTop / renderedH;
+  let w = visW / renderedW;
+  let h = visH / renderedH;
+  // Clamp to unit square; keep a tiny epsilon so empty never slips through
+  x = Math.min(1, Math.max(0, x));
+  y = Math.min(1, Math.max(0, y));
+  w = Math.min(1 - x, Math.max(1e-6, w));
+  h = Math.min(1 - y, Math.max(1e-6, h));
+  return { x, y, w, h };
+}
+
+/** Map normalized 0–1 rect → integer source pixels (IIIF region). */
+export function sourceRegionFromNormalized(norm, sourceW, sourceH) {
+  const sw = Math.max(1, Number(sourceW) || 1);
+  const sh = Math.max(1, Number(sourceH) || 1);
+  let x = Math.floor((Number(norm.x) || 0) * sw);
+  let y = Math.floor((Number(norm.y) || 0) * sh);
+  let w = Math.ceil((Number(norm.w) || 0) * sw);
+  let h = Math.ceil((Number(norm.h) || 0) * sh);
+  x = Math.max(0, Math.min(x, sw - 1));
+  y = Math.max(0, Math.min(y, sh - 1));
+  w = Math.max(1, Math.min(w, sw - x));
+  h = Math.max(1, Math.min(h, sh - y));
+  return { x, y, w, h };
+}
+
+/**
+ * Visible tile crop in *preview* image natural pixels (cover-fit + pan/zoom).
+ * Derived from normalizedVisibleRect so preview and source stay in sync.
+ */
+export function visibleRegionInPreview(opts) {
+  const nw = Math.max(1, Number(opts.naturalW) || 1);
+  const nh = Math.max(1, Number(opts.naturalH) || 1);
+  return sourceRegionFromNormalized(normalizedVisibleRect(opts), nw, nh);
 }
 
 /** Map preview-natural region → source IIIF region pixels. */
@@ -139,6 +168,70 @@ export function scaleRegionToSource(region, previewW, previewH, sourceW, sourceH
   w = Math.max(1, Math.min(w, sourceW - x));
   h = Math.max(1, Math.min(h, sourceH - y));
   return { x, y, w, h };
+}
+
+/**
+ * Export framing mode after a hi-res swap:
+ * - fill-tile: IIIF region *is* the visible crop → draw filling the tile with
+ *   no further pan/zoom (avoids double-cropping the preview transform).
+ * - cover-transform: full image → keep Collage cover + pan/zoom transform.
+ */
+export function exportFramingMode(plan) {
+  if (plan?.framing === 'fill-tile' || (plan?.region && plan.region !== 'full')) {
+    return 'fill-tile';
+  }
+  return 'cover-transform';
+}
+
+/** Snapshot inline framing styles so prepareImagesForPrintExport can restore. */
+export function snapshotImgFraming(img) {
+  if (!img) return null;
+  return {
+    src: img.src,
+    width: img.style.width,
+    height: img.style.height,
+    maxWidth: img.style.maxWidth,
+    maxHeight: img.style.maxHeight,
+    position: img.style.position,
+    top: img.style.top,
+    left: img.style.left,
+    transform: img.style.transform,
+    objectFit: img.style.objectFit,
+    onload: img.onload,
+  };
+}
+
+export function restoreImgFraming(img, snap) {
+  if (!img || !snap) return;
+  img.style.width = snap.width;
+  img.style.height = snap.height;
+  img.style.maxWidth = snap.maxWidth;
+  img.style.maxHeight = snap.maxHeight;
+  img.style.position = snap.position;
+  img.style.top = snap.top;
+  img.style.left = snap.left;
+  img.style.transform = snap.transform;
+  img.style.objectFit = snap.objectFit;
+  img.onload = snap.onload;
+}
+
+/**
+ * Draw a region-cropped print image so it fills the tile box exactly.
+ * No pan/zoom — those were already baked into the IIIF region.
+ */
+export function applyFillTileFraming(img, tileW, tileH) {
+  const tw = Math.max(1, Math.round(Number(tileW) || 1));
+  const th = Math.max(1, Math.round(Number(tileH) || 1));
+  img.style.width = `${tw}px`;
+  img.style.height = `${th}px`;
+  img.style.maxWidth = 'none';
+  img.style.maxHeight = 'none';
+  img.style.position = 'absolute';
+  img.style.top = '50%';
+  img.style.left = '50%';
+  img.style.objectFit = 'fill';
+  img.style.transform = 'translate(-50%, -50%)';
+  img.onload = null; // prevent Collage bindTileImageEvents from re-applying pan/zoom
 }
 
 export function regionToIiifPath({ x, y, w, h }) {
@@ -206,17 +299,20 @@ export async function planLocPrintRequest({
   let regionW = info.width;
   let regionH = info.height;
 
+  let framing = 'cover-transform';
+  let normalized = null;
   if (tileW > 0 && tileH > 0 && naturalW > 0 && naturalH > 0) {
-    const previewRegion = visibleRegionInPreview({
+    normalized = normalizedVisibleRect({
       tileW, tileH, naturalW, naturalH, zoom, panX, panY,
     });
-    const srcRegion = scaleRegionToSource(previewRegion, naturalW, naturalH, info.width, info.height);
+    const srcRegion = sourceRegionFromNormalized(normalized, info.width, info.height);
     // Only use region if it's meaningfully cropped (< 98% of full)
     const areaRatio = (srcRegion.w * srcRegion.h) / (info.width * info.height);
     if (areaRatio < 0.98) {
       region = regionToIiifPath(srcRegion);
       regionW = srcRegion.w;
       regionH = srcRegion.h;
+      framing = 'fill-tile';
     }
   }
 
@@ -224,6 +320,7 @@ export async function planLocPrintRequest({
   const targetH = Math.max(1, (Number(tileH) || regionH) * exportScale);
   const size = chooseIiifSize(regionW, regionH, targetW, targetH, { maxEdge });
   // LoC rejects `max`; pct:100 works for full, but size-capped w,/ ,h is preferred.
+  // Preserve preview URL rotation (Collage tiles do not apply CSS rotate/flip).
   const printUrl = buildIiifUrl({
     base: parsed.base,
     region,
@@ -238,6 +335,8 @@ export async function planLocPrintRequest({
     base: parsed.base,
     region,
     size,
+    framing,
+    normalized,
     sourceWidth: info.width,
     sourceHeight: info.height,
     regionWidth: regionW,

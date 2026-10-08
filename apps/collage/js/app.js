@@ -11,6 +11,10 @@ import {
   fetchLocPrintObjectUrl,
   createLocHiResCache,
   releaseLocHiResBlobs,
+  exportFramingMode,
+  snapshotImgFraming,
+  restoreImgFraming,
+  applyFillTileFraming,
 } from './loc-iiif.js';
 
 (function() {
@@ -2145,13 +2149,13 @@ import {
    * (caller may toast once). Returns { restored: fn, fellBack: bool }.
    */
   async function prepareImagesForPrintExport(imgs, { exportScale = 3 } = {}) {
-    const originalSrcs = [];
+    const framingSnaps = [];
     const objectUrlsToIgnore = new Set(); // owned by session cache; do not revoke here
     let fellBack = false;
 
     for (let idx = 0; idx < imgs.length; idx++) {
       const img = imgs[idx];
-      originalSrcs[idx] = img.src;
+      framingSnaps[idx] = snapshotImgFraming(img);
       const candidate = img.dataset.largeSrc || img.src;
       if (!isLocIiifUrl(candidate) && !isLocIiifUrl(img.src)) {
         if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
@@ -2162,13 +2166,16 @@ import {
       const itemData = findItemDataForImg(img);
       const tw = tile?.clientWidth || 0;
       const th = tile?.clientHeight || 0;
+      // Capture preview natural size BEFORE swapping src (needed for cover-transform)
+      const previewNW = img.naturalWidth || 0;
+      const previewNH = img.naturalHeight || 0;
       try {
         const plan = await planLocPrintRequest({
           url,
           tileW: tw,
           tileH: th,
-          naturalW: img.naturalWidth || 0,
-          naturalH: img.naturalHeight || 0,
+          naturalW: previewNW,
+          naturalH: previewNH,
           zoom: itemData ? (parseFloat(itemData.zoom) || 1) : 1,
           panX: itemData ? (parseFloat(itemData.panX) || 0) : 0,
           panY: itemData ? (parseFloat(itemData.panY) || 0) : 0,
@@ -2185,6 +2192,10 @@ import {
           timeoutMs: 45000,
         });
         objectUrlsToIgnore.add(entry.objectUrl);
+        const mode = exportFramingMode(plan);
+        // Disable Collage onload (updateTileTransform) while we apply export framing —
+        // otherwise a region-cropped image gets pan/zoom applied again (double crop).
+        img.onload = null;
         // Wait for the hi-res decode before html2canvas / print
         await new Promise((resolve, reject) => {
           const onLoad = () => { cleanup(); resolve(); };
@@ -2202,9 +2213,17 @@ import {
             resolve();
           }
         });
+        if (mode === 'fill-tile' && tw > 0 && th > 0) {
+          // Region request already IS the on-screen crop — fill the tile, no pan/zoom.
+          applyFillTileFraming(img, tw, th);
+        } else if (itemData && tile) {
+          // Full-image upgrade: same cover+pan+zoom math at higher resolution.
+          updateTileTransform(img, itemData, tile);
+        }
       } catch (err) {
         console.warn('LoC full-res fetch failed; using preview largePath:', err);
         fellBack = true;
+        if (framingSnaps[idx]) restoreImgFraming(img, framingSnaps[idx]);
         if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
       }
     }
@@ -2213,7 +2232,24 @@ import {
       fellBack,
       restore() {
         imgs.forEach((img, idx) => {
-          if (originalSrcs[idx] != null) img.src = originalSrcs[idx];
+          const snap = framingSnaps[idx];
+          if (!snap) return;
+          restoreImgFraming(img, snap);
+          if (snap.src != null) img.src = snap.src;
+          // Re-apply cover+pan+zoom from current item state after src restores
+          const tile = img.closest('.collage-item');
+          const itemData = findItemDataForImg(img);
+          if (tile && itemData) {
+            const finish = () => updateTileTransform(img, itemData, tile);
+            if (img.complete && img.naturalWidth > 0) finish();
+            else {
+              img.onload = () => {
+                finish();
+                // restore original onload after one shot
+                img.onload = snap.onload;
+              };
+            }
+          }
         });
       },
     };
