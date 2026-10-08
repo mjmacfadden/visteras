@@ -20,9 +20,9 @@ import {
   addStop, deleteStop, duplicateStop, swapStops, moveStop, reverseStops,
   cssGradient, parseSwatchList, swatchFromModel, normalizeSwatch, normalizeColor,
   multiply, invert, apply as applyM, translate, IDENTITY, MID_MIN, MID_MAX,
-} from './visteras-gradient-model.js?v=gradient-1';
-import { mountGradientPanel } from './visteras-gradient-panel.js?v=gradient-1';
-import { mountGradientTool } from './visteras-gradient-tool.js?v=gradient-1';
+} from './visteras-gradient-model.js?v=gradient-2';
+import { mountGradientPanel } from './visteras-gradient-panel.js?v=gradient-2';
+import { mountGradientTool } from './visteras-gradient-tool.js?v=gradient-2';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const MODE = 'gradient';

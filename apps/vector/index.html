@@ -27,7 +27,7 @@
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
   <link href="./css/visteras-panel-dock.css?v=dock-5" rel="stylesheet" media="all">
-  <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-gradient.css?v=gradient-2" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-fx.css?v=effects-polish-1" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-panel.css?v=appearance-stroke-1" rel="stylesheet" media="all">
   <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
@@ -113,16 +113,16 @@
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_lock_menu">Lock<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
               <div class="menu_dropdown_list menu_submenu_list" role="menu">
-                <div class="menu_dropdown_item" role="menuitem" id="action_lock_selection">Selection <span class="menu_dropdown_shortcut">⌘2</span></div>
+                <div class="menu_dropdown_item" role="menuitem" id="action_lock_selection">Selection <span class="menu_dropdown_shortcut">⌃⌘2</span></div>
               </div>
             </div>
-            <div class="menu_dropdown_item" id="action_unlock_all">Unlock All <span class="menu_dropdown_shortcut">⌥⌘2</span></div>
+            <div class="menu_dropdown_item" id="action_unlock_all">Unlock All <span class="menu_dropdown_shortcut">⌃⌥⌘2</span></div>
             <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_hide_menu">Hide<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
               <div class="menu_dropdown_list menu_submenu_list" role="menu">
-                <div class="menu_dropdown_item" role="menuitem" id="action_hide_selection">Selection <span class="menu_dropdown_shortcut">⌘3</span></div>
+                <div class="menu_dropdown_item" role="menuitem" id="action_hide_selection">Selection <span class="menu_dropdown_shortcut">⌃⌘3</span></div>
               </div>
             </div>
-            <div class="menu_dropdown_item" id="action_show_all">Show All <span class="menu_dropdown_shortcut">⌥⌘3</span></div>
+            <div class="menu_dropdown_item" id="action_show_all">Show All <span class="menu_dropdown_shortcut">⌃⌥⌘3</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_item disabled" id="action_image_trace" title="Trace the selected raster image into vector paths">Image Trace…</div>
@@ -156,7 +156,7 @@
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_fit_all_artboards">Fit All Artboards in Window <span class="menu_dropdown_shortcut">⌥⌘0</span></div>
             <div class="menu_dropdown_item" id="action_fit_workspace">Fit Artboard in Window <span class="menu_dropdown_shortcut">⌘0</span></div>
-            <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌘1</span></div>
+            <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌃⌘1</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
             <div class="menu_dropdown_item" id="action_zoom_out">Zoom Out <span class="menu_dropdown_shortcut">⌘-</span></div>
@@ -289,23 +289,27 @@
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
-    import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-5';
+    import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-6';
     import { mountOffsetPath } from './js/visteras-offset-path.js?v=offset-path-5';
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
     import { mountTransformPanel } from './js/visteras-transform-panel.js';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
-    import { mountArtboards } from './js/visteras-artboards.js?v=artboard-bg-2';
+    import { mountArtboards } from './js/visteras-artboards.js?v=artboard-bg-3';
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
-    import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-1';
-    import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-1';
+    import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-2';
+    import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-2';
+    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=safe-2';
+    import { mountObjectTransform } from './js/visteras-object-transform.js?v=transform-1';
+    import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
+    import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
     import { mountGrid } from './js/visteras-grid.js?v=grid-1';
-    import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-1';
-    import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=1';
+    import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-3';
+    import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
-    import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
+    import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
     import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
@@ -323,10 +327,10 @@
     import { initLogoEasterEgg } from './lib/visteras-ui/easter-egg.js';
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
     import { mountExport } from './js/visteras-export.js?v=export-3';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=appearance-stroke-1';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-2';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-5';
-    import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-2';
+    import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-3';
     import { mountTextOutlines } from './js/visteras-text-outlines.js?v=outlines-1';
     import { mountExpand } from './js/visteras-expand.js?v=expand-1';
     import { mountGuides } from './js/visteras-guides.js?v=guides-2';
@@ -649,31 +653,42 @@
       }
     }
 
-    // Set up Studio Menu Bar Interactions
+    // Set up Studio Menu Bar Interactions.
+    // Live queries + delegation so menus injected after init (e.g. Select) open/hover like File/Edit.
     function setupMenuBar() {
-      const menuEntries = document.querySelectorAll('.menu_entry');
+      const menuBar = document.getElementById('visteras_menu_bar');
+      const menuEntries = () => Array.from(menuBar.querySelectorAll('.menu_entry'));
+      const closeAllMenus = () => menuEntries().forEach((m) => m.classList.remove('open'));
 
-      menuEntries.forEach(entry => {
-        const title = entry.querySelector('.menu_entry_title');
-        title.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const wasOpen = entry.classList.contains('open');
-          menuEntries.forEach(m => m.classList.remove('open'));
-          if (!wasOpen) entry.classList.add('open');
-        });
+      menuBar.addEventListener('click', (e) => {
+        const title = e.target.closest('.menu_entry_title');
+        if (!title || !menuBar.contains(title)) return;
+        const entry = title.closest('.menu_entry');
+        if (!entry || entry.parentElement?.closest('.menu_entry')) return;
+        e.stopPropagation();
+        const wasOpen = entry.classList.contains('open');
+        closeAllMenus();
+        if (!wasOpen) entry.classList.add('open');
+      });
 
-        entry.addEventListener('mouseenter', () => {
-          const anyOpen = Array.from(menuEntries).some(m => m.classList.contains('open'));
-          if (anyOpen) {
-            menuEntries.forEach(m => m.classList.remove('open'));
-            entry.classList.add('open');
-          }
-        });
+      menuBar.addEventListener('mouseover', (e) => {
+        const entry = e.target.closest('.menu_entry');
+        if (!entry || !menuBar.contains(entry)) return;
+        if (entry.parentElement?.closest('.menu_entry')) return;
+        const entries = menuEntries();
+        const anyOpen = entries.some((m) => m.classList.contains('open'));
+        if (anyOpen && !entry.classList.contains('open')) {
+          closeAllMenus();
+          entry.classList.add('open');
+        }
       });
 
       document.addEventListener('click', () => {
-        menuEntries.forEach(m => m.classList.remove('open'));
+        closeAllMenus();
       });
+
+      // Allow late-injected top-level menus to re-sync (no-op with delegation; kept for callers).
+      window.__visterasRefreshMenuBar = () => { /* live queries — nothing to rebind */ };
 
       // Actions wiring
       const sc = svgEditor.svgCanvas;
@@ -1271,16 +1286,14 @@
 
         // Command / Control shortcuts
         if (isCmdOrCtrl && !e.altKey) {
-          // Command/Ctrl + 0: Fit artboard to workspace
-          if (e.code === 'Digit0' || e.code === 'Numpad0' || e.key === '0') {
+          // Fit artboard ⌘0 / Ctrl+0 (preventDefault blocks zoom); Actual Size ⌃⌘1 / Ctrl+Alt+1
+          if (eventMatchesChord(e, { meta: true, key: '0' }) && !e.altKey && !e.shiftKey) {
             e.preventDefault();
             e.stopPropagation();
             fitArtboardToWorkspace();
             return;
           }
-
-          // Command/Ctrl + 1: 100% Zoom (Actual Size)
-          if (!e.shiftKey && (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1')) {
+          if (eventMatchesChord(e, { meta: true, key: '1' })) {
             e.preventDefault();
             e.stopPropagation();
             zoomTo100Percent();
@@ -1351,8 +1364,8 @@
             return;
           }
 
-          // Command/Ctrl + 7: Make Clipping Mask
-          if (!e.shiftKey && (e.key === '7' || e.code === 'Digit7' || e.code === 'Numpad7')) {
+          // Browser-safe: ⌃⌘7 / Ctrl+Alt+7 Make Clipping Mask (bare ⌘7 is a browser tab shortcut)
+          if (eventMatchesChord(e, { meta: true, key: '7' })) {
             e.preventDefault();
             e.stopPropagation();
             window.__visterasClippingMask?.make();
@@ -1418,13 +1431,7 @@
             return;
           }
 
-          // Command/Ctrl + D: Duplicate / Transform Again
-          if (!e.shiftKey && (e.key === 'd' || e.key === 'D')) {
-            e.preventDefault();
-            e.stopPropagation();
-            sc.cloneSelectedElements?.(20, 20);
-            return;
-          }
+          // Command/Ctrl + D: Transform Again — handled by mountObjectTransform (capture).
 
           // Command/Ctrl + R: Toggle Rulers (metaKey mac + ctrlKey win/linux).
           // #view_rulers does not exist in this SVG-Edit build — route through shell.
@@ -1452,11 +1459,18 @@
 
         // Alt + Command / Control shortcuts
         if (isCmdOrCtrl && e.altKey) {
-          // Alt + Command/Ctrl + 7: Release Clipping Mask
-          if (!e.shiftKey && (e.key === '7' || e.code === 'Digit7' || e.code === 'Numpad7')) {
+          // Browser-safe: ⌃⌥⌘7 / Ctrl+Alt+Shift+7 Release Clipping Mask
+          if (eventMatchesChord(e, { meta: true, alt: true, key: '7' })) {
             e.preventDefault();
             e.stopPropagation();
             window.__visterasClippingMask?.release();
+            return;
+          }
+          // Fit All Artboards ⌥⌘0 / Ctrl+Alt+0
+          if (eventMatchesChord(e, { meta: true, alt: true, key: '0' })) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('action_fit_all_artboards')?.click();
             return;
           }
         }
@@ -2572,6 +2586,13 @@
     mountEffects(svgEditor);
     mountAppearance(svgEditor);
     mountObjectLock(svgEditor);
+    // Object ▸ Transform (Again ⌘D, Move… ⇧⌘M, Rotate/Reflect/Scale, Reset Bounding Box)
+    mountObjectTransform(svgEditor);
+    // Object ▸ Compound Path ▸ Make (⌃⌘8) / Release (⌃⌥⇧⌘8)
+    mountCompoundPath(svgEditor);
+    // Select ▸ Inverse / Same ▸ Fill/Stroke/Weight/Opacity/Appearance
+    mountSelectSame(svgEditor);
+    window.__visterasRefreshMenuBar?.();
     mountGrid(svgEditor);
     mountContextMenu(svgEditor);
     mountShortcutLabels();
@@ -2581,7 +2602,7 @@
     mountArtboards(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
-    // Object ▸ Clipping Mask ▸ Make (⌘7), Release (⌥⌘7)
+    // Object ▸ Clipping Mask ▸ Make (⌃⌘7), Release (⌃⌥⌘7)
     mountClippingMask(svgEditor);
     // Type ▸ Create Outlines (⇧⌘O) / Convert to Path
     mountTextOutlines(svgEditor);

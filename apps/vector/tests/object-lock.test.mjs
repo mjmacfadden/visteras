@@ -89,15 +89,16 @@ test('hideSelection / showAll round-trip via data-visteras-hidden', () => {
   assert.deepEqual(sc._sel.map((e) => e.id), ['a']);
 });
 
-test('Object menu + shortcuts wired (⌘2 / ⌥⌘2 / ⌘3 / ⌥⌘3)', () => {
+test('Object menu + shortcuts wired (⌃⌘2 / ⌃⌥⌘2 / ⌃⌘3 / ⌃⌥⌘3)', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const src = fs.readFileSync(new URL('../js/visteras-object-lock.js', import.meta.url), 'utf8');
   assert.match(html, /id="action_lock_selection"/);
-  assert.match(html, /id="action_unlock_all"/);
-  assert.match(html, /id="action_hide_selection"/);
-  assert.match(html, /id="action_show_all"/);
+  assert.match(html, /⌃⌘2/);
+  assert.match(html, /⌃⌥⌘2/);
+  assert.match(html, /⌃⌘3/);
+  assert.match(html, /⌃⌥⌘3/);
   assert.match(html, /mountObjectLock/);
-  assert.match(src, /Digit2/);
-  assert.match(src, /Digit3/);
+  assert.match(html, /visteras-object-lock\.js\?v=lock-2/);
+  assert.match(src, /eventMatchesChord/);
   assert.equal(LOCK_ATTR, 'data-visteras-locked', 'same attr as Layers panel lock');
 });

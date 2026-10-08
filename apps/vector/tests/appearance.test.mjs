@@ -77,7 +77,7 @@ test('Appearance stroke row markup: weight field, presets, steppers, underlined 
   assert.match(css, /vapp_weight/);
   assert.match(css, /vapp_label_link/);
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-appearance\.js\?v=appearance-stroke-1/);
+  assert.match(html, /visteras-appearance\.js\?v=appearance-stroke-2/);
 });
 
 test('appearanceRows prefers data-visteras-stroke-weight over stroke-width', () => {

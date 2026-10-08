@@ -1,11 +1,11 @@
 /**
- * Visteras Vector — Clipping Masks (Object ▸ Clipping Mask ▸ Make ⌘7, Release ⌥⌘7).
+ * Visteras Vector — Clipping Masks (Object ▸ Clipping Mask ▸ Make ⌃⌘7, Release ⌃⌥⌘7).
  *
  * Illustrator / Gravit parity:
- * - Make (⌘7): Selected objects are grouped; the topmost object in stacking (DOM) order
+ * - Make (⌃⌘7): Selected objects are grouped; the topmost object in stacking (DOM) order
  *   becomes the clipping mask shape (placed in <defs><clipPath id="...">), and the underlying
  *   objects become the clipped content inside the <g class="vclip-group" data-visteras-clip="..." clip-path="url(#...)">.
- * - Release (⌥⌘7): The clipping mask is unpacked; the clipping shape is restored back into
+ * - Release (⌃⌥⌘7): The clipping mask is unpacked; the clipping shape is restored back into
  *   the document above the clipped content, the content elements are un-grouped, and the
  *   <clipPath> in <defs> is removed.
  * - Single undo/redo step (BatchCommand).
@@ -280,8 +280,8 @@ export function mountClippingMask(editor) {
     submenu.id = 'menu_clipping_mask';
     submenu.innerHTML = `Clipping Mask<span class="menu_submenu_arrow">▸</span>
       <div class="menu_dropdown_list menu_submenu_list">
-        <div class="menu_dropdown_item disabled" id="action_make_clipping_mask">Make <span class="menu_dropdown_shortcut">⌘7</span></div>
-        <div class="menu_dropdown_item disabled" id="action_release_clipping_mask">Release <span class="menu_dropdown_shortcut">⌥⌘7</span></div>
+        <div class="menu_dropdown_item disabled" id="action_make_clipping_mask">Make <span class="menu_dropdown_shortcut" data-shortcut="Ctrl+Meta+7">⌃⌘7</span></div>
+        <div class="menu_dropdown_item disabled" id="action_release_clipping_mask">Release <span class="menu_dropdown_shortcut" data-shortcut="Ctrl+Alt+Meta+7">⌃⌥⌘7</span></div>
       </div>`;
     const sep = document.createElement('div');
     sep.className = 'menu_dropdown_separator';

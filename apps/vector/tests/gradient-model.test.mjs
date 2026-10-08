@@ -134,3 +134,28 @@ test('Gradient model: CSS preview and swatch schema', () => {
   assert.deepEqual(G.parseSwatchList('{bad'), []);
   assert.equal(G.GRADIENT_SWATCHES_KEY, 'visteras-vector-gradient-swatches');
 });
+
+test('Gradient model: recolorStop changes one stop only and never mutates the input', () => {
+  const stops = [{ o: 0, c: '#ffffff', a: 1, mid: 40 }, { o: 0.5, c: '#00ff00', a: 0.5, mid: 50 }, { o: 1, c: '#000000', a: 1, mid: 50 }];
+  const frozen = JSON.stringify(stops);
+  const out = G.recolorStop(stops, 1, '#F00');
+  assert.equal(JSON.stringify(stops), frozen, 'input untouched (shared gradients stay safe)');
+  assert.notEqual(out, stops);
+  assert.deepEqual(out.map((s) => s.c), ['#ffffff', '#ff0000', '#000000']);
+  assert.equal(out[1].a, 0.5, 'opacity kept'); assert.equal(out[1].o, 0.5, 'location kept'); assert.equal(out[0].mid, 40, 'midpoints kept');
+  assert.deepEqual(G.recolorStop(stops, 7, '#ff0000').map((s) => s.c), ['#ffffff', '#00ff00', '#000000'], 'bad index: no change');
+  assert.deepEqual(G.recolorStop(stops, 0, 'not-a-colour').map((s) => s.c), ['#ffffff', '#00ff00', '#000000'], 'bad colour: no change');
+  assert.equal(G.recolorStop(stops, 2, 'rgb(0, 0, 255)')[2].c, '#0000ff');
+});
+
+test('Gradient model: stopSelectionLive gates colour routing to a selected stop', () => {
+  const base = { active: true, index: 1, count: 3, attr: 'fill', stopAttr: 'fill', hasGradient: true };
+  assert.equal(G.stopSelectionLive(base), true);
+  assert.equal(G.stopSelectionLive({ ...base, active: false }), false, 'nothing clicked (Esc / empty canvas / other object)');
+  assert.equal(G.stopSelectionLive({ ...base, hasGradient: false }), false, 'selection lost its gradient');
+  assert.equal(G.stopSelectionLive({ ...base, attr: 'stroke' }), false, 'Fill/Stroke switched');
+  assert.equal(G.stopSelectionLive({ ...base, midpoint: 0 }), false, 'a midpoint is selected, not a stop');
+  assert.equal(G.stopSelectionLive({ ...base, index: 3 }), false, 'stale index');
+  assert.equal(G.stopSelectionLive({ ...base, index: -1 }), false);
+  assert.equal(G.stopSelectionLive(), false);
+});
