@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {
   formatShortcut, detectMac, parseShortcutChord, localizeShortcut, hasForbiddenShortcutToken,
 } from '../js/visteras-shortcut-label.js';
+import { rewriteShortcutLabels } from '../js/visteras-shortcut-labels-apply.js';
 
 test('formatShortcut Mac: Illustrator symbol order ⌃⌥⇧⌘', () => {
   assert.equal(formatShortcut({ meta: true, key: 'x', mac: true }), '⌘X');
@@ -56,4 +57,35 @@ test('hygiene: no visible Vector UI shortcut label contains META/Meta', () => {
   // Editor.js still embeds META in the legacy se-cmenu template — must stay replaced/hidden.
   const ctx = fs.readFileSync(new URL('../js/visteras-context-menu.js', import.meta.url), 'utf8');
   assert.match(ctx, /data-visteras-replaced|se-cmenu_canvas/);
+});
+
+
+
+test('rewriteShortcutLabels turns META chords into platform labels', () => {
+  // Minimal DOM stub
+  const spans = [];
+  const make = (text) => {
+    const el = {
+      textContent: text,
+      getAttribute: (k) => (k === 'data-shortcut' ? null : null),
+      setAttribute() {},
+      hasAttribute: () => false,
+      matches: (sel) => sel.includes('menu_dropdown_shortcut') || sel.includes('vcm-shortcut') || sel.includes('data-shortcut'),
+    };
+    spans.push(el);
+    return el;
+  };
+  make('META+X');
+  make('Meta+Shift+G');
+  const root = {
+    querySelectorAll: (sel) => {
+      if (sel.includes('menu_dropdown_shortcut') || sel.includes('vcm-shortcut') || sel.includes('data-shortcut')) return spans;
+      return [];
+    },
+  };
+  const n = rewriteShortcutLabels(root, { mac: true });
+  assert.ok(n >= 1);
+  assert.equal(spans[0].textContent, '⌘X');
+  assert.equal(spans[1].textContent, '⇧⌘G');
+  assert.equal(hasForbiddenShortcutToken(spans[0].textContent), false);
 });

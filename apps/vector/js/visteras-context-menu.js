@@ -10,7 +10,7 @@
  * This menu reuses the same #action_* menu-bar commands (click) — no duplicate
  * logic. Items are omitted when they don't apply (Illustrator hide, not disable).
  */
-import { formatShortcut, detectMac } from './visteras-shortcut-label.js?v=1';
+import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
 
 const MENU_ID = 'visteras_context_menu';
 
