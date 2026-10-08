@@ -868,6 +868,11 @@ export function mountEyedropperTool(editor) {
   const applySampledColor = (hex, fromImage = false) => {
     if (!hex) return; // transparent pixel: no-op
     const ctrl = api();
+    // Selected gradient stop (Gradient panel / annotator): the sample recolours that stop only.
+    if (ctrl?.routeToGradientStop?.(hex)) {
+      window.__visterasLastEyedropperSample = { hex, well: 'gradient-stop', selection: selection().length };
+      return;
+    }
     const well = ctrl?.getActiveTarget?.() === 'stroke' ? 'stroke' : 'fill';
     const sel = selection();
     const style = pixelSampleStyle(hex, { fromImage, well });
@@ -926,6 +931,14 @@ export function mountEyedropperTool(editor) {
   const handleClick = (e) => {
     if (sampling) return; // previous pixel sample still resolving
     const hit = pickTargetAt(e.clientX, e.clientY, api(), { images: true });
+    if (!e.altKey && window.__visterasGradientStopRoute?.isActive?.()) {
+      // A gradient stop is selected: sample one colour into it (Illustrator), not the whole appearance.
+      if (!hit) return;
+      const solid = !e.shiftKey && hit.nodeName !== 'image' ? solidPaintAt(hit, e.clientX, e.clientY) : null;
+      if (solid) applySampledColor(solid);
+      else pixelSample({ clientX: e.clientX, clientY: e.clientY, shiftKey: true }, hit); // images / gradients: rendered pixel
+      return;
+    }
     if (e.shiftKey && !e.altKey) {
       if (!hit) return; // empty canvas: no-op
       pixelSample(e, hit);

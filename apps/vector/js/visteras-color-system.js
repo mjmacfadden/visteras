@@ -1230,8 +1230,34 @@ function createColorController(svgEditor) {
       api.setActiveTarget(state.activeTarget === 'fill' ? 'stroke' : 'fill');
     },
 
-    setWorkingColor(hexOrNone, { apply = true, recordRecent = true, noUndo = false } = {}) {
+    /**
+     * Illustrator: with a gradient stop selected (Gradient panel / annotator),
+     * colour input recolours that stop — a fresh per-object gradient, one undo
+     * step (noUndo = live preview) — instead of replacing the fill.
+     * @returns {boolean} true when the stop took the colour
+     */
+    routeToGradientStop(hex, { noUndo = false, recordRecent = true } = {}) {
+      const route = window.__visterasGradientStopRoute;
+      const n = normalizeHex(hex);
+      if (!n || n === 'none' || !route?.isActive?.()) return false;
+      if (!route.recolor(n, { live: noUndo })) return false;
+      state.workingNone = false;
+      state.workingHex = n;
+      if (recordRecent && !noUndo) api.pushRecent(n);
+      api.emit();
+      window.__visterasUpdateSwatches?.();
+      return true;
+    },
+
+    /** Swatch click. ⌥-click always targets the selected gradient stop (Illustrator). */
+    applySwatch(hex, { alt = false } = {}) {
+      if (alt && api.routeToGradientStop(hex)) return;
+      api.setWorkingColor(hex);
+    },
+
+    setWorkingColor(hexOrNone, { apply = true, recordRecent = true, noUndo = false, toStop = true } = {}) {
       const sc = svgEditor.svgCanvas;
+      if (apply && toStop && api.routeToGradientStop(hexOrNone, { noUndo, recordRecent })) return;
       const paint = (val) => {
         if (!sc) return;
         state.suppressSync = true;
@@ -2030,7 +2056,7 @@ function mountColorPanelContent(ctrl, svgEditor, content) {
       chip.dataset.hex = hex;
       chip.title = hex.toUpperCase();
       if (active && hex.toLowerCase() === active) chip.classList.add('active');
-      chip.addEventListener('click', () => ctrl.setWorkingColor(hex));
+      chip.addEventListener('click', (e) => ctrl.applySwatch(hex, { alt: e.altKey }));
       recentGrid.appendChild(chip);
     }
   }
@@ -2144,7 +2170,7 @@ function mountSwatchesPanelContent(ctrl, content) {
         ctrl.deleteUserSwatch(userId);
         return;
       }
-      ctrl.setWorkingColor(hex);
+      ctrl.applySwatch(hex, { alt: e.altKey });
     });
     if (userId) {
       btn.addEventListener('contextmenu', (e) => {
@@ -2236,7 +2262,7 @@ function mountSwatchesPanelContent(ctrl, content) {
           chip.dataset.hex = color.hex;
           chip.title = `${palette.name}\n${color.name ? `${color.name} ` : ''}${color.hex.toUpperCase()}`;
           if (active && color.hex.toLowerCase() === active) chip.classList.add('active');
-          chip.addEventListener('click', () => ctrl.setWorkingColor(color.hex));
+          chip.addEventListener('click', (e) => ctrl.applySwatch(color.hex, { alt: e.altKey }));
           chipsEl.appendChild(chip);
         });
         rowEl.append(nameEl, chipsEl);
@@ -2823,8 +2849,10 @@ function mountPickerModal(ctrl) {
 
   function open(target, edit = null) {
     if (externalEdit) cancel();
-    externalEdit = edit;
     if (target && !edit) ctrl.setActiveTarget(target, { syncColor: true });
+    // Fill/Stroke well with a gradient stop selected → edit that stop (Illustrator).
+    if (!edit && window.__visterasGradientStopRoute?.isActive?.() && window.__visterasGradientStopRoute.openPicker()) return;
+    externalEdit = edit;
     const st = ctrl.getState();
     openSnapshot = {
       hex: st.workingHex,

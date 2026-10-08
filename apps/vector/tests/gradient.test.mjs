@@ -13,8 +13,8 @@ const html = read('index.html');
 const gradientSources = ['js/visteras-gradient.js', 'js/visteras-gradient-panel.js', 'js/visteras-gradient-tool.js', 'js/visteras-gradient-model.js'].map((p) => [p, read(p)]);
 
 test('index.html mounts gradients after the dock / colour system and links the stylesheet', () => {
-  assert.match(html, /import \{ mountGradient \} from '\.\/js\/visteras-gradient\.js\?v=gradient-1';/);
-  assert.match(html, /<link href="\.\/css\/visteras-gradient\.css\?v=gradient-1" rel="stylesheet"/);
+  assert.match(html, /import \{ mountGradient \} from '\.\/js\/visteras-gradient\.js\?v=gradient-2';/);
+  assert.match(html, /<link href="\.\/css\/visteras-gradient\.css\?v=gradient-2" rel="stylesheet"/);
   const dock = html.indexOf('mountVisterasPanelDock({ svgEditor });');
   const color = html.indexOf('mountVisterasColorSystem({ svgEditor });');
   const eye = html.indexOf('mountEyedropperTool(svgEditor);');
@@ -105,4 +105,41 @@ test('gradient stylesheet keeps the orange accent', () => {
   assert.match(css, /#fa7c1b/);
   assert.match(css, /\.vgrad-stop\.selected/);
   assert.match(css, /\.is-gradient/);
+});
+
+test('stop selection: click selects (no popover), double-click opens the picker, Esc / canvas / other object deselect', () => {
+  const panel = read('js/visteras-gradient-panel.js');
+  const tool = read('js/visteras-gradient-tool.js');
+  // panel slider: pointerdown selects; the popover is behind the 400 ms double-click check only
+  assert.match(panel, /selectStop\(index\); \/\/ single click selects/);
+  assert.match(panel, /lastClick\?\.index === index && now - lastClick\.time < 400\) \{\s*lastClick = null;\s*openColorPopover\(/);
+  assert.match(panel, /class="vgrad-stop\$\{i === selStop && selMid < 0 && stopActive \? ' selected' : ''\}"/, 'orange .selected only while a stop is selected');
+  // deselect paths
+  assert.match(panel, /event === 'selected' && stopActive && selIds\(\) !== stopOwner\) clearStopSelection\(\)/);
+  assert.match(panel, /e\.key !== 'Escape' \|\| !stopActive/);
+  assert.match(panel, /stopActive && \(!m \|\| attr !== stopAttr\)\) clearStopSelection/);
+  // annotator: click selects with the orange accent; double-click opens the colour popover; empty canvas deselects
+  assert.match(tool, /panel\.selectStop\(stopIndex\); \} \/\/ click = select/);
+  assert.match(tool, /dragging\.openColor = \(\) => openStopColor\(frame, stopIndex, rect\)/);
+  assert.match(tool, /const ACCENT = '#fa7c1b'/);
+  assert.match(tool, /data-vgrad-selected/);
+  assert.match(tool, /if \(emptyClick\) panel\.clearStopSelection/);
+});
+
+test('stop selection routes Color panel, Swatches (incl. ⌥-click), well picker and Eyedropper to the stop', () => {
+  const panel = read('js/visteras-gradient-panel.js');
+  const cs = read('js/visteras-color-system.js');
+  const eye = read('js/visteras-eyedropper.js');
+  assert.match(panel, /window\.__visterasGradientStopRoute = \{/);
+  assert.match(panel, /recolorStop\(m\.stops, i, c\)/);
+  assert.match(panel, /label: 'Gradient Stop Color', gradientOnly: true/, 'one undo step, only objects that have a gradient');
+  assert.match(cs, /if \(apply && toStop && api\.routeToGradientStop\(hexOrNone, \{ noUndo, recordRecent \}\)\) return;/);
+  assert.match(cs, /route\.recolor\(n, \{ live: noUndo \}\)/, 'live preview while dragging, one step on commit');
+  assert.match(cs, /applySwatch\(hex, \{ alt = false \} = \{\}\) \{\s*if \(alt && api\.routeToGradientStop\(hex\)\) return;/);
+  assert.ok((cs.match(/ctrl\.applySwatch\([^)]*\{ alt: e\.altKey \}\)/g) || []).length >= 3, 'user, palette and recent swatches pass ⌥');
+  assert.match(cs, /__visterasGradientStopRoute\?\.isActive\?\.\(\) && window\.__visterasGradientStopRoute\.openPicker\(\)/);
+  assert.match(eye, /ctrl\?\.routeToGradientStop\?\.\(hex\)/);
+  assert.match(eye, /!e\.altKey && window\.__visterasGradientStopRoute\?\.isActive\?\.\(\)/);
+  // , (Color mode) still sets a flat colour
+  assert.match(panel, /setWorkingColor\(st\.workingHex \|\| '#000000', \{ toStop: false \}\)/);
 });
