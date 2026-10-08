@@ -8,6 +8,9 @@ export const EXPORT_GUIDE_SELECTORS = [
   '.visteras-ruler-guide',
   '.visteras-smart-guide',
   '[data-guide-id]',
+  '#visteras_document_grid',
+  '.visteras-document-grid',
+  '#visteras_grid_pattern',
 ].join(', ');
 
 /**

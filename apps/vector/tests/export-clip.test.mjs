@@ -84,3 +84,40 @@ test('stripExportGuides tolerates null / missing querySelectorAll', () => {
   assert.equal(stripExportGuides(null), 0);
   assert.equal(stripExportGuides({}), 0);
 });
+
+test('stripExportGuides removes the document grid layer (never exported)', () => {
+  const root = element('svg');
+  const layer = element('g', { class: 'layer' });
+  const art = element('rect', { id: 'art', width: '10', height: '10' });
+  layer.append(art);
+  const grid = element('g', { id: 'visteras_document_grid', class: 'visteras-document-grid' });
+  const defs = element('defs');
+  defs.append(element('pattern', { id: 'visteras_grid_pattern' }));
+  grid.append(defs, element('rect', { fill: 'url(#visteras_grid_pattern)' }));
+  root.append(layer, grid);
+  root.getElementById = (id) => ({ visteras_document_grid: grid, visteras_grid_pattern: defs.children[0] }[id] || null);
+  const all = () => {
+    const out = [];
+    const walk = (n) => { out.push(n); for (const c of n.children || []) walk(c); };
+    for (const c of root.children) walk(c);
+    return out;
+  };
+  root.querySelectorAll = (sel) => {
+    const tokens = String(sel).split(',').map((s) => s.trim());
+    return all().filter((n) => {
+      const id = n.id || n.getAttribute?.('id');
+      const cls = n.getAttribute?.('class') || '';
+      for (const t of tokens) {
+        if (t.startsWith('#') && id === t.slice(1)) return true;
+        if (t.startsWith('.') && cls.split(/\s+/).includes(t.slice(1))) return true;
+      }
+      return false;
+    });
+  };
+  const n = stripExportGuides(root);
+  assert.ok(n >= 1, `removed grid (got ${n})`);
+  assert.equal(root.children.includes(grid), false);
+  assert.equal(root.children.includes(layer), true);
+  assert.match(EXPORT_GUIDE_SELECTORS, /visteras_document_grid/);
+  assert.match(EXPORT_GUIDE_SELECTORS, /visteras-document-grid/);
+});

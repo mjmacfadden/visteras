@@ -169,7 +169,11 @@
             <div class="menu_dropdown_item" id="action_lock_guides">Lock Guides <span class="menu_dropdown_shortcut">⌥⌘;</span></div>
             <div class="menu_dropdown_item" id="action_clear_guides">Clear Guides</div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_grid" role="menuitemcheckbox" aria-checked="false">Show Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_snap_grid" role="menuitemcheckbox" aria-checked="false">Snap to Grid <span class="menu_dropdown_shortcut">⇧⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_grid_in_back" role="menuitemcheckbox" aria-checked="true">Grid in Back</div>
+            <div class="menu_dropdown_item" id="action_grid_prefs">Guides &amp; Grid…</div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
             <div class="menu_dropdown_item" id="action_toggle_gradient_annotator">Hide Gradient Annotator <span class="menu_dropdown_shortcut">⌥⌘G</span></div>
             <div class="menu_dropdown_separator"></div>
@@ -296,6 +300,7 @@
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-1';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-1';
+    import { mountGrid } from './js/visteras-grid.js?v=grid-1';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
@@ -351,7 +356,7 @@
     // also 404'd on its browser-fs-access import and never loaded).
     const VECTOR_EXTENSIONS = [
       'ext-connector',
-      'ext-grid',
+      // 'ext-grid' — replaced by visteras-grid.js (artboards hide #canvasBackground)
       'ext-markers',
       'ext-panning',
       'ext-shapes',
@@ -1143,9 +1148,6 @@
         document.getElementById('tool_wireframe')?.click();
       });
 
-      document.getElementById('action_toggle_grid')?.addEventListener('click', () => {
-        document.getElementById('view_grid')?.click();
-      });
 
       document.getElementById('action_toggle_rulers')?.addEventListener('click', () => {
         // SVG-Edit has no #view_rulers control — document shell owns ruler toggle.
@@ -1443,13 +1445,6 @@
             return;
           }
 
-          // Command/Ctrl + ': Toggle Grid
-          if (e.key === "'" || e.code === 'Quote') {
-            e.preventDefault();
-            e.stopPropagation();
-            document.getElementById('view_grid')?.click();
-            return;
-          }
 
         }
 
@@ -2575,6 +2570,7 @@
     mountEffects(svgEditor);
     mountAppearance(svgEditor);
     mountObjectLock(svgEditor);
+    mountGrid(svgEditor);
     mountParagraph(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);
