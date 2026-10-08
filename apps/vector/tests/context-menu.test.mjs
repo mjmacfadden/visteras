@@ -63,7 +63,7 @@ test('context menu reuses menu-bar actions (no duplicate cut/copy logic) and rep
   assert.match(src, /data-visteras-replaced/);
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /mountContextMenu/);
-  assert.match(html, /visteras-context-menu\.js\?v=cmenu-2/);
+  assert.match(html, /visteras-context-menu\.js\?v=cmenu-3/);
 });
 
 test('contextMenuItems: selection offers Transform submenu / Inverse / Same when actions enabled', () => {
@@ -103,5 +103,5 @@ test('context menu gap-3 actions reuse action_* ids (no duplicate logic)', () =>
   assert.match(src, /action_select_inverse/);
   assert.match(src, /submenu/);
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-context-menu\.js\?v=cmenu-2/);
+  assert.match(html, /visteras-context-menu\.js\?v=cmenu-3/);
 });

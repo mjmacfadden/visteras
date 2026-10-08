@@ -1,5 +1,5 @@
 /**
- * Visteras Vector — Object ▸ Compound Path ▸ Make (⌘8) / Release (⌥⇧⌘8)
+ * Visteras Vector — Object ▸ Compound Path ▸ Make (⌃⌘8) / Release (⌃⌥⇧⌘8)
  *
  * Make: combine selected paths/shapes into one <path> with fill-rule evenodd
  * (Illustrator-style holes where overlap). Appearance from the top-most object.
@@ -8,7 +8,8 @@
  * One undo BatchCommand each.
  */
 
-import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
+import { detectMac } from './visteras-shortcut-label.js';
+import { formatBrowserSafeShortcut, eventMatchesChord } from './visteras-browser-shortcuts.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const COMPOUND_ATTR = 'data-visteras-compound';
@@ -216,16 +217,16 @@ function injectMenu() {
   const objList = document.querySelector('#menu_object > .menu_dropdown_list');
   if (!objList || document.getElementById('menu_compound_path')) return;
   const mac = detectMac();
-  const scMake = formatShortcut({ meta: true, key: '8', mac });
-  const scRel = formatShortcut({ meta: true, alt: true, shift: true, key: '8', mac });
+  const scMake = formatBrowserSafeShortcut({ meta: true, key: '8', mac });
+  const scRel = formatBrowserSafeShortcut({ meta: true, alt: true, shift: true, key: '8', mac });
 
   const block = document.createElement('div');
   block.innerHTML = `
     <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="menu_compound_path">
       Compound Path<span class="menu_submenu_arrow" aria-hidden="true">▸</span>
       <div class="menu_dropdown_list menu_submenu_list" role="menu">
-        <div class="menu_dropdown_item disabled" role="menuitem" id="action_compound_make">Make <span class="menu_dropdown_shortcut" data-shortcut="Meta+8">${scMake}</span></div>
-        <div class="menu_dropdown_item disabled" role="menuitem" id="action_compound_release">Release <span class="menu_dropdown_shortcut" data-shortcut="Alt+Shift+Meta+8">${scRel}</span></div>
+        <div class="menu_dropdown_item disabled" role="menuitem" id="action_compound_make">Make <span class="menu_dropdown_shortcut" data-shortcut="Ctrl+Meta+8">${scMake}</span></div>
+        <div class="menu_dropdown_item disabled" role="menuitem" id="action_compound_release">Release <span class="menu_dropdown_shortcut" data-shortcut="Ctrl+Alt+Shift+Meta+8">${scRel}</span></div>
       </div>
     </div>
     <div class="menu_dropdown_separator"></div>
@@ -270,20 +271,20 @@ export function mountCompoundPath(editor) {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (!(e.metaKey || e.ctrlKey)) return;
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase())) return;
     if (window.__visterasIsTypingDirectly) return;
-    if (e.key !== '8') return;
-    // ⌘8 Make; ⌥⇧⌘8 Release
-    if (e.altKey && e.shiftKey) {
-      e.preventDefault();
-      e.stopPropagation();
-      releaseCompoundPath(sc);
-      syncMenu(sc);
-    } else if (!e.altKey && !e.shiftKey) {
+    // Browser-safe: ⌃⌘8 Make; ⌃⌥⇧⌘8 Release (bare ⌘8 switches browser tabs)
+    if (eventMatchesChord(e, { meta: true, key: '8' })) {
       e.preventDefault();
       e.stopPropagation();
       makeCompoundPath(sc);
+      syncMenu(sc);
+      return;
+    }
+    if (eventMatchesChord(e, { meta: true, alt: true, shift: true, key: '8' })) {
+      e.preventDefault();
+      e.stopPropagation();
+      releaseCompoundPath(sc);
       syncMenu(sc);
     }
   }, true);

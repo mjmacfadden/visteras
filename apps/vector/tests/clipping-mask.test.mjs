@@ -384,22 +384,21 @@ test('Clipping Mask: sweepOrphanClipPaths removes unreferenced clipPaths from de
   assert.equal(sc.defs.children.length, 0, 'Unused vclip_ clipPath swept from defs');
 });
 
-test('HTML: index.html wires ⌘7 / ⌥⌘7 shortcuts, imports and mounts mountClippingMask', () => {
+test('HTML: index.html wires browser-safe clipping shortcuts, imports and mounts mountClippingMask', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
 
-  // 1. Keyboard shortcuts in keydown listener
-  assert.match(html, /window\.__visterasClippingMask\?\.make\(\);/, '⌘7 executes make()');
-  assert.match(html, /window\.__visterasClippingMask\?\.release\(\);/, '⌥⌘7 executes release()');
+  assert.match(html, /window\.__visterasClippingMask\?\.make\(\);/);
+  assert.match(html, /window\.__visterasClippingMask\?\.release\(\);/);
+  assert.match(html, /eventMatchesChord\(e, \{ meta: true, key: '7' \}\)/);
+  assert.match(html, /eventMatchesChord\(e, \{ meta: true, alt: true, key: '7' \}\)/);
 
-  // 2. Module import and mount
-  assert.match(html, /import\s+\{\s*mountClippingMask\s*\}\s+from\s+'\.\/js\/visteras-clipping-mask\.js\?v=clip-\d+';/);
+  assert.match(html, /import\s+\{\s*mountClippingMask\s*\}\s+from\s+'\.\/js\/visteras-clipping-mask\.js\?v=clip-3'/);
   assert.match(html, /mountClippingMask\(svgEditor\);/);
 
-  // 3. Dynamic injection mounts Clipping Mask submenu with Make ⌘7 and Release ⌥⌘7
   const src = fs.readFileSync(clipJsPath, 'utf8');
   assert.match(src, /menu_clipping_mask/);
-  assert.match(src, /id="action_make_clipping_mask"[^>]*>Make\s+<span class="menu_dropdown_shortcut">⌘7<\/span>/);
-  assert.match(src, /id="action_release_clipping_mask"[^>]*>Release\s+<span class="menu_dropdown_shortcut">⌥⌘7<\/span>/);
+  assert.match(src, /id="action_make_clipping_mask"[^>]*>Make\s+<span class="menu_dropdown_shortcut"[^>]*>⌃⌘7<\/span>/);
+  assert.match(src, /id="action_release_clipping_mask"[^>]*>Release\s+<span class="menu_dropdown_shortcut"[^>]*>⌃⌥⌘7<\/span>/);
 });
 
 test('Clipping Mask: placing a raster image over a vector clips image with vector shape (does not disappear)', () => {

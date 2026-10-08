@@ -179,12 +179,12 @@ const menuDefinition = [
 					},
 					{
 						name: 'Original Size',
-						shortcut: 'Ctrl + 1',
+						shortcut: 'Ctrl + Alt + 1',
 						target: 'view/zoom.original'
 					},
 					{
 						name: 'Fit Window',
-						shortcut: 'Ctrl + 0',
+						shortcut: 'Ctrl + Alt + 0',
 						target: 'view/zoom.auto'
 					}
 				]

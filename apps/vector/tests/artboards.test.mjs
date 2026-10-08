@@ -109,7 +109,7 @@ test('Artboard Background uses Appearance Fill swatch + None chip (not a hex tex
   assert.match(src, /setProperty\('background-color'/);
   assert.match(src, /paintArtboardBackgroundChip\(bg/);
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-artboards\.js\?v=artboard-bg-2/);
+  assert.match(html, /visteras-artboards\.js\?v=artboard-bg-3/);
 });
 
 

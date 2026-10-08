@@ -8,6 +8,7 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Helper_class from './../../libs/helpers.js';
 import View_ruler_class from './../../modules/view/ruler.js';
+import { eventMatchesDigitChord } from './../../libs/browser_shortcuts.js';
 
 export const BRUSH_SIZE_STEPS = [
 	1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -234,9 +235,9 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Ctrl/Cmd + 0 = Fit window
-			if ((event.ctrlKey || event.metaKey) && !event.altKey
-				&& (event.code === 'Digit0' || event.code === 'Numpad0')) {
+			// Browser-safe zoom (bare Cmd/Ctrl+0/1 are reserved by Chrome for zoom/tabs)
+			const isMacOS = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesDigitChord(event, { meta: true, key: '0' }, isMacOS) && !event.altKey && !event.shiftKey) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.GUI_preview) {
@@ -244,10 +245,7 @@ class GUI_shortcuts_class {
 				}
 				return;
 			}
-
-			// Ctrl/Cmd + 1 = 100% Zoom (Actual size)
-			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
-				&& (event.code === 'Digit1' || event.code === 'Numpad1' || event.key === '1')) {
+			if (eventMatchesDigitChord(event, { meta: true, key: '1' }, isMacOS)) {
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.modules && app.GUI.modules['view/zoom']) {
@@ -271,7 +269,7 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Ctrl/Cmd + Shift + 4 = Toggle logo easter egg
+			// Ctrl/Cmd + Shift + 4 = Toggle logo easter egg (may conflict with macOS screenshot ⌘⇧4 — leave as soft easter egg)
 			const hasCmdCtrlSuper = event.ctrlKey || event.metaKey || this.is_meta_down || this.is_ctrl_down;
 			const hasShift = event.shiftKey;
 			const isDigit4 = event.code === 'Digit4' || event.code === 'Numpad4'

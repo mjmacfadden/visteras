@@ -1,9 +1,12 @@
 /**
- * Visteras Vector — Object ▸ Lock / Unlock All (⌘2 / ⌥⌘2) and Hide / Show All
- * (⌘3 / ⌥⌘3), Illustrator behaviour. Reuses data-visteras-locked (Layers panel
+ * Visteras Vector — Object ▸ Lock / Unlock All (⌃⌘2 / ⌃⌥⌘2) and Hide / Show All
+ * (⌃⌘3 / ⌃⌥⌘3). Browser-safe (bare ⌘2/3 switch Chrome tabs). Reuses data-visteras-locked (Layers panel
  * lock icon) so canvas picking already ignores locked objects. Unlock All
  * unlocks every locked object and selects them. Undoable.
  */
+
+import { eventMatchesChord } from './visteras-browser-shortcuts.js';
+
 export const LOCK_ATTR = 'data-visteras-locked';
 export const HIDE_ATTR = 'data-visteras-hidden';
 export const POINTER_SAVE = 'data-visteras-pointer-events';
@@ -153,14 +156,25 @@ export function mountObjectLock(editor) {
   document.getElementById('action_show_all')?.addEventListener('click', onShow);
 
   document.addEventListener('keydown', (e) => {
-    if (!(e.metaKey || e.ctrlKey) || e.code !== 'Digit2' && e.code !== 'Digit3') return;
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase())) return;
-    if (e.code === 'Digit2') {
+    if (eventMatchesChord(e, { meta: true, key: '2' })) {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (e.altKey) onUnlock(); else onLock();
-    } else if (e.code === 'Digit3') {
+      onLock();
+      return;
+    }
+    if (eventMatchesChord(e, { meta: true, alt: true, key: '2' })) {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (e.altKey) onShow(); else onHide();
+      onUnlock();
+      return;
+    }
+    if (eventMatchesChord(e, { meta: true, key: '3' })) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      onHide();
+      return;
+    }
+    if (eventMatchesChord(e, { meta: true, alt: true, key: '3' })) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      onShow();
     }
   }, true);
 
