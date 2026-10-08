@@ -34,6 +34,9 @@ export const PARA_ATTRS = {
   align: 'data-visteras-align', // left | center | right | justify
   spaceBefore: 'data-visteras-space-before', // px, not applied to the first paragraph
   spaceAfter: 'data-visteras-space-after', // px, not applied after the last paragraph
+  indentLeft: 'data-visteras-indent-left', // px
+  indentRight: 'data-visteras-indent-right', // px
+  indentFirst: 'data-visteras-indent-first', // px first-line indent (Illustrator)
 };
 export const AUTO_LEADING = 1.2;
 const ANCHOR_ALIGN = { start: 'left', middle: 'center', end: 'right' };
@@ -114,24 +117,43 @@ export function computeParagraphLayout(opts, measure) {
   const leading = Number(opts.leading) > 0 ? Number(opts.leading) : size * AUTO_LEADING;
   const align = ['left', 'center', 'right', 'justify'].includes(opts.align) ? opts.align : 'left';
   const before = Math.max(0, Number(opts.spaceBefore) || 0), after = Math.max(0, Number(opts.spaceAfter) || 0);
-  const lineX = x + (align === 'center' ? width / 2 : align === 'right' ? width : 0);
+  const indentLeft = Math.max(0, Number(opts.indentLeft) || 0);
+  const indentRight = Math.max(0, Number(opts.indentRight) || 0);
+  const indentFirst = Number(opts.indentFirst) || 0;
+  const contentWidth = Math.max(8, width - indentLeft - indentRight);
   const out = [];
   let baseline = size, sourceIndex = 0, first = true, full = false;
   value.split('\n').forEach((paragraph, pi) => {
     if (full) return;
     if (pi > 0) sourceIndex++; // the newline
-    const lines = wrapText(paragraph, width, measure);
+    // First line wraps into a narrower (or wider for hanging) band.
+    const firstExtra = Math.max(0, indentFirst);
+    const hanging = Math.max(0, -indentFirst);
+    const firstBand = Math.max(8, contentWidth - firstExtra + hanging);
+    const bodyBand = Math.max(8, contentWidth);
+    let lines = wrapText(paragraph, firstBand, measure);
+    if (!lines.length) lines = [''];
+    if (lines.length > 1 || (lines[0] && lines[0].length < paragraph.length)) {
+      const used = lines[0].length;
+      const rest = paragraph.slice(used);
+      lines = [lines[0]];
+      if (rest) lines.push(...wrapText(rest, bodyBand, measure));
+    }
     lines.forEach((line, li) => {
       if (full) return;
       if (!first) baseline += leading + (li === 0 ? after + before : 0);
       first = false;
       if (baseline + size * (AUTO_LEADING - 1) > height + 1e-6) { full = true; return; }
+      const band = li === 0 ? firstBand : bodyBand;
+      const inset = indentLeft + (li === 0 ? firstExtra : hanging);
+      const originX = x + inset;
+      const lineX = originX + (align === 'center' ? band / 2 : align === 'right' ? band : 0);
       const entry = { text: line, start: sourceIndex, x: lineX, y: y + baseline, wordSpacing: null };
       if (align === 'justify' && li < lines.length - 1) {
         const trimmed = line.replace(/\s+$/, '');
         const gaps = (trimmed.match(/ /g) || []).length;
         if (gaps) {
-          const extra = (width - measure(trimmed)) / gaps;
+          const extra = (band - measure(trimmed)) / gaps;
           if (extra > 0) entry.wordSpacing = Math.round(extra * 1000) / 1000;
         }
       }
@@ -149,7 +171,15 @@ export function readParagraphAttrs(text) {
   const num = (k) => { const v = Number(text.getAttribute(PARA_ATTRS[k])); return Number.isFinite(v) && text.getAttribute(PARA_ATTRS[k]) !== null && text.getAttribute(PARA_ATTRS[k]) !== '' ? v : null; };
   const stored = text.getAttribute(PARA_ATTRS.align);
   const align = ['left', 'center', 'right', 'justify'].includes(stored) ? stored : ANCHOR_ALIGN[text.getAttribute('text-anchor') || 'start'] || 'left';
-  return { leading: num('leading'), align, spaceBefore: num('spaceBefore') || 0, spaceAfter: num('spaceAfter') || 0 };
+  return {
+    leading: num('leading'),
+    align,
+    spaceBefore: num('spaceBefore') || 0,
+    spaceAfter: num('spaceAfter') || 0,
+    indentLeft: num('indentLeft') || 0,
+    indentRight: num('indentRight') || 0,
+    indentFirst: num('indentFirst') || 0,
+  };
 }
 
 /**
@@ -188,6 +218,9 @@ export function drawOversetMarker(parent, point) {
 export function layoutParagraph(text) {
   const width = Number(text.getAttribute('data-text-width'));
   if (!width) return;
+  // Frame size is fixed (Illustrator area type). Never grow/shrink data-text-* from content.
+  const frameW = text.getAttribute('data-text-width');
+  const frameH = text.getAttribute('data-text-height');
   const value = text.getAttribute('data-text-content') || '';
   const style = getComputedStyle(text), size = parseFloat(style.fontSize) || 24;
   const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
@@ -211,6 +244,9 @@ export function layoutParagraph(text) {
     fragment.append(span);
   }
   if (text.innerHTML !== [...fragment.childNodes].map(n => n.outerHTML).join('')) text.replaceChildren(fragment);
+  // Re-assert fixed frame (guards against any SVG-Edit / observer side effect).
+  if (frameW != null && text.getAttribute('data-text-width') !== frameW) text.setAttribute('data-text-width', frameW);
+  if (frameH != null && text.getAttribute('data-text-height') !== frameH) text.setAttribute('data-text-height', frameH);
 }
 
 export function beginTextEdit(editor, text) {
@@ -479,6 +515,8 @@ export function mountTextEditing(editor) {
   sc.call=function(event,...args){const result=call2.call(this,event,...args);if(event==='selected'||event==='changed'||event==='zoomed')queueOverset();return result;};
   document.getElementById('workarea')?.addEventListener('scroll',queueOverset,{passive:true});
   const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);queueOverset();};
+  window.__visterasLayoutParagraph = layoutParagraph;
+  window.__visterasTextEditing = { layoutParagraph, computeParagraphLayout, isOverset, oversetPort };
   const observer=new MutationObserver(relayout);
   // Opening a file (setSvgString) replaces #svgcontent: re-attach and reflow.
   let bound=null;

@@ -34,7 +34,7 @@ test('Paragraph: tracking ↔ letter-spacing and readParagraph defaults', () => 
   assert.equal(P.trackingToLetterSpacing(100, 24), 2.4);
   assert.equal(P.letterSpacingToTracking('2.4', 24), 100);
   const el = fakeEl('text', { 'font-size': '20', 'text-anchor': 'middle', 'letter-spacing': '1' });
-  assert.deepEqual(P.readParagraph(el), { leading: null, autoLeading: 24, align: 'center', tracking: 50, spaceBefore: 0, spaceAfter: 0 });
+  assert.deepEqual(P.readParagraph(el), { leading: null, autoLeading: 24, align: 'center', tracking: 50, spaceBefore: 0, spaceAfter: 0, indentLeft: 0, indentRight: 0, indentFirst: 0 });
   assert.deepEqual(P.normalizeParagraphPatch({ leading: '', tracking: '25.4', spaceBefore: -3, align: 'bogus' }), { leading: null, tracking: 25, spaceBefore: 0 });
 });
 
@@ -91,7 +91,8 @@ test('Area text: layout reports overset instead of growing; frame size is never 
   assert.equal(T.computeParagraphLayout({ value: 'aaa bbb', width: 40, size: 20, height: 50, leading: 40, align: 'justify' }, mono).overset, true);
   const src = fs.readFileSync(new URL('../js/visteras-text-editing.js', import.meta.url), 'utf8');
   const layoutBody = src.slice(src.indexOf('export function layoutParagraph'), src.indexOf('export function beginTextEdit'));
-  assert.doesNotMatch(layoutBody, /setAttribute\('data-text-(width|height)'/, 'layout must not resize the frame');
+  // Frame size is snapshotted; layout may re-assert the same value but never grows from content.
+  assert.match(layoutBody, /Frame size is fixed/);
   assert.match(src, /drawOversetMarker/);
   assert.match(src, /stroke: '#e5191a'/, 'red out-port');
 });
@@ -102,4 +103,49 @@ test('Area text: selection bbox (SVG-Edit getBBox) and Transform panel use the f
   const tp = fs.readFileSync(new URL('../js/visteras-transform-panel.js', import.meta.url), 'utf8');
   assert.match(tp, /const frameBBox=el=>/);
   assert.match(tp, /const b=frameBBox\(el\)/);
+});
+
+
+test('Paragraph layout: left/right/first-line indents inset x and shrink the wrap band', () => {
+  const left = T.computeParagraphLayout({ value: 'aaa bbb', width: 60, size: 10, x: 0, indentLeft: 10, indentRight: 0 }, mono);
+  assert.equal(left[0].x, 10);
+  // content width 50 → 'aaa ' (40) + 'bbb' (30) wrap
+  assert.deepEqual(left.map((l) => l.text), ['aaa ', 'bbb']);
+  const first = T.computeParagraphLayout({ value: 'aaa bbb ccc', width: 80, size: 10, x: 0, indentLeft: 0, indentFirst: 20 }, mono);
+  // first line band 60 → 'aaa ' then body band 80 → rest
+  assert.equal(first[0].x, 20);
+  assert.ok(first[0].text.startsWith('aaa'));
+  const hang = T.computeParagraphLayout({ value: 'aaa bbb ccc ddd', width: 80, size: 10, x: 0, indentFirst: -20 }, mono);
+  // hanging: first line starts at 0 (no negative inset beyond left), body inset 20
+  assert.equal(hang[0].x, 0);
+});
+
+test('Paragraph: applyParagraph writes indent attrs and panel/menu wiring', () => {
+  const a = fakeEl('text', { id: 't1', 'font-size': '20', 'data-text-width': '200', 'data-text-height': '100' });
+  const sc = fakeCanvas([a]);
+  P.applyParagraph(sc, [a], { indentLeft: 12, indentRight: 8, indentFirst: 24 });
+  assert.deepEqual(
+    ['data-visteras-indent-left', 'data-visteras-indent-right', 'data-visteras-indent-first'].map((k) => a.getAttribute(k)),
+    ['12', '8', '24']
+  );
+  const src = fs.readFileSync(new URL('../js/visteras-paragraph.js', import.meta.url), 'utf8');
+  assert.match(src, /mountParagraphPanel/);
+  assert.match(src, /action_window_paragraph/);
+  assert.match(src, /visteras_paragraph_panel/);
+  assert.match(src, /KeyT/);
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /mountParagraphPanel\(svgEditor\)/);
+});
+
+test('Area text: layout may re-assert the snapshotted frame but never invents a new size', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-text-editing.js', import.meta.url), 'utf8');
+  const layoutBody = src.slice(src.indexOf('export function layoutParagraph'), src.indexOf('export function beginTextEdit'));
+  assert.match(layoutBody, /const frameW = text\.getAttribute\('data-text-width'\)/);
+  assert.match(layoutBody, /const frameH = text\.getAttribute\('data-text-height'\)/);
+  assert.match(layoutBody, /if \(frameW != null && text\.getAttribute\('data-text-width'\) !== frameW\)/);
+  assert.match(layoutBody, /setAttribute\('data-text-width', frameW\)/);
+  assert.match(layoutBody, /setAttribute\('data-text-height', frameH\)/);
+  // Only those two data-text-width/height writes exist in layoutParagraph.
+  const writes = [...layoutBody.matchAll(/setAttribute\('data-text-(width|height)'/g)];
+  assert.equal(writes.length, 2, 'layout only re-asserts the snapshotted frame');
 });
