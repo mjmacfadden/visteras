@@ -99,6 +99,53 @@ export function isTextCopyContext(e, doc = (typeof document !== 'undefined' ? do
   return false;
 }
 
+// ─── Copy normalization (Illustrator → Photoshop style) ─────────────────────
+
+const finiteRect = (r) => !!r && [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width >= 0 && r.height >= 0 && (r.width > 0 || r.height > 0);
+
+/** Union of {x,y,width,height} rects; null / empty / non-finite entries are skipped. */
+export function unionRects(rects) {
+  let out = null;
+  for (const r of rects || []) {
+    if (!finiteRect(r)) continue;
+    if (!out) { out = { x: r.x, y: r.y, width: r.width, height: r.height }; continue; }
+    const x = Math.min(out.x, r.x), y = Math.min(out.y, r.y);
+    out = { x, y, width: Math.max(out.x + out.width, r.x + r.width) - x, height: Math.max(out.y + out.height, r.y + r.height) - y };
+  }
+  return out;
+}
+
+/**
+ * Visual bounds of a selection (#svgcontent user units). `boundsOf` is the
+ * effect-aware getVisualBounds, so drop shadows / glows are not clipped.
+ */
+export function selectionVisualBounds(elements, boundsOf) {
+  return unionRects((elements || []).filter(Boolean).map((el) => { try { return boundsOf(el); } catch { return null; } }));
+}
+
+/** Bounds snapped outward to whole pixels (1 user unit = 1 px when pasted into Studio). */
+export function pixelBounds(bounds) {
+  if (!finiteRect(bounds)) return { x: 0, y: 0, width: 100, height: 100 };
+  const x0 = Math.floor(bounds.x + 1e-6), y0 = Math.floor(bounds.y + 1e-6);
+  const x1 = Math.ceil(bounds.x + bounds.width - 1e-6), y1 = Math.ceil(bounds.y + bounds.height - 1e-6);
+  return { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) };
+}
+
+/**
+ * Self-contained SVG for the OS clipboard, normalized to its own bounds: the
+ * selection is wrapped in ONE group translated so its visual bounds start at
+ * 0,0, and width/height/viewBox are the bounds size. The artboard position
+ * stays in data-visteras-origin (informational only).
+ * @param {{parts:string[]|string, defs?:string, bounds:{x:number,y:number,width:number,height:number}|null}} o
+ */
+export function normalizedSvgMarkup({ parts, defs = '', bounds }) {
+  const b = pixelBounds(bounds);
+  const body = Array.isArray(parts) ? parts.join('\n') : String(parts || '');
+  const tx = b.x ? -b.x : 0, ty = b.y ? -b.y : 0;
+  const transform = tx || ty ? ` transform="translate(${tx} ${ty})"` : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
+}
+
 // ─── DOM rendering ───────────────────────────────────────────────────────────
 const SVG_NS = 'http://www.w3.org/2000/svg';
 

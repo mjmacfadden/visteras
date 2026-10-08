@@ -20,7 +20,8 @@
 import {
 	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
-} from './visteras-clipboard-payload.js?v=clipboard-png-1';
+	selectionVisualBounds, normalizedSvgMarkup,
+} from './visteras-clipboard-payload.js?v=clipboard-bridge-2';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
@@ -38,7 +39,7 @@ function extractSvgFromHtml(html) {
 	return m ? m[0] : null;
 }
 
-function serializeSelectedToSvg(svgCanvas, customSelected = null) {
+export function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	if (!svgCanvas) return null;
 	const selected = (customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
 		.filter(Boolean);
@@ -46,7 +47,7 @@ function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 
 	const serializer = new XMLSerializer();
 	const parts = [];
-	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	const copied = [];
 
 	for (const el of selected) {
 		try {
@@ -85,42 +86,32 @@ function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 			} catch (e2) { /* ignore */ }
 
 			parts.push(serializer.serializeToString(clone));
-			if (typeof svgCanvas.getStrokedBBox === 'function') {
-				const bb = svgCanvas.getStrokedBBox([el]);
-				if (bb) {
-					if (bb.x < minX) minX = bb.x;
-					if (bb.y < minY) minY = bb.y;
-					if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
-					if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
-				}
-			} else if (el.getBBox) {
-				const bb = el.getBBox();
-				if (bb) {
-					if (bb.x < minX) minX = bb.x;
-					if (bb.y < minY) minY = bb.y;
-					if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
-					if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
-				}
-			}
+			copied.push(el);
 		} catch (err) {
 			console.warn('serializeSelectedToSvg element failed', err);
 		}
 	}
 
 	if (!parts.length) return null;
-	if (!Number.isFinite(minX)) {
-		minX = 0; minY = 0; maxX = 100; maxY = 100;
-	}
-	const pad = 2;
-	const vbX = minX - pad;
-	const vbY = minY - pad;
-	const vbW = Math.max(1, (maxX - minX) + pad * 2);
-	const vbH = Math.max(1, (maxY - minY) + pad * 2);
+	// Normalize to the selection's own visual bounds (shadows / glows included):
+	// one group translated to 0,0, viewBox 0 0 w h, so the receiving app never
+	// inherits the artboard position (Illustrator -> Photoshop behaviour).
+	const bounds = selectionVisualBounds(copied, (el) => visualBoundsOf(svgCanvas, el));
 
 	// Clip paths, masks and gradients the selection references travel with it.
 	let defs = '';
 	try { defs = referencedDefsMarkup(selected); } catch (e) { defs = ''; }
-	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}" data-visteras-format="1" data-visteras-source="vector">\n${defs ? defs + '\n' : ''}${parts.join('\n')}\n</svg>`;
+	return normalizedSvgMarkup({ parts, defs, bounds });
+}
+
+/** Effect-aware bounds of one element in #svgcontent user units. */
+function visualBoundsOf(svgCanvas, el) {
+	try {
+		const b = window.__visterasEffects?.getVisualBounds?.(el);
+		if (b && b.width >= 0) return b;
+	} catch (e) { /* fall through */ }
+	try { if (typeof svgCanvas.getStrokedBBox === 'function') return svgCanvas.getStrokedBBox([el]); } catch (e) { /* fall through */ }
+	try { const b = el.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height }; } catch (e) { return null; }
 }
 
 async function writeSvgClipboard(svgText) {
