@@ -74,3 +74,16 @@ test('normalize: serializeSelectedToSvg uses effect-aware bounds (window.__viste
     globalThis.window = prevWindow; globalThis.XMLSerializer = prevSer;
   }
 });
+
+test('normalize: Vector origin markers survive clipboard sanitizing (class + copy group + web custom format)', async () => {
+  const svg = normalizedSvgMarkup({ parts: ['<rect/>'], bounds: { x: 2000, y: 0, width: 10, height: 10 } });
+  const root = svg.match(/<svg\b[^>]*>/)[0];
+  assert.match(root, /\sclass="visteras-vector-clip"/);
+  assert.match(root, /data-visteras-source="vector"/);
+  assert.match(svg, /<g data-visteras-copy-group="1"/);
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../js/visteras-clipboard-bridge.js', import.meta.url), 'utf8');
+  assert.match(src, /const CLIP_MIME = 'web application\/x-visteras-clip\+json'/);
+  assert.match(src, /items\[CLIP_MIME\] = Promise\.resolve/, 'rich ClipboardItem carries the Vector side channel');
+  assert.match(src, /source: 'vector', svg: svgText/);
+});

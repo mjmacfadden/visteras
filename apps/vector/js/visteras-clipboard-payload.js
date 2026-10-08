@@ -143,7 +143,9 @@ export function normalizedSvgMarkup({ parts, defs = '', bounds }) {
   const body = Array.isArray(parts) ? parts.join('\n') : String(parts || '');
   const tx = b.x ? -b.x : 0, ty = b.y ? -b.y : 0;
   const transform = tx || ty ? ` transform="translate(${tx} ${ty})"` : '';
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
+  // class="visteras-vector-clip" is a redundant marker that survives Chromium's
+  // image/svg+xml rewrite; Studio accepts the data-attr, the class or the copy group.
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="visteras-vector-clip" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
 }
 
 // ─── DOM rendering ───────────────────────────────────────────────────────────

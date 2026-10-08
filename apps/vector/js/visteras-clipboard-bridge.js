@@ -21,10 +21,11 @@ import {
 	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
 	selectionVisualBounds, normalizedSvgMarkup,
-} from './visteras-clipboard-payload.js?v=clipboard-bridge-2';
+} from './visteras-clipboard-payload.js?v=clipboard-bridge-3';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
+const CLIP_MIME = 'web application/x-visteras-clip+json';
 const CHANNEL = 'visteras-vector-clip';
 
 function looksLikeSvg(text) {
@@ -114,6 +115,11 @@ function visualBoundsOf(svgCanvas, el) {
 	try { const b = el.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height }; } catch (e) { return null; }
 }
 
+/** Web custom format payload: tells Studio the clipboard SVG came from Vector. */
+function clipJson(svgText) {
+	return JSON.stringify({ format: 'visteras-clip', source: 'vector', svg: svgText });
+}
+
 async function writeSvgClipboard(svgText) {
 	if (!svgText) return false;
 	try {
@@ -122,10 +128,12 @@ async function writeSvgClipboard(svgText) {
 				await navigator.clipboard.write([new ClipboardItem(items)]);
 			};
 			try {
-				await tryWrite({
+				const items = {
 					[SVG_MIME]: new Blob([svgText], { type: SVG_MIME }),
 					'text/plain': new Blob([svgText], { type: 'text/plain' })
-				});
+				};
+				if (clipboardSupports()(CLIP_MIME)) items[CLIP_MIME] = new Blob([clipJson(svgText)], { type: CLIP_MIME });
+				await tryWrite(items);
 				return true;
 			} catch (e) {
 				await tryWrite({
@@ -169,7 +177,13 @@ function writeRichClipboard(selected, svgText) {
 			try { createImageBitmap(blob).then((bmp) => { own.w = bmp.width; own.h = bmp.height; bmp.close?.(); }).catch(() => {}); } catch (e) { /* ignore */ }
 			return blob;
 		});
-		const { types, items } = buildClipboardItems({ kind, svgText, png, supports: clipboardSupports() });
+		const supports = clipboardSupports();
+		const { types, items } = buildClipboardItems({ kind, svgText, png, supports });
+		// Vector-origin side channel Chromium never sanitizes (web custom format).
+		if (svgText && supports(CLIP_MIME)) {
+			items[CLIP_MIME] = Promise.resolve(new Blob([clipJson(svgText)], { type: CLIP_MIME }));
+			types.push(CLIP_MIME);
+		}
 		state.types = types;
 		// Keep the promises from surfacing as unhandled when the write is refused.
 		for (const v of Object.values(items)) v.catch(() => {});
@@ -325,7 +339,7 @@ export function installVisterasClipboardBridge(opts = {}) {
 				e.clipboardData.setData(SVG_MIME, svgText);
 				e.clipboardData.setData('text/plain', svgText);
 				e.clipboardData.setData('text/html', svgText);
-				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, svg: svgText }));
+				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, source: 'vector', svg: svgText }));
 				e.preventDefault();
 			} catch (err) {
 				console.warn('e.clipboardData.setData error:', err);

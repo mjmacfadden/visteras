@@ -7,11 +7,59 @@
  * unit tests can load this file in a vm context.
  */
 
-/** True for the clipboard SVG written by Vector's copy bridge. */
+/**
+ * True for the clipboard SVG written by Vector's copy bridge. Any of three
+ * markers counts, so one surviving a clipboard sanitizer is enough: the root
+ * data-visteras-source="vector", the root class "visteras-vector-clip", or
+ * Vector's normalized copy group (data-visteras-copy-group).
+ */
 export function is_visteras_vector_svg(svgText) {
 	if (!svgText || typeof svgText !== 'string') return false;
 	const m = svgText.match(/<svg\b[^>]*>/i);
-	return !!m && /\bdata-visteras-source\s*=\s*["']vector["']/i.test(m[0]);
+	if (!m) return false;
+	if (/\bdata-visteras-source\s*=\s*["']vector["']/i.test(m[0])) return true;
+	const cls = m[0].match(/\sclass\s*=\s*["']([^"']*)["']/i);
+	if (cls && /(^|\s)visteras-vector-clip(\s|$)/.test(cls[1])) return true;
+	return /<g\b[^>]*\bdata-visteras-copy-group\s*=/i.test(svgText);
+}
+
+/** Add the Vector marker to an SVG root (when only a side channel said it came from Vector). */
+export function mark_vector_svg(svgText) {
+	if (!svgText || is_visteras_vector_svg(svgText)) return svgText;
+	return String(svgText).replace(/<svg\b/i, '<svg data-visteras-source="vector"');
+}
+
+/**
+ * Pick the SVG to paste from every clipboard representation. text/plain is
+ * preferred (browsers never sanitize it; Chrome re-serializes image/svg+xml and
+ * hides it from paste events). Any Vector-marked representation wins, and a
+ * Vector side channel (web custom format / JSON with source "vector") marks the
+ * pick, so a Vector copy always reaches the smart-object paste.
+ * @param {{plain?:string, svg?:string, html?:string, json?:string|string[]}} reps
+ * @returns {string|null}
+ */
+export function pick_clipboard_svg({ plain = '', svg = '', html = '', json = [] } = {}) {
+	const extract = (t) => {
+		if (!t || typeof t !== 'string') return null;
+		const m = t.match(/<svg[\s\S]*<\/svg>/i);
+		return m ? m[0] : null;
+	};
+	const cands = [plain, svg, html].map(extract).filter(Boolean);
+	let from_vector = false;
+	for (const text of [].concat(json || [])) {
+		if (!text) continue;
+		try {
+			const d = JSON.parse(text);
+			if (!d) continue;
+			if (d.source === 'vector') from_vector = true;
+			const inner = extract(d.svg);
+			if (inner) cands.push(inner);
+		} catch (e) { /* not JSON */ }
+	}
+	const marked = cands.find(is_visteras_vector_svg);
+	if (marked) return marked;
+	if (!cands.length) return null;
+	return from_vector ? mark_vector_svg(cands[0]) : cands[0];
 }
 
 /** Pixel size of an SVG document: width/height attributes, else the viewBox. */

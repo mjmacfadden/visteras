@@ -130,3 +130,47 @@ test('Studio paste: Studio-origin / foreign SVG still pastes as editable vector 
 	assert.equal(actions[0].kind, 'bundle');
 	assert.equal(actions[0].list.every((a) => a.kind === 'vector'), true);
 });
+
+// Chromium rewrites image/svg+xml on the clipboard (prolog → comment, HTML serialization) and
+// hides it from paste events; text/plain stays raw. Vector content must route to the smart
+// object whichever representation survives.
+const SANITIZED = '<!--?xml version="1.0" encoding="UTF-8"?--><svg xmlns="http://www.w3.org/2000/svg" class="visteras-vector-clip" viewBox="0 0 300 120" width="300" height="120"><g data-visteras-copy-group="1" transform="translate(-2000 -40)"><rect x="2000" y="40" width="80" height="80"></rect></g></svg>';
+
+test('vector-paste: Vector marker survives sanitizing (class / copy group), Studio SVG does not match', () => {
+	assert.equal(lib.is_visteras_vector_svg(SANITIZED), true, 'data-* stripped, class + copy group remain');
+	assert.equal(lib.is_visteras_vector_svg(SANITIZED.replace(' class="visteras-vector-clip"', '')), true, 'copy group alone');
+	assert.equal(lib.is_visteras_vector_svg('<svg class="other visteras-vector-clip x"><path/></svg>'), true);
+	assert.equal(lib.is_visteras_vector_svg('<svg data-visteras-format="1"><g data-visteras-vector-name="a"><path/></g></svg>'), false);
+});
+
+test('vector-paste: pick_clipboard_svg prefers raw text/plain and any Vector-marked representation', () => {
+	assert.equal(lib.pick_clipboard_svg({ plain: VECTOR_SVG, svg: SANITIZED }), VECTOR_SVG.match(/<svg[\s\S]*<\/svg>/)[0], 'text/plain wins');
+	assert.equal(lib.pick_clipboard_svg({ svg: SANITIZED }), SANITIZED.slice(SANITIZED.indexOf('<svg')), 'sanitized SVG alone still routes');
+	const plainStudio = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>';
+	assert.equal(lib.pick_clipboard_svg({ plain: plainStudio, svg: SANITIZED }), SANITIZED.slice(SANITIZED.indexOf('<svg')), 'marked representation beats an unmarked one');
+	const marked = lib.pick_clipboard_svg({ svg: plainStudio, json: ['{"format":"visteras-clip","source":"vector"}'] });
+	assert.equal(lib.is_visteras_vector_svg(marked), true, 'web custom format says Vector → marked');
+	assert.equal(lib.is_visteras_vector_svg(lib.pick_clipboard_svg({ plain: plainStudio })), false, 'foreign SVG stays unmarked');
+	assert.equal(lib.pick_clipboard_svg({ json: ['{"source":"vector","svg":' + JSON.stringify(VECTOR_SVG) + '}'] }) !== null, true, 'SVG carried in the JSON side channel');
+	assert.equal(lib.pick_clipboard_svg({ plain: 'hello' }), null);
+	assert.equal(lib.pick_clipboard_svg(), null);
+});
+
+test('Studio paste: a sanitized Vector SVG (data-* stripped) still lands as ONE smart layer', async () => {
+	const { paste, actions } = loadPaste();
+	assert.equal(await paste.paste_svg_text(SANITIZED), true);
+	assert.equal(actions.length, 1);
+	const inserts = actions[0].list.filter((a) => a.kind === 'insert');
+	assert.equal(inserts.length, 1);
+	assert.equal(inserts[0].settings.type, 'smart');
+	assert.deepEqual([inserts[0].settings.width, inserts[0].settings.height], [300, 120]);
+});
+
+test('Studio clipboard read: paste event uses synchronous getData (DataTransfer dies after the event)', () => {
+	const src = fs.readFileSync(require.resolve('../src/js/core/vector/vector-svg.js'), 'utf8');
+	const fn = src.slice(src.indexOf('export async function read_svg_from_clipboard_event'), src.indexOf('export function get_vector_clip_channel'));
+	assert.ok(!/getAsString/.test(fn), 'no async getAsString');
+	assert.match(fn, /pick_clipboard_svg\(/, 'all representations go through pick_clipboard_svg');
+	const sw = fs.readFileSync(require.resolve('../service-worker.js'), 'utf8');
+	assert.match(sw, /visteras-studio-shell-v9[4-9]|visteras-studio-shell-v\d{3,}/, 'service worker cache bumped for the paste fix');
+});
