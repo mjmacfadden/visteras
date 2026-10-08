@@ -22,12 +22,12 @@ const shapeBuilderJsPath = path.resolve(vectorRoot, 'js/visteras-shape-builder.j
 
 test('HTML: index.html includes visteras-panel-dock.css stylesheet', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-3"[^>]*>/);
+  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-4"[^>]*>/);
 });
 
 test('HTML: index.html imports and mounts visteras-panel-dock', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-3';/);
+  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-4';/);
   assert.match(html, /mountVisterasColorSystem\(\{\s*svgEditor\s*\}\);[\s\S]*?mountVisterasPanelDock\(\{\s*svgEditor\s*\}\);/);
 });
 
