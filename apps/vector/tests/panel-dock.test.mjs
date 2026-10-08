@@ -513,7 +513,7 @@ test('Panel Dock: mounts #vdock strip and #vdock_flyout with the shared panel gr
   // Verify every dock panel icon in the strip
   const icons = vdock.querySelectorAll('.vdock-icon');
   const panels = icons.map(i => i.dataset.panel);
-  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers']);
+  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers']);
 
   // Verify flyout exists
   const flyout = env.doc.getElementById('vdock_flyout');
