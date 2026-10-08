@@ -5,9 +5,23 @@ import {
   isSystemFontFamily,
 } from './visteras-font-bridge.js';
 import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
+import {
+  isLocIiifUrl,
+  planLocPrintRequest,
+  fetchLocPrintObjectUrl,
+  createLocHiResCache,
+  releaseLocHiResBlobs,
+  exportFramingMode,
+  snapshotImgFraming,
+  restoreImgFraming,
+  applyFillTileFraming,
+} from './loc-iiif.js';
 
 (function() {
   'use strict';
+
+  // Session-only LoC IIIF hi-res cache (info.json + blob object URLs). Not persisted.
+  const locHiResCache = createLocHiResCache();
 
   // --- Available Pixabay Color Options ---
   const COLOR_OPTIONS = [
@@ -1543,6 +1557,8 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
             const jpgs = item.image_url.filter(u => typeof u === 'string' && u.includes('.jpg'));
             if (jpgs.length === 0) continue;
 
+            // Preview thumbnails stay small. largePath is often IIIF full/pct:12.5
+            // (~640px); downloadJpg/printCollage upgrade LoC IIIF via loc-iiif.js.
             const preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
             const large = jpgs[jpgs.length - 1].split('#')[0];
 
@@ -2115,6 +2131,130 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
   }
 
   // --- High-Resolution Download & Print ---
+  function findItemDataForImg(img) {
+    if (!img || !Array.isArray(state.items)) return null;
+    const large = img.dataset.largeSrc || '';
+    const src = img.currentSrc || img.src || '';
+    return state.items.find((it) => {
+      const p = it?.image?.path || '';
+      const l = it?.image?.largePath || '';
+      if (!p && !l) return false;
+      return (l && (large === l || src === l)) || (p && (src === p || large === p || src.endsWith(p) || large.endsWith(p)));
+    }) || null;
+  }
+
+  /**
+   * For LoC IIIF tiles, upgrade img.src to a print-sized (region-capped) fetch.
+   * Non-LoC tiles keep the existing largeSrc swap. Failures fall back silently
+   * (caller may toast once). Returns { restored: fn, fellBack: bool }.
+   */
+  async function prepareImagesForPrintExport(imgs, { exportScale = 3 } = {}) {
+    const framingSnaps = [];
+    const objectUrlsToIgnore = new Set(); // owned by session cache; do not revoke here
+    let fellBack = false;
+
+    for (let idx = 0; idx < imgs.length; idx++) {
+      const img = imgs[idx];
+      framingSnaps[idx] = snapshotImgFraming(img);
+      const candidate = img.dataset.largeSrc || img.src;
+      if (!isLocIiifUrl(candidate) && !isLocIiifUrl(img.src)) {
+        if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
+        continue;
+      }
+      const url = isLocIiifUrl(candidate) ? candidate : img.src;
+      const tile = img.closest('.collage-item');
+      const itemData = findItemDataForImg(img);
+      const tw = tile?.clientWidth || 0;
+      const th = tile?.clientHeight || 0;
+      // Capture preview natural size BEFORE swapping src (needed for cover-transform)
+      const previewNW = img.naturalWidth || 0;
+      const previewNH = img.naturalHeight || 0;
+      try {
+        const plan = await planLocPrintRequest({
+          url,
+          tileW: tw,
+          tileH: th,
+          naturalW: previewNW,
+          naturalH: previewNH,
+          zoom: itemData ? (parseFloat(itemData.zoom) || 1) : 1,
+          panX: itemData ? (parseFloat(itemData.panX) || 0) : 0,
+          panY: itemData ? (parseFloat(itemData.panY) || 0) : 0,
+          exportScale,
+          cache: locHiResCache,
+          timeoutMs: 45000,
+        });
+        if (!plan.upgraded) {
+          if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
+          continue;
+        }
+        const entry = await fetchLocPrintObjectUrl(plan, {
+          cache: locHiResCache,
+          timeoutMs: 45000,
+        });
+        objectUrlsToIgnore.add(entry.objectUrl);
+        const mode = exportFramingMode(plan);
+        // Disable Collage onload (updateTileTransform) while we apply export framing —
+        // otherwise a region-cropped image gets pan/zoom applied again (double crop).
+        img.onload = null;
+        // Wait for the hi-res decode before html2canvas / print
+        await new Promise((resolve, reject) => {
+          const onLoad = () => { cleanup(); resolve(); };
+          const onErr = () => { cleanup(); reject(new Error('hi-res image decode failed')); };
+          const cleanup = () => {
+            img.removeEventListener('load', onLoad);
+            img.removeEventListener('error', onErr);
+          };
+          img.addEventListener('load', onLoad);
+          img.addEventListener('error', onErr);
+          img.crossOrigin = 'anonymous';
+          img.src = entry.objectUrl;
+          if (img.complete && img.naturalWidth > 0) {
+            cleanup();
+            resolve();
+          }
+        });
+        if (mode === 'fill-tile' && tw > 0 && th > 0) {
+          // Region request already IS the on-screen crop — fill the tile, no pan/zoom.
+          applyFillTileFraming(img, tw, th);
+        } else if (itemData && tile) {
+          // Full-image upgrade: same cover+pan+zoom math at higher resolution.
+          updateTileTransform(img, itemData, tile);
+        }
+      } catch (err) {
+        console.warn('LoC full-res fetch failed; using preview largePath:', err);
+        fellBack = true;
+        if (framingSnaps[idx]) restoreImgFraming(img, framingSnaps[idx]);
+        if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
+      }
+    }
+
+    return {
+      fellBack,
+      restore() {
+        imgs.forEach((img, idx) => {
+          const snap = framingSnaps[idx];
+          if (!snap) return;
+          restoreImgFraming(img, snap);
+          if (snap.src != null) img.src = snap.src;
+          // Re-apply cover+pan+zoom from current item state after src restores
+          const tile = img.closest('.collage-item');
+          const itemData = findItemDataForImg(img);
+          if (tile && itemData) {
+            const finish = () => updateTileTransform(img, itemData, tile);
+            if (img.complete && img.naturalWidth > 0) finish();
+            else {
+              img.onload = () => {
+                finish();
+                // restore original onload after one shot
+                img.onload = snap.onload;
+              };
+            }
+          }
+        });
+      },
+    };
+  }
+
   async function downloadJpg() {
     if (!el.letterPage || typeof html2canvas === 'undefined') {
       showToast('Export engine loading...');
@@ -2122,6 +2262,7 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
     }
 
     showToast('Rendering high-res 300 DPI sheet...');
+    let restore = null;
     try {
       if (state.textOverlay && state.textOverlay.content && state.textOverlay.fontFamily) {
         try {
@@ -2132,13 +2273,12 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
         } catch (_) {}
       }
 
-      // Temporarily swap images to high-res large URLs for pristine 300 DPI rasterization
       const imgs = el.container.querySelectorAll('img');
-      const originalSrcs = [];
-      imgs.forEach((img, idx) => {
-        originalSrcs[idx] = img.src;
-        if (img.dataset.largeSrc) img.src = img.dataset.largeSrc;
-      });
+      const prep = await prepareImagesForPrintExport(imgs, { exportScale: 3 });
+      restore = prep.restore;
+      if (prep.fellBack) {
+        showToast('Some Library of Congress images used preview resolution (full-res unavailable).');
+      }
 
       const savedTransform = el.viewport.style.transform;
       el.viewport.style.transform = 'none';
@@ -2151,7 +2291,8 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       });
 
       el.viewport.style.transform = savedTransform;
-      imgs.forEach((img, idx) => { img.src = originalSrcs[idx]; });
+      if (restore) restore();
+      restore = null;
 
       const link = document.createElement('a');
       link.download = `visteras-collage-${Date.now()}.jpg`;
@@ -2160,12 +2301,34 @@ import { initLogoEasterEgg } from '../lib/visteras-ui/easter-egg.js';
       showToast('Collage sheet exported successfully.');
     } catch (err) {
       console.error('Export failed:', err);
+      if (restore) restore();
       showToast('Export failed. Check console for details.');
     }
   }
 
-  function printCollage() {
-    window.print();
+  async function printCollage() {
+    const imgs = el.container ? el.container.querySelectorAll('img') : [];
+    let restore = null;
+    try {
+      showToast('Preparing print-quality Library of Congress images…');
+      const prep = await prepareImagesForPrintExport(imgs, { exportScale: 3 });
+      restore = prep.restore;
+      if (prep.fellBack) {
+        showToast('Some Library of Congress images used preview resolution (full-res unavailable).');
+      }
+      const cleanup = () => {
+        if (restore) { restore(); restore = null; }
+        window.removeEventListener('afterprint', cleanup);
+      };
+      window.addEventListener('afterprint', cleanup);
+      // Safety restore if afterprint never fires (some browsers)
+      setTimeout(cleanup, 120000);
+      window.print();
+    } catch (err) {
+      console.error('Print prep failed:', err);
+      if (restore) restore();
+      window.print();
+    }
   }
 
   // --- Saved Collages Manager ---
