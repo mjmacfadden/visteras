@@ -1,5 +1,35 @@
 import {normalizeArtboards,artboardId,nextArtboardName,artboardState,artboardUnion,associatedArtboard,nearbyArtboard,ArtboardCommand} from './visteras-artboard-model.js';
 
+/**
+ * Paint the Properties ▸ Artboard Background chip.
+ * `.vcs-appearance-chip { background: #ccc !important }` beats a normal inline
+ * style — same trap as Appearance Fill/Stroke — so we set background-color with
+ * !important (mirrors color-system paintWell).
+ */
+export function paintArtboardBackgroundChip(bg, noneBtn, backgroundColor) {
+  if (!bg) return;
+  const isNone = backgroundColor === 'none';
+  bg.classList.toggle('is-none', isNone);
+  bg.textContent = '';
+  bg.removeAttribute('data-hex');
+  if (isNone) {
+    bg.style.removeProperty('background-color');
+    bg.style.removeProperty('background-image');
+    bg.title = 'Artboard background: None';
+  } else {
+    const color = backgroundColor || '#ffffff';
+    bg.style.setProperty('background-color', color, 'important');
+    bg.style.removeProperty('background-image');
+    bg.dataset.hex = color;
+    bg.title = `Artboard background: ${color}`;
+  }
+  if (noneBtn) {
+    noneBtn.classList.toggle('is-active', isNone);
+    noneBtn.setAttribute('aria-pressed', String(isNone));
+  }
+}
+
+
 /** Artboards live on the document, not in svgcontent. The editor-only background
  * group is a sibling of svgcontent; it never enters Layers or saved SVG artwork. */
 export function mountArtboards(editor) {
@@ -57,11 +87,11 @@ export function mountArtboards(editor) {
   function layout(){if(layingOut||gesture||draw)return;layingOut=true;try{const c=sc.getSvgContent(),z=sc.getZoom(),work=document.getElementById('workarea'),host=document.getElementById('svgcanvas');if(!c||!work||!host)return;const u=artboardUnion([...doc().artboards,...artwork().map(bounds).filter(Boolean)]);if(!u)return;const pad=600;const baseW=sc.contentW||sc.getResolution?.()?.w||800,baseH=sc.contentH||sc.getResolution?.()?.h||600;const halfW=Math.max(baseW/2-u.x,u.x+u.width-baseW/2)+pad,halfH=Math.max(baseH/2-u.y,u.y+u.height-baseH/2)+pad;const w=Math.max(work.clientWidth,halfW*2*z),h=Math.max(work.clientHeight,halfH*2*z);const oldX=Number(c.getAttribute('x'))||0,oldY=Number(c.getAttribute('y'))||0;host.style.width=`${w}px`;host.style.height=`${h}px`;work.style.overflow='auto';const offset=sc.updateCanvas(w,h);if(offset){work.scrollLeft+=offset.x-oldX;work.scrollTop+=offset.y-oldY;}c.style.overflow='visible';renderBoards();}finally{layingOut=false;}}
   function fit(all=false){const r=all?artboardUnion(doc().artboards):active(),work=document.getElementById('workarea');if(!r||!work)return;const z=Math.max(.01,Math.min(64,(work.clientWidth-64)/r.width,(work.clientHeight-64)/r.height));sc.setZoom(z);editor.updateCanvas(false);const c=sc.getSvgContent();work.scrollLeft=Number(c.getAttribute('x'))+(r.x+r.width/2)*z-work.clientWidth/2;work.scrollTop=Number(c.getAttribute('y'))+(r.y+r.height/2)*z-work.clientHeight/2;shell.updateStatusBar();}
   // Reuse the existing Transform section and its reference point / size fields.
-  const props=document.createElement('section');props.id='visteras-artboard-properties';props.className='prop_section';props.innerHTML='<div class="prop_section_header">Artboard</div><div class="prop_section_body"><label>Name <input id="vab_name" aria-label="Artboard name"></label><label>Background <button id="vab_background" type="button" aria-label="Artboard background"></button><button id="vab_none" type="button" title="Transparent background">None</button></label><label><input id="vab_move_art" type="checkbox" checked> Move artwork with artboard</label></div>';
+  const props=document.createElement('section');props.id='visteras-artboard-properties';props.className='prop_section';props.innerHTML='<div class="prop_section_header">Artboard</div><div class="prop_section_body"><label>Name <input id="vab_name" aria-label="Artboard name"></label><div class="vcs-appearance-row vab-background-row" data-target="artboard-bg"><span class="vab-bg-label">Background</span><button type="button" class="vcs-appearance-chip" id="vab_background" title="Artboard background" aria-label="Artboard background"></button><button type="button" class="vcs-appearance-none" id="vab_none" title="Transparent background (None)" aria-label="Transparent background" aria-pressed="false">⌀</button></div><label><input id="vab_move_art" type="checkbox" checked> Move artwork with artboard</label></div>';
   document.getElementById('properties_panel')?.append(props);
   const transformSection=document.getElementById('sec_transform'),transformHome=transformSection?.parentNode,transformNext=transformSection?.nextSibling;
   const propertyMode=()=>tool()||!sc.getSelectedElements().filter(Boolean).length;
-  function syncProperties(){const b=active(),show=propertyMode();props.hidden=!show;const empty=document.getElementById('prop_empty_state');if(empty)empty.style.display='none';if(show&&transformSection){props.append(transformSection);transformSection.style.display='';}else if(transformSection&&transformSection.parentNode===props&&transformHome)transformHome.insertBefore(transformSection,transformNext);const name=props.querySelector('#vab_name');if(b&&document.activeElement!==name)name.value=b.name;const bg=props.querySelector('#vab_background');if(b&&bg){bg.style.background=b.backgroundColor==='none'?'transparent':b.backgroundColor;bg.textContent=b.backgroundColor==='none'?'Transparent':b.backgroundColor;}const rot=document.getElementById('prop_row_rotate_flip');if(rot){rot.hidden=show;rot.style.setProperty('display',show?'none':'grid','important');}window.dispatchEvent(new CustomEvent('visteras:artboard-properties'));}
+  function syncProperties(){const b=active(),show=propertyMode();props.hidden=!show;const empty=document.getElementById('prop_empty_state');if(empty)empty.style.display='none';if(show&&transformSection){props.append(transformSection);transformSection.style.display='';}else if(transformSection&&transformSection.parentNode===props&&transformHome)transformHome.insertBefore(transformSection,transformNext);const name=props.querySelector('#vab_name');if(b&&document.activeElement!==name)name.value=b.name;const bg=props.querySelector('#vab_background'),noneBtn=props.querySelector('#vab_none');if(b&&bg)paintArtboardBackgroundChip(bg,noneBtn,b.backgroundColor);const rot=document.getElementById('prop_row_rotate_flip');if(rot){rot.hidden=show;rot.style.setProperty('display',show?'none':'grid','important');}window.dispatchEvent(new CustomEvent('visteras:artboard-properties'));}
   props.querySelector('#vab_name').addEventListener('change',e=>edit({name:e.target.value.trim()||active().name},'Rename artboard'));
   props.querySelector('#vab_move_art').addEventListener('change',e=>moveArtwork=e.target.checked);
   props.querySelector('#vab_none').addEventListener('click',()=>edit({backgroundColor:'none'},'Artboard background'));
@@ -87,7 +117,7 @@ export function mountArtboards(editor) {
   document.getElementById('action_fit_all_artboards')?.addEventListener('click',()=>fit(true));
   const nav=document.getElementById('vab_navigation')||document.createElement('select');nav.id='vab_navigation';nav.setAttribute('aria-label','Active artboard');const statusSize=document.getElementById('vector_status_size');if(statusSize&&!nav.parentNode)statusSize.append(nav);nav.onchange=()=>{setActive(nav.value);fit();};
   const oldRenderPanel=renderPanel;renderPanel=()=>{oldRenderPanel();nav.replaceChildren(...doc().artboards.map((b,i)=>{const o=document.createElement('option');o.value=b.id;o.textContent=`${i+1}: ${b.name}`;o.selected=b.id===active().id;return o;}));};
-  const style=document.createElement('style');style.textContent='#prop_empty_state{display:none!important}#canvasBackground{display:none!important}#svgcontent{overflow:visible!important}#visteras-artboard-properties label{display:flex;align-items:center;gap:6px;margin:8px 0;font-size:12px}#vab_name{min-width:0;width:100%}.vab-row{display:flex;gap:5px;align-items:center;padding:4px}.vab-row button:nth-child(2){flex:1;text-align:left}.vab-row.active{background:#4a3a2e}.vab-actions{display:flex;gap:5px;margin:10px 0}#vdock_artboards_panel{padding:10px}#vab_navigation{max-width:150px;background:#333;color:#ddd;border:0}#tool_artboard{color:#aaa}#tool_artboard[pressed=true]{color:#fa7c1b}';document.head.append(style);
+  const style=document.createElement('style');style.textContent='#prop_empty_state{display:none!important}#canvasBackground{display:none!important}#svgcontent{overflow:visible!important}#visteras-artboard-properties label{display:flex;align-items:center;gap:6px;margin:8px 0;font-size:12px}#visteras-artboard-properties .vab-background-row{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px}#visteras-artboard-properties .vab-bg-label{min-width:72px;color:#ccc;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;font-size:11px}#visteras-artboard-properties .vcs-appearance-none.is-active{outline:1px solid #fa7c1b;outline-offset:1px}#vab_name{min-width:0;width:100%}.vab-row{display:flex;gap:5px;align-items:center;padding:4px}.vab-row button:nth-child(2){flex:1;text-align:left}.vab-row.active{background:#4a3a2e}.vab-actions{display:flex;gap:5px;margin:10px 0}#vdock_artboards_panel{padding:10px}#vab_navigation{max-width:150px;background:#333;color:#ddd;border:0}#tool_artboard{color:#aaa}#tool_artboard[pressed=true]{color:#fa7c1b}';document.head.append(style);
   const defs=node('defs',{},sc.getSvgRoot());const pattern=node('pattern',{id:'visteras-artboard-checker',width:16,height:16,patternUnits:'userSpaceOnUse'},defs);node('rect',{width:16,height:16,fill:'#eee'},pattern);node('path',{d:'M0 0h8v8H0zM8 8h8v8H8z',fill:'#ccc'},pattern);
   const api={active,transformBounds:(m,moving)=>{const b={...active()};transformAdapter.begin(moving?'move':'resize',{altKey:false});transformAdapter.preview(b,m);transformAdapter.finish(false);},all:()=>doc().artboards,selectedIds:()=>[...panelSelection],propertyMode,edit,create,duplicate,remove,reorder,setActive,fit,transformAdapter,refresh,documentChanged:()=>{gesture=null;draw=null;panelSelection.clear();ensure();refresh();layout();fit();}};
   window.__visterasArtboards=api;window.__visterasSelectionController.setAdapter(transformAdapter);ensure();refresh();layout();fit();return api;

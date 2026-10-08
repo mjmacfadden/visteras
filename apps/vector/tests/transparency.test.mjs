@@ -63,7 +63,7 @@ test('Window menu: Transparency ⇧⌘F10 and Appearance ⇧F6 (placeholder); pa
   assert.match(html, /id="action_window_appearance"[^>]*>Appearance <span class="menu_dropdown_shortcut">⇧F6<\/span>/);
   assert.match(html, /mountBlendModes\(svgEditor\);[\s\S]*?mountTransparency\(svgEditor\);/);
   const dock = fs.readFileSync(new URL('../js/visteras-panel-dock.js', import.meta.url), 'utf8');
-  assert.match(dock, /'Appearance panel coming'/);
+  assert.match(dock, /toggle\('appearance'\)/, '⇧F6 opens Appearance');
   assert.match(dock, /transparencyPane\.id = 'vdock_transparency_panel'/);
   const src = fs.readFileSync(new URL('../js/visteras-transparency.js', import.meta.url), 'utf8');
   assert.match(src, /id="vtr_opacity" class="vtr-input" type="number" min="0" max="100" step="1"/);

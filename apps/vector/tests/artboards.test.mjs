@@ -1,6 +1,8 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeArtboards,createMultipleArtboards,artboardState,artboardUnion,associatedArtboard,nearbyArtboard,nextArtboardName,artboardsForExport,ArtboardCommand} from '../js/visteras-artboard-model.js';
+import {normalizeArtboards,normalizeBackgroundColor,createMultipleArtboards,artboardState,artboardUnion,associatedArtboard,nearbyArtboard,nextArtboardName,artboardsForExport,ArtboardCommand} from '../js/visteras-artboard-model.js';
+import { paintArtboardBackgroundChip } from '../js/visteras-artboards.js';
 import {scopeRect,backgroundColor,pixelSize} from '../js/visteras-export-core.js';
 const board=(id,x=0,y=0,width=100,height=100,backgroundColor='#ffffff')=>({id,name:`Artboard ${id}`,x,y,width,height,backgroundColor});
 test('Legacy document bounds become one valid artboard; new documents also have one',()=>{
@@ -94,3 +96,80 @@ test('createMultipleArtboards creates requested number of artboards arranged in 
  assert.deepEqual([four[3].x,four[3].y],[550,550]);
 });
 
+test('Artboard Background uses Appearance Fill swatch + None chip (not a hex text button)', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-artboards.js', import.meta.url), 'utf8');
+  assert.match(src, /vcs-appearance-chip/);
+  assert.match(src, /vcs-appearance-none/);
+  assert.match(src, /vab-background-row/);
+  assert.match(src, /classList\.toggle\('is-none'/);
+  assert.match(src, /classList\.toggle\('is-active'/);
+  assert.doesNotMatch(src, /bg\.textContent=b\.backgroundColor/);
+  assert.match(src, /__visterasOpenColorPicker/);
+  assert.match(src, /paintArtboardBackgroundChip/);
+  assert.match(src, /setProperty\('background-color'/);
+  assert.match(src, /paintArtboardBackgroundChip\(bg/);
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /visteras-artboards\.js\?v=artboard-bg-2/);
+});
+
+
+function fakeChip() {
+  const props = new Map();
+  const classes = new Set();
+  const el = {
+    style: {
+      setProperty(name, value, priority) { props.set(name, { value, priority: priority || '' }); },
+      removeProperty(name) { props.delete(name); },
+    },
+    classList: {
+      toggle(name, force) { if (force) classes.add(name); else classes.delete(name); },
+      contains(name) { return classes.has(name); },
+    },
+    dataset: {},
+    title: '',
+    textContent: 'x',
+    removeAttribute(name) { if (name === 'data-hex') delete el.dataset.hex; },
+    setAttribute(name, value) { el._attrs = el._attrs || {}; el._attrs[name] = value; },
+    getAttribute(name) { return el._attrs?.[name]; },
+    _props: props,
+    _classes: classes,
+  };
+  return el;
+}
+
+test('paintArtboardBackgroundChip paints real color with !important (beats #ccc chip CSS)', () => {
+  const bg = fakeChip();
+  const none = fakeChip();
+  paintArtboardBackgroundChip(bg, none, '#ffffff');
+  assert.equal(bg._props.get('background-color')?.value, '#ffffff');
+  assert.equal(bg._props.get('background-color')?.priority, 'important');
+  assert.equal(bg.dataset.hex, '#ffffff');
+  assert.equal(bg._classes.has('is-none'), false);
+  assert.equal(none._classes.has('is-active'), false);
+  assert.equal(none.getAttribute('aria-pressed'), 'false');
+
+  paintArtboardBackgroundChip(bg, none, '#ff0000');
+  assert.equal(bg._props.get('background-color')?.value, '#ff0000');
+  assert.equal(bg.dataset.hex, '#ff0000');
+});
+
+test('paintArtboardBackgroundChip None uses is-none (red-slash CSS) and clears inline color', () => {
+  const bg = fakeChip();
+  const none = fakeChip();
+  paintArtboardBackgroundChip(bg, none, '#336699');
+  paintArtboardBackgroundChip(bg, none, 'none');
+  assert.equal(bg._classes.has('is-none'), true);
+  assert.equal(bg._props.has('background-color'), false);
+  assert.equal(none._classes.has('is-active'), true);
+  assert.equal(none.getAttribute('aria-pressed'), 'true');
+  assert.match(bg.title, /None/i);
+});
+
+test('new artboard default background is white (#ffffff) — what the canvas fills with', () => {
+  // normalizeArtboards default param + create() both use #ffffff (canvas fill).
+  assert.equal(normalizeArtboards(null)[0].backgroundColor, '#ffffff');
+  assert.equal(normalizeArtboards(null, 800, 600, '#ffffff')[0].backgroundColor, '#ffffff');
+  assert.equal(normalizeBackgroundColor('#ffffff'), '#ffffff');
+  const src = fs.readFileSync(new URL('../js/visteras-artboards.js', import.meta.url), 'utf8');
+  assert.match(src, /backgroundColor:rect\.backgroundColor\|\|'#ffffff'/);
+});

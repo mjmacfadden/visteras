@@ -2,6 +2,7 @@ import { hasArtworkMutations } from './visteras-document-mutations.js';
 import { createDocumentSessions } from './visteras-document-sessions.js';
 import { recordDocumentChange, replaceDocumentSession, applyDocumentSave } from './visteras-document-save.js';
 import { normalizeArtboards, createMultipleArtboards } from './visteras-artboard-model.js';
+import { stripExportGuides } from './visteras-export-clip.js';
 /**
  * Visteras Vector — document shell
  *
@@ -232,7 +233,17 @@ export function mountVisterasDocumentShell({ svgEditor }) {
   }
 
   function captureSvg() {
-    try { return sc.getSvgString?.() || EMPTY_SVG; } catch { return EMPTY_SVG; }
+    try {
+      const raw = sc.getSvgString?.() || EMPTY_SVG;
+      // Guides are stored on the doc as rulerGuides and re-drawn on open;
+      // never persist the on-canvas guide layer as artwork (Illustrator).
+      const doc = new DOMParser().parseFromString(raw, 'image/svg+xml');
+      if (doc.documentElement && !doc.querySelector('parsererror')) {
+        stripExportGuides(doc.documentElement);
+        return new XMLSerializer().serializeToString(doc.documentElement);
+      }
+      return raw;
+    } catch { return EMPTY_SVG; }
   }
 
   function ensureDocumentLayersInteractive() {

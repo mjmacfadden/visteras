@@ -22,12 +22,12 @@ const shapeBuilderJsPath = path.resolve(vectorRoot, 'js/visteras-shape-builder.j
 
 test('HTML: index.html includes visteras-panel-dock.css stylesheet', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-3"[^>]*>/);
+  assert.match(html, /<link[^>]+href="\.\/css\/visteras-panel-dock\.css\?v=dock-5"[^>]*>/);
 });
 
 test('HTML: index.html imports and mounts visteras-panel-dock', () => {
   const html = fs.readFileSync(indexHtmlPath, 'utf8');
-  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-3';/);
+  assert.match(html, /import\s+\{\s*mountVisterasPanelDock\s*\}\s+from\s+'\.\/js\/visteras-panel-dock\.js\?v=dock-5';/);
   assert.match(html, /mountVisterasColorSystem\(\{\s*svgEditor\s*\}\);[\s\S]*?mountVisterasPanelDock\(\{\s*svgEditor\s*\}\);/);
 });
 
@@ -513,7 +513,7 @@ test('Panel Dock: mounts #vdock strip and #vdock_flyout with the shared panel gr
   // Verify every dock panel icon in the strip
   const icons = vdock.querySelectorAll('.vdock-icon');
   const panels = icons.map(i => i.dataset.panel);
-  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers']);
+  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers']);
 
   // Verify flyout exists
   const flyout = env.doc.getElementById('vdock_flyout');

@@ -1,0 +1,70 @@
+/* Window ▸ Appearance dock flyout */
+#vdock_appearance_panel { padding: 8px 10px 12px; color: #ddd; font-size: 12px; }
+#vdock_appearance_panel .vapp_empty { color: #999; padding: 12px 4px; }
+#vdock_appearance_panel .vapp_meta { color: #888; margin-bottom: 6px; font-size: 11px; }
+#vdock_appearance_panel .vapp_list { display: flex; flex-direction: column; gap: 2px; }
+#vdock_appearance_panel .vapp_row {
+  display: grid;
+  grid-template-columns: 22px 36px minmax(52px, auto) 1fr;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 4px 2px;
+  border-radius: 4px;
+}
+#vdock_appearance_panel .vapp_row_stroke {
+  grid-template-columns: 22px 36px minmax(48px, auto) 1fr;
+}
+#vdock_appearance_panel .vapp_row[data-kind="opacity"],
+#vdock_appearance_panel .vapp_row[data-kind="effect"] { grid-template-columns: 22px 1fr auto; }
+#vdock_appearance_panel .vapp_row:hover { background: rgba(255,255,255,0.06); }
+#vdock_appearance_panel .vapp_off { opacity: 0.55; }
+#vdock_appearance_panel .vapp_eye, #vdock_appearance_panel .vapp_label, #vdock_appearance_panel .vapp_swatch {
+  background: transparent; border: 0; color: inherit; padding: 0; cursor: pointer; text-align: left;
+}
+#vdock_appearance_panel .vapp_eye { width: 22px; height: 22px; display: grid; place-items: center; color: #bbb; }
+#vdock_appearance_panel .vapp_eye_spacer { width: 22px; height: 22px; }
+#vdock_appearance_panel .vapp_swatch_wrap {
+  display: inline-flex; align-items: stretch; border: 1px solid #111; border-radius: 3px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+#vdock_appearance_panel .vapp_swatch {
+  width: 18px; height: 18px; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  background: #ccc; flex-shrink: 0;
+}
+#vdock_appearance_panel .vapp_swatch.is-none {
+  background: #fff !important;
+  background-image: linear-gradient(to top right, #fff calc(50% - 1px), #e62e2e calc(50% - 1px), #e62e2e calc(50% + 1px), #fff calc(50% + 1px)) !important;
+}
+#vdock_appearance_panel .vapp_swatch.is-mixed { background: repeating-linear-gradient(45deg,#666,#666 2px,#444 2px,#444 4px); }
+#vdock_appearance_panel .vapp_swatch_menu {
+  width: 14px; padding: 0; border: 0; border-left: 1px solid #333; background: #2a2a2a; color: #bbb;
+  font-size: 9px; line-height: 1; cursor: pointer;
+}
+#vdock_appearance_panel .vapp_swatch_menu:hover { background: #3a3a3a; color: #fff; }
+#vdock_appearance_panel .vapp_label { font-weight: 500; }
+#vdock_appearance_panel .vapp_label_link {
+  text-decoration: underline; text-underline-offset: 2px; color: #cde;
+}
+#vdock_appearance_panel .vapp_label_link:hover { color: #fa7c1b; }
+#vdock_appearance_panel .vapp_summary { color: #999; font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#vdock_appearance_panel .vapp_weight {
+  display: inline-flex; align-items: center; gap: 2px; justify-self: end; min-width: 0;
+}
+#vdock_appearance_panel .vapp_weight_input {
+  width: 44px; height: 22px; background: #1e1e1e; color: #eee; border: 1px solid #444;
+  border-radius: 3px 0 0 3px; padding: 0 4px; font-size: 11px; box-sizing: border-box;
+}
+#vdock_appearance_panel .vapp_weight_presets {
+  width: 22px; height: 22px; background: #1e1e1e; color: #ccc; border: 1px solid #444; border-left: 0;
+  border-radius: 0; padding: 0; font-size: 9px; cursor: pointer;
+}
+#vdock_appearance_panel .vapp_weight_spin {
+  display: inline-flex; flex-direction: column; height: 22px; border: 1px solid #444; border-left: 0;
+  border-radius: 0 3px 3px 0; overflow: hidden;
+}
+#vdock_appearance_panel .vapp_weight_spin_btn {
+  flex: 1; width: 16px; padding: 0; margin: 0; border: 0; background: #2a2a2a; color: #bbb;
+  font-size: 7px; line-height: 1; cursor: pointer;
+}
+#vdock_appearance_panel .vapp_weight_spin_btn:hover { background: #3a3a3a; color: #fff; }
+#vdock_appearance_panel .vapp_gaps { margin: 10px 2px 0; color: #777; font-size: 10px; line-height: 1.35; }

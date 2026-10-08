@@ -26,11 +26,12 @@
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-panel-dock.css?v=dock-3" rel="stylesheet" media="all">
+  <link href="./css/visteras-panel-dock.css?v=dock-5" rel="stylesheet" media="all">
   <link href="./css/visteras-gradient.css?v=gradient-1" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-fx.css?v=effects-polish-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-appearance-panel.css?v=appearance-stroke-1" rel="stylesheet" media="all">
   <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-export.css?v=export-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-export.css?v=export-3" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -110,6 +111,19 @@
             <div class="menu_dropdown_item" id="action_flip_h">Flip Horizontal</div>
             <div class="menu_dropdown_item" id="action_flip_v">Flip Vertical</div>
             <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_lock_menu">Lock<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_lock_selection">Selection <span class="menu_dropdown_shortcut">⌘2</span></div>
+              </div>
+            </div>
+            <div class="menu_dropdown_item" id="action_unlock_all">Unlock All <span class="menu_dropdown_shortcut">⌥⌘2</span></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_hide_menu">Hide<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_hide_selection">Selection <span class="menu_dropdown_shortcut">⌘3</span></div>
+              </div>
+            </div>
+            <div class="menu_dropdown_item" id="action_show_all">Show All <span class="menu_dropdown_shortcut">⌥⌘3</span></div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_item disabled" id="action_image_trace" title="Trace the selected raster image into vector paths">Image Trace…</div>
             <div class="menu_dropdown_separator"></div>
@@ -155,7 +169,11 @@
             <div class="menu_dropdown_item" id="action_lock_guides">Lock Guides <span class="menu_dropdown_shortcut">⌥⌘;</span></div>
             <div class="menu_dropdown_item" id="action_clear_guides">Clear Guides</div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_toggle_grid">Toggle Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_toggle_grid" role="menuitemcheckbox" aria-checked="false">Show Grid <span class="menu_dropdown_shortcut">⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_snap_grid" role="menuitemcheckbox" aria-checked="false">Snap to Grid <span class="menu_dropdown_shortcut">⇧⌘'</span></div>
+            <div class="menu_dropdown_item" id="action_grid_in_back" role="menuitemcheckbox" aria-checked="true">Grid in Back</div>
+            <div class="menu_dropdown_item" id="action_grid_prefs">Guides &amp; Grid…</div>
+            <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_toggle_wireframe">Outline Mode <span class="menu_dropdown_shortcut">F / ⌘Y</span></div>
             <div class="menu_dropdown_item" id="action_toggle_gradient_annotator">Hide Gradient Annotator <span class="menu_dropdown_shortcut">⌥⌘G</span></div>
             <div class="menu_dropdown_separator"></div>
@@ -176,7 +194,7 @@
             <div class="menu_dropdown_item" id="action_window_artboards">Artboards</div>
             <div class="menu_dropdown_item" id="action_window_effects">Effects</div>
             <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
-            <div class="menu_dropdown_item disabled" id="action_window_appearance" aria-disabled="true" title="Appearance panel coming">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
+            <div class="menu_dropdown_item" id="action_window_appearance">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
             <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_window_properties">Properties</div>
@@ -278,8 +296,13 @@
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
-    import { mountArtboards } from './js/visteras-artboards.js';
+    import { mountArtboards } from './js/visteras-artboards.js?v=artboard-bg-2';
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
+    import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-1';
+    import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-1';
+    import { mountGrid } from './js/visteras-grid.js?v=grid-1';
+    import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-1';
+    import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=1';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-1';
@@ -293,16 +316,16 @@
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js?v=trace-dialog-2';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-bridge-5';
-    import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=guides-2';
+    import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=guides-3';
     import { captureDocumentSnapshot, serializeDocumentSnapshot, createDocumentSaveQueue } from './js/visteras-document-save.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
     import { initLogoEasterEgg } from './lib/visteras-ui/easter-egg.js';
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
-    import { mountExport } from './js/visteras-export.js?v=export-1';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-1';
+    import { mountExport } from './js/visteras-export.js?v=export-3';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=appearance-stroke-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
-    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-3';
+    import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-5';
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-2';
     import { mountTextOutlines } from './js/visteras-text-outlines.js?v=outlines-1';
     import { mountExpand } from './js/visteras-expand.js?v=expand-1';
@@ -335,7 +358,7 @@
     // also 404'd on its browser-fs-access import and never loaded).
     const VECTOR_EXTENSIONS = [
       'ext-connector',
-      'ext-grid',
+      // 'ext-grid' — replaced by visteras-grid.js (artboards hide #canvasBackground)
       'ext-markers',
       'ext-panning',
       'ext-shapes',
@@ -1127,9 +1150,6 @@
         document.getElementById('tool_wireframe')?.click();
       });
 
-      document.getElementById('action_toggle_grid')?.addEventListener('click', () => {
-        document.getElementById('view_grid')?.click();
-      });
 
       document.getElementById('action_toggle_rulers')?.addEventListener('click', () => {
         // SVG-Edit has no #view_rulers control — document shell owns ruler toggle.
@@ -1427,13 +1447,6 @@
             return;
           }
 
-          // Command/Ctrl + ': Toggle Grid
-          if (e.key === "'" || e.code === 'Quote') {
-            e.preventDefault();
-            e.stopPropagation();
-            document.getElementById('view_grid')?.click();
-            return;
-          }
 
         }
 
@@ -2557,6 +2570,11 @@
     mountTransparency(svgEditor);
     // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
+    mountAppearance(svgEditor);
+    mountObjectLock(svgEditor);
+    mountGrid(svgEditor);
+    mountContextMenu(svgEditor);
+    mountShortcutLabels();
     mountParagraph(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);

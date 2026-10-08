@@ -12,38 +12,12 @@
  * Only one dock flyout is open at a time; auto-collapses on canvas click or Esc.
  */
 
+import { stepStrokeWeight, formatStrokeWeight } from './visteras-stroke-weight.js?v=1';
+
 const STORAGE_KEY = 'visteras-vector-dock';
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 240;
-
-/**
- * Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → 5 …
- */
-export function stepStrokeWeight(value, dir) {
-  const n = Math.max(0, Number(value) || 0);
-  const quarters = [0, 0.25, 0.5, 0.75, 1];
-  if (dir > 0) {
-    for (const s of quarters) {
-      if (n < s - 1e-9) return s;
-    }
-    return Math.floor(n + 1e-9) + 1;
-  }
-  if (n > 1 + 1e-9) {
-    const floored = Math.floor(n + 1e-9);
-    return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
-  }
-  for (let i = quarters.length - 1; i >= 0; i--) {
-    if (n > quarters[i] + 1e-9) return quarters[i];
-  }
-  return 0;
-}
-
-export function formatStrokeWeight(n) {
-  const v = Math.max(0, Number(n) || 0);
-  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
-  return String(Math.round(v * 100) / 100);
-}
 
 /**
  * Illustrator panel shortcuts → panel id. Shift is significant:
@@ -182,6 +156,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
     <!-- Group 4b: Effects & Transparency -->
     <div class="vdock-group" id="vdock_grp_effects">
       <button type="button" class="vdock-icon" data-panel="effects" title="Effects" aria-label="Effects" aria-expanded="false" aria-controls="vdock_flyout"><em aria-hidden="true">fx</em></button>
+    </div>
+    <div class="vdock-group" id="vdock_grp_appearance">
+      <button type="button" class="vdock-icon" data-panel="appearance" title="Appearance (⇧F6)" aria-label="Appearance (⇧F6)" aria-expanded="false" aria-controls="vdock_flyout">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <path d="M3 8h14M8 3v14"/>
+        </svg>
+      </button>
     </div>
     <div class="vdock-group" id="vdock_grp_transparency">
       <button type="button" class="vdock-icon" data-panel="transparency" title="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-label="Transparency (⇧⌘F10 / Shift+Ctrl+F10)" aria-expanded="false" aria-controls="vdock_flyout">
@@ -480,6 +462,10 @@ export function mountVisterasPanelDock({ svgEditor }) {
   effectsPane.id = 'vdock_effects_panel';
   effectsPane.className = 'vdock-panel-pane';
   flyoutBody.appendChild(effectsPane);
+  const appearancePane = document.createElement('div');
+  appearancePane.id = 'vdock_appearance_panel';
+  appearancePane.className = 'vdock-panel-pane';
+  flyoutBody.appendChild(appearancePane);
 
   // (E2) Transparency Panel (#vdock_transparency_panel) — filled by js/visteras-transparency.js
   const transparencyPane = document.createElement('div');
@@ -530,6 +516,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       gradient: 'Gradient',
       artboards: 'Artboards',
       effects: 'Effects',
+      appearance: 'Appearance',
       transparency: 'Transparency',
       layers: 'Layers',
     };
@@ -537,7 +524,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
   }
 
   function updateWindowMenuCheckmarks() {
-    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'transparency', 'layers', 'artboards'];
+    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers', 'artboards'];
     panels.forEach(p => {
       const item = document.getElementById(`action_window_${p}`);
       if (item) {
@@ -608,6 +595,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       gradient: gradPane,
       artboards: artboardsPane,
       effects: effectsPane,
+      appearance: appearancePane,
       transparency: transparencyPane,
       layers: layerPanel,
     };
@@ -772,8 +760,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
     if (shortcutPanel) {
       e.preventDefault();
       if (shortcutPanel === 'appearance') {
-        // No Appearance panel yet: never fall through to Color.
-        (window.__visterasToast || showToast)('Appearance panel coming');
+        toggle('appearance');
         return;
       }
       toggle(shortcutPanel);
@@ -830,3 +817,5 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
   return dockApi;
 }
+
+export { stepStrokeWeight, formatStrokeWeight };
