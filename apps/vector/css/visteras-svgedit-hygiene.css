@@ -56,11 +56,12 @@
 #tool_node_clone,
 #tool_node_delete,
 #tool_node_link,
-#seg_type,
-#path_node_x,
-#path_node_y {
+#seg_type {
   display: none !important;
 }
+
+/* path_node_x/y: shown again in Properties ▸ Path & Nodes for Direct Selection /
+   pathedit (gravit-gap-4). Still relocated out of #tools_top. */
 
 /* --------------------------------------------------------------------------
  * 5. Orphan options-bar tools that stay permanently unused under the Visteras

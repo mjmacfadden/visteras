@@ -2,6 +2,7 @@ import { cutAnchors } from './visteras-pen-geometry.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
 import { anchors, readSegments, serializeSegments, moveAnchors, deleteAnchors, moveControl, convertAnchors } from './visteras-anchor-model.js';
+import { syncAnchorXYFields, readAnchorXYFields } from './visteras-path-ops.js';
 
 const SHAPES = 'path,rect,circle,ellipse,line,polygon,polyline';
 export function mountDirectSelection(editor) {
@@ -201,6 +202,23 @@ export function mountDirectSelection(editor) {
     renderParent = null;
     reusable.clear();
     status.textContent = `${count} anchor${count === 1 ? '' : 's'} selected across ${paths} path${paths === 1 ? '' : 's'}`;
+    // Single selected anchor → numeric X/Y (document units).
+    {
+      let single = null;
+      if (count === 1) {
+        for (const rec of records) {
+          if (rec.selected.size !== 1) continue;
+          const idx = [...rec.selected][0];
+          const s = rec.segments[idx];
+          if (!s) continue;
+          const m = matrix(rec.el);
+          const doc = point(s.x, s.y, m);
+          single = { x: doc.x, y: doc.y, rec, index: idx };
+        }
+      }
+      window.__visterasDirectAnchorXY = single;
+      syncAnchorXYFields(() => single ? { x: single.x, y: single.y } : null);
+    }
     document.getElementById('tool_undo').disabled = sc.undoMgr.getUndoStackSize() === 0;
     document.getElementById('tool_redo').disabled = sc.undoMgr.getRedoStackSize() === 0;
   }
@@ -719,4 +737,27 @@ export function mountDirectSelection(editor) {
     }
   }, true);
   window.addEventListener('blur', () => finish(true));
+
+  // Anchor X/Y fields (Properties ▸ Path & Nodes) — write document-unit values back.
+  const commitXY = () => {
+    const single = window.__visterasDirectAnchorXY;
+    const xy = readAnchorXYFields();
+    if (!single || !xy || !active) return;
+    const before = snapshot();
+    const item = before.find((i) => i.rec === single.rec);
+    if (!item) return;
+    const local = point(xy.x, xy.y, item.inverse);
+    const s = item.segments[single.index];
+    if (!s) return;
+    const dx = local.x - s.x, dy = local.y - s.y;
+    write(item, moveAnchors(item.segments, new Set([single.index]), dx, dy));
+    commit(before, 'Move anchor');
+  };
+  for (const id of ['path_node_x', 'path_node_y']) {
+    const el = document.getElementById(id);
+    if (!el || el.__visterasXYWired) continue;
+    el.__visterasXYWired = true;
+    el.addEventListener('change', commitXY);
+  }
 }
+
