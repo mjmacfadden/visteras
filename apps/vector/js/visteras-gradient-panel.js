@@ -5,12 +5,18 @@
  * Aspect · gradient slider · Opacity / Location.
  * Panel edits preview live (no history) on `input` and commit ONE undo step on
  * `change` / mouse-up (core.beginSession).
+ * Stop selection (Illustrator): a click on a stop (panel slider or annotator)
+ * selects it without opening anything; while selected, the Color panel,
+ * Swatches (click or ⌥-click), the Fill/Stroke well picker and the Eyedropper
+ * recolour that stop via window.__visterasGradientStopRoute. Esc, a click on
+ * empty canvas or another object, or a Fill/Stroke switch deselects it.
  */
 import {
   GRADIENT_PRESETS, normalizeModel, defaultModel, fitLinear, fitRadial, decodeGradient,
   addStop, deleteStop, duplicateStop, swapStops, moveStop, reverseStops,
   cssGradient, swatchFromModel, normalizeSwatch, normalizeColor, MID_MIN, MID_MAX,
-} from './visteras-gradient-model.js?v=gradient-1';
+  recolorStop, stopSelectionLive,
+} from './visteras-gradient-model.js?v=gradient-2';
 
 const DRAG_DELETE_PX = 20;
 const r1 = (n) => Math.round(n * 10) / 10;
@@ -35,6 +41,8 @@ export function mountGradientPanel(editor, core) {
   let shown = normalizeModel({ ...core.getLast() }); // what the panel displays
   let shownHasGradient = false;
   let selStop = 0, selMid = -1;
+  let stopActive = false, stopAttr = null, stopOwner = ''; // a clicked (selected) colour stop
+  const stopListeners = new Set();
   let session = null;                                // live preview from the panel
   const $ = (id) => document.getElementById(id);
 
@@ -89,9 +97,10 @@ export function mountGradientPanel(editor, core) {
   const abort = () => { if (session) { session.cancel(); session = null; } };
 
   /** Apply a model transform to every target (each rebased on its own geometry). */
-  function apply(mutate, { live = false, label = 'Gradient' } = {}) {
+  function apply(mutate, { live = false, label = 'Gradient', gradientOnly = false } = {}) {
     const attr = activeAttr();
-    const els = core.targets(attr);
+    const els = gradientOnly ? core.targets(attr).filter((el) => core.gradientNodeFor(el, attr)) : core.targets(attr);
+    if (!els.length && gradientOnly) return;
     if (!els.length) {
       // Nothing selected: edit the default (last-used) gradient, like Illustrator.
       shown = normalizeModel(mutate(normalizeModel(shown), null));
@@ -125,7 +134,48 @@ export function mountGradientPanel(editor, core) {
     if (m) { shown = m; shownHasGradient = true; } else { shown = normalizeModel({ ...core.getLast() }); shownHasGradient = false; }
     if (selStop >= shown.stops.length) selStop = shown.stops.length - 1;
     if (selMid >= shown.stops.length - 1) selMid = -1;
+    if (stopActive && (!m || attr !== stopAttr)) clearStopSelection({ quiet: true });
     render();
+  }
+
+  /* ───────────── stop selection (Illustrator) ───────────── */
+  const selIds = () => (sc.getSelectedElements?.() || []).filter(Boolean).map((el) => el.id).join('|');
+  const notifyStop = () => { for (const fn of stopListeners) { try { fn(); } catch { /* ignore */ } } };
+  /** True while colour input should recolour the selected stop. */
+  function stopLive() {
+    if (!stopActive) return false;
+    const attr = activeAttr();
+    const hasGradient = shownHasGradient && core.targets(attr).some((el) => core.gradientNodeFor(el, attr));
+    return stopSelectionLive({ active: stopActive, index: selStop, count: shown.stops.length, attr, stopAttr, hasGradient, midpoint: selMid });
+  }
+  /** Click on a stop: select it (orange) and show its colour in the Color panel; opens nothing. */
+  function selectStop(i, { showColor = true } = {}) {
+    if (!Number.isInteger(i) || i < 0) return;
+    selStop = i; selMid = -1;
+    stopActive = true; stopAttr = activeAttr(); stopOwner = selIds();
+    render();
+    const st = shown.stops[selStop];
+    if (showColor && st) { try { cs()?.setWorkingColor?.(st.c, { apply: false, recordRecent: false }); } catch { /* ignore */ } }
+    notifyStop();
+  }
+  function clearStopSelection({ quiet = false } = {}) {
+    if (!stopActive) return false;
+    stopActive = false; stopAttr = null; stopOwner = '';
+    if (!quiet) render();
+    notifyStop();
+    return true;
+  }
+  /** Colour → selected stop on every selected object that has a gradient: fresh gradient per object, one undo step (live = preview only). */
+  function recolorSelectedStop(hex, { live = false } = {}) {
+    if (!stopLive()) return false;
+    const c = normalizeColor(hex, null);
+    if (!c) return false;
+    const i = selStop;
+    const attr = activeAttr();
+    // Same colour again (e.g. the hex field's blur after Enter): no extra undo step.
+    if (!live && !session && core.targets(attr).filter((el) => core.gradientNodeFor(el, attr)).every((el) => core.readModel(el, attr)?.stops[i]?.c === c)) return true;
+    apply((m) => ({ ...m, stops: recolorStop(m.stops, i, c) }), { live, label: 'Gradient Stop Color', gradientOnly: true });
+    return true;
   }
 
   function render() {
@@ -154,7 +204,7 @@ export function mountGradientPanel(editor, core) {
     setVal('vgrad_location', selMid >= 0 ? r1(m.stops[selMid].mid) : r1((st?.o ?? 0) * 100));
     $('vgrad_delete').disabled = selMid >= 0 || m.stops.length <= 2;
     $('vgrad_ramp').style.backgroundImage = `${cssGradient(m, { angle: 90 })}, linear-gradient(45deg, #bbb 25%, transparent 25%, transparent 75%, #bbb 75%), linear-gradient(45deg, #bbb 25%, #fff 25%, #fff 75%, #bbb 75%)`;
-    $('vgrad_stops').innerHTML = m.stops.map((s, i) => `<button type="button" class="vgrad-stop${i === selStop && selMid < 0 ? ' selected' : ''}" data-stop="${i}" style="left:${s.o * 100}%" title="Stop ${i + 1}: ${s.c.toUpperCase()} · ${Math.round(s.a * 100)}% · ${r1(s.o * 100)}%" aria-label="Stop ${i + 1}"><span style="background:${s.c}"></span></button>`).join('');
+    $('vgrad_stops').innerHTML = m.stops.map((s, i) => `<button type="button" class="vgrad-stop${i === selStop && selMid < 0 && stopActive ? ' selected' : ''}" data-stop="${i}" aria-pressed="${i === selStop && selMid < 0 && stopActive}" style="left:${s.o * 100}%" title="Stop ${i + 1}: ${s.c.toUpperCase()} · ${Math.round(s.a * 100)}% · ${r1(s.o * 100)}%" aria-label="Stop ${i + 1}"><span style="background:${s.c}"></span></button>`).join('');
     $('vgrad_mids').innerHTML = m.stops.slice(0, -1).map((s, i) => { const nx = m.stops[i + 1]; const o = s.o + (nx.o - s.o) * s.mid / 100; return `<button type="button" class="vgrad-midpt${i === selMid ? ' selected' : ''}" data-mid="${i}" style="left:${o * 100}%" title="Midpoint ${r1(s.mid)}%" aria-label="Midpoint ${i + 1}"></button>`; }).join('');
     const note = $('vgrad_note');
     const zero = core.zeroAreaOnly(attr);
@@ -166,6 +216,7 @@ export function mountGradientPanel(editor, core) {
     if (selMid >= 0 || shown.stops.length <= 2) return;
     const stops = deleteStop(shown.stops, selStop);
     selStop = Math.max(0, selStop - 1);
+    clearStopSelection({ quiet: true });
     apply(withStops(stops), { label: 'Delete Gradient Stop' });
   }
 
@@ -184,7 +235,7 @@ export function mountGradientPanel(editor, core) {
       const startX = e.clientX, startY = e.clientY;
       let moved = false;
       if (midBtn) {
-        selMid = Number(midBtn.dataset.mid); render();
+        selMid = Number(midBtn.dataset.mid); clearStopSelection({ quiet: true }); render();
         const k = selMid;
         const move = (ev) => {
           moved = true;
@@ -198,7 +249,7 @@ export function mountGradientPanel(editor, core) {
       }
       if (stopBtn) {
         const index = Number(stopBtn.dataset.stop);
-        selStop = index; selMid = -1; render();
+        selectStop(index); // single click selects (no popover); double-click opens the colour picker
         const alt = e.altKey;
         const original = shown.stops.map((s) => ({ ...s }));
         let pendingDelete = false;
@@ -238,6 +289,7 @@ export function mountGradientPanel(editor, core) {
             }
           }
           lastClick = null;
+          if (pendingDelete) clearStopSelection({ quiet: true });
           finish(alt ? 'Duplicate Gradient Stop' : pendingDelete ? 'Delete Gradient Stop' : 'Move Gradient Stop');
           render();
         };
@@ -251,6 +303,7 @@ export function mountGradientPanel(editor, core) {
         const res = addStop(shown.stops, offsetAt(ev.clientX));
         selStop = res.index; selMid = -1;
         apply(withStops(res.stops), { label: 'Add Gradient Stop' });
+        selectStop(res.index); // Illustrator: the new stop is selected
       };
       window.addEventListener('pointerup', up);
     });
@@ -272,7 +325,7 @@ export function mountGradientPanel(editor, core) {
    * @param {DOMRect} rect anchor
    * @param {{color?: string, onColor?: Function, onDone?: Function}} [hooks] the annotator passes its own session
    */
-  function openColorPopover(rect, hooks = {}) {
+  function openColorPopover(rect, hooks = {}, { gradientOnly = false } = {}) {
     const idx = selStop;
     const st = shown.stops[idx];
     if (!st) return;
@@ -280,7 +333,8 @@ export function mountGradientPanel(editor, core) {
     const noTargets = !core.targets(activeAttr()).length;
     window.__visterasOpenColorPicker?.(null, {
       color: hooks.color || st.c,
-      onColor: hooks.onColor || ((hex) => apply((m) => ({ ...m, stops: m.stops.map((s, k) => k === idx ? { ...s, c: hex } : s) }), { live: true })),
+      label: 'Gradient Stop',
+      onColor: hooks.onColor || ((hex) => apply((m) => ({ ...m, stops: recolorStop(m.stops, idx, hex) }), { live: true, gradientOnly })),
       onDone: hooks.onDone || ((commit) => {
         if (noTargets) { shown = commit ? shown : original; core.setLast(shown); }
         if (commit) finish('Gradient Stop Color'); else abort();
@@ -322,7 +376,8 @@ export function mountGradientPanel(editor, core) {
     core.applyModels(els, attr, (el) => core.seedModel(el, attr), 'Gradient');
     sync();
   }
-  const applyLastColor = () => { const st = cs()?.getState?.(); if (st) cs().setWorkingColor(st.workingHex || '#000000'); };
+  // , = Color mode: a flat colour replaces the gradient even while a stop is selected.
+  const applyLastColor = () => { const st = cs()?.getState?.(); if (st) { clearStopSelection(); cs().setWorkingColor(st.workingHex || '#000000', { toStop: false }); } };
 
   function renderSwatchSection() {
     const host = document.querySelector('#vcs_swatches_panel .vcs-swatches-panel-content');
@@ -388,6 +443,8 @@ export function mountGradientPanel(editor, core) {
     };
     numInput('vgrad_angle', (v, live) => apply((m, el) => (m.type === 'linear' ? { ...m, ...fitLinear(el ? core.bboxOf(el) : { width: 100, height: 100 }, v) } : { ...m, angle: v }), { live, label: 'Gradient Angle' }));
     numInput('vgrad_aspect', (v, live) => apply((m) => ({ ...m, aspect: Math.max(1, v) }), { live, label: 'Gradient Aspect Ratio' }));
+    // Opacity / Location act on the selected stop; focusing them selects the current one so it is visible.
+    for (const id of ['vgrad_opacity', 'vgrad_location']) $(id).addEventListener('focus', () => { if (!stopActive && selMid < 0 && shownHasGradient) selectStop(selStop, { showColor: false }); });
     numInput('vgrad_opacity', (v, live) => { const i = selStop; apply((m) => ({ ...m, stops: m.stops.map((s, k) => (k === i ? { ...s, a: Math.min(1, Math.max(0, v / 100)) } : s)) }), { live, label: 'Gradient Stop Opacity' }); });
     numInput('vgrad_location', (v, live) => {
       if (selMid >= 0) { const k = selMid; apply((m) => ({ ...m, stops: m.stops.map((s, j) => (j === k ? { ...s, mid: Math.min(MID_MAX, Math.max(MID_MIN, v)) } : s)) }), { live, label: 'Gradient Midpoint' }); return; }
@@ -417,14 +474,31 @@ export function mountGradientPanel(editor, core) {
     if (e.key === '.' || e.key === '>') { e.preventDefault(); e.stopImmediatePropagation(); applyLastGradient(); }
     else if (e.key === ',' || e.key === '<') { e.preventDefault(); e.stopImmediatePropagation(); applyLastColor(); }
   }, true);
+  // Esc deselects a selected stop first (fields, dialogs, the colour picker and canvas drags keep their own Esc).
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !stopActive || session || core.busy || typing(e)) return;
+    if (document.querySelector('#vcs_picker_modal.open, dialog[open]')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    clearStopSelection();
+  }, true);
 
   const call = sc.call;
   sc.call = function (event, ...args) {
     const result = call.call(this, event, ...args);
+    // A different object (or empty canvas) deselects the stop.
+    if (event === 'selected' && stopActive && selIds() !== stopOwner) clearStopSelection();
     if ((event === 'selected' || event === 'changed') && !session && !core.busy) queueMicrotask(sync);
     return result;
   };
   cs()?.subscribe?.(() => { if (!session && !core.busy) sync(); });
+
+  window.__visterasGradientStopRoute = {
+    isActive: () => stopLive(),
+    recolor: (hex, opts) => recolorSelectedStop(hex, opts),
+    /** Fill/Stroke well picker while a stop is selected → the stop's colour picker (one undo step on OK). */
+    openPicker: () => { if (!stopLive()) return false; openColorPopover($('vgrad_stops')?.querySelector(`[data-stop="${selStop}"]`)?.getBoundingClientRect(), {}, { gradientOnly: true }); return true; },
+    clear: () => clearStopSelection(),
+  };
 
   return {
     sync,
@@ -434,11 +508,18 @@ export function mountGradientPanel(editor, core) {
     getShown: () => normalizeModel(shown),
     setSelectedStop: (i) => { selStop = i; selMid = -1; render(); },
     getSelectedStop: () => selStop,
+    selectStop,
+    clearStopSelection,
+    stopSelection: () => ({ active: stopLive(), index: selStop }),
+    onStopSelection: (fn) => { stopListeners.add(fn); return () => stopListeners.delete(fn); },
     hasSession: () => !!session,
     api: {
       shown: () => normalizeModel(shown),
       selectedStop: () => selStop,
       setSelectedStop: (i) => { selStop = i; selMid = -1; render(); },
+      selectStop: (i) => selectStop(i),
+      clearStopSelection: () => clearStopSelection(),
+      stopSelection: () => ({ active: stopLive(), index: selStop }),
       applyPreset,
       applyLastGradient,
       swatches: () => core.loadSwatches().map((s) => ({ ...s })),

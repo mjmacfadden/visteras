@@ -1,4 +1,4 @@
-import { syncPenPaintDefaults } from './visteras-color-system.js?v=gradient-1';
+import { syncPenPaintDefaults } from './visteras-color-system.js?v=gradient-2';
 import { penHandles } from './visteras-pen-handles.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';
 import { mountPenDrawingHistory } from './visteras-pen-history.js';

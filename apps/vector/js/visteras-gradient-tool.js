@@ -6,7 +6,8 @@
  *    object's local frame, so colour runs continuously across them;
  *  - annotator (G mode, View ▸ Hide/Show Gradient Annotator ⌥⌘G): linear bar
  *    origin ● → end ■, rotate just past the end; radial dashed ellipse (ring =
- *    radius, dot = aspect); stops under the bar (drag, drag off to delete,
+ *    radius, dot = aspect); stops under the bar (click selects — orange — so
+ *    Color/Swatches/Eyedropper recolour it; drag, drag off to delete,
  *    Alt-drag to duplicate, double-click for colour, click the bar to add).
  * Overlay lives in SVG-Edit's selectorParentGroup (Shape Builder pattern).
  */
@@ -14,10 +15,11 @@ import {
   GRADIENT_ATTR, normalizeModel, modelPoints, modelFromPoints, modelFromDocument, flipModel,
   direction, angleOf, snapAngle, addStop, deleteStop, duplicateStop, moveStop,
   multiply, invert, apply as applyM, translate, IDENTITY,
-} from './visteras-gradient-model.js?v=gradient-1';
+} from './visteras-gradient-model.js?v=gradient-2';
 
 const NS = 'http://www.w3.org/2000/svg';
 const MODE = 'gradient';
+const ACCENT = '#fa7c1b'; // selected stop (orange accent)
 const DRAG_DELETE_PX = 20;
 const ROTATE_CURSOR = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path d="M15 6a7 7 0 1 0 1.5 6" fill="none" stroke="#000" stroke-width="3"/><path d="M15 6a7 7 0 1 0 1.5 6" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M12.5 2.5 16 6l-4.2 1.4z" fill="#fff" stroke="#000" stroke-width=".8"/></svg>')}") 10 10, alias`;
 const asM = (m) => ({ a: m.a, b: m.b, c: m.c, d: m.d, e: m.e, f: m.f });
@@ -155,10 +157,14 @@ export function mountGradientTool(editor, core, panel) {
       mk('line', { x1: O.x, y1: O.y, x2: E.x, y2: E.y, stroke: '#000', 'stroke-width': 3, 'pointer-events': 'none', opacity: 0.55 }, g);
       mk('line', { x1: O.x, y1: O.y, x2: E.x, y2: E.y, stroke: '#fff', 'stroke-width': 1.2, 'pointer-events': 'none' }, g);
       const len = Math.hypot(E.x - O.x, E.y - O.y) || 1, nx = -(E.y - O.y) / len, ny = (E.x - O.x) / len;
+      const selected = panel.stopSelection?.() || { active: false };
       f.model.stops.forEach((st, i) => {
         const cx = O.x + (E.x - O.x) * st.o + nx * 9, cy = O.y + (E.y - O.y) * st.o + ny * 9;
+        const on = selected.active && selected.index === i;
         mk('rect', { x: cx - 5.5, y: cy - 5.5, width: 11, height: 11, fill: 'none', stroke: '#000', 'stroke-width': 0.8, 'pointer-events': 'none', opacity: 0.6 }, g);
-        mk('rect', { x: cx - 4.5, y: cy - 4.5, width: 9, height: 9, fill: st.c, stroke: '#fff', 'stroke-width': 1.2, 'pointer-events': 'all', 'data-vgrad-handle': `stop:${i}` }, g);
+        if (on) mk('rect', { x: cx - 7.5, y: cy - 7.5, width: 15, height: 15, fill: 'none', stroke: ACCENT, 'stroke-width': 2, 'pointer-events': 'none', 'data-vgrad-selected-ring': i }, g);
+        const h = mk('rect', { x: cx - 4.5, y: cy - 4.5, width: 9, height: 9, fill: st.c, stroke: on ? ACCENT : '#fff', 'stroke-width': 1.2, 'pointer-events': 'all', 'data-vgrad-handle': `stop:${i}` }, g);
+        if (on) h.setAttribute('data-vgrad-selected', '1');
       });
       mk('circle', { cx: E.x, cy: E.y, r: 14, fill: 'transparent', 'pointer-events': 'all', 'data-vgrad-handle': 'rotate' }, g);
       mk('rect', { x: E.x - 4.5, y: E.y - 4.5, width: 9, height: 9, fill: '#fff', stroke: '#000', 'stroke-width': 1, 'pointer-events': 'all', 'data-vgrad-handle': 'end' }, g);
@@ -191,11 +197,11 @@ export function mountGradientTool(editor, core, panel) {
     const hit = topLevelOf(e.target);
     const selected = (sc.getSelectedElements?.() || []).filter(Boolean);
     if (hit && !selected.includes(hit)) { sc.selectOnly([hit], true); span = null; }
-    else if (!hit && !selected.length) return;
-    startVectorDrag(e);
+    else if (!hit && !selected.length) { panel.clearStopSelection?.(); return; }
+    startVectorDrag(e, { emptyClick: !hit });
   }
 
-  function startVectorDrag(e) {
+  function startVectorDrag(e, { emptyClick = false } = {}) {
     const attr = activeAttr();
     const els = core.targets(attr);
     if (!els.length) { if (core.zeroAreaOnly(attr)) core.toastMsg('Gradients need an area — use Object ▸ Outline Stroke for lines'); return; }
@@ -220,6 +226,7 @@ export function mountGradientTool(editor, core, panel) {
     dragging.up = () => {
       if (!dragging.moved) {
         fs.cancel();
+        if (emptyClick) panel.clearStopSelection?.(); // click on empty canvas deselects the stop
         // A click on an object without a gradient applies the last-used one.
         const fresh = els.filter((el) => !core.gradientNodeFor(el, attr));
         if (fresh.length) core.applyModels(fresh, attr, (el) => core.seedModel(el, attr), 'Gradient');
@@ -245,7 +252,7 @@ export function mountGradientTool(editor, core, panel) {
     const alt = e.altKey;
     const stopIndex = kind.startsWith('stop:') ? Number(kind.slice(5)) : -1;
     begin({ kind, frames: [frame], moved: false, start: { x: e.clientX, y: e.clientY }, pendingDelete: false });
-    if (stopIndex >= 0) { panel.setShown(start); panel.setSelectedStop(stopIndex); }
+    if (stopIndex >= 0) { panel.setShown(start); panel.selectStop(stopIndex); } // click = select (no popover)
     const d = direction(start.angle), perp = { x: -d.y, y: d.x };
     dragging.move = (ev) => {
       if (!dragging.moved && Math.hypot(ev.clientX - dragging.start.x, ev.clientY - dragging.start.y) < 3) return;
@@ -292,7 +299,8 @@ export function mountGradientTool(editor, core, panel) {
         const res = addStop(start.stops, t);
         fs.update({ ...start, stops: res.stops });
         fs.commit('Add Gradient Stop');
-        panel.setSelectedStop(res.index);
+        panel.setShown(frame.model);
+        panel.selectStop(res.index); // Illustrator: the new stop is selected
         return;
       }
       if (!dragging.moved) {
@@ -301,7 +309,7 @@ export function mountGradientTool(editor, core, panel) {
           const rect = handle.getBoundingClientRect();
           const now = performance.now();
           const key = `${fi}:${stopIndex}`;
-          panel.setSelectedStop(stopIndex);
+          panel.selectStop(stopIndex, { showColor: false });
           if (lastStopClick?.key === key && now - lastStopClick.time < 400) {
             dragging.openColor = () => openStopColor(frame, stopIndex, rect);
             lastStopClick = null;
@@ -310,6 +318,7 @@ export function mountGradientTool(editor, core, panel) {
         return;
       }
       lastStopClick = null;
+      if (stopIndex >= 0 && dragging.pendingDelete) panel.clearStopSelection?.();
       const labels = { origin: 'Move Gradient', end: 'Gradient Vector', rotate: 'Rotate Gradient', ring: 'Gradient Radius', aspect: 'Gradient Aspect Ratio' };
       fs.commit(labels[kind] || (alt ? 'Duplicate Gradient Stop' : dragging.pendingDelete ? 'Delete Gradient Stop' : 'Move Gradient Stop'));
     };
@@ -433,6 +442,7 @@ export function mountGradientTool(editor, core, panel) {
     return result;
   };
   cs()?.subscribe?.(() => scheduleAnnotator());
+  panel.onStopSelection?.(() => scheduleAnnotator());
 
   return {
     api: {

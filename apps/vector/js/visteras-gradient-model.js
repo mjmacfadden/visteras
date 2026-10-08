@@ -218,6 +218,25 @@ export function moveStop(stops, index, o) {
   return { stops: s, index: s.indexOf(moved) };
 }
 
+/** Recolour stop i (Illustrator: Color / Swatches / Eyedropper with a stop selected). A fresh array; other stops untouched. */
+export function recolorStop(stops, index, color) {
+  const s = normalizeStops(stops).map((x) => ({ ...x }));
+  const c = normalizeColor(color, null);
+  if (!c || !s[index]) return s;
+  s[index].c = c;
+  return s;
+}
+
+/**
+ * Does colour input go to the selected gradient stop? Only while a stop (not a
+ * midpoint) was clicked, the selection still has a gradient on the same
+ * Fill/Stroke, and the index is valid.
+ */
+export function stopSelectionLive({ active, index, count, attr, stopAttr, hasGradient, midpoint = -1 } = {}) {
+  return !!active && !!hasGradient && !!attr && attr === stopAttr && !(midpoint >= 0)
+    && Number.isInteger(index) && index >= 0 && index < (Number(count) || 0);
+}
+
 /* ───────────────────────────── geometry ───────────────────────────── */
 export const normalizeAngle = (deg) => { let a = ((Number(deg) || 0) % 360 + 360) % 360; if (a > 180) a -= 360; return round(a, 4) === -180 ? 180 : round(a, 4); };
 export const snapAngle = (deg, step = 45) => normalizeAngle(Math.round(deg / step) * step);
