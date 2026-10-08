@@ -20,8 +20,8 @@
 import {
 	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
-	selectionVisualBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg,
-} from './visteras-clipboard-payload.js?v=clipboard-bridge-3';
+	selectionVisualBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg, sortByDocumentOrder,
+} from './visteras-clipboard-payload.js?v=clipboard-bridge-5';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
@@ -42,8 +42,10 @@ function extractSvgFromHtml(html) {
 
 export function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	if (!svgCanvas) return null;
-	const selected = (customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
-		.filter(Boolean);
+	// Document (stacking) order, not selection / click order: the SVG paints
+	// later children on top, so this keeps overlaps exactly as in Vector.
+	const selected = sortByDocumentOrder((customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
+		.filter(Boolean));
 	if (!selected.length) return null;
 
 	const serializer = new XMLSerializer();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { unionRects, selectionVisualBounds, pixelBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg } from '../js/visteras-clipboard-payload.js';
+import { unionRects, selectionVisualBounds, pixelBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg, sortByDocumentOrder } from '../js/visteras-clipboard-payload.js';
 import { getVisualBounds } from '../js/visteras-effects.js';
 import { fakeEl } from './helpers/fake-svg.mjs';
 
@@ -102,4 +102,63 @@ test('stamp: every Vector copy carries a nonce + timestamp on the SVG root (Stud
   assert.equal((restamped.match(/data-visteras-clip=/g) || []).length, 1, 'stamp replaced, not duplicated');
   assert.equal(restamped.replace(/ data-visteras-(clip|copied)="[^"]*"/g, ''), svg, 'content untouched');
   assert.equal(stampClipSvg('not svg', a), 'not svg');
+});
+
+// Fake document: `order` is the DOM (paint) order back → front; `parent` makes contains() work.
+function docOrdered(ids, { parent = {} } = {}) {
+  const els = ids.map((id, i) => {
+    const el = fakeEl('rect', { id, x: String(2000 + i * 40), y: '100', width: '100', height: '80', fill: ['#f00', '#0f0', '#00f', '#ff0'][i % 4] });
+    el.docIndex = i;
+    el.getBBox = () => ({ x: +el.attrs.x, y: +el.attrs.y, width: +el.attrs.width, height: +el.attrs.height });
+    return el;
+  });
+  const byId = Object.fromEntries(els.map((e) => [e.id, e]));
+  for (const el of els) {
+    el.compareDocumentPosition = (other) => (other === el ? 0 : other.docIndex > el.docIndex ? 4 : 2);
+    el.contains = (other) => { for (let p = parent[other.id]; p; p = parent[p]) if (p === el.id) return true; return other === el; };
+  }
+  return byId;
+}
+
+test('stacking: sortByDocumentOrder returns document (back → front) order whatever the click order', () => {
+  const d = docOrdered(['back', 'middle', 'front']);
+  const ids = (list) => list.map((e) => e.id);
+  assert.deepEqual(ids(sortByDocumentOrder([d.front, d.back, d.middle])), ['back', 'middle', 'front'], 'click order front, back, middle');
+  assert.deepEqual(ids(sortByDocumentOrder([d.front, d.middle, d.back])), ['back', 'middle', 'front'], 'reverse order (SVG-Edit selection order)');
+  assert.deepEqual(ids(sortByDocumentOrder([d.back, d.middle, d.front])), ['back', 'middle', 'front'], 'already in order');
+  assert.deepEqual(ids(sortByDocumentOrder([d.middle, null, d.middle, undefined])), ['middle'], 'nulls and duplicates dropped');
+  // Elements without compareDocumentPosition keep their given order.
+  const a = fakeEl('rect', { id: 'a' }), b = fakeEl('rect', { id: 'b' });
+  assert.deepEqual(ids(sortByDocumentOrder([b, a])), ['b', 'a']);
+});
+
+test('stacking: a selected group keeps its own children (nested order intact); selected descendants are not copied twice', () => {
+  const d = docOrdered(['g1', 'g1_child_back', 'g1_child_front', 'top'], { parent: { g1_child_back: 'g1', g1_child_front: 'g1' } });
+  const ids = sortByDocumentOrder([d.top, d.g1_child_front, d.g1]).map((e) => e.id);
+  assert.deepEqual(ids, ['g1', 'top'], 'the child travels inside its group, group stays behind the later sibling');
+});
+
+test('stacking: serializeSelectedToSvg writes overlapping shapes in document order when selected in reverse / click order', async () => {
+  const d = docOrdered(['Z1', 'Z2', 'Z3']);
+  const sc = { getStrokedBBox: ([el]) => el.getBBox() };
+  const prevWindow = globalThis.window, prevSer = globalThis.XMLSerializer;
+  globalThis.window = { __visterasEffects: { getVisualBounds: (el) => getVisualBounds(el, sc) }, getComputedStyle: () => null };
+  globalThis.XMLSerializer = class { serializeToString(n) { return `<${n.tagName} ${Object.entries(n.attrs).map(([k, v]) => `${k}="${String(v).replace(/"/g, '&quot;')}"`).join(' ')}/>`; } };
+  for (const el of Object.values(d)) {
+    el.style = {};
+    el.cloneNode = () => { const c = fakeEl(el.tagName, el.attrs); c.classList = { remove() {} }; c.querySelectorAll = () => []; return c; };
+  }
+  try {
+    const { serializeSelectedToSvg } = await import('../js/visteras-clipboard-bridge.js');
+    const order = (svg) => [...svg.matchAll(/id="(Z\d)"/g)].map((m) => m[1]);
+    for (const clicked of [[d.Z3, d.Z1, d.Z2], [d.Z3, d.Z2, d.Z1], [d.Z2, d.Z3, d.Z1]]) {
+      const svg = serializeSelectedToSvg(sc, clicked);
+      assert.deepEqual(order(svg), ['Z1', 'Z2', 'Z3'], `selected ${clicked.map((e) => e.id).join(',')} → painted back to front`);
+    }
+    // Via the canvas selection too (no customSelected).
+    const svg = serializeSelectedToSvg({ ...sc, getSelectedElements: () => [d.Z3, d.Z2, d.Z1] });
+    assert.deepEqual(order(svg), ['Z1', 'Z2', 'Z3']);
+  } finally {
+    globalThis.window = prevWindow; globalThis.XMLSerializer = prevSer;
+  }
 });

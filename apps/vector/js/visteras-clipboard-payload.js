@@ -148,6 +148,29 @@ export function normalizedSvgMarkup({ parts, defs = '', bounds }) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="visteras-vector-clip" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
 }
 
+/**
+ * Selected elements in DOCUMENT order (back → front), the stacking order of
+ * Vector's Layers panel, whatever order they were clicked / selected in
+ * (SVG-Edit's getSelectedElements() is selection order). Elements inside
+ * another selected element are dropped: they travel with that ancestor.
+ * Illustrator copies in stacking order too.
+ */
+export function sortByDocumentOrder(elements) {
+  const list = [...new Set((elements || []).filter(Boolean))];
+  const top = list.filter((el) => !list.some((o) => o !== el && typeof o.contains === 'function' && o.contains(el)));
+  const FOLLOWING = 4, PRECEDING = 2; // Node.DOCUMENT_POSITION_*
+  return top
+    .map((el, i) => ({ el, i }))
+    .sort((a, b) => {
+      if (typeof a.el.compareDocumentPosition !== 'function') return a.i - b.i;
+      const pos = a.el.compareDocumentPosition(b.el);
+      if (pos & FOLLOWING) return -1;
+      if (pos & PRECEDING) return 1;
+      return a.i - b.i;
+    })
+    .map((x) => x.el);
+}
+
 /** {source, nonce, ts} identifying one copy (Studio pastes the most recent copy). */
 export function newClipStamp(source = 'vector', now = Date.now(), rand = Math.random) {
   return { source, nonce: `${source}-${now.toString(36)}-${rand().toString(36).slice(2, 10)}`, ts: now };
