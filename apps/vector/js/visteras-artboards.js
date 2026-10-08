@@ -1,5 +1,35 @@
 import {normalizeArtboards,artboardId,nextArtboardName,artboardState,artboardUnion,associatedArtboard,nearbyArtboard,ArtboardCommand} from './visteras-artboard-model.js';
 
+/**
+ * Paint the Properties ▸ Artboard Background chip.
+ * `.vcs-appearance-chip { background: #ccc !important }` beats a normal inline
+ * style — same trap as Appearance Fill/Stroke — so we set background-color with
+ * !important (mirrors color-system paintWell).
+ */
+export function paintArtboardBackgroundChip(bg, noneBtn, backgroundColor) {
+  if (!bg) return;
+  const isNone = backgroundColor === 'none';
+  bg.classList.toggle('is-none', isNone);
+  bg.textContent = '';
+  bg.removeAttribute('data-hex');
+  if (isNone) {
+    bg.style.removeProperty('background-color');
+    bg.style.removeProperty('background-image');
+    bg.title = 'Artboard background: None';
+  } else {
+    const color = backgroundColor || '#ffffff';
+    bg.style.setProperty('background-color', color, 'important');
+    bg.style.removeProperty('background-image');
+    bg.dataset.hex = color;
+    bg.title = `Artboard background: ${color}`;
+  }
+  if (noneBtn) {
+    noneBtn.classList.toggle('is-active', isNone);
+    noneBtn.setAttribute('aria-pressed', String(isNone));
+  }
+}
+
+
 /** Artboards live on the document, not in svgcontent. The editor-only background
  * group is a sibling of svgcontent; it never enters Layers or saved SVG artwork. */
 export function mountArtboards(editor) {
@@ -61,7 +91,7 @@ export function mountArtboards(editor) {
   document.getElementById('properties_panel')?.append(props);
   const transformSection=document.getElementById('sec_transform'),transformHome=transformSection?.parentNode,transformNext=transformSection?.nextSibling;
   const propertyMode=()=>tool()||!sc.getSelectedElements().filter(Boolean).length;
-  function syncProperties(){const b=active(),show=propertyMode();props.hidden=!show;const empty=document.getElementById('prop_empty_state');if(empty)empty.style.display='none';if(show&&transformSection){props.append(transformSection);transformSection.style.display='';}else if(transformSection&&transformSection.parentNode===props&&transformHome)transformHome.insertBefore(transformSection,transformNext);const name=props.querySelector('#vab_name');if(b&&document.activeElement!==name)name.value=b.name;const bg=props.querySelector('#vab_background'),noneBtn=props.querySelector('#vab_none');if(b&&bg){const isNone=b.backgroundColor==='none';bg.classList.toggle('is-none',isNone);bg.style.background=isNone?'':b.backgroundColor;bg.textContent='';bg.removeAttribute('data-hex');if(!isNone)bg.dataset.hex=b.backgroundColor;if(noneBtn){noneBtn.classList.toggle('is-active',isNone);noneBtn.setAttribute('aria-pressed',String(isNone));}}const rot=document.getElementById('prop_row_rotate_flip');if(rot){rot.hidden=show;rot.style.setProperty('display',show?'none':'grid','important');}window.dispatchEvent(new CustomEvent('visteras:artboard-properties'));}
+  function syncProperties(){const b=active(),show=propertyMode();props.hidden=!show;const empty=document.getElementById('prop_empty_state');if(empty)empty.style.display='none';if(show&&transformSection){props.append(transformSection);transformSection.style.display='';}else if(transformSection&&transformSection.parentNode===props&&transformHome)transformHome.insertBefore(transformSection,transformNext);const name=props.querySelector('#vab_name');if(b&&document.activeElement!==name)name.value=b.name;const bg=props.querySelector('#vab_background'),noneBtn=props.querySelector('#vab_none');if(b&&bg)paintArtboardBackgroundChip(bg,noneBtn,b.backgroundColor);const rot=document.getElementById('prop_row_rotate_flip');if(rot){rot.hidden=show;rot.style.setProperty('display',show?'none':'grid','important');}window.dispatchEvent(new CustomEvent('visteras:artboard-properties'));}
   props.querySelector('#vab_name').addEventListener('change',e=>edit({name:e.target.value.trim()||active().name},'Rename artboard'));
   props.querySelector('#vab_move_art').addEventListener('change',e=>moveArtwork=e.target.checked);
   props.querySelector('#vab_none').addEventListener('click',()=>edit({backgroundColor:'none'},'Artboard background'));
