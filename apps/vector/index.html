@@ -301,6 +301,7 @@
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-1';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-1';
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=transform-1';
+    import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-1';
     import { mountGrid } from './js/visteras-grid.js?v=grid-1';
     import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-1';
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=1';
@@ -2569,6 +2570,8 @@
     mountObjectLock(svgEditor);
     // Object ▸ Transform (Again ⌘D, Move… ⇧⌘M, Rotate/Reflect/Scale, Reset Bounding Box)
     mountObjectTransform(svgEditor);
+    // Object ▸ Compound Path ▸ Make (⌘8) / Release (⌥⇧⌘8)
+    mountCompoundPath(svgEditor);
     mountGrid(svgEditor);
     mountContextMenu(svgEditor);
     mountShortcutLabels();
