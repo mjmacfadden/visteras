@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { appearanceRows } from '../js/visteras-appearance.js';
+import { appearanceRows, ILLUSTRATOR_STROKE_WEIGHT_PRESETS, stepStrokeWeight, formatStrokeWeight } from '../js/visteras-appearance.js';
 import { serializeFx } from '../js/visteras-effects.js';
 import { fakeEl } from './helpers/fake-svg.mjs';
 
@@ -44,4 +44,47 @@ test('Appearance panel is wired: dock icon, ⇧F6, Window menu, mount', () => {
   assert.doesNotMatch(index, /Appearance panel coming/);
   assert.match(index, /id="action_window_appearance"/);
   assert.doesNotMatch(index, /action_window_appearance"[^>]*disabled/);
+});
+
+
+test('Illustrator stroke weight presets match AI list', () => {
+  assert.deepEqual([...ILLUSTRATOR_STROKE_WEIGHT_PRESETS], [
+    0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100,
+  ]);
+  assert.equal(formatStrokeWeight(0.25), '0.25');
+  assert.equal(formatStrokeWeight(10), '10');
+});
+
+test('stepStrokeWeight follows Illustrator-ish quarters then integers', () => {
+  assert.equal(stepStrokeWeight(0, 1), 0.25);
+  assert.equal(stepStrokeWeight(0.25, 1), 0.5);
+  assert.equal(stepStrokeWeight(1, 1), 2);
+  assert.equal(stepStrokeWeight(2, -1), 1);
+  assert.equal(stepStrokeWeight(0.5, -1), 0.25);
+});
+
+test('Appearance stroke row markup: weight field, presets, steppers, underlined label, swatch menu', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-appearance.js', import.meta.url), 'utf8');
+  assert.match(src, /vapp_weight_input/);
+  assert.match(src, /vapp_weight_presets/);
+  assert.match(src, /vapp_weight_spin_btn/);
+  assert.match(src, /data-act="stroke-options"/);
+  assert.match(src, /data-act="swatches"/);
+  assert.match(src, /writeStrokeWidth/);
+  assert.match(src, /__visterasDock\.open\('stroke'\)/);
+  assert.match(src, /ILLUSTRATOR_STROKE_WEIGHT_PRESETS/);
+  const css = fs.readFileSync(new URL('../css/visteras-appearance-panel.css', import.meta.url), 'utf8');
+  assert.match(css, /vapp_weight/);
+  assert.match(css, /vapp_label_link/);
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /visteras-appearance\.js\?v=appearance-stroke-1/);
+});
+
+test('appearanceRows prefers data-visteras-stroke-weight over stroke-width', () => {
+  const el = fakeEl('rect', {
+    id: 'r', fill: 'none', stroke: '#000', 'stroke-width': '4',
+    'data-visteras-stroke-weight': '2',
+  });
+  const { rows } = appearanceRows([el]);
+  assert.equal(rows.find((r) => r.kind === 'stroke').weight, '2');
 });

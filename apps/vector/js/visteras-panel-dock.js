@@ -12,38 +12,12 @@
  * Only one dock flyout is open at a time; auto-collapses on canvas click or Esc.
  */
 
+import { stepStrokeWeight, formatStrokeWeight } from './visteras-stroke-weight.js?v=1';
+
 const STORAGE_KEY = 'visteras-vector-dock';
 const MIN_WIDTH = 220;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 240;
-
-/**
- * Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → 5 …
- */
-export function stepStrokeWeight(value, dir) {
-  const n = Math.max(0, Number(value) || 0);
-  const quarters = [0, 0.25, 0.5, 0.75, 1];
-  if (dir > 0) {
-    for (const s of quarters) {
-      if (n < s - 1e-9) return s;
-    }
-    return Math.floor(n + 1e-9) + 1;
-  }
-  if (n > 1 + 1e-9) {
-    const floored = Math.floor(n + 1e-9);
-    return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
-  }
-  for (let i = quarters.length - 1; i >= 0; i--) {
-    if (n > quarters[i] + 1e-9) return quarters[i];
-  }
-  return 0;
-}
-
-export function formatStrokeWeight(n) {
-  const v = Math.max(0, Number(n) || 0);
-  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
-  return String(Math.round(v * 100) / 100);
-}
 
 /**
  * Illustrator panel shortcuts → panel id. Shift is significant:
@@ -843,3 +817,5 @@ export function mountVisterasPanelDock({ svgEditor }) {
 
   return dockApi;
 }
+
+export { stepStrokeWeight, formatStrokeWeight };

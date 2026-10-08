@@ -16,6 +16,7 @@
 import { SWATCH_CATEGORIES } from './visteras-swatches-data.js';
 import { mountStrokeLink } from './visteras-stroke-link.js?v=stroke-link-2';
 import { resolveSelectionPaint, parseCssPaint } from './visteras-paint-resolver.js?v=paint-resolver-3';
+import { ILLUSTRATOR_STROKE_WEIGHT_PRESETS, stepStrokeWeight, formatStrokeWeight } from './visteras-stroke-weight.js?v=1';
 
 const STORAGE_SWATCHES = 'visteras-vector-swatches';
 const STORAGE_RECENT = 'visteras-vector-recent-colors';
@@ -2303,34 +2304,6 @@ function chainCanvasEvent(sc, name, fn) {
   });
 }
 
-/**
- * Stepper sequence: 0 → 0.25 → 0.5 → 0.75 → 1 → 2 → 3 → 4 → 5 …
- */
-function stepStrokeWeight(value, dir) {
-  const n = Math.max(0, Number(value) || 0);
-  const quarters = [0, 0.25, 0.5, 0.75, 1];
-  if (dir > 0) {
-    for (const s of quarters) {
-      if (n < s - 1e-9) return s;
-    }
-    return Math.floor(n + 1e-9) + 1;
-  }
-  if (n > 1 + 1e-9) {
-    const floored = Math.floor(n + 1e-9);
-    return Math.abs(n - floored) < 1e-9 ? floored - 1 : floored;
-  }
-  for (let i = quarters.length - 1; i >= 0; i--) {
-    if (n > quarters[i] + 1e-9) return quarters[i];
-  }
-  return 0;
-}
-
-function formatStrokeWeight(n) {
-  const v = Math.max(0, Number(n) || 0);
-  if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v));
-  return String(Math.round(v * 100) / 100);
-}
-
 function mountAppearanceColors(ctrl, svgEditor) {
   const fillChip = document.getElementById('vcs_app_fill_chip');
   const strokeChip = document.getElementById('vcs_app_stroke_chip');
@@ -2436,6 +2409,11 @@ function mountAppearanceColors(ctrl, svgEditor) {
     if (dkW && document.activeElement !== dkW) {
       dkW.value = formatStrokeWeight(n);
     }
+    const appW2 = document.getElementById('vapp_stroke_weight');
+    if (appW2 && document.activeElement !== appW2) {
+      appW2.value = formatStrokeWeight(n);
+    }
+    try { if (document.activeElement?.id !== 'vapp_stroke_weight') window.__visterasAppearance?.render?.(); } catch { /* ignore */ }
   }
 
   function writeStrokeAlign(align) {
@@ -2644,6 +2622,14 @@ function mountAppearanceColors(ctrl, svgEditor) {
       writeStrokeAlign(align);
       refresh();
     });
+  }
+
+  // Expose for Appearance panel / Stroke dock / smoke (same undo path as Properties weight).
+  if (window.__visterasColorSystem) {
+    window.__visterasColorSystem.writeStrokeWidth = writeStrokeWidth;
+    window.__visterasColorSystem.readStrokeWidth = readStrokeWidth;
+    window.__visterasColorSystem.formatStrokeWeight = formatStrokeWeight;
+    window.__visterasColorSystem.stepStrokeWeight = stepStrokeWeight;
   }
 
   ctrl.subscribe(refresh);
@@ -2972,5 +2958,5 @@ export function mountVisterasColorSystem({ svgEditor } = {}) {
   return ctrl;
 }
 
-export { isTextPaintTarget, hasShapePaintTarget, targetHasText, targetHasShape, stepStrokeWeight, formatStrokeWeight };
+export { isTextPaintTarget, hasShapePaintTarget, targetHasText, targetHasShape, stepStrokeWeight, formatStrokeWeight, ILLUSTRATOR_STROKE_WEIGHT_PRESETS };
 export default mountVisterasColorSystem;
