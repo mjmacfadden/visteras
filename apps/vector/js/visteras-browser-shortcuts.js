@@ -1,14 +1,16 @@
 /**
  * Browser-safe shortcut remapping for Vector (and mirrored by Studio).
  *
- * Chrome/Safari reserve ⌘1–9 (and Ctrl+1–9 on Windows) for tab switching;
- * ⌘0 / Ctrl+0 often resets zoom. Pages cannot reliably override those.
+ * Chrome/Safari reserve ⌘1–9 (and Ctrl+1–9 on Windows) for tab switching.
+ * ⌘0 / Ctrl+0 resets page zoom, but unlike tab keys the page CAN block that
+ * with preventDefault on keydown (capture if needed) — so Fit Artboard keeps
+ * Illustrator’s ⌘0 / Ctrl+0 (and Fit All ⌥⌘0 / Ctrl+Alt+0). Digits 1–9 still remap.
  *
  * Rule (Rham / gravit-gap-3):
- *   Mac:     add ⌃ to any ⌘+digit chord → ⌃⌘N, ⌃⌥⌘N, ⌃⌥⇧⌘N, …
- *   Windows: Ctrl+digit → Ctrl+Alt+digit;
- *            chords that already include Alt → Ctrl+Alt+Shift+digit
- *            (keeps Unlock/Show/Release distinct from Lock/Hide/Make).
+ *   Mac:     add ⌃ to ⌘+digit (1–9) → ⌃⌘N, ⌃⌥⌘N, …
+ *   Windows: Ctrl+digit (1–9) → Ctrl+Alt+digit;
+ *            already-Alt → Ctrl+Alt+Shift+digit
+ *   Exception: digit 0 is left as Illustrator (⌘0 / ⌥⌘0; Win Ctrl+0 / Ctrl+Alt+0).
  *
  * AltGr note: Ctrl+Alt+letter is AltGr on many EU layouts; digit chords are
  * usually safer but still flagged in tests/docs.
@@ -31,6 +33,14 @@ export function browserSafeChord(spec = {}) {
   let { meta = false, ctrl = false, alt = false, shift = false } = spec;
   if (!isDigitKey(key)) {
     return { meta: !!meta, ctrl: !!ctrl, alt: !!alt, shift: !!shift, key, mac };
+  }
+  // Digit 0: keep Illustrator chords. Chrome zoom-reset is preventDefault-able
+  // (unlike ⌘1–9 tab switching). Handlers must call preventDefault on keydown.
+  if (key === '0') {
+    if (mac) {
+      return { meta: !!meta, ctrl: !!ctrl, alt: !!alt, shift: !!shift, key, mac };
+    }
+    return { meta: false, ctrl: !!(meta || ctrl), alt: !!alt, shift: !!shift, key, mac };
   }
   if (mac) {
     if (meta) ctrl = true; // ⌃⌘digit…
@@ -67,8 +77,10 @@ export function isBrowserReservedChord(spec = {}) {
   const shift = !!spec.shift;
   const primary = mac ? meta : (ctrl || meta);
 
-  // Tab switching / zoom reset: primary+digit with no extra safety modifier
-  if (isDigitKey(key) && primary) {
+  // Tab switching: primary+digit 1–9 with no safety modifier is reserved.
+  // Digit 0 is NOT reserved here: browsers reset zoom on ⌘0/Ctrl+0, but the
+  // page can preventDefault that (verified in Chrome). Fit Artboard uses it.
+  if (isDigitKey(key) && key !== '0' && primary) {
     if (mac && meta && !ctrl) return true; // bare ⌘digit
     if (!mac && (ctrl || meta) && !alt) return true; // bare Ctrl+digit
   }

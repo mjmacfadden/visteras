@@ -1,7 +1,8 @@
 /**
  * Browser-safe digit shortcut remapping (same rule as Vector gravit-gap-3).
- * Mac: add Ctrl to Cmd+digit. Windows: Ctrl+digit → Ctrl+Alt+digit;
+ * Mac: add Ctrl to Cmd+digit (1–9). Windows: Ctrl+digit → Ctrl+Alt+digit;
  * already-Alt chords → Ctrl+Alt+Shift+digit.
+ * Exception: digit 0 stays Illustrator (⌘0 / Ctrl+0) — zoom reset is preventDefault-able.
  */
 export function isDigitKey(key) {
   return /^[0-9]$/.test(String(key ?? '').trim());
@@ -12,6 +13,10 @@ export function browserSafeChord(spec = {}, isMac) {
   const key = String(spec.key ?? '').trim();
   let meta = !!spec.meta, ctrl = !!spec.ctrl, alt = !!spec.alt, shift = !!spec.shift;
   if (!isDigitKey(key)) return { meta, ctrl, alt, shift, key };
+  if (key === '0') {
+    if (mac) return { meta, ctrl, alt, shift, key };
+    return { meta: false, ctrl: !!(meta || ctrl), alt, shift, key };
+  }
   if (mac) {
     if (meta) ctrl = true;
     return { meta, ctrl, alt, shift, key };

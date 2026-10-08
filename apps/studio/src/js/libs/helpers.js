@@ -584,15 +584,25 @@ class Helper_class {
 	format_shortcut(shortcut) {
 		if (!shortcut) return '';
 		const isMac = this.is_mac();
-		// Browser-safe digit chords (same rule as Vector): bare Ctrl/Cmd+digit is reserved.
-		// Canonical stored form is "Ctrl + Alt + N" (Windows). Mac displays "Ctrl + Cmd + N".
+		// Browser-safe digit chords (same rule as Vector): bare Ctrl/Cmd+digit 1–9 is reserved.
+		// Digit 0 stays bare (Fit Window) — zoom reset is preventDefault-able.
+		// Canonical stored form for 1–9 is "Ctrl + Alt + N" (Windows). Mac: "Ctrl + Cmd + N".
 		const digitAlt = String(shortcut).match(/^\s*Ctrl\s*\+\s*Alt\s*\+\s*([0-9])\s*$/i);
 		if (digitAlt) {
-			return isMac ? ('Ctrl + Cmd + ' + digitAlt[1]) : ('Ctrl + Alt + ' + digitAlt[1]);
+			const d = digitAlt[1];
+			if (d === '0') {
+				// Ctrl+Alt+0 is Fit All style — keep as written (Win) / Ctrl+Option+0 unused; Mac Option+Cmd via Alt path below
+				return isMac ? ('Ctrl + Option + ' + d) : ('Ctrl + Alt + ' + d);
+			}
+			return isMac ? ('Ctrl + Cmd + ' + d) : ('Ctrl + Alt + ' + d);
 		}
 		const digitBare = String(shortcut).match(/^\s*Ctrl\s*\+\s*([0-9])\s*$/i);
 		if (digitBare) {
-			return isMac ? ('Ctrl + Cmd + ' + digitBare[1]) : ('Ctrl + Alt + ' + digitBare[1]);
+			const d = digitBare[1];
+			if (d === '0') {
+				return isMac ? ('Cmd + 0') : ('Ctrl + 0');
+			}
+			return isMac ? ('Ctrl + Cmd + ' + d) : ('Ctrl + Alt + ' + d);
 		}
 		if (isMac) {
 			return shortcut.replace(/\bCtrl\b/gi, 'Cmd').replace(/\bAlt\b/gi, 'Option');

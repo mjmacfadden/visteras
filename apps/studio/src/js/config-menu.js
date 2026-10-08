@@ -184,7 +184,7 @@ const menuDefinition = [
 					},
 					{
 						name: 'Fit Window',
-						shortcut: 'Ctrl + Alt + 0',
+						shortcut: 'Ctrl + 0',
 						target: 'view/zoom.auto'
 					}
 				]

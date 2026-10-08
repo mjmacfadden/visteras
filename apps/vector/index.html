@@ -154,8 +154,8 @@
         <div class="menu_entry" id="menu_view">
           <div class="menu_entry_title">View</div>
           <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item" id="action_fit_all_artboards">Fit All Artboards in Window <span class="menu_dropdown_shortcut">⌃⌥⌘0</span></div>
-            <div class="menu_dropdown_item" id="action_fit_workspace">Fit Artboard in Window <span class="menu_dropdown_shortcut">⌃⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_fit_all_artboards">Fit All Artboards in Window <span class="menu_dropdown_shortcut">⌥⌘0</span></div>
+            <div class="menu_dropdown_item" id="action_fit_workspace">Fit Artboard in Window <span class="menu_dropdown_shortcut">⌘0</span></div>
             <div class="menu_dropdown_item" id="action_zoom_100">Actual Size (100%) <span class="menu_dropdown_shortcut">⌃⌘1</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_zoom_in">Zoom In <span class="menu_dropdown_shortcut">⌘+</span></div>
@@ -300,7 +300,7 @@
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-2';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-2';
-    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=safe-1';
+    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=safe-2';
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=transform-1';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
     import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
@@ -1286,7 +1286,7 @@
 
         // Command / Control shortcuts
         if (isCmdOrCtrl && !e.altKey) {
-          // Browser-safe: ⌃⌘0 / Ctrl+Alt+0 Fit artboard; ⌃⌘1 / Ctrl+Alt+1 Actual Size
+          // Fit artboard ⌘0 / Ctrl+0 (preventDefault blocks zoom); Actual Size ⌃⌘1 / Ctrl+Alt+1
           if (eventMatchesChord(e, { meta: true, key: '0' }) && !e.altKey && !e.shiftKey) {
             e.preventDefault();
             e.stopPropagation();
@@ -1466,7 +1466,7 @@
             window.__visterasClippingMask?.release();
             return;
           }
-          // Browser-safe: ⌃⌥⌘0 / Ctrl+Alt+Shift+0 Fit All Artboards
+          // Fit All Artboards ⌥⌘0 / Ctrl+Alt+0
           if (eventMatchesChord(e, { meta: true, alt: true, key: '0' })) {
             e.preventDefault();
             e.stopPropagation();

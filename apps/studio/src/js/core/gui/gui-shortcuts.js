@@ -88,6 +88,18 @@ class GUI_shortcuts_class {
 		window.addEventListener('keydown', preventAltFocus, { capture: true, passive: false });
 		window.addEventListener('keyup', preventAltFocus, { capture: true, passive: false });
 		document.addEventListener('keydown', preventAltFocus, { capture: true, passive: false });
+		// Capture: Fit Window ⌘0/Ctrl+0 must preventDefault before Chrome resets page zoom.
+		const isMacOSFit = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+		const fitWindowOnZero = (event) => {
+			if (eventMatchesDigitChord(event, { meta: true, key: '0' }, isMacOSFit) && !event.altKey && !event.shiftKey) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.GUI_preview) app.GUI.GUI_preview.zoom_auto();
+			}
+		};
+		window.addEventListener('keydown', fitWindowOnZero, { capture: true, passive: false });
+		document.addEventListener('keydown', fitWindowOnZero, { capture: true, passive: false });
+
 		document.addEventListener('keyup', preventAltFocus, { capture: true, passive: false });
 
 		const updateModifierState = (event, isDown) => {
@@ -235,7 +247,8 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Browser-safe zoom (bare Cmd/Ctrl+0/1 are reserved by Chrome for zoom/tabs)
+			// Fit Window: Illustrator ⌘0 / Ctrl+0 (preventDefault blocks browser zoom reset).
+			// Actual Size stays browser-safe ⌃⌘1 / Ctrl+Alt+1 (⌘1 is a tab shortcut).
 			const isMacOS = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
 			if (eventMatchesDigitChord(event, { meta: true, key: '0' }, isMacOS) && !event.altKey && !event.shiftKey) {
 				event.preventDefault();
