@@ -785,10 +785,8 @@ export async function read_svg_from_clipboard_event(e) {
 		if (picked) return picked;
 	}
 
-	// Check cross-app broadcast cache
-	if (window.__visteras_last_cross_app_svg) {
-		return window.__visteras_last_cross_app_svg;
-	}
+	// The BroadcastChannel cache is NOT consulted here: it may be older than the
+	// system clipboard. Edit_paste uses it only when the clipboard is unreadable.
 
 	try {
 		if (navigator.clipboard && navigator.clipboard.read) {

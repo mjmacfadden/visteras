@@ -444,15 +444,15 @@ class GUI_shortcuts_class {
 				return;
 			}
 
-			// Ctrl/Cmd + V = Paste from the system clipboard. Keep this explicit
-			// fallback because browser paste events are not delivered when focus is
-			// inside the canvas overlay or a menu has just closed.
+			// Ctrl/Cmd + V = Paste the most recent copy. The native paste event is
+			// left alone (its clipboardData needs no permission); if the browser
+			// sends none (focus inside the canvas overlay, a menu just closed), the
+			// paste module falls back to navigator.clipboard.read() shortly after.
 			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
 				&& (event.code === 'KeyV' || event.keyCode === 86)) {
-				event.preventDefault();
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/paste']) {
-					app.GUI.modules['edit/paste'].paste();
+					app.GUI.modules['edit/paste'].paste_shortcut();
 				}
 				return;
 			}

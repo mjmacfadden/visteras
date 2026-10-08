@@ -20,7 +20,7 @@
 import {
 	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
-	selectionVisualBounds, normalizedSvgMarkup,
+	selectionVisualBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg,
 } from './visteras-clipboard-payload.js?v=clipboard-bridge-3';
 
 const SVG_MIME = 'image/svg+xml';
@@ -105,6 +105,14 @@ export function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	return normalizedSvgMarkup({ parts, defs, bounds });
 }
 
+/** Serialize + stamp one copy (nonce/timestamp let Studio paste only the most recent copy). */
+function stampedCopy(svgCanvas, selected) {
+	const svgText = serializeSelectedToSvg(svgCanvas, selected);
+	if (!svgText) return { svgText: null, stamp: null };
+	const stamp = newClipStamp('vector');
+	return { svgText: stampClipSvg(svgText, stamp), stamp };
+}
+
 /** Effect-aware bounds of one element in #svgcontent user units. */
 function visualBoundsOf(svgCanvas, el) {
 	try {
@@ -117,7 +125,10 @@ function visualBoundsOf(svgCanvas, el) {
 
 /** Web custom format payload: tells Studio the clipboard SVG came from Vector. */
 function clipJson(svgText) {
-	return JSON.stringify({ format: 'visteras-clip', source: 'vector', svg: svgText });
+	const root = (String(svgText).match(/<svg\b[^>]*>/) || [''])[0];
+	const nonce = (root.match(/data-visteras-clip="([^"]*)"/) || [])[1] || null;
+	const ts = Number((root.match(/data-visteras-copied="(\d+)"/) || [])[1]) || Date.now();
+	return JSON.stringify({ format: 'visteras-clip', source: 'vector', nonce, ts, svg: svgText });
 }
 
 async function writeSvgClipboard(svgText) {
@@ -209,11 +220,11 @@ function writeOnce(selected, svgText) {
 	writeRichClipboard(selected, svgText);
 }
 
-function publishChannel(svgText) {
+function publishChannel(svgText, stamp = null) {
 	try {
 		if (typeof BroadcastChannel === 'undefined') return;
 		const ch = new BroadcastChannel(CHANNEL);
-		ch.postMessage({ type: 'vector-clipboard', svg: svgText, meta: { source: 'vector' }, ts: Date.now() });
+		ch.postMessage({ type: 'vector-clipboard', svg: svgText, meta: { source: 'vector', nonce: stamp && stamp.nonce }, nonce: stamp && stamp.nonce, ts: (stamp && stamp.ts) || Date.now() });
 		ch.close();
 	} catch (e) { /* ignore */ }
 }
@@ -328,10 +339,10 @@ export function installVisterasClipboardBridge(opts = {}) {
 		const selected = getSelectedElementsSafe();
 		if (!selected.length) return;
 
-		const svgText = serializeSelectedToSvg(svgCanvas, selected);
+		const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 		if (!svgText) return;
 
-		publishChannel(svgText);
+		publishChannel(svgText, stamp);
 
 		if (e.clipboardData) {
 			try {
@@ -339,7 +350,7 @@ export function installVisterasClipboardBridge(opts = {}) {
 				e.clipboardData.setData(SVG_MIME, svgText);
 				e.clipboardData.setData('text/plain', svgText);
 				e.clipboardData.setData('text/html', svgText);
-				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, source: 'vector', svg: svgText }));
+				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, svg: svgText, source: 'vector', nonce: stamp.nonce, ts: stamp.ts }));
 				e.preventDefault();
 			} catch (err) {
 				console.warn('e.clipboardData.setData error:', err);
@@ -374,9 +385,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 		const result = origCopy ? origCopy(...args) : undefined;
 		try {
 			const selected = getSelectedElementsSafe();
-			const svgText = serializeSelectedToSvg(svgCanvas, selected);
+			const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 			if (svgText) {
-				publishChannel(svgText);
+				publishChannel(svgText, stamp);
 				writeOnce(selected, svgText);
 			}
 		} catch (err) {
@@ -391,9 +402,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 		svgCanvas.cutSelectedElements = function (...args) {
 			try {
 				const selected = getSelectedElementsSafe();
-				const svgText = serializeSelectedToSvg(svgCanvas, selected);
+				const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 				if (svgText) {
-					publishChannel(svgText);
+					publishChannel(svgText, stamp);
 					writeOnce(selected, svgText);
 				}
 			} catch (err) { /* ignore */ }

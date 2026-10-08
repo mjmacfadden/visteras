@@ -148,6 +148,20 @@ export function normalizedSvgMarkup({ parts, defs = '', bounds }) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="visteras-vector-clip" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
 }
 
+/** {source, nonce, ts} identifying one copy (Studio pastes the most recent copy). */
+export function newClipStamp(source = 'vector', now = Date.now(), rand = Math.random) {
+  return { source, nonce: `${source}-${now.toString(36)}-${rand().toString(36).slice(2, 10)}`, ts: now };
+}
+
+/** Write the copy stamp on the SVG root: data-visteras-clip (nonce) + data-visteras-copied (ms). */
+export function stampClipSvg(svgText, stamp) {
+  const m = String(svgText || '').match(/<svg\b[^>]*>/i);
+  if (!m || !stamp) return svgText;
+  const clean = m[0].replace(/\s+data-visteras-(clip|copied)\s*=\s*["'][^"']*["']/gi, '');
+  const next = clean.replace(/\s*(\/?)>$/, ` data-visteras-clip="${String(stamp.nonce).replace(/["<>&]/g, '')}" data-visteras-copied="${Number(stamp.ts) || 0}"$1>`);
+  return String(svgText).replace(m[0], next);
+}
+
 // ─── DOM rendering ───────────────────────────────────────────────────────────
 const SVG_NS = 'http://www.w3.org/2000/svg';
 

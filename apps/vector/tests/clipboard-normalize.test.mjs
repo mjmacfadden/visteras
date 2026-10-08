@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { unionRects, selectionVisualBounds, pixelBounds, normalizedSvgMarkup } from '../js/visteras-clipboard-payload.js';
+import { unionRects, selectionVisualBounds, pixelBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg } from '../js/visteras-clipboard-payload.js';
 import { getVisualBounds } from '../js/visteras-effects.js';
 import { fakeEl } from './helpers/fake-svg.mjs';
 
@@ -85,5 +85,21 @@ test('normalize: Vector origin markers survive clipboard sanitizing (class + cop
   const src = fs.readFileSync(new URL('../js/visteras-clipboard-bridge.js', import.meta.url), 'utf8');
   assert.match(src, /const CLIP_MIME = 'web application\/x-visteras-clip\+json'/);
   assert.match(src, /items\[CLIP_MIME\] = Promise\.resolve/, 'rich ClipboardItem carries the Vector side channel');
-  assert.match(src, /source: 'vector', svg: svgText/);
+  assert.match(src, /source: 'vector', nonce: stamp\.nonce/, 'copy-event JSON says Vector + carries the stamp');
+  assert.match(src, /format: 'visteras-clip', source: 'vector', nonce, ts, svg: svgText/, 'custom format carries the stamp');
+});
+
+test('stamp: every Vector copy carries a nonce + timestamp on the SVG root (Studio pastes only the newest copy)', () => {
+  const a = newClipStamp('vector', 1000, () => 0.25), b = newClipStamp('vector', 1001, () => 0.75);
+  assert.notEqual(a.nonce, b.nonce);
+  assert.match(a.nonce, /^vector-/);
+  const svg = normalizedSvgMarkup({ parts: ['<rect/>'], bounds: { x: 2000, y: 0, width: 10, height: 10 } });
+  const stamped = stampClipSvg(svg, a);
+  const root = stamped.match(/<svg\b[^>]*>/)[0];
+  assert.match(root, new RegExp(`data-visteras-clip="${a.nonce}" data-visteras-copied="1000"`));
+  assert.match(root, /data-visteras-source="vector"/);
+  const restamped = stampClipSvg(stamped, b);
+  assert.equal((restamped.match(/data-visteras-clip=/g) || []).length, 1, 'stamp replaced, not duplicated');
+  assert.equal(restamped.replace(/ data-visteras-(clip|copied)="[^"]*"/g, ''), svg, 'content untouched');
+  assert.equal(stampClipSvg('not svg', a), 'not svg');
 });
