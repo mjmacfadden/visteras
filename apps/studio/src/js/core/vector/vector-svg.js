@@ -7,6 +7,7 @@
  */
 
 import { Vector, Subpath, Anchor } from './vector-model.js';
+import { pick_clipboard_svg } from '../../libs/vector-paste.js';
 
 export const VISTERAS_VECTOR_MIME = 'web application/x-visteras-vector+json';
 export const SVG_MIME = 'image/svg+xml';
@@ -764,84 +765,57 @@ export async function write_svg_clipboard(svgText, extra = {}) {
 	return false;
 }
 
+/** Web custom format Vector writes next to the SVG (Chromium; survives sanitizing). */
+export const VISTERAS_CLIP_MIME = 'web application/x-visteras-clip+json';
+
 /**
  * @param {ClipboardEvent} [e]
  * @returns {Promise<string|null>}
  */
 export async function read_svg_from_clipboard_event(e) {
-	const as_svg = (text) => {
-		if (!text) return null;
-		const m = String(text).match(/<svg[\s\S]*?<\/svg>/i);
-		if (m) return m[0];
-		if (looks_like_svg(text)) return text;
-		return null;
-	};
-
 	if (e && e.clipboardData) {
-		const items = e.clipboardData.items;
-		if (items) {
-			for (let i = 0; i < items.length; i++) {
-				const type = items[i].type || '';
-				if (type === SVG_MIME || type === 'text/html' || type === 'text/plain' || type === VISTERAS_VECTOR_MIME) {
-					const text = await new Promise((resolve) => {
-						try {
-							items[i].getAsString((s) => resolve(s));
-						} catch (err) {
-							resolve(null);
-						}
-					});
-					if (type === VISTERAS_VECTOR_MIME && text) {
-						try {
-							const data = JSON.parse(text);
-							if (data && data.format === 'visteras-vector') {
-								if (data.svg) return as_svg(data.svg);
-								if (Array.isArray(data.vectors)) return vectors_to_svg(data.vectors.map(Vector.fromJSON));
-							}
-						} catch (err) { /* fall through */ }
-					}
-					const svg = as_svg(text);
-					if (svg) return svg;
-				}
-			}
-		}
-		const plain = as_svg(e.clipboardData.getData('text/plain'));
-		if (plain) return plain;
-		const html = as_svg(e.clipboardData.getData('text/html'));
-		if (html) return html;
+		// Synchronous getData only: the DataTransfer goes dead after the event,
+		// so async item string reads after an await never call back.
+		const dt = e.clipboardData;
+		const get = (t) => { try { return dt.getData(t) || ''; } catch (err) { return ''; } };
+		const picked = pick_clipboard_svg({
+			plain: get('text/plain'), svg: get(SVG_MIME), html: get('text/html'),
+			json: [get(VISTERAS_VECTOR_MIME), get(VISTERAS_CLIP_MIME)],
+		});
+		if (picked) return picked;
 	}
 
-	// Check cross-app broadcast cache
-	if (window.__visteras_last_cross_app_svg) {
-		return window.__visteras_last_cross_app_svg;
-	}
+	// The BroadcastChannel cache is NOT consulted here: it may be older than the
+	// system clipboard. Edit_paste uses it only when the clipboard is unreadable.
 
 	try {
 		if (navigator.clipboard && navigator.clipboard.read) {
 			const clip_items = await navigator.clipboard.read();
+			const reps = { plain: '', svg: '', html: '', json: [] };
 			for (const item of clip_items) {
-				const types = item.types || [];
-				for (const type of types) {
-					if (type === SVG_MIME || type === 'text/plain' || type === 'text/html' || type === VISTERAS_VECTOR_MIME) {
-						const blob = await item.getType(type);
-						const text = await blob.text();
-						if (type === VISTERAS_VECTOR_MIME) {
-							try {
-								const data = JSON.parse(text);
-								if (data && data.format === 'visteras-vector') {
-									if (data.svg) return as_svg(data.svg);
-									if (Array.isArray(data.vectors)) return vectors_to_svg(data.vectors.map(Vector.fromJSON));
-								}
-							} catch (err) { /* ignore */ }
-						}
-						const svg = as_svg(text);
-						if (svg) return svg;
+				for (const type of (item.types || [])) {
+					if (type !== SVG_MIME && type !== 'text/plain' && type !== 'text/html' && type !== VISTERAS_VECTOR_MIME && type !== VISTERAS_CLIP_MIME) continue;
+					const text = await (await item.getType(type)).text();
+					if (type === 'text/plain') reps.plain = text;
+					else if (type === SVG_MIME) reps.svg = text;
+					else if (type === 'text/html') reps.html = text;
+					else {
+						reps.json.push(text);
+						try {
+							const data = JSON.parse(text);
+							if (data && data.format === 'visteras-vector' && !data.svg && Array.isArray(data.vectors)) {
+								reps.json.push(JSON.stringify({ svg: vectors_to_svg(data.vectors.map(Vector.fromJSON)) }));
+							}
+						} catch (err) { /* ignore */ }
 					}
 				}
 			}
+			const picked = pick_clipboard_svg(reps);
+			if (picked) return picked;
 		} else if (navigator.clipboard && navigator.clipboard.readText) {
 			const text = await navigator.clipboard.readText();
-			const svg = as_svg(text);
-			if (svg) return svg;
+			const picked = pick_clipboard_svg({ plain: text });
+			if (picked) return picked;
 		}
 	} catch (err) {
 		// Permission denied — event path or broadcast cache may still have succeeded

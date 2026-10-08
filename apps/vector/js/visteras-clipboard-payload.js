@@ -99,6 +99,92 @@ export function isTextCopyContext(e, doc = (typeof document !== 'undefined' ? do
   return false;
 }
 
+// ─── Copy normalization (Illustrator → Photoshop style) ─────────────────────
+
+const finiteRect = (r) => !!r && [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width >= 0 && r.height >= 0 && (r.width > 0 || r.height > 0);
+
+/** Union of {x,y,width,height} rects; null / empty / non-finite entries are skipped. */
+export function unionRects(rects) {
+  let out = null;
+  for (const r of rects || []) {
+    if (!finiteRect(r)) continue;
+    if (!out) { out = { x: r.x, y: r.y, width: r.width, height: r.height }; continue; }
+    const x = Math.min(out.x, r.x), y = Math.min(out.y, r.y);
+    out = { x, y, width: Math.max(out.x + out.width, r.x + r.width) - x, height: Math.max(out.y + out.height, r.y + r.height) - y };
+  }
+  return out;
+}
+
+/**
+ * Visual bounds of a selection (#svgcontent user units). `boundsOf` is the
+ * effect-aware getVisualBounds, so drop shadows / glows are not clipped.
+ */
+export function selectionVisualBounds(elements, boundsOf) {
+  return unionRects((elements || []).filter(Boolean).map((el) => { try { return boundsOf(el); } catch { return null; } }));
+}
+
+/** Bounds snapped outward to whole pixels (1 user unit = 1 px when pasted into Studio). */
+export function pixelBounds(bounds) {
+  if (!finiteRect(bounds)) return { x: 0, y: 0, width: 100, height: 100 };
+  const x0 = Math.floor(bounds.x + 1e-6), y0 = Math.floor(bounds.y + 1e-6);
+  const x1 = Math.ceil(bounds.x + bounds.width - 1e-6), y1 = Math.ceil(bounds.y + bounds.height - 1e-6);
+  return { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) };
+}
+
+/**
+ * Self-contained SVG for the OS clipboard, normalized to its own bounds: the
+ * selection is wrapped in ONE group translated so its visual bounds start at
+ * 0,0, and width/height/viewBox are the bounds size. The artboard position
+ * stays in data-visteras-origin (informational only).
+ * @param {{parts:string[]|string, defs?:string, bounds:{x:number,y:number,width:number,height:number}|null}} o
+ */
+export function normalizedSvgMarkup({ parts, defs = '', bounds }) {
+  const b = pixelBounds(bounds);
+  const body = Array.isArray(parts) ? parts.join('\n') : String(parts || '');
+  const tx = b.x ? -b.x : 0, ty = b.y ? -b.y : 0;
+  const transform = tx || ty ? ` transform="translate(${tx} ${ty})"` : '';
+  // class="visteras-vector-clip" is a redundant marker that survives Chromium's
+  // image/svg+xml rewrite; Studio accepts the data-attr, the class or the copy group.
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="visteras-vector-clip" viewBox="0 0 ${b.width} ${b.height}" width="${b.width}" height="${b.height}" data-visteras-format="1" data-visteras-source="vector" data-visteras-origin="${b.x} ${b.y}">\n${defs ? defs + '\n' : ''}<g data-visteras-copy-group="1"${transform}>\n${body}\n</g>\n</svg>`;
+}
+
+/**
+ * Selected elements in DOCUMENT order (back → front), the stacking order of
+ * Vector's Layers panel, whatever order they were clicked / selected in
+ * (SVG-Edit's getSelectedElements() is selection order). Elements inside
+ * another selected element are dropped: they travel with that ancestor.
+ * Illustrator copies in stacking order too.
+ */
+export function sortByDocumentOrder(elements) {
+  const list = [...new Set((elements || []).filter(Boolean))];
+  const top = list.filter((el) => !list.some((o) => o !== el && typeof o.contains === 'function' && o.contains(el)));
+  const FOLLOWING = 4, PRECEDING = 2; // Node.DOCUMENT_POSITION_*
+  return top
+    .map((el, i) => ({ el, i }))
+    .sort((a, b) => {
+      if (typeof a.el.compareDocumentPosition !== 'function') return a.i - b.i;
+      const pos = a.el.compareDocumentPosition(b.el);
+      if (pos & FOLLOWING) return -1;
+      if (pos & PRECEDING) return 1;
+      return a.i - b.i;
+    })
+    .map((x) => x.el);
+}
+
+/** {source, nonce, ts} identifying one copy (Studio pastes the most recent copy). */
+export function newClipStamp(source = 'vector', now = Date.now(), rand = Math.random) {
+  return { source, nonce: `${source}-${now.toString(36)}-${rand().toString(36).slice(2, 10)}`, ts: now };
+}
+
+/** Write the copy stamp on the SVG root: data-visteras-clip (nonce) + data-visteras-copied (ms). */
+export function stampClipSvg(svgText, stamp) {
+  const m = String(svgText || '').match(/<svg\b[^>]*>/i);
+  if (!m || !stamp) return svgText;
+  const clean = m[0].replace(/\s+data-visteras-(clip|copied)\s*=\s*["'][^"']*["']/gi, '');
+  const next = clean.replace(/\s*(\/?)>$/, ` data-visteras-clip="${String(stamp.nonce).replace(/["<>&]/g, '')}" data-visteras-copied="${Number(stamp.ts) || 0}"$1>`);
+  return String(svgText).replace(m[0], next);
+}
+
 // ─── DOM rendering ───────────────────────────────────────────────────────────
 const SVG_NS = 'http://www.w3.org/2000/svg';
 

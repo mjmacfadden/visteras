@@ -20,10 +20,12 @@
 import {
 	classifySelection, buildClipboardItems, clipboardSupports, isTextCopyContext,
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
-} from './visteras-clipboard-payload.js?v=clipboard-png-1';
+	selectionVisualBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg, sortByDocumentOrder,
+} from './visteras-clipboard-payload.js?v=clipboard-bridge-5';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
+const CLIP_MIME = 'web application/x-visteras-clip+json';
 const CHANNEL = 'visteras-vector-clip';
 
 function looksLikeSvg(text) {
@@ -38,15 +40,17 @@ function extractSvgFromHtml(html) {
 	return m ? m[0] : null;
 }
 
-function serializeSelectedToSvg(svgCanvas, customSelected = null) {
+export function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	if (!svgCanvas) return null;
-	const selected = (customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
-		.filter(Boolean);
+	// Document (stacking) order, not selection / click order: the SVG paints
+	// later children on top, so this keeps overlaps exactly as in Vector.
+	const selected = sortByDocumentOrder((customSelected || (svgCanvas.getSelectedElements ? svgCanvas.getSelectedElements() : []))
+		.filter(Boolean));
 	if (!selected.length) return null;
 
 	const serializer = new XMLSerializer();
 	const parts = [];
-	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	const copied = [];
 
 	for (const el of selected) {
 		try {
@@ -85,42 +89,48 @@ function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 			} catch (e2) { /* ignore */ }
 
 			parts.push(serializer.serializeToString(clone));
-			if (typeof svgCanvas.getStrokedBBox === 'function') {
-				const bb = svgCanvas.getStrokedBBox([el]);
-				if (bb) {
-					if (bb.x < minX) minX = bb.x;
-					if (bb.y < minY) minY = bb.y;
-					if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
-					if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
-				}
-			} else if (el.getBBox) {
-				const bb = el.getBBox();
-				if (bb) {
-					if (bb.x < minX) minX = bb.x;
-					if (bb.y < minY) minY = bb.y;
-					if (bb.x + bb.width > maxX) maxX = bb.x + bb.width;
-					if (bb.y + bb.height > maxY) maxY = bb.y + bb.height;
-				}
-			}
+			copied.push(el);
 		} catch (err) {
 			console.warn('serializeSelectedToSvg element failed', err);
 		}
 	}
 
 	if (!parts.length) return null;
-	if (!Number.isFinite(minX)) {
-		minX = 0; minY = 0; maxX = 100; maxY = 100;
-	}
-	const pad = 2;
-	const vbX = minX - pad;
-	const vbY = minY - pad;
-	const vbW = Math.max(1, (maxX - minX) + pad * 2);
-	const vbH = Math.max(1, (maxY - minY) + pad * 2);
+	// Normalize to the selection's own visual bounds (shadows / glows included):
+	// one group translated to 0,0, viewBox 0 0 w h, so the receiving app never
+	// inherits the artboard position (Illustrator -> Photoshop behaviour).
+	const bounds = selectionVisualBounds(copied, (el) => visualBoundsOf(svgCanvas, el));
 
 	// Clip paths, masks and gradients the selection references travel with it.
 	let defs = '';
 	try { defs = referencedDefsMarkup(selected); } catch (e) { defs = ''; }
-	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${vbX} ${vbY} ${vbW} ${vbH}" width="${vbW}" height="${vbH}" data-visteras-format="1" data-visteras-source="vector">\n${defs ? defs + '\n' : ''}${parts.join('\n')}\n</svg>`;
+	return normalizedSvgMarkup({ parts, defs, bounds });
+}
+
+/** Serialize + stamp one copy (nonce/timestamp let Studio paste only the most recent copy). */
+function stampedCopy(svgCanvas, selected) {
+	const svgText = serializeSelectedToSvg(svgCanvas, selected);
+	if (!svgText) return { svgText: null, stamp: null };
+	const stamp = newClipStamp('vector');
+	return { svgText: stampClipSvg(svgText, stamp), stamp };
+}
+
+/** Effect-aware bounds of one element in #svgcontent user units. */
+function visualBoundsOf(svgCanvas, el) {
+	try {
+		const b = window.__visterasEffects?.getVisualBounds?.(el);
+		if (b && b.width >= 0) return b;
+	} catch (e) { /* fall through */ }
+	try { if (typeof svgCanvas.getStrokedBBox === 'function') return svgCanvas.getStrokedBBox([el]); } catch (e) { /* fall through */ }
+	try { const b = el.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height }; } catch (e) { return null; }
+}
+
+/** Web custom format payload: tells Studio the clipboard SVG came from Vector. */
+function clipJson(svgText) {
+	const root = (String(svgText).match(/<svg\b[^>]*>/) || [''])[0];
+	const nonce = (root.match(/data-visteras-clip="([^"]*)"/) || [])[1] || null;
+	const ts = Number((root.match(/data-visteras-copied="(\d+)"/) || [])[1]) || Date.now();
+	return JSON.stringify({ format: 'visteras-clip', source: 'vector', nonce, ts, svg: svgText });
 }
 
 async function writeSvgClipboard(svgText) {
@@ -131,10 +141,12 @@ async function writeSvgClipboard(svgText) {
 				await navigator.clipboard.write([new ClipboardItem(items)]);
 			};
 			try {
-				await tryWrite({
+				const items = {
 					[SVG_MIME]: new Blob([svgText], { type: SVG_MIME }),
 					'text/plain': new Blob([svgText], { type: 'text/plain' })
-				});
+				};
+				if (clipboardSupports()(CLIP_MIME)) items[CLIP_MIME] = new Blob([clipJson(svgText)], { type: CLIP_MIME });
+				await tryWrite(items);
 				return true;
 			} catch (e) {
 				await tryWrite({
@@ -178,7 +190,13 @@ function writeRichClipboard(selected, svgText) {
 			try { createImageBitmap(blob).then((bmp) => { own.w = bmp.width; own.h = bmp.height; bmp.close?.(); }).catch(() => {}); } catch (e) { /* ignore */ }
 			return blob;
 		});
-		const { types, items } = buildClipboardItems({ kind, svgText, png, supports: clipboardSupports() });
+		const supports = clipboardSupports();
+		const { types, items } = buildClipboardItems({ kind, svgText, png, supports });
+		// Vector-origin side channel Chromium never sanitizes (web custom format).
+		if (svgText && supports(CLIP_MIME)) {
+			items[CLIP_MIME] = Promise.resolve(new Blob([clipJson(svgText)], { type: CLIP_MIME }));
+			types.push(CLIP_MIME);
+		}
 		state.types = types;
 		// Keep the promises from surfacing as unhandled when the write is refused.
 		for (const v of Object.values(items)) v.catch(() => {});
@@ -204,11 +222,11 @@ function writeOnce(selected, svgText) {
 	writeRichClipboard(selected, svgText);
 }
 
-function publishChannel(svgText) {
+function publishChannel(svgText, stamp = null) {
 	try {
 		if (typeof BroadcastChannel === 'undefined') return;
 		const ch = new BroadcastChannel(CHANNEL);
-		ch.postMessage({ type: 'vector-clipboard', svg: svgText, meta: { source: 'vector' }, ts: Date.now() });
+		ch.postMessage({ type: 'vector-clipboard', svg: svgText, meta: { source: 'vector', nonce: stamp && stamp.nonce }, nonce: stamp && stamp.nonce, ts: (stamp && stamp.ts) || Date.now() });
 		ch.close();
 	} catch (e) { /* ignore */ }
 }
@@ -323,10 +341,10 @@ export function installVisterasClipboardBridge(opts = {}) {
 		const selected = getSelectedElementsSafe();
 		if (!selected.length) return;
 
-		const svgText = serializeSelectedToSvg(svgCanvas, selected);
+		const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 		if (!svgText) return;
 
-		publishChannel(svgText);
+		publishChannel(svgText, stamp);
 
 		if (e.clipboardData) {
 			try {
@@ -334,7 +352,7 @@ export function installVisterasClipboardBridge(opts = {}) {
 				e.clipboardData.setData(SVG_MIME, svgText);
 				e.clipboardData.setData('text/plain', svgText);
 				e.clipboardData.setData('text/html', svgText);
-				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, svg: svgText }));
+				e.clipboardData.setData(VISTERAS_MIME, JSON.stringify({ format: 'visteras-vector', version: 1, svg: svgText, source: 'vector', nonce: stamp.nonce, ts: stamp.ts }));
 				e.preventDefault();
 			} catch (err) {
 				console.warn('e.clipboardData.setData error:', err);
@@ -369,9 +387,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 		const result = origCopy ? origCopy(...args) : undefined;
 		try {
 			const selected = getSelectedElementsSafe();
-			const svgText = serializeSelectedToSvg(svgCanvas, selected);
+			const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 			if (svgText) {
-				publishChannel(svgText);
+				publishChannel(svgText, stamp);
 				writeOnce(selected, svgText);
 			}
 		} catch (err) {
@@ -386,9 +404,9 @@ export function installVisterasClipboardBridge(opts = {}) {
 		svgCanvas.cutSelectedElements = function (...args) {
 			try {
 				const selected = getSelectedElementsSafe();
-				const svgText = serializeSelectedToSvg(svgCanvas, selected);
+				const { svgText, stamp } = stampedCopy(svgCanvas, selected);
 				if (svgText) {
-					publishChannel(svgText);
+					publishChannel(svgText, stamp);
 					writeOnce(selected, svgText);
 				}
 			} catch (err) { /* ignore */ }

@@ -12,6 +12,7 @@ import {
 	publish_vector_clip,
 	VISTERAS_VECTOR_MIME
 } from './../../core/vector/vector-svg.js';
+import { CLIP_MIME, new_clip_stamp, stamp_svg } from './../../libs/clipboard-select.js';
 
 var instance = null;
 
@@ -84,15 +85,22 @@ class Copy_class {
 	store_internal_clipboard(extracted) {
 		if (extracted == null || extracted.canvas == null)
 			return;
+		const stamp = new_clip_stamp('studio');
 		config._internal_clipboard = {
 			data_url: extracted.canvas.toDataURL('image/png'),
 			x: extracted.x,
 			y: extracted.y,
 			width: extracted.width,
 			height: extracted.height,
+			// Paste picks the most recent copy: nonce/ts identify this copy on the
+			// system clipboard; system_write records whether it got there.
+			nonce: stamp.nonce,
+			ts: stamp.ts,
+			system_write: 'pending',
 		};
 		config._clipboard_position = { x: extracted.x, y: extracted.y };
 		config._internal_clipboard_fresh = true;
+		return config._internal_clipboard;
 	}
 
 	get_vectors_for_clipboard() {
@@ -123,12 +131,17 @@ class Copy_class {
 			alertify.error('Nothing to copy.');
 			return false;
 		}
+		var stamp = new_clip_stamp('studio');
+		svgText = stamp_svg(svgText, stamp);
 		var jsonText = JSON.stringify({
 			format: 'visteras-vector',
 			version: 1,
+			source: 'studio',
+			nonce: stamp.nonce,
+			ts: stamp.ts,
 			vectors: vectors.map(v => v.toJSON())
 		});
-		config._internal_clipboard = {
+		var clip = {
 			type: 'svg',
 			svg: svgText,
 			json: jsonText,
@@ -136,12 +149,17 @@ class Copy_class {
 			x: 0,
 			y: 0,
 			width: 0,
-			height: 0
+			height: 0,
+			nonce: stamp.nonce,
+			ts: stamp.ts,
+			system_write: 'pending'
 		};
+		config._internal_clipboard = clip;
 		config._internal_clipboard_fresh = true;
 		config._clipboard_position = null;
-		publish_vector_clip(svgText, { source: 'studio' });
-		await write_svg_clipboard(svgText, { jsonText });
+		publish_vector_clip(svgText, { source: 'studio', nonce: stamp.nonce });
+		var ok = await write_svg_clipboard(svgText, { jsonText });
+		clip.system_write = ok ? 'ok' : 'failed';
 		return true;
 	}
 
@@ -157,7 +175,7 @@ class Copy_class {
 			alertify.error('Nothing to copy.');
 			return;
 		}
-		this.store_internal_clipboard(extracted);
+		var clip = this.store_internal_clipboard(extracted);
 
 		try {
 			if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
@@ -166,11 +184,25 @@ class Copy_class {
 						resolve(blob || new Blob([], { type: 'image/png' }));
 					}, 'image/png');
 				});
-				navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]).catch((err) => {
+				var items = { 'image/png': blobPromise };
+				// Copy stamp as a web custom format where supported (Chromium), so paste can
+				// recognise its own copy exactly; elsewhere paste compares image size.
+				try {
+					if (typeof ClipboardItem.supports === 'function' && ClipboardItem.supports(CLIP_MIME)) {
+						items[CLIP_MIME] = new Blob([JSON.stringify({ format: 'visteras-clip', source: 'studio', nonce: clip.nonce, ts: clip.ts })], { type: CLIP_MIME });
+					}
+				} catch (e) { /* unsupported */ }
+				navigator.clipboard.write([new ClipboardItem(items)]).then(() => {
+					clip.system_write = 'ok';
+				}).catch((err) => {
+					clip.system_write = 'failed';
 					console.warn('System clipboard write failed:', err);
 				});
+			} else {
+				clip.system_write = 'failed';
 			}
 		} catch (error) {
+			clip.system_write = 'failed';
 			console.warn('System clipboard write error:', error);
 		}
 	}
