@@ -60,3 +60,19 @@ export class Smart_source_action extends Base_action {
 	async undo() { super.undo(); this.apply(this.previous); }
 	free() { this.previous = null; this.source = null; }
 }
+
+/** Register an embedded source (e.g. a pasted Vector group) before inserting the layer that shows it. */
+export class Add_smart_source_action extends Base_action {
+	constructor(source) {
+		super('smart_source_add', 'Add Smart Layer Source'); this.source = source;
+		validate_sources({ [source.id]: source }, [{ type: 'smart', smart_source_id: source.id }]);
+		this.memory_estimate = source.width * source.height * 4 + source.preview.length * 2;
+	}
+	async do() {
+		super.do();
+		this.previous = config.smart_sources;
+		config.smart_sources = { ...config.smart_sources, [this.source.id]: this.source };
+	}
+	async undo() { super.undo(); config.smart_sources = this.previous; this.previous = null; }
+	free() { this.previous = null; this.source = null; }
+}

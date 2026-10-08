@@ -2,6 +2,15 @@ import app from './../../app.js';
 import config from './../../config.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
 import { Insert_vector_action } from './../../actions/vector/insert-vector.js';
+import { Add_smart_source_action } from './../../actions/smart-layer.js';
+import { v4 as uuid } from 'uuid';
+import {
+	is_visteras_vector_svg,
+	svg_pixel_size,
+	compute_paste_placement,
+	svg_data_url,
+	smart_source_document
+} from './../../libs/vector-paste.js';
 import {
 	svg_to_vectors,
 	read_svg_from_clipboard_event,
@@ -16,7 +25,7 @@ class Edit_paste_class {
 			return;
 		}
 		if (window.__visteras_last_cross_app_svg) {
-			const ok = this.paste_svg_text(window.__visteras_last_cross_app_svg);
+			const ok = await this.paste_svg_text(window.__visteras_last_cross_app_svg);
 			if (ok) return;
 		}
 		const ok = await this.paste_from_system_svg(null);
@@ -62,10 +71,85 @@ class Edit_paste_class {
 		}
 	}
 
+	/**
+	 * Paste SVG text. A Visteras Vector copy becomes ONE Smart Layer (Promise<boolean>);
+	 * other SVG (Studio's own vector copies, plain SVG) becomes editable vector layers.
+	 */
 	paste_svg_text(svgText) {
 		if (!svgText || !looks_like_svg(svgText)) {
 			return false;
 		}
+		if (is_visteras_vector_svg(svgText)) {
+			return this.paste_vector_smart(svgText).catch((error) => {
+				console.warn('Vector Smart Object paste failed, pasting as vector layers:', error);
+				return this.paste_svg_as_vectors(svgText);
+			});
+		}
+		return this.paste_svg_as_vectors(svgText);
+	}
+
+	/** Visible part of the document in world (document px) coordinates, or null. */
+	visible_world_rect() {
+		try {
+			const canvas = document.getElementById('canvas_minipaint');
+			if (!canvas || !app.Layers || typeof app.Layers.get_world_coords !== 'function') return null;
+			const a = app.Layers.get_world_coords(0, 0);
+			const b = app.Layers.get_world_coords(canvas.width, canvas.height);
+			return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+		} catch (e) {
+			return null;
+		}
+	}
+
+	/** Render an SVG string to a canvas of the given pixel size. */
+	render_svg(svg_url, width, height) {
+		return new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => {
+				const canvas = document.createElement('canvas');
+				canvas.width = width;
+				canvas.height = height;
+				canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+				resolve(canvas);
+			};
+			img.onerror = () => reject(new Error('Could not render the pasted SVG.'));
+			img.src = svg_url;
+		});
+	}
+
+	/**
+	 * Illustrator -> Photoshop "Paste as Smart Object": the whole Vector selection
+	 * becomes ONE Smart Layer whose embedded source holds the SVG group, rendered
+	 * 1:1 and centered in the visible canvas area.
+	 */
+	async paste_vector_smart(svgText) {
+		const size = svg_pixel_size(svgText);
+		if (!size) throw new Error('Pasted SVG has no size.');
+		const place = compute_paste_placement(size, config.WIDTH, config.HEIGHT, this.visible_world_rect());
+		const svg_url = svg_data_url(svgText);
+		const preview = await this.render_svg(svg_url, place.width, place.height);
+		const name = 'Vector Smart Object';
+		const version = typeof VERSION !== 'undefined' ? VERSION : '4.0.0';
+		const source = {
+			id: uuid(), revision: 1, width: place.width, height: place.height,
+			document: smart_source_document({ svg_url, width: place.width, height: place.height, name, version }),
+			preview: preview.toDataURL('image/png'), link: preview,
+		};
+		const result = await app.State.do_action(new app.Actions.Bundle_action('paste_vector_smart', 'Paste Vector Smart Object', [
+			new Add_smart_source_action(source),
+			new app.Actions.Insert_layer_action({
+				name, type: 'smart', smart_source_id: source.id, link: preview,
+				x: place.x, y: place.y, width: place.width, height: place.height,
+				width_original: place.width, height_original: place.height,
+			}, false),
+		]));
+		if (result && result.status && result.status !== 'completed') throw (result.reason || new Error('Paste was cancelled.'));
+		if (app.GUI && app.GUI.GUI_layers) app.GUI.GUI_layers.render_layers();
+		config.need_render = true;
+		return true;
+	}
+
+	paste_svg_as_vectors(svgText) {
 		var vectors = svg_to_vectors(svgText);
 		if (!vectors.length) {
 			alertify.error('Could not parse SVG from clipboard.');
