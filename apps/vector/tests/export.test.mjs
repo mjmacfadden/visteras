@@ -27,7 +27,7 @@ test('Export: ⌥⌘E via e.code KeyE; settings key on the storage allowlist', (
 test('Export: no popup window — exportHandler / exportedPDF delegate to the export module', () => {
   assert.match(editor, /exportHandler\(e, t\) \{\n\t\t\/\/ Visteras: no popup window[^\n]*\n[^\n]*\n\t\tif \(window\.__visterasExport\) \{ window\.__visterasExport\.legacyExported\?\.\(t\); return; \}/);
   assert.match(editor, /if \(window\.__visterasExport && t\.outputType === "blob"\) return;/);
-  assert.match(src, /sc\.exportPDF\(`\$\{X\.safeBase\(title\(\)\)\}\.pdf`, 'blob', \{svg:built\.svg,size:/);
+  assert.match(src, /buildArtboardPdf|renderPdfDocument/, 'PDF uses vector buildArtboardPdf, not the raster sc.exportPDF path');
 });
 
 test('Export: pipeline — clone, scope viewBox, background inside the SVG, fonts/images inlined, picker before render', () => {

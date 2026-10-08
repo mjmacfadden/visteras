@@ -1,4 +1,5 @@
 import { clipExportToRect, stripExportGuides } from './visteras-export-clip.js';
+import { buildArtboardPdf, pdfPageSpecs } from './visteras-export-pdf.js?v=pdf-1';
 import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
 /**
  * Visteras Vector — File ▸ Export (Export for Screens… ⌥⌘E, Export As…) and
@@ -13,7 +14,7 @@ import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
  * Delivery: one file → saveFile (picker before rendering keeps user activation);
  * several → showDirectoryPicker (sub-folders) or a store-only ZIP.
  */
-import * as X from './visteras-export-core.js?v=export-2';
+import * as X from './visteras-export-core.js?v=export-3';
 import { isSystemFontFamily, findGoogleFontEntry } from '../lib/visteras-fonts.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -280,10 +281,22 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       return { blob: new Blob([out.svg], { type: info.mime }), warnings };
     }
     if (info.ext === 'pdf') {
-      if (job.scope !== 'artboard') warnings.push('PDF (raster) always exports the artboard');
-      const built = await buildExportSvg({board:job.board,scope:'artboard',background:artboardColor(job.board)});
-      const m = await sc.exportPDF(`${X.safeBase(title())}.pdf`, 'blob', {svg:built.svg,size:{w:built.w,h:built.h}});
-      return { blob: m.output instanceof Blob ? m.output : new Blob([m.output], { type: info.mime }), warnings };
+      // Single-artboard path (multi-page uses renderPdfDocument).
+      const board = job.board || artboard();
+      const bg = artboardColor(board);
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true });
+      warnings.push(...built.warnings);
+      const out = await buildArtboardPdf({
+        title: title(),
+        pages: [{ svg: built.svg, width: board.width, height: board.height, name: board.name }],
+        rasterFallback: async () => {
+          const r = await buildExportSvg({ board, scope: 'artboard', background: bg || '#ffffff', scale: 1, fonts: true, images: true });
+          return rasterize(r.svg, r.w, r.h, 'image/png');
+        },
+      });
+      warnings.push(...out.warnings);
+      if (!out.vector) warnings.push('PDF used a raster fallback for one or more artboards (some effects may not convert to vectors)');
+      return { blob: out.blob, warnings, pageCount: out.pageCount, pageSizes: out.pageSizes, vector: out.vector };
     }
     const scale = Number(job.scale) || X.scaleForPpi(job.ppi);
     const background = X.backgroundColor(job.background, { bgColor: job.bgColor, artboard: artboardColor(job.board), opaque: !!info.opaque });
@@ -332,6 +345,34 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
   };
 
   const reportWarnings = (list) => { for (const w of [...new Set(list)]) toast(w, 'warning'); };
+
+  /**
+   * Illustrator-style PDF: one file, one page per artboard, page size = artboard size,
+   * real vectors via svg2pdf (raster fallback per page when a filter cannot convert).
+   */
+  async function renderPdfDocument(boards) {
+    const list = (boards && boards.length ? boards : [artboard()]).map((b) => b || artboard());
+    const warnings = [];
+    const pages = [];
+    for (const board of list) {
+      const bg = artboardColor(board);
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true });
+      warnings.push(...built.warnings);
+      pages.push({ svg: built.svg, width: board.width, height: board.height, name: board.name });
+    }
+    const out = await buildArtboardPdf({
+      title: title(),
+      pages,
+      rasterFallback: async (page) => {
+        const board = { width: page.width, height: page.height, name: page.name, backgroundColor: 'none' };
+        const r = await buildExportSvg({ board: list.find((b) => b.name === page.name) || list[0], scope: 'artboard', background: artboardColor(list.find((b) => b.name === page.name) || list[0]) || '#ffffff', scale: 1, fonts: true, images: true });
+        return rasterize(r.svg, r.w, r.h, 'image/png');
+      },
+    });
+    warnings.push(...out.warnings);
+    if (out.mixed || !out.vector) warnings.push('PDF used a raster fallback for one or more artboards (live SVG filters / blend modes may not convert)');
+    return { blob: out.blob, warnings, pageCount: out.pageCount, pageSizes: out.pageSizes, vector: out.vector };
+  }
 
   /** Single file through the shared saveFile helper (picker first, then render). */
   async function deliverOne(job, fileName) {
@@ -452,7 +493,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const hasSel = selected().length > 0;
     const ppiSel = X.PPI_PRESETS.includes(ppi) ? String(ppi) : 'other';
     const st = dialog('vexp_as', 'Export As', `
-      <label class="vexp_row"><span>Format:</span><select id="vexp_as_format">${[['png', 'PNG (png)'], ['jpg', 'JPEG (jpg)'], ['svg', 'SVG (svg)'], ['pdf', 'PDF (raster)']].map(([k, l]) => `<option value="${k}"${k === fmt ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label class="vexp_row"><span>Format:</span><select id="vexp_as_format">${[['png', 'PNG (png)'], ['jpg', 'JPEG (jpg)'], ['svg', 'SVG (svg)'], ['pdf', 'PDF']].map(([k, l]) => `<option value="${k}"${k === fmt ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
       <div class="vexp_row vexp_checks"><label><input type="checkbox" id="vexp_as_artboard"${s.asUseArtboard ? ' checked' : ''}> Use Artboard</label>
         <label title="${hasSel ? '' : 'Select something first'}"><input type="checkbox" id="vexp_as_selection"${hasSel && s.asSelection ? ' checked' : ''}${hasSel ? '' : ' disabled'}> Selection Only</label></div>
       ${boardControls()}
@@ -496,18 +537,30 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       const info = X.formatInfo(v.format);
       const job = { scope: v.scope, padding: 0, scale: 0, ppi: v.ppi, format: v.format, background: v.background, bgColor: v.bgColor, quality: v.format === 'jpg' ? X.jpegQuality(v.quality) : undefined };
       let boards;try{boards=exportBoards(st,v.format==='pdf'?'artboard':v.scope);}catch(e){toast(e.message,'error');return;}
-      const problem = boards.map(board=>sizeProblem({...job,board})).find(Boolean);
+      const problem = v.format==='pdf' ? null : boards.map(board=>sizeProblem({...job,board})).find(Boolean);
       if (problem) { toast(problem, 'error'); return; }
       busy(st, true);
       progress(st, `Rendering ${X.exportFileName({ title: title(), scope: v.scope, ext: info.ext })}`, 0.5);
       try {
-        const paths=X.uniquePaths(boards.map(board=>X.exportFileName({title:board?.name||title(),scope:v.scope,ext:info.ext})));
-        const jobs=boards.map((board,i)=>({path:paths[i],job:{...job,board}}));
-        const res = jobs.length===1?await deliverOne(jobs[0].job,jobs[0].path):await deliverMany(jobs,{isCancelled:()=>st.cancelled});
-        if (res.cancelled) { busy(st, false); st.dlg.querySelector('.vexp_progress').hidden = true; return; }
-        closeDialog();
-        toast(res.name?`Exported "${res.name}"`:`Exported ${res.done} artboards`, 'success');
-        for(const failure of res.failed||[])toast(failure,'error');
+        if (v.format === 'pdf') {
+          const fileName = X.exportFileName({ title: title(), scope: 'artboard', ext: 'pdf' });
+          const warnings = [];
+          const res = await saveFile({
+            data: async () => { const out = await renderPdfDocument(boards); warnings.push(...out.warnings); return out.blob; },
+            fileName, mimeType: 'application/pdf', types: TYPES.pdf,
+          });
+          closeDialog();
+          reportWarnings(warnings);
+          toast(res?.name ? `Exported "${res.name}" (${boards.length} page${boards.length===1?'':'s'})` : `Exported PDF (${boards.length} page${boards.length===1?'':'s'})`, 'success');
+        } else {
+          const paths=X.uniquePaths(boards.map(board=>X.exportFileName({title:board?.name||title(),scope:v.scope,ext:info.ext})));
+          const jobs=boards.map((board,i)=>({path:paths[i],job:{...job,board}}));
+          const res = jobs.length===1?await deliverOne(jobs[0].job,jobs[0].path):await deliverMany(jobs,{isCancelled:()=>st.cancelled});
+          if (res.cancelled) { busy(st, false); st.dlg.querySelector('.vexp_progress').hidden = true; return; }
+          closeDialog();
+          toast(res.name?`Exported "${res.name}"`:`Exported ${res.done} artboards`, 'success');
+          for(const failure of res.failed||[])toast(failure,'error');
+        }
       } catch (e) {
         busy(st, false);
         toast(`Export failed: ${errorText(e, X.scaleForPpi(v.ppi))}`, 'error');
@@ -685,7 +738,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
   }, true);
 
   const api = {
-    buildExportSvg, rasterize, renderJob, deliverOne, deliverMany, sizeProblem, scopeRect,
+    buildExportSvg, rasterize, renderJob, renderPdfDocument, deliverOne, deliverMany, sizeProblem, scopeRect, pdfPageSpecs,
     openExportAs, openExportForScreens, openRasterSettings, close: closeDialog,
     getRaster, setRaster, legacyExported, debug, core: X,
   };
