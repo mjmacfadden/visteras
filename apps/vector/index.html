@@ -303,7 +303,7 @@
     import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=safe-1';
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=transform-1';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
-    import { mountSelectSame } from './js/visteras-select-same.js?v=select-2';
+    import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
     import { mountGrid } from './js/visteras-grid.js?v=grid-1';
     import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-3';
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
@@ -653,31 +653,42 @@
       }
     }
 
-    // Set up Studio Menu Bar Interactions
+    // Set up Studio Menu Bar Interactions.
+    // Live queries + delegation so menus injected after init (e.g. Select) open/hover like File/Edit.
     function setupMenuBar() {
-      const menuEntries = document.querySelectorAll('.menu_entry');
+      const menuBar = document.getElementById('visteras_menu_bar');
+      const menuEntries = () => Array.from(menuBar.querySelectorAll('.menu_entry'));
+      const closeAllMenus = () => menuEntries().forEach((m) => m.classList.remove('open'));
 
-      menuEntries.forEach(entry => {
-        const title = entry.querySelector('.menu_entry_title');
-        title.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const wasOpen = entry.classList.contains('open');
-          menuEntries.forEach(m => m.classList.remove('open'));
-          if (!wasOpen) entry.classList.add('open');
-        });
+      menuBar.addEventListener('click', (e) => {
+        const title = e.target.closest('.menu_entry_title');
+        if (!title || !menuBar.contains(title)) return;
+        const entry = title.closest('.menu_entry');
+        if (!entry || entry.parentElement?.closest('.menu_entry')) return;
+        e.stopPropagation();
+        const wasOpen = entry.classList.contains('open');
+        closeAllMenus();
+        if (!wasOpen) entry.classList.add('open');
+      });
 
-        entry.addEventListener('mouseenter', () => {
-          const anyOpen = Array.from(menuEntries).some(m => m.classList.contains('open'));
-          if (anyOpen) {
-            menuEntries.forEach(m => m.classList.remove('open'));
-            entry.classList.add('open');
-          }
-        });
+      menuBar.addEventListener('mouseover', (e) => {
+        const entry = e.target.closest('.menu_entry');
+        if (!entry || !menuBar.contains(entry)) return;
+        if (entry.parentElement?.closest('.menu_entry')) return;
+        const entries = menuEntries();
+        const anyOpen = entries.some((m) => m.classList.contains('open'));
+        if (anyOpen && !entry.classList.contains('open')) {
+          closeAllMenus();
+          entry.classList.add('open');
+        }
       });
 
       document.addEventListener('click', () => {
-        menuEntries.forEach(m => m.classList.remove('open'));
+        closeAllMenus();
       });
+
+      // Allow late-injected top-level menus to re-sync (no-op with delegation; kept for callers).
+      window.__visterasRefreshMenuBar = () => { /* live queries — nothing to rebind */ };
 
       // Actions wiring
       const sc = svgEditor.svgCanvas;
@@ -2581,6 +2592,7 @@
     mountCompoundPath(svgEditor);
     // Select ▸ Inverse / Same ▸ Fill/Stroke/Weight/Opacity/Appearance
     mountSelectSame(svgEditor);
+    window.__visterasRefreshMenuBar?.();
     mountGrid(svgEditor);
     mountContextMenu(svgEditor);
     mountShortcutLabels();

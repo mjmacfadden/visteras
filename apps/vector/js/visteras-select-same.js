@@ -289,6 +289,10 @@ function injectSelectMenu() {
   } else {
     anchor.after(entry);
   }
+  // Top-level menu was missing from setupMenuBar's one-shot NodeList; live
+  // delegation in index.html covers it, but ask for a refresh in case callers
+  // still use per-entry wiring.
+  window.__visterasRefreshMenuBar?.();
 }
 
 function syncSelectMenu(sc) {

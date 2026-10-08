@@ -28,6 +28,7 @@ test('Select menu injects after Text and before Effect (Illustrator order)', () 
   assert.match(src, /const textMenu = document\.getElementById\('menu_text'\)/);
   assert.match(src, /effectMenu\.before\(entry\)/);
   assert.match(src, /Illustrator order/);
+  assert.match(src, /__visterasRefreshMenuBar/);
 });
 
 test('Select menu includes All, All on Active Artboard, Deselect, Reselect, Inverse, Same', () => {
@@ -48,8 +49,10 @@ test('Select menu includes All, All on Active Artboard, Deselect, Reselect, Inve
   assert.match(src, /eventMatchesChord\(e, \{ meta: true, key: '6' \}/);
 });
 
-test('index mounts select-same with cache-bust select-2', () => {
+test('index mounts select-same with cache-bust select-3; menu bar uses live delegation', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-select-same\.js\?v=select-2/);
+  assert.match(html, /visteras-select-same\.js\?v=select-3/);
   assert.match(html, /mountSelectSame/);
+  assert.match(html, /Live queries \+ delegation/);
+  assert.match(html, /const menuEntries = \(\) => Array\.from\(menuBar\.querySelectorAll\('\.menu_entry'\)\)/);
 });
