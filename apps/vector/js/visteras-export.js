@@ -1,4 +1,4 @@
-import { clipExportToRect } from './visteras-export-clip.js';
+import { clipExportToRect, stripExportGuides } from './visteras-export-clip.js';
 import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
 /**
  * Visteras Vector — File ▸ Export (Export for Screens… ⌥⌘E, Export As…) and
@@ -13,7 +13,7 @@ import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
  * Delivery: one file → saveFile (picker before rendering keeps user activation);
  * several → showDirectoryPicker (sub-folders) or a store-only ZIP.
  */
-import * as X from './visteras-export-core.js?v=export-1';
+import * as X from './visteras-export-core.js?v=export-2';
 import { isSystemFontFamily, findGoogleFontEntry } from '../lib/visteras-fonts.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -180,6 +180,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     if (!rect) throw new Error(scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export');
     const { w, h } = forSvgFile ? { w: X.pixelSize(rect, 1).w, h: X.pixelSize(rect, 1).h } : X.pixelSize(rect, scale);
     const clone = sc.getSvgContent().cloneNode(true);
+    stripExportGuides(clone);
     for (const a of ['x', 'y', 'style', 'id']) clone.removeAttribute(a);
     // XMLSerializer writes xmlns (and xmlns:xlink when used) itself; setting them as
     // plain attributes would duplicate them and make the SVG undecodable.
@@ -249,6 +250,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     if (!rect) return str;
     const doc = new DOMParser().parseFromString(str, 'image/svg+xml');
     const root = doc.documentElement;
+    stripExportGuides(root);
     root.setAttribute('viewBox', `${rect.x} ${rect.y} ${rect.width} ${rect.height}`);
     root.setAttribute('width', rect.width); root.setAttribute('height', rect.height);
     clipExportToRect(root, rect);
