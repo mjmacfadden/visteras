@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeArtboards,createMultipleArtboards,artboardState,artboardUnion,associatedArtboard,nearbyArtboard,nextArtboardName,artboardsForExport,ArtboardCommand} from '../js/visteras-artboard-model.js';
@@ -94,3 +95,13 @@ test('createMultipleArtboards creates requested number of artboards arranged in 
  assert.deepEqual([four[3].x,four[3].y],[550,550]);
 });
 
+test('Artboard Background uses Appearance Fill swatch + None chip (not a hex text button)', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-artboards.js', import.meta.url), 'utf8');
+  assert.match(src, /vcs-appearance-chip/);
+  assert.match(src, /vcs-appearance-none/);
+  assert.match(src, /vab-background-row/);
+  assert.match(src, /classList\.toggle\('is-none'/);
+  assert.match(src, /classList\.toggle\('is-active',isNone\)/);
+  assert.doesNotMatch(src, /bg\.textContent=b\.backgroundColor/);
+  assert.match(src, /__visterasOpenColorPicker/);
+});
