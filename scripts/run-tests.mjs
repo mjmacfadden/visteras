@@ -12,6 +12,7 @@ const SUITES = [
   ['ui', 'test:ui'],
   ['vector', 'test:vector'],
   ['inspire', 'test:inspire'],
+  ['collage', 'test:collage'],
   ['studio', 'test:studio'],
   ['storage-check', 'check:storage']
 ];
