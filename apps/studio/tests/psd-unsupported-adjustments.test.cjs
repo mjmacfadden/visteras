@@ -65,9 +65,9 @@ test('psd.js wiring: default branch uses the placeholder, warns once, and export
 test('end to end: a PSD with Levels imports as a placeholder, warns once, and exports Levels again', async () => {
 	const { createCanvas } = require('@napi-rs/canvas');
 	const warnings = [];
-	const context = vm.createContext({ config: { layers: [] }, console: { log() {}, warn: (...a) => warnings.push('WARN ' + a.map(String).join(' ')) }, alertify: { success() {}, warning: (m) => warnings.push(m), error: (m) => warnings.push('ERR ' + m) }, document: { createElement: () => createCanvas(1, 1) }, performance });
+	const context = vm.createContext({ config: { layers: [] }, console: { log() {}, warn: (...a) => warnings.push('WARN ' + a.map(String).join(' ')) }, alertify: { success() {}, warning: (m) => warnings.push(m), error: (m) => warnings.push('ERR ' + m) }, document: { createElement: () => createCanvas(1, 1) }, performance, HTMLCanvasElement: createCanvas(1, 1).constructor, ImageData: require('@napi-rs/canvas').ImageData });
 	const strip = (f) => fs.readFileSync(require.resolve('../src/js/' + f), 'utf8').replace(/^import .*;$/gm, '').replace(/export default \{[\s\S]*?\};/g, '').replace(/^export default .*;$/gm, '').replace(/\bexport /g, '');
-	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-unsupported.js'].map(strip).join('\n')
+	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-fill.js', 'libs/psd-unsupported.js'].map(strip).join('\n')
 		+ fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8').replace(/^import .*;$/gm, '').replace(/\bexport (?=(?:async )?function)/g, ''), context);
 	let imported;
 	context.app = { Documents: { create_document_from_psd_data: (d) => { imported = d; } } };
@@ -75,6 +75,7 @@ test('end to end: a PSD with Levels imports as a placeholder, warns once, and ex
 		{ name: 'Levels 1', adjustment: { type: 'levels', rgb: { shadowInput: 12, highlightInput: 230, midtoneInput: 1.1, shadowOutput: 0, highlightOutput: 255 } } },
 		{ name: 'Curves 1', adjustment: { type: 'curves', rgb: [{ input: 0, output: 0 }, { input: 255, output: 255 }] } },
 		{ name: 'Hue/Saturation 1', adjustment: { type: 'hue/saturation', master: { hue: 10, saturation: 0, lightness: 0 } } },
+		{ name: 'Faded', fillOpacity: 0.4, left: 0, top: 0, right: 4, bottom: 4, canvas: createCanvas(4, 4) },
 	] };
 	vm.runInContext('agPsdModulePromise = Promise.resolve({readPsd: () => psdFixture})', context);
 	await context.load_psd(new ArrayBuffer(0), 'client.psd');
@@ -93,4 +94,8 @@ test('end to end: a PSD with Levels imports as a placeholder, warns once, and ex
 	assert.ok(types.includes('levels') && types.includes('curves') && types.includes('hue/saturation'), JSON.stringify(types));
 	const lvOut = exported.find((l) => l.adjustment && l.adjustment.type === 'levels');
 	assert.equal(lvOut.adjustment.rgb.shadowInput, 12);
+	const faded = imported.layers.find((l) => l.name === 'Faded');
+	assert.equal(faded && faded.fillOpacity, 40, 'Fill % imported');
+	const fadedOut = exported.find((l) => l.name === 'Faded');
+	assert.equal(fadedOut && fadedOut.fillOpacity, 0.4, 'Fill % exported');
 });

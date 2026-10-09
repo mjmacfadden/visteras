@@ -10,6 +10,7 @@ import { point_text_origin } from './text-geometry.js';
 import app from './../app.js';
 import config from './../config.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
+import { psd_fill_to_studio, studio_fill_to_psd } from './psd-fill.js';
 import { unsupported_adjustment_fields, unsupported_labels, unsupported_import_message, unsupported_export_adjustment } from './psd-unsupported.js';
 import filesaver from './../../../node_modules/file-saver/dist/FileSaver.min.js';
 import { is_group, get_children, get_parent_id, is_psd_group } from './layer-tree.js';
@@ -200,6 +201,8 @@ export async function load_psd(buffer, filename, options = {}) {
 				} else {
 					const convertedLayer = convert_psd_layer(node, idCounter, docWidth, docHeight);
 					if (convertedLayer) {
+						const fill = psd_fill_to_studio(node);
+						if (fill != null) convertedLayer.fillOpacity = fill;
 						convertedLayer.parent_id = parent_id;
 						convertedLayer.order = orderCounter++;
 						layers.push(convertedLayer);
@@ -1106,6 +1109,8 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
 			out.push(psdGroup);
 		} else {
 			const psdLayer = export_layer_to_psd(layer, docWidth, docHeight);
+			const fill = studio_fill_to_psd(layer);
+			if (psdLayer && fill != null) psdLayer.fillOpacity = fill;
 			if (psdLayer) out.push(psdLayer);
 		}
 	}
