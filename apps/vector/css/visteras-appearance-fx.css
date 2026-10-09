@@ -78,3 +78,7 @@
 .vfx_browser_item { display: block; width: 100%; text-align: left; padding: 8px; color: #ddd; background: #333; border: 1px solid #444; border-radius: 3px; margin: 4px 0; cursor: pointer; }
 .vfx_browser_item:hover:not(:disabled) { border-color: #fa7c1b; }
 .vfx_browser_item:disabled { opacity: .4; cursor: default; }
+
+/* Paragraph panel: Illustrator's single row of 7 alignment buttons. */
+.vpara_panel_align { display: flex; flex-wrap: nowrap; align-items: center; gap: 2px; margin: 2px 0 6px; }
+.vpara_panel_align .visteras_text_align_btn:disabled { opacity: .4; cursor: default !important; }

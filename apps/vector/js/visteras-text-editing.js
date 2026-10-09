@@ -31,7 +31,7 @@ export function wrapText(value, width, measure) {
 // Data attributes survive the SVG-Edit sanitizer; tspans are regenerated from them.
 export const PARA_ATTRS = {
   leading: 'data-visteras-leading', // px; absent = Auto (120% of size)
-  align: 'data-visteras-align', // left | center | right | justify
+  align: 'data-visteras-align', // left | center | right | justify | justify-center | justify-right | justify-all
   spaceBefore: 'data-visteras-space-before', // px, not applied to the first paragraph
   spaceAfter: 'data-visteras-space-after', // px, not applied after the last paragraph
   indentLeft: 'data-visteras-indent-left', // px
@@ -40,6 +40,10 @@ export const PARA_ATTRS = {
 };
 export const AUTO_LEADING = 1.2;
 const ANCHOR_ALIGN = { start: 'left', middle: 'center', end: 'right' };
+/** Justify variants → how the paragraph's last line sits (Illustrator Paragraph panel). */
+export const JUSTIFY_LAST = { justify: 'left', 'justify-center': 'center', 'justify-right': 'right', 'justify-all': 'justify' };
+export const PARAGRAPH_ALIGNS = ['left', 'center', 'right', ...Object.keys(JUSTIFY_LAST)];
+const H_ANCHOR = { left: 'start', center: 'middle', right: 'end' };
 
 export const LOREM_IPSUM = 'Lorem Ipsum';
 export const LOREM_PARAGRAPH = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.';
@@ -111,11 +115,13 @@ export function getLoremIpsumForBox(opts, measure) {
  * { text, start, x, y, wordSpacing } (wordSpacing only for justified lines).
  * Justify = Illustrator "Justify with last line aligned left": every wrapped line
  * except a paragraph's last gets extra word-spacing to fill the box width.
+ * justify-center / justify-right place that last line centred / right;
+ * justify-all justifies it too. Justify variants carry a per-line anchor.
  */
 export function computeParagraphLayout(opts, measure) {
   const { value = '', width, height = Infinity, size = 24, x = 0, y = 0 } = opts;
   const leading = Number(opts.leading) > 0 ? Number(opts.leading) : size * AUTO_LEADING;
-  const align = ['left', 'center', 'right', 'justify'].includes(opts.align) ? opts.align : 'left';
+  const align = PARAGRAPH_ALIGNS.includes(opts.align) ? opts.align : 'left';
   const before = Math.max(0, Number(opts.spaceBefore) || 0), after = Math.max(0, Number(opts.spaceAfter) || 0);
   const indentLeft = Math.max(0, Number(opts.indentLeft) || 0);
   const indentRight = Math.max(0, Number(opts.indentRight) || 0);
@@ -147,9 +153,13 @@ export function computeParagraphLayout(opts, measure) {
       const band = li === 0 ? firstBand : bodyBand;
       const inset = indentLeft + (li === 0 ? firstExtra : hanging);
       const originX = x + inset;
-      const lineX = originX + (align === 'center' ? band / 2 : align === 'right' ? band : 0);
+      const isLast = li === lines.length - 1;
+      const justified = align in JUSTIFY_LAST && (!isLast || align === 'justify-all');
+      const h = justified ? 'left' : (JUSTIFY_LAST[align] || align);
+      const lineX = originX + (h === 'center' ? band / 2 : h === 'right' ? band : 0);
       const entry = { text: line, start: sourceIndex, x: lineX, y: y + baseline, wordSpacing: null };
-      if (align === 'justify' && li < lines.length - 1) {
+      if (align in JUSTIFY_LAST) entry.anchor = H_ANCHOR[h];
+      if (justified) {
         const trimmed = line.replace(/\s+$/, '');
         const gaps = (trimmed.match(/ /g) || []).length;
         if (gaps) {
@@ -170,7 +180,7 @@ export function computeParagraphLayout(opts, measure) {
 export function readParagraphAttrs(text) {
   const num = (k) => { const v = Number(text.getAttribute(PARA_ATTRS[k])); return Number.isFinite(v) && text.getAttribute(PARA_ATTRS[k]) !== null && text.getAttribute(PARA_ATTRS[k]) !== '' ? v : null; };
   const stored = text.getAttribute(PARA_ATTRS.align);
-  const align = ['left', 'center', 'right', 'justify'].includes(stored) ? stored : ANCHOR_ALIGN[text.getAttribute('text-anchor') || 'start'] || 'left';
+  const align = PARAGRAPH_ALIGNS.includes(stored) ? stored : ANCHOR_ALIGN[text.getAttribute('text-anchor') || 'start'] || 'left';
   return {
     leading: num('leading'),
     align,
@@ -240,6 +250,7 @@ export function layoutParagraph(text) {
     span.setAttribute('y', line.y);
     span.setAttribute('data-text-start', line.start);
     if (line.wordSpacing != null) span.setAttribute('word-spacing', line.wordSpacing);
+    if (line.anchor) span.setAttribute('text-anchor', line.anchor);
     span.textContent = line.text || '\u200b';
     fragment.append(span);
   }

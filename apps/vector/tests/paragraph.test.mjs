@@ -149,3 +149,30 @@ test('Area text: layout may re-assert the snapshotted frame but never invents a 
   const writes = [...layoutBody.matchAll(/setAttribute\('data-text-(width|height)'/g)];
   assert.equal(writes.length, 2, 'layout only re-asserts the snapshotted frame');
 });
+
+test('Paragraph layout: justify last-line variants (center, right, all) and per-line anchors', () => {
+  const v = 'aa b cc dd eeee\nff gg';
+  const run = (align) => T.computeParagraphLayout({ value: v, width: 100, size: 10, x: 0, align }, mono);
+  const jc = run('justify-center');
+  assert.deepEqual(jc.map((l) => [l.text, l.x, l.anchor, l.wordSpacing]), [['aa b cc ', 0, 'start', 15], ['dd eeee', 50, 'middle', null], ['ff gg', 50, 'middle', null]]);
+  const jr = run('justify-right');
+  assert.deepEqual(jr.map((l) => [l.x, l.anchor]), [[0, 'start'], [100, 'end'], [100, 'end']]);
+  const ja = run('justify-all');
+  // 'dd eeee' (70px, 1 gap) and 'ff gg' (50px, 1 gap) are stretched too
+  assert.deepEqual(ja.map((l) => [l.x, l.anchor, l.wordSpacing]), [[0, 'start', 15], [0, 'start', 30], [0, 'start', 50]]);
+  // plain justify keeps the last line left; left/center/right add no anchor override
+  assert.deepEqual(run('justify').map((l) => l.anchor), ['start', 'start', 'start']);
+  assert.equal(run('center')[0].anchor, undefined);
+});
+
+test('Paragraph: justify variants stored on the text with a matching text-anchor; one-row button set', () => {
+  assert.equal(P.ALIGN_TO_ANCHOR['justify-center'], 'middle');
+  assert.equal(P.ALIGN_TO_ANCHOR['justify-right'], 'end');
+  assert.equal(P.ALIGN_TO_ANCHOR['justify-all'], 'start');
+  assert.deepEqual(P.ALIGN_BUTTONS.map((b) => b.align), ['left', 'center', 'right', 'justify', 'justify-center', 'justify-right', 'justify-all']);
+  assert.equal(P.alignLabel('justify-center'), 'Justify, Last Line Center');
+  assert.deepEqual(P.normalizeParagraphPatch({ align: 'justify-all' }), { align: 'justify-all' });
+  assert.deepEqual(P.normalizeParagraphPatch({ align: 'justify-bogus' }), {});
+  const css = fs.readFileSync(new URL('../css/visteras-appearance-fx.css', import.meta.url), 'utf8');
+  assert.match(css, /\.vpara_panel_align \{ display: flex; flex-wrap: nowrap;/);
+});

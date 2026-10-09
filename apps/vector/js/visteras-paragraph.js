@@ -4,7 +4,8 @@
  *
  * Storage (all on the <text>, survives the SVG-Edit sanitizer and .vvd reopen):
  *   data-visteras-leading       px, absent = Auto (120 %)
- *   data-visteras-align         left | center | right | justify (+ text-anchor kept in sync)
+ *   data-visteras-align         left | center | right | justify | justify-center | justify-right |
+ *                               justify-all (+ text-anchor kept in sync)
  *   data-visteras-tracking      1/1000 em (Illustrator units) → letter-spacing (px) attribute
  *   data-visteras-space-before  px
  *   data-visteras-space-after   px
@@ -21,9 +22,25 @@ export const PARA = {
   indentRight: 'data-visteras-indent-right',
   indentFirst: 'data-visteras-indent-first',
 };
-export const ALIGN_TO_ANCHOR = { left: 'start', center: 'middle', right: 'end', justify: 'start' };
+export const ALIGN_TO_ANCHOR = {
+  left: 'start', center: 'middle', right: 'end',
+  justify: 'start', 'justify-center': 'middle', 'justify-right': 'end', 'justify-all': 'start',
+};
+/** Illustrator Paragraph panel, left to right, one row. */
+export const ALIGN_BUTTONS = [
+  { align: 'left', data: 'start', label: 'Align Left', icon: 'alignLeft' },
+  { align: 'center', data: 'middle', label: 'Align Center', icon: 'alignCenter' },
+  { align: 'right', data: 'end', label: 'Align Right', icon: 'alignRight' },
+  { align: 'justify', data: 'justify', label: 'Justify with Last Line Aligned Left', icon: 'justify' },
+  { align: 'justify-center', data: 'justify-center', label: 'Justify with Last Line Aligned Center', icon: 'justifyCenter' },
+  { align: 'justify-right', data: 'justify-right', label: 'Justify with Last Line Aligned Right', icon: 'justifyRight' },
+  { align: 'justify-all', data: 'justify-all', label: 'Justify All Lines', icon: 'justifyAll' },
+];
+export const isJustify = (align) => typeof align === 'string' && align.startsWith('justify');
+/** Undo-history label for an alignment change. */
+export const alignLabel = (align) => (ALIGN_BUTTONS.find((b) => b.align === align)?.label || 'Align').replace(' with Last Line Aligned', ', Last Line');
 export const ANCHOR_TO_ALIGN = { start: 'left', middle: 'center', end: 'right' };
-const BUTTON_ALIGN = { start: 'left', middle: 'center', end: 'right', justify: 'justify' };
+const BUTTON_ALIGN = Object.fromEntries(ALIGN_BUTTONS.map((b) => [b.data, b.align]));
 
 const round = (n, d = 3) => Math.round(n * 10 ** d) / 10 ** d;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -148,6 +165,12 @@ const ICON = {
   before: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 7h12v1H2zm0 3h12v1H2zm0 3h8v1H2zM8 1l3 3H9v1H7V4H5z"/></svg>',
   after: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 2h12v1H2zm0 3h12v1H2zm0 3h8v1H2zm6 7-3-3h2v-1h2v1h2z"/></svg>',
   justify: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M2 12.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5zm0-3a.5.5 0 0 1 .5-.5h11a.5.5 0 0 1 0 1h-11a.5.5 0 0 1-.5-.5z"/></svg>',
+  justifyCenter: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm0 3h12v1.2H2zm0 3h12v1.2H2zm3.5 3h5v1.2h-5z"/></svg>',
+  justifyRight: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm0 3h12v1.2H2zm0 3h12v1.2H2zm5 3h7v1.2H7z"/></svg>',
+  justifyAll: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm0 3h12v1.2H2zm0 3h12v1.2H2zm0 3h12v1.2H2z"/></svg>',
+  alignLeft: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm0 3h8v1.2H2zm0 3h12v1.2H2zm0 3h8v1.2H2z"/></svg>',
+  alignCenter: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm2 3h8v1.2H4zm-2 3h12v1.2H2zm2 3h8v1.2H4z"/></svg>',
+  alignRight: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm4 3h8v1.2H6zm-4 3h12v1.2H2zm4 3h8v1.2H6z"/></svg>',
   indentLeft: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 2h12v1H2zm6 3h6v1H8zm0 3h6v1H8zm0 3h6v1H8zM2 13h12v1H2zM6 5.5 2.5 8 6 10.5V9h1.5V7H6z"/></svg>',
   indentRight: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 2h12v1H2zM2 5h6v1H2zm0 3h6v1H2zm0 3h6v1H2zm0 3h12v1H2zm8-7.5L13.5 8 10 10.5V9H8.5V7H10z"/></svg>',
   indentFirst: '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 2h12v1H2zm4 3h8v1H6zm0 3h8v1H6zM2 11h12v1H2zm0 3h12v1H2zM5 5.5 1.5 8 5 10.5V9h1V7H5z"/></svg>',
@@ -254,10 +277,10 @@ export function mountParagraph(editor) {
     const els = texts();
     const align = BUTTON_ALIGN[btn.dataset.align];
     const own = els.filter((el) => !isPathText(el));
-    if (!own.length) { if (align === 'justify') e.stopImmediatePropagation(); return; } // type-on-path / defaults → legacy handler
+    if (!own.length) { if (isJustify(align)) e.stopImmediatePropagation(); return; } // type-on-path / defaults → legacy handler
     e.stopImmediatePropagation();
     e.preventDefault();
-    applyParagraph(sc, own, { align }, align === 'justify' ? 'Justify' : `Align ${align[0].toUpperCase()}${align.slice(1)}`);
+    applyParagraph(sc, own, { align }, alignLabel(align));
     document.getElementById('tool_text_anchor')?.setAttribute('value', ALIGN_TO_ANCHOR[align]);
     setAlignButtons(align);
   }, true);
@@ -298,16 +321,7 @@ function ensureParagraphPanel() {
     </div>
     <div class="floating_panel_body" id="paragraph_panel_body">
       <div class="vpara_panel_align" id="vpara_panel_align" role="group" aria-label="Paragraph alignment">
-        <button type="button" class="visteras_text_align_btn" data-align="start" title="Align Left" aria-label="Align Left" aria-pressed="false">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm0 3h8v1.2H2zm0 3h12v1.2H2zm0 3h8v1.2H2z"/></svg>
-        </button>
-        <button type="button" class="visteras_text_align_btn" data-align="middle" title="Align Center" aria-label="Align Center" aria-pressed="false">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm2 3h8v1.2H4zm-2 3h12v1.2H2zm2 3h8v1.2H4z"/></svg>
-        </button>
-        <button type="button" class="visteras_text_align_btn" data-align="end" title="Align Right" aria-label="Align Right" aria-pressed="false">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M2 3h12v1.2H2zm4 3h8v1.2H6zm-4 3h12v1.2H2zm4 3h8v1.2H6z"/></svg>
-        </button>
-        <button type="button" class="visteras_text_align_btn" data-align="justify" title="Justify with Last Line Aligned Left" aria-label="Justify with Last Line Aligned Left" aria-pressed="false">${ICON.justify}</button>
+        ${ALIGN_BUTTONS.map((b) => `<button type="button" class="visteras_text_align_btn" data-align="${b.data}" title="${b.label}" aria-label="${b.label}" aria-pressed="false">${ICON[b.icon]}</button>`).join('')}
       </div>
       <div class="prop_row vpara_row" id="vpara_panel_indent_row">
         ${field('vpara_p_indent_left', ICON.indentLeft, 'Left Indent (px)', 'min="0" step="1"')}
@@ -408,6 +422,10 @@ export function mountParagraphPanel(editor) {
       input.value = v[k];
       input.disabled = !area;
     }
+    const onlyPath = els.every(isPathText);
+    for (const btn of alignSlot?.querySelectorAll('.visteras_text_align_btn') || []) {
+      if (isJustify(BUTTON_ALIGN[btn.dataset.align])) btn.disabled = onlyPath;
+    }
     setAlignButtons(v.align);
   };
 
@@ -428,7 +446,7 @@ export function mountParagraphPanel(editor) {
     const align = BUTTON_ALIGN[btn.dataset.align];
     const own = texts().filter((el) => !isPathText(el));
     if (!own.length) return;
-    applyParagraph(sc, own, { align }, align === 'justify' ? 'Justify' : `Align ${align[0].toUpperCase()}${align.slice(1)}`);
+    applyParagraph(sc, own, { align }, alignLabel(align));
     setAlignButtons(align);
     window.__visterasParagraph?.render?.();
   });
