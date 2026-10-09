@@ -41,7 +41,8 @@
 /* --------------------------------------------------------------------------
  * 3. Marker / star / polygon context leftovers in the options bar.
  *    Left-toolbar star/polygon tools remain; Properties integration deferred.
- *    Unsafe to delete extension DOM (ext-markers / ext-polystar still wire it).
+ *    Unsafe to delete extension DOM (ext-polystar still wires it). ext-markers is
+ *    no longer loaded: arrowheads live in the Stroke dock (visteras-arrowheads.js).
  * -------------------------------------------------------------------------- */
 #tools_top #star_panel,
 #tools_top #polygon_panel,
@@ -56,11 +57,12 @@
 #tool_node_clone,
 #tool_node_delete,
 #tool_node_link,
-#seg_type,
-#path_node_x,
-#path_node_y {
+#seg_type {
   display: none !important;
 }
+
+/* path_node_x/y: shown again in Properties ▸ Path & Nodes for Direct Selection /
+   pathedit (gravit-gap-4). Still relocated out of #tools_top. */
 
 /* --------------------------------------------------------------------------
  * 5. Orphan options-bar tools that stay permanently unused under the Visteras
@@ -76,7 +78,9 @@
 #tools_top #g_title,
 #tools_top #link_url,
 #tools_top #linkLabel,
-#tools_top #image_url {
+#tools_top #image_url,
+#tools_top #elem_id,
+#tools_top #elem_class {
   display: none !important;
 }
 

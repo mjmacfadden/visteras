@@ -12,7 +12,7 @@ test('Window Menu: Pathfinder is a single option in Window menu', () => {
   const html = fs.readFileSync(vectorHtmlPath, 'utf8');
 
   // Verify Object menu exists and DOES NOT contain pathfinder items
-  const objectMenuMatch = html.match(/<div class="menu_entry" id="menu_object">([\s\S]*?)<\/div>\s*<!-- Text Menu -->/);
+  const objectMenuMatch = html.match(/<div class="menu_entry" id="menu_object">([\s\S]*?)<\/div>\s*<!-- Type Menu[^>]*-->/);
   assert.ok(objectMenuMatch, 'Object menu section found');
   const objectMenuContent = objectMenuMatch[1];
   assert.equal(objectMenuContent.includes('action_pathfinder_unite'), false, 'Pathfinder Unite should not be in Object menu');

@@ -246,7 +246,7 @@ export function reselectLast(sc) {
 function injectSelectMenu() {
   if (document.getElementById('menu_select')) return;
   const mac = detectMac();
-  // Illustrator order: File, Edit, Object, Type/Text, Select, Effect, …
+  // Illustrator order: File, Edit, Object, Type, Select, Effect, … (Type menu keeps id menu_text)
   const textMenu = document.getElementById('menu_text');
   const effectMenu = document.getElementById('menu_effect');
   const anchor = textMenu || document.getElementById('menu_object');

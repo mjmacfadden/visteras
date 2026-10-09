@@ -93,6 +93,12 @@
             <div class="menu_dropdown_item" id="action_deselect_all">Deselect All <span class="menu_dropdown_shortcut">⌘⇧A</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_delete">Delete <span class="menu_dropdown_shortcut">⌫</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_edit_colors_menu">Edit Colors<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_adjust_color_balance" data-fx-type="colorAdjust">Adjust Color Balance…</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -134,9 +140,9 @@
           </div>
         </div>
 
-        <!-- Text Menu -->
+        <!-- Type Menu (Illustrator "Type"; id stays menu_text for stable wiring) -->
         <div class="menu_entry" id="menu_text">
-          <div class="menu_entry_title">Text</div>
+          <div class="menu_entry_title">Type</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_type_on_path" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_separator"></div>
@@ -308,7 +314,10 @@
     import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-3';
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
-    import { mountParagraph } from './js/visteras-paragraph.js?v=gravit-1';
+    import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=gravit-4';
+    import { mountPathOps } from './js/visteras-path-ops.js?v=gravit-4';
+    import { mountArtboardExtras } from './js/visteras-artboard-extras.js?v=gravit-4';
+    import { mountArrowheads } from './js/visteras-arrowheads.js?v=gravit-4';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
@@ -363,7 +372,6 @@
     const VECTOR_EXTENSIONS = [
       'ext-connector',
       // 'ext-grid' — replaced by visteras-grid.js (artboards hide #canvasBackground)
-      'ext-markers',
       'ext-panning',
       'ext-shapes',
       'ext-polystar',
@@ -1625,7 +1633,7 @@
               </div>
             </div>
 
-            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Color Adjust) -->
+            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Adjust Color Balance) -->
             <div class="prop_section" id="sec_effects" style="display:none;">
               <div class="prop_section_header" data-target="sec_effects_body">
                 <span class="prop_section_arrow"></span>
@@ -1792,6 +1800,10 @@
                 <span class="prop_section_title">Path & Nodes</span>
               </div>
               <div class="prop_section_body" id="sec_path_node_body">
+                <div class="prop_row" id="row_path_node_xy" style="gap:8px;align-items:center;">
+                  <div class="prop_label" style="min-width:70px;">Anchor:</div>
+                  <div id="slot_path_node_xy" style="display:flex;gap:6px;flex:1;"></div>
+                </div>
                 <div class="prop_row">
                   <div class="prop_label" style="min-width:70px;">Convert:</div>
                   <div class="prop_actions_flow" style="gap:4px;">
@@ -1816,10 +1828,6 @@
               </div>
               <div class="prop_section_body" id="sec_actions_body">
                 <div class="prop_actions_flow" id="slot_action_btns"></div>
-                <div class="prop_row" id="row_elem_id_class" style="margin-top: 4px; display: none;">
-                  <div id="slot_elem_id" style="flex:1;"></div>
-                  <div id="slot_elem_class" style="flex:1;"></div>
-                </div>
               </div>
             </div>
 
@@ -2138,11 +2146,11 @@
       moveEl('tool_letter_spacing', 'slot_letter_spacing');
       moveEl('tool_word_spacing', 'slot_word_spacing');
 
-      // Relocate Path controls (hygiene): dead SVG-Edit node clone/delete/link/
-      // seg_type / path_node X/Y stay in #tools_top and are CSS-hidden in
-      // visteras-svgedit-hygiene.css — do not surface them in Properties.
-      // Direct Selection Convert buttons own corner/smooth. Keep open/close +
-      // add-subpath as the remaining useful path actions.
+      // Path node X/Y: surface again in Properties for Direct Selection / pathedit
+      // (units via SVG-Edit convertUnit + Direct Selection sync). Clone/delete/link/
+      // seg_type stay hidden. Convert buttons own corner/smooth.
+      moveEl('path_node_x', 'slot_path_node_xy');
+      moveEl('path_node_y', 'slot_path_node_xy');
       moveEl('tool_openclose_path', 'slot_node_btns');
       moveEl('tool_add_subpath', 'slot_node_btns');
 
@@ -2157,8 +2165,6 @@
       moveEl('tool_delete', 'slot_action_btns');
       moveEl('tool_topath', 'slot_action_btns');
       moveEl('tool_reorient', 'slot_action_btns');
-      moveEl('elem_id', 'slot_elem_id');
-      moveEl('elem_class', 'slot_elem_class');
 
       // Properties header click handler (tab expands if collapsed)
       document.getElementById('properties_panel_header')?.addEventListener('click', () => {
@@ -2582,7 +2588,7 @@
     mountBlendModes(svgEditor);
     // Window ▸ Transparency (⇧⌘F10): Blend Mode, Opacity, Isolate Blending
     mountTransparency(svgEditor);
-    // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
+    // Effects: Drop Shadow / Inner Shadow / Adjust Color Balance / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
     mountAppearance(svgEditor);
     mountObjectLock(svgEditor);
@@ -2597,9 +2603,13 @@
     mountContextMenu(svgEditor);
     mountShortcutLabels();
     mountParagraph(svgEditor);
+    mountParagraphPanel(svgEditor);
+    mountPathOps(svgEditor);
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);
     mountArtboards(svgEditor);
+    mountArtboardExtras(svgEditor);
+    mountArrowheads(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌃⌘7), Release (⌃⌥⌘7)

@@ -106,19 +106,20 @@ test('Effects: getVisualBounds unions the stroked bbox with effect extents', () 
 
 test('Effect menu: Illustrator structure (Apply Last, Last Effect, raster settings, Illustrator / Photoshop Effects)', () => {
   const html = F.effectMenuHtml();
-  const order = ['Apply Last Effect', 'Last Effect…', 'Document Raster Effects Settings…', 'Illustrator Effects', 'Stylize', 'Drop Shadow…', 'SVG Filters', 'Color Adjust…', 'Photoshop Effects', 'Blur', 'Gaussian Blur…'];
+  const order = ['Apply Last Effect', 'Last Effect…', 'Document Raster Effects Settings…', 'Illustrator Effects', 'Stylize', 'Drop Shadow…', 'Photoshop Effects', 'Blur', 'Gaussian Blur…'];
   const idx = order.map((t) => html.indexOf(t));
   assert.ok(idx.every((i) => i >= 0), JSON.stringify(idx));
   assert.deepEqual([...idx].sort((a, b) => a - b), idx);
   assert.match(html, /id="action_effect_apply_last"[^>]*><span class="menu_label">Apply Last Effect<\/span><span class="menu_dropdown_shortcut">⇧⌘E<\/span>/);
   assert.match(html, /<span class="menu_dropdown_shortcut">⌥⇧⌘E<\/span>/);
   assert.match(html, /class="menu_dropdown_item" role="menuitem" id="action_effect_raster_settings" data-fx-act="rasterSettings"/, 'Document Raster Effects Settings… opens the export module dialog');
-  assert.equal((html.match(/menu_has_submenu/g) || []).length, 3);
+  assert.equal((html.match(/menu_has_submenu/g) || []).length, 2);
+  assert.doesNotMatch(html, /SVG Filters|Color Adjust|Adjust Color Balance|colorAdjust/, 'Adjust Color Balance lives in Edit > Edit Colors');
   assert.doesNotMatch(html, /Inner Shadow/, 'Inner Shadow is legacy: not offered in menus');
   const pop = F.effectMenuHtml({ prefix: 'vfx_menu_', withLast: false });
   assert.doesNotMatch(pop, /Apply Last|Raster|menu_dropdown_separator/);
   assert.match(pop, /id="vfx_menu_dropShadow"/);
-  const idx2 = ['Stylize', 'SVG Filters', 'Blur'].map((t) => pop.indexOf(t));
+  const idx2 = ['Stylize', 'Blur'].map((t) => pop.indexOf(t));
   assert.deepEqual([...idx2].sort((a, b) => a - b), idx2, 'fx popup mirrors the Effect menu order');
   const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.ok(index.indexOf('id="menu_object"') < index.indexOf('id="menu_effect"') && index.indexOf('id="menu_effect"') < index.indexOf('id="menu_view"'), 'Effect sits between Object and View');

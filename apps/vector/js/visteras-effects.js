@@ -29,7 +29,7 @@ export const FX_DEFAULTS = {
 };
 /** Render order: color → blur → feather → inside effects → outside effects (under the art). */
 export const FX_ORDER = ['colorAdjust', 'gaussianBlur', 'feather', 'innerShadow', 'innerGlow', 'outerGlow', 'dropShadow'];
-export const FX_LABELS = { dropShadow: 'Drop Shadow', innerShadow: 'Inner Shadow', innerGlow: 'Inner Glow', outerGlow: 'Outer Glow', feather: 'Feather', colorAdjust: 'Color Adjust', gaussianBlur: 'Gaussian Blur' };
+export const FX_LABELS = { dropShadow: 'Drop Shadow', innerShadow: 'Inner Shadow', innerGlow: 'Inner Glow', outerGlow: 'Outer Glow', feather: 'Feather', colorAdjust: 'Adjust Color Balance', gaussianBlur: 'Gaussian Blur' };
 /** Types offered in menus (Inner Shadow is legacy). */
 export const LEGACY_TYPES = ['innerShadow'];
 export const SHADOW_MODES = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-burn', 'color-dodge', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'];
@@ -466,11 +466,10 @@ export const EFFECT_MENU = [
   { sep: true },
   { header: 'Illustrator Effects' },
   { submenu: 'Stylize', id: 'stylize', items: ['dropShadow', 'innerGlow', 'outerGlow', 'feather'] },
-  { submenu: 'SVG Filters', id: 'svg_filters', items: ['colorAdjust'] },
   { header: 'Photoshop Effects' },
   { submenu: 'Blur', id: 'blur', items: ['gaussianBlur'] },
 ];
-const MENU_LABELS = { dropShadow: 'Drop Shadow…', innerGlow: 'Inner Glow…', outerGlow: 'Outer Glow…', feather: 'Feather…', colorAdjust: 'Color Adjust…', gaussianBlur: 'Gaussian Blur…' };
+const MENU_LABELS = { dropShadow: 'Drop Shadow…', innerGlow: 'Inner Glow…', outerGlow: 'Outer Glow…', feather: 'Feather…', colorAdjust: 'Adjust Color Balance…', gaussianBlur: 'Gaussian Blur…' };
 
 /** Menu HTML (menu-bar classes). `prefix` keeps ids unique between the menu bar and the fx popup. */
 export function effectMenuHtml({ prefix = 'action_effect_', withLast = true } = {}) {
@@ -661,10 +660,12 @@ export function mountEffects(editor) {
   browser.innerHTML = '<p class="vfx_browser_hint">Select an object, then choose an effect.</p>' +
     EFFECT_MENU.filter(group => group.submenu).map(group => `<section class="vfx_browser_group"><h3>${esc(group.submenu)}</h3>${group.items.map(item => `<button type="button" class="vfx_browser_item" data-fx-type="${item}" ${!FX_DEFAULTS[item] ? 'disabled' : ''}>${esc(MENU_LABELS[item] || item)}</button>`).join('')}</section>`).join('');
   browser.addEventListener('click', e => runItem(e.target.closest('[data-fx-type]')));
+  // Illustrator: Edit > Edit Colors > Adjust Color Balance… (moved out of the Effect menu)
+  document.getElementById('action_adjust_color_balance')?.addEventListener('click', (e) => runItem(e.currentTarget));
   document.getElementById('action_window_effects')?.addEventListener('click', () => window.__visterasDock?.toggle?.('effects'));
   function renderMenus() {
     const has = targets().length > 0;
-    for (const n of document.querySelectorAll('#menu_effect_list [data-fx-type], #vdock_effects_panel [data-fx-type]')) { const disabled = !has || !FX_DEFAULTS[n.dataset.fxType]; n.classList.toggle('disabled', disabled); if (n.tagName === 'BUTTON') n.disabled = disabled; }
+    for (const n of document.querySelectorAll('#menu_effect_list [data-fx-type], #vdock_effects_panel [data-fx-type], #action_adjust_color_balance')) { const disabled = !has || !FX_DEFAULTS[n.dataset.fxType]; n.classList.toggle('disabled', disabled); if (n.tagName === 'BUTTON') n.disabled = disabled; }
     const ap = document.getElementById('action_effect_apply_last'), la = document.getElementById('action_effect_last');
     const label = lastEffect ? FX_LABELS[lastEffect.type] : null;
     if (ap) { ap.querySelector('.menu_label').textContent = label ? `Apply ${label}` : 'Apply Last Effect'; ap.classList.toggle('disabled', !label || !has); }
