@@ -2,7 +2,7 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
-import { merge_visible_plan } from './../../libs/merge-plan.js';
+import { merge_visible_plan, flatten_plan } from './../../libs/merge-plan.js';
 
 class Layer_flatten_class {
 
@@ -93,46 +93,73 @@ class Layer_flatten_class {
 		}
 	}
 
-	flatten() {
-		//create tmp canvas
-		var canvas = document.createElement('canvas');
-		canvas.width = config.WIDTH;
-		canvas.height = config.HEIGHT;
-		var ctx = canvas.getContext("2d");
-		
-		var layers_sorted = this.Base_layers.get_sorted_layers();
+	async flatten() {
+		if (this.flattening) return false;
+		if (!config.layers || config.layers.length === 0) return false;
 
-		//paint layers
-		for (var i = layers_sorted.length - 1; i >= 0; i--) {
-			var layer = layers_sorted[i];
-			
-			ctx.globalAlpha = layer.opacity / 100;
-			ctx.globalCompositeOperation = layer.composition;
-
-			this.Base_layers.render_object(ctx, layer);
+		const plan = flatten_plan(config.layers);
+		if (!plan.ok) {
+			alertify.error(plan.error);
+			return false;
 		}
 
-		//create requested layer
-		var params = [];
-		params.type = 'image';
-		params.name = 'Merged';
-		params.data = canvas.toDataURL("image/png");
-
-		//remove rest of layers
-		let delete_actions = [];
-		for (var i = config.layers.length - 1; i >= 0; i--) {
-			delete_actions.push(new app.Actions.Delete_layer_action(config.layers[i].id));
+		if (plan.hasHidden) {
+			const ok = await new Promise((resolve) => {
+				alertify.confirm(
+					'Discard hidden layers?',
+					'Discard hidden layers?',
+					() => resolve(true),
+					() => resolve(false)
+				).set({
+					labels: { ok: 'OK', cancel: 'Cancel' },
+					defaultFocus: 'ok',
+				});
+			});
+			if (!ok) return false;
 		}
-		// Run actions
-		app.State.do_action(
-			new app.Actions.Bundle_action('flatten_image', 'Flatten Image', [
-				new app.Actions.Insert_layer_action(params),
-				...delete_actions
-			])
-		);
 
-		canvas.width = 1;
-		canvas.height = 1;
+		this.flattening = true;
+		try {
+			// create tmp canvas
+			const canvas = document.createElement('canvas');
+			canvas.width = config.WIDTH;
+			canvas.height = config.HEIGHT;
+			this.Base_layers.convert_layers_to_canvas(canvas.getContext('2d'), null, false);
+
+			const insert_action = new app.Actions.Insert_layer_action({
+				name: plan.result.name,
+				locked: plan.result.locked,
+				type: plan.result.type,
+				data: canvas.toDataURL('image/png'),
+				x: 0,
+				y: 0,
+				width: canvas.width,
+				height: canvas.height,
+				width_original: canvas.width,
+				height_original: canvas.height,
+				parent_id: plan.result.parent_id,
+				order: plan.result.order,
+				opacity: plan.result.opacity,
+				composition: plan.result.composition,
+				mask: plan.result.mask,
+				filters: plan.result.filters,
+			}, false);
+
+			const delete_actions = plan.deleteIds.map((id) => new app.Actions.Delete_layer_action(id));
+
+			await app.State.do_action(
+				new app.Actions.Bundle_action('flatten_image', 'Flatten Image', [
+					insert_action,
+					...delete_actions,
+				])
+			);
+
+			canvas.width = 1;
+			canvas.height = 1;
+			return true;
+		} finally {
+			this.flattening = false;
+		}
 	}
 
 }
