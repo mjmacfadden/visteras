@@ -352,6 +352,16 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Shift + F6 = Select ▸ Modify ▸ Feather (Photoshop)
+			if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.code === 'F6' || event.key === 'F6')) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection']) {
+					app.GUI.modules['edit/selection'].feather();
+				}
+				return;
+			}
+
 			// Shift + N = New Layer (no modifiers besides Shift)
 			if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
 				&& (event.code === 'KeyN' || event.key === 'N' || event.key === 'n' || event.keyCode === 78)) {

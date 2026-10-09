@@ -510,9 +510,35 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Expand',
-				ellipsis: true,
-				target: 'edit/selection.expand'
+				name: 'Modify',
+				children: [
+					{
+						name: 'Border',
+						ellipsis: true,
+						target: 'edit/selection.border'
+					},
+					{
+						name: 'Smooth',
+						ellipsis: true,
+						target: 'edit/selection.smooth'
+					},
+					{
+						name: 'Expand',
+						ellipsis: true,
+						target: 'edit/selection.expand'
+					},
+					{
+						name: 'Contract',
+						ellipsis: true,
+						target: 'edit/selection.contract'
+					},
+					{
+						name: 'Feather',
+						shortcut: 'Shift + F6',
+						ellipsis: true,
+						target: 'edit/selection.feather'
+					}
+				]
 			},
 			{
 				divider: true
