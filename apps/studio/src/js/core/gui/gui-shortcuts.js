@@ -69,7 +69,8 @@ class GUI_shortcuts_class {
 			'm': 'selection',
 			'w': 'magic_wand',
 			'u': 'rectangle',
-			'j': 'desaturate',
+			'j': 'spot_heal',
+			'h': 'pan',
 			'o': 'bulge_pinch',
 			'a': 'direct_select',
 		};
@@ -348,6 +349,16 @@ class GUI_shortcuts_class {
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.modules && app.GUI.modules['file/new']) {
 					app.GUI.modules['file/new'].new();
+				}
+				return;
+			}
+
+			// Shift + F6 = Select ▸ Modify ▸ Feather (Photoshop)
+			if (event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && (event.code === 'F6' || event.key === 'F6')) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/selection']) {
+					app.GUI.modules['edit/selection'].feather();
 				}
 				return;
 			}

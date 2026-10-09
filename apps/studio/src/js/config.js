@@ -1130,7 +1130,7 @@ config.TOOLS = [
 	},
 	{
 		name: 'pan',
-		title: 'Pan Tool',
+		title: 'Hand Tool',
 		attributes: {},
 	},
 ];

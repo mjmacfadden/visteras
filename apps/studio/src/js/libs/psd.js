@@ -10,6 +10,8 @@ import { point_text_origin } from './text-geometry.js';
 import app from './../app.js';
 import config from './../config.js';
 import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
+import { psd_fill_to_studio, studio_fill_to_psd } from './psd-fill.js';
+import { unsupported_adjustment_fields, unsupported_labels, unsupported_import_message, unsupported_export_adjustment } from './psd-unsupported.js';
 import filesaver from './../../../node_modules/file-saver/dist/FileSaver.min.js';
 import { is_group, get_children, get_parent_id, is_psd_group } from './layer-tree.js';
 import { is_layer_clipped } from './layer-clip.js';
@@ -199,6 +201,8 @@ export async function load_psd(buffer, filename, options = {}) {
 				} else {
 					const convertedLayer = convert_psd_layer(node, idCounter, docWidth, docHeight);
 					if (convertedLayer) {
+						const fill = psd_fill_to_studio(node);
+						if (fill != null) convertedLayer.fillOpacity = fill;
 						convertedLayer.parent_id = parent_id;
 						convertedLayer.order = orderCounter++;
 						layers.push(convertedLayer);
@@ -239,6 +243,9 @@ export async function load_psd(buffer, filename, options = {}) {
 			return;
 		}
 	}
+
+	const unsupportedMsg = unsupported_import_message(unsupported_labels(layers));
+	if (unsupportedMsg) alertify.warning(unsupportedMsg, 15);
 
 	// If imported via "Open as Layer" (into current document)
 	if (options.asLayers) {
@@ -533,6 +540,7 @@ function convert_psd_adjustment(psdLayer, id, name, opacity, visible, compositio
 
 	let adjustment_type = 'brightness';
 	let params = { value: 0 };
+	let unsupported = null;
 
 	switch (adj.type) {
 		case 'brightness/contrast': {
@@ -604,13 +612,16 @@ function convert_psd_adjustment(psdLayer, id, name, opacity, visible, compositio
 			break;
 		}
 		default: {
-			adjustment_type = 'brightness';
-			params = { value: 0 };
+			// Levels, Curves, Color Balance, Gradient Map, …: no Studio equivalent
+			// yet. Keep a recognisable placeholder instead of a silent no-op.
+			unsupported = unsupported_adjustment_fields(adj, name);
+			adjustment_type = unsupported.adjustment_type;
+			params = unsupported.params;
 			break;
 		}
 	}
 
-	return {
+	const model = {
 		id: id,
 		name: name || (adjustment_type.charAt(0).toUpperCase() + adjustment_type.slice(1)),
 		type: 'adjustment',
@@ -629,6 +640,11 @@ function convert_psd_adjustment(psdLayer, id, name, opacity, visible, compositio
 		filters: [],
 		mask: mask,
 	};
+	if (unsupported) {
+		model.name = unsupported.name;
+		model.psd_unsupported = unsupported.psd_unsupported;
+	}
+	return model;
 }
 
 /**
@@ -1093,6 +1109,8 @@ function build_psd_children_tree(layers, parent_id, docWidth, docHeight) {
 			out.push(psdGroup);
 		} else {
 			const psdLayer = export_layer_to_psd(layer, docWidth, docHeight);
+			const fill = studio_fill_to_psd(layer);
+			if (psdLayer && fill != null) psdLayer.fillOpacity = fill;
 			if (psdLayer) out.push(psdLayer);
 		}
 	}
@@ -1191,6 +1209,9 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 				gamma: Math.max(0.01, Math.min(9.99, gamma)),
 			};
 		}
+		// Unsupported PSD adjustments (Levels, Curves, …) round-trip unchanged.
+		const passthrough = unsupported_export_adjustment(layer);
+		if (passthrough) adjObj = passthrough;
 		// blur is a Filters effect only — no PSD adjustment mapping
 
 		const psdLayer = {

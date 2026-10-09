@@ -30,7 +30,7 @@ test('unchanged layout is exactly idempotent for undo history',()=>{
  for(let i=0;i<1000;i++)place_point_text(l,301,69,55);
  assert.equal(JSON.stringify(l),before);
 });
-vm.runInContext(fs.readFileSync(require.resolve('../src/js/libs/psd.js'),'utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),context);
+vm.runInContext(fs.readFileSync(require.resolve('../src/js/libs/psd-fill.js'),'utf8').replace(/\bexport /g,'')+fs.readFileSync(require.resolve('../src/js/libs/psd-unsupported.js'),'utf8').replace(/\bexport /g,'')+fs.readFileSync(require.resolve('../src/js/libs/psd.js'),'utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),context);
 test('wrapped paragraph keeps its declared font size despite tall pixel bounds',()=>{
  const l=context.convert_psd_text({left:20,top:30,right:179,bottom:107,canvas:{width:159,height:77},text:{text:'Words wrap across several lines.',shapeType:'box',transform:[1,0,0,1,20,30],boxBounds:[0,0,180,100],style:{font:{name:'ArialMT'},fontSize:24,fillColor:{r:0,g:0,b:0}}}},1,'Paragraph',100,true,'source-over');
  assert.equal(l.params.size,24);assert.equal(l.data[0][0].meta.size,24);

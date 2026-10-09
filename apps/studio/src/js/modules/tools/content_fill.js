@@ -28,7 +28,7 @@ class Tools_contentFill_class {
 		}
 
 		var settings = {
-			title: 'Content Fill',
+			title: 'Extend Canvas Fill',
 			preview: true,
 			on_change: function (params, canvas_preview, w, h, canvasElement) {
 				canvas_preview.clearRect(0, 0, w, h);
@@ -69,7 +69,7 @@ class Tools_contentFill_class {
 
 		//save
 		return app.State.do_action(
-			new app.Actions.Bundle_action('content_fill', 'Content Fill', [
+			new app.Actions.Bundle_action('content_fill', 'Extend Canvas Fill', [
 				new app.Actions.Update_layer_action(config.layer.id, {
 					x: 0,
 					y: 0,

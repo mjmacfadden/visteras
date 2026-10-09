@@ -30,8 +30,8 @@ class Layer_smart_class {
 	assert_mutable(layer) {
 		if (layer.locked) throw new Error('Unlock the layer first.');
 	}
-	async action(action) {
-		const result = await app.State.do_action(action);
+	async action(action, options = {}) {
+		const result = await app.State.do_action(action, options);
 		if (result.status !== 'completed') throw result.reason;
 	}
 	canvas(width, height) {
@@ -45,7 +45,7 @@ class Layer_smart_class {
 		app.Layers.convert_layers_to_canvas(canvas.getContext('2d'), null, false);
 		return canvas;
 	}
-	convert(id) { return this.run(async () => {
+	convert(id, options = {}) { return this.run(async () => {
 		const layer = this.layer(id); this.assert_mutable(layer);
 		if (layer.type === 'smart') return;
 		if ((config.selected_layer_ids || []).length > 1 && typeof id !== 'number')
@@ -98,7 +98,7 @@ class Layer_smart_class {
 			link: preview, link_canvas: null, data: null, render_function: null, is_vector: false, params: {} });
 		for (const key of Object.keys(outer)) if (key.startsWith('_')) delete outer[key];
 		const layers = config.layers.filter(l => !ids.has(l.id) || l.id === layer.id).map(l => l.id === layer.id ? outer : l);
-		await this.action(new Smart_layer_action('Convert to Smart Layer', layers, { ...config.smart_sources, [source.id]: source }, outer.id));
+		await this.action(new Smart_layer_action('Convert to Smart Layer', layers, { ...config.smart_sources, [source.id]: source }, outer.id), options.history || {});
 	}); }
 	edit_contents(id) { return this.run(async () => {
 		const layer = this.smart(id);

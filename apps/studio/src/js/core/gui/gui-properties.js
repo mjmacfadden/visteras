@@ -349,6 +349,20 @@ class GUI_properties_class {
 		}
 
 		let html = '<div class="properties_controls">';
+		if (layer.psd_unsupported) {
+			// PSD adjustment Studio can't apply yet: say so instead of showing
+			// Brightness sliders for a placeholder.
+			const label = this.esc(layer.psd_unsupported.label || 'Adjustment');
+			html += `<div class="properties_title">${label} (from PSD)</div>`;
+			html += `<div class="properties_notice" id="properties_psd_unsupported" role="note">Studio can't apply Photoshop ${label} adjustments yet. This layer is a placeholder with no effect; exporting to PSD writes the original ${label} settings back unchanged.</div>`;
+			html += '</div>';
+			target.innerHTML = html;
+			target.dataset.adjType = 'psd-unsupported';
+			delete target.dataset.textSig;
+			this.bound_layer_id = layer.id;
+			this.bound_kind = 'adjustment';
+			return;
+		}
 		html += `<div class="properties_title trn">${this.esc(conf.title)}</div>`;
 
 		for (const p of conf.params) {

@@ -11,6 +11,7 @@ import EXIF from './../../../../node_modules/exif-js/exif.js';
 import GUI_tools_class from "../../core/gui/gui-tools";
 import semver_compare from './../../../../node_modules/semver-compare/';
 import { migrate_layer_clipping } from './../../libs/layer-clip.js';
+import { drop_mode, fit_place_rect, is_blank_start_document } from './../../libs/drop-routing.js';
 
 var instance = null;
 
@@ -49,8 +50,21 @@ class File_open_class {
 		var _this = this;
 
 		window.ondrop = function (e) {
-			//drop
+			//drop: images onto a working document are placed (Photoshop Place Embedded);
+			//Shift-drop, an empty document, or other file types open as documents.
 			e.preventDefault();
+			const files = e.dataTransfer ? e.dataTransfer.files : null;
+			const mode = drop_mode({
+				files: files,
+				shiftKey: e.shiftKey,
+				hasDocument: !app.Documents || !!app.Documents.get_active_document(),
+				documentEmpty: !!app.Documents && is_blank_start_document(app.Documents.is_active_document_empty(),
+					(app.Documents.get_active_document() || {}).title),
+			});
+			if (mode === 'place') {
+				_this.open_handler_as_layer({ target: { files: Array.from(files) } }, { smart: true });
+				return;
+			}
 			_this.open_handler(e);
 		};
 		window.ondragover = function (e) {
@@ -96,8 +110,6 @@ class File_open_class {
 	open_file_as_layer() {
 		var _this = this;
 
-		alertify.success('Image will be added as a new layer.');
-
 		document.getElementById("tmp").innerHTML = '';
 		var a = document.createElement('input');
 		a.setAttribute("id", "file_open_as_layer");
@@ -106,7 +118,7 @@ class File_open_class {
 		a.accept = 'image/*,.psd,.piskel,.ttf,.otf,.woff,.woff2,image/vnd.adobe.photoshop,image/x-photoshop';
 		document.getElementById("tmp").appendChild(a);
 		document.getElementById('file_open_as_layer').addEventListener('change', function (e) {
-			_this.open_handler_as_layer(e);
+			_this.open_handler_as_layer(e, { smart: true });
 		}, false);
 
 		//force click
@@ -116,7 +128,7 @@ class File_open_class {
 	/**
 	 * handler for opening files as new layers (no canvas resize)
 	 */
-	async open_handler_as_layer(e) {
+	async open_handler_as_layer(e, options = {}) {
 		var _this = this;
 		var files = e.target.files;
 
@@ -189,46 +201,57 @@ class File_open_class {
 				continue;
 			}
 
-			var FR = new FileReader();
-			FR.file = files[i];
-
-			FR.onload = function (event) {
-				var order = auto_increment + order_map[this.file.name];
-				const isOpaque = (this.file && (this.file.type === 'image/jpeg' || this.file.type === 'image/jpg' || this.file.type === 'image/heic' || this.file.type === 'image/heif')) ||
-					/\.(jpe?g|heic|heif|bmp)$/i.test((this.file && this.file.name) || '');
-				var new_layer = {
-					name: this.file.name,
-					type: 'image',
-					data: event.target.result,
-					order: order,
-					_exif: _this.extract_exif(this.file),
-					_is_opaque: isOpaque,
-				};
-				// Fit the placed image to the first canvas boundary without
-				// resizing its source bitmap or the document.
-				var image = new Image();
-				image.onload = function () {
-					var scale = Math.min(config.WIDTH / image.naturalWidth, config.HEIGHT / image.naturalHeight);
-					new_layer.width = image.naturalWidth * scale;
-					new_layer.height = image.naturalHeight * scale;
-					new_layer.width_original = image.naturalWidth;
-					new_layer.height_original = image.naturalHeight;
-					new_layer.x = (config.WIDTH - new_layer.width) / 2;
-					new_layer.y = (config.HEIGHT - new_layer.height) / 2;
-					app.State.do_action(
-						new app.Actions.Insert_layer_action(new_layer, false)
-					);
-				};
-				image.onerror = function () {
-					alertify.error('Sorry, image could not be loaded.');
-				};
-				image.src = new_layer.data;
-			};
-			FR.readAsDataURL(f);
+			try {
+				await this.place_image_file(f, auto_increment + (order_map[f.name] || 0), options);
+			} catch (err) {
+				console.error('[Place] Error placing image:', err);
+				alertify.error('Sorry, image could not be placed.');
+			}
 
 			//sleep after last image import
 			await new Promise(r => setTimeout(r, 10));
 		}
+	}
+
+	/**
+	 * Place Embedded: adds one image as a layer fitted inside the canvas
+	 * (never enlarged) and, with options.smart, converts it into an embedded
+	 * Smart Layer in the same undo step.
+	 */
+	async place_image_file(file, order, options = {}) {
+		const readResult = await this.read_file_async(file, 'dataURL');
+		const image = await new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => resolve(img);
+			img.onerror = reject;
+			img.src = readResult.result;
+		});
+		const isOpaque = /^image\/(jpe?g|heic|heif|bmp)$/i.test(file.type || '') ||
+			/\.(jpe?g|heic|heif|bmp)$/i.test(file.name || '');
+		const rect = fit_place_rect(image.naturalWidth, image.naturalHeight, config.WIDTH, config.HEIGHT);
+		const new_layer = {
+			name: file.name.replace(/\.[a-z0-9]+$/i, '') || file.name,
+			type: 'image',
+			data: readResult.result,
+			order: order,
+			x: rect.x,
+			y: rect.y,
+			width: rect.width,
+			height: rect.height,
+			width_original: image.naturalWidth,
+			height_original: image.naturalHeight,
+			_exif: this.extract_exif(file),
+			_is_opaque: isOpaque,
+		};
+		const result = await app.State.do_action(new app.Actions.Insert_layer_action(new_layer, false));
+		if (!result || result.status !== 'completed') return;
+		const smart = options.smart && app.GUI && app.GUI.modules && app.GUI.modules['layer/smart'];
+		if (smart && config.layer && config.layer.type === 'image') {
+			await smart.convert(config.layer.id, { history: { merge_with_history: 'insert_layer' } });
+		}
+		const history = app.State.action_history;
+		const last = history && history[history.length - 1];
+		if (last && last.action_id === 'insert_layer') last.action_description = 'Place Embedded';
 	}
 
 	async open_file() {

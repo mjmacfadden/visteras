@@ -17,7 +17,7 @@ const menuDefinition = [
 				target: 'file/open.open_file'
 			},
 			{
-				name: 'Open as Layer',
+				name: 'Place Embedded',
 				ellipsis: true,
 				target: 'file/open.open_file_as_layer'
 			},
@@ -84,12 +84,12 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Quick Save',
+				name: 'Snapshot to Browser',
 				shortcut: 'F9',
 				target: 'file/quicksave.quicksave'
 			},
 			{
-				name: 'Quick Load',
+				name: 'Restore Browser Snapshot',
 				shortcut: 'F10',
 				target: 'file/quickload.quickload'
 			}
@@ -137,7 +137,7 @@ const menuDefinition = [
 				target: 'edit/copy.copy_to_clipboard'
 			},
 			{
-				name: 'Copy Selection to Layer',
+				name: 'Layer via Copy',
 				shortcut: 'Ctrl + J',
 				target: 'layer/new.new_selection'
 			},
@@ -191,7 +191,7 @@ const menuDefinition = [
 			},
 			{
 				name: 'Grid',
-				shortcut: 'G',
+				shortcut: "Ctrl + '",
 				target: 'view/grid.grid'
 			},
 			{
@@ -256,16 +256,14 @@ const menuDefinition = [
 			{
 				name: 'Trim',
 				ellipsis: true,
-				shortcut: 'T',
 				target: 'image/trim.trim'
 			},
 			{
 				divider: true
 			},
 			{
-				name: 'Resize',
+				name: 'Image Size',
 				ellipsis: true,
-				shortcut: 'R',
 				target: 'image/resize.resize'
 			},
 			{
@@ -341,7 +339,8 @@ const menuDefinition = [
 				target: 'layer/new.new'
 			},
 			{
-				name: 'New from Visible',
+				name: 'Stamp Visible',
+				shortcut: 'Ctrl + Alt + Shift + E',
 				target: 'layer/flatten.new_from_visible'
 			},
 			{
@@ -412,7 +411,6 @@ const menuDefinition = [
 			},
 			{
 				name: 'Duplicate',
-				shortcut: 'Ctrl + J',
 				target: 'layer/duplicate.duplicate'
 			},
 			{
@@ -481,7 +479,13 @@ const menuDefinition = [
 			},
 			{
 				name: 'Merge Down',
+				shortcut: 'Ctrl + E',
 				target: 'layer/merge.merge'
+			},
+			{
+				name: 'Merge Visible',
+				shortcut: 'Ctrl + Shift + E',
+				target: 'layer/flatten.merge_visible'
 			},
 			{
 				name: 'Flatten Image',
@@ -511,9 +515,35 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Expand',
-				ellipsis: true,
-				target: 'edit/selection.expand'
+				name: 'Modify',
+				children: [
+					{
+						name: 'Border',
+						ellipsis: true,
+						target: 'edit/selection.border'
+					},
+					{
+						name: 'Smooth',
+						ellipsis: true,
+						target: 'edit/selection.smooth'
+					},
+					{
+						name: 'Expand',
+						ellipsis: true,
+						target: 'edit/selection.expand'
+					},
+					{
+						name: 'Contract',
+						ellipsis: true,
+						target: 'edit/selection.contract'
+					},
+					{
+						name: 'Feather',
+						shortcut: 'Shift + F6',
+						ellipsis: true,
+						target: 'edit/selection.feather'
+					}
+				]
 			},
 			{
 				divider: true
@@ -642,7 +672,7 @@ const menuDefinition = [
 				]
 			},
 			{
-				name: 'Black and White',
+				name: 'Threshold (B/W)',
 				ellipsis: true,
 				target: 'effects/black_and_white.black_and_white'
 			},
@@ -763,7 +793,7 @@ const menuDefinition = [
 				target: 'tools/keypoints.keypoints'
 			},
 			{
-				name: 'Content Fill',
+				name: 'Extend Canvas Fill',
 				ellipsis: true,
 				target: 'tools/content_fill.content_fill'
 			},
