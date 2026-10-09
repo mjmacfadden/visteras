@@ -35,6 +35,11 @@ export class Select_layer_action extends Base_action {
 		this.old_layer = old_layer;
 
 		if (old_layer !== new_layer) {
+			const transform_module = app.GUI?.modules?.['edit/transform'];
+			if (transform_module && transform_module.is_active()) {
+				await transform_module.commit();
+			}
+
 			// New layer selection: allow auto-focus Properties for adjustments
 			if (app.GUI) app.GUI._adj_tab_user_sticky = false;
 			const textTool = (app.GUI && app.GUI.GUI_tools && app.GUI.GUI_tools.tools_modules['text'])
