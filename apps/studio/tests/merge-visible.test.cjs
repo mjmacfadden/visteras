@@ -54,6 +54,7 @@ test('wiring: menu items, shortcuts, one undo step', () => {
 	const flat = read('modules/layer/flatten.js');
 	assert.match(flat, /async merge_visible\(\)/);
 	assert.match(flat, /Bundle_action\('merge_visible', 'Merge Visible'/);
+	assert.match(flat, /new app\.Actions\.Update_layer_action\(plan\.into, \{[\s\S]*mask:\s*null,\s*filters:\s*\[\],[\s\S]*opacity:\s*100,\s*composition:\s*'source-over'/);
 	assert.match(flat, /!event\.altKey \|\| !event\.shiftKey \|\| event\.code !== 'KeyE'[\s\S]{0,300}this\.new_from_visible\(\)/);
 });
 

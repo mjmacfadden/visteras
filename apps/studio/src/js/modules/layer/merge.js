@@ -54,7 +54,7 @@ class Layer_merge_class {
 			const steps = plan.into != null
 				? [
 					// Locked Background: merge into it (it stays the locked Background).
-					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H }),
+					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H, mask: null, filters: [] }),
 					new app.Actions.Update_layer_image_action(canvas, plan.into),
 				]
 				: [new app.Actions.Insert_layer_action({

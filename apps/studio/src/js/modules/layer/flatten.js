@@ -64,7 +64,7 @@ class Layer_flatten_class {
 			const steps = plan.into != null
 				? [
 					// Locked Background: merge into it, as Photoshop does.
-					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H }),
+					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H, mask: null, filters: [], opacity: 100, composition: 'source-over' }),
 					new app.Actions.Update_layer_image_action(canvas, plan.into),
 				]
 				: [new app.Actions.Insert_layer_action({
