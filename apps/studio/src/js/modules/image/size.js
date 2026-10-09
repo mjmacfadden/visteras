@@ -5,6 +5,7 @@ import Dialog_class from './../../libs/popup.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
 import Tools_settings_class from './../tools/settings.js';
 import Helper_class from './../../libs/helpers.js';
+import { DEFAULT_ANCHOR, anchor_offset, resolve_canvas_size, anchor_grid_html } from './../../libs/canvas-anchor.js';
 
 class Image_size_class {
 
@@ -37,11 +38,38 @@ class Image_size_class {
 			params: [
 				{name: "w", title: "Width:", value: width, placeholder: width, comment: units},
 				{name: "h", title: "Height:", value: height, placeholder: height, comment: units},
+				{name: "relative", title: "Relative:", value: false},
+				{title: "Anchor:", html: anchor_grid_html(DEFAULT_ANCHOR)},
 				{name: "resolution", title: "Resolution:", values: resolutions},
 				{name: "layout", title: "Layout:", value: "Custom", values: ["Custom", "Landscape", "Portrait"]},
 				{name: "enable_autoresize", title: "Enable autoresize:", value: enable_autoresize},
 				{name: "in_proportion", title: "In proportion:", value: false},
 			],
+			on_load: function () {
+				const grid = document.getElementById('canvas_anchor_grid');
+				const input = document.getElementById('pop_data_anchor');
+				if (grid && input) {
+					grid.addEventListener('click', (e) => {
+						const cell = e.target.closest('[data-anchor]');
+						if (!cell) return;
+						input.value = cell.dataset.anchor;
+						grid.querySelectorAll('[data-anchor]').forEach((b) => {
+							b.classList.toggle('active', b === cell);
+							b.setAttribute('aria-pressed', String(b === cell));
+						});
+					});
+				}
+				// Relative: the fields switch to "amount to add" (0) and back.
+				const rel = document.getElementById('pop_data_relative');
+				const w = document.getElementById('pop_data_w');
+				const h = document.getElementById('pop_data_h');
+				if (rel && w && h) {
+					rel.addEventListener('change', () => {
+						w.value = rel.checked ? 0 : width;
+						h.value = rel.checked ? 0 : height;
+					});
+				}
+			},
 			on_finish: function (params) {
 				_this.size_handler(params);
 			},
@@ -77,6 +105,14 @@ class Image_size_class {
 			height = width / ratio;
 		}
 		
+		if (data.relative == true && data.resolution == 'Custom') {
+			var old_w = this.Helper.get_user_unit(config.WIDTH, units, resolution);
+			var old_h = this.Helper.get_user_unit(config.HEIGHT, units, resolution);
+			var rel = resolve_canvas_size(old_w, old_h, parseFloat(data.w) || 0, parseFloat(data.h) || 0, true);
+			width = Math.max(1, rel.width);
+			height = Math.max(1, rel.height);
+		}
+
 		if (data.resolution != 'Custom') {
 			var dim = data.resolution.split(" ");
 			dim = dim[0].split("x");
@@ -102,6 +138,29 @@ class Image_size_class {
 				HEIGHT: parseInt(height)
 			}),
 		];
+
+		// Anchor (Photoshop default: centre): move content so the anchored
+		// side/corner stays put. Full-canvas adjustment layers follow the canvas.
+		if (data.in_proportion != true) {
+			var shift = anchor_offset(data.anchor || DEFAULT_ANCHOR, config.WIDTH, config.HEIGHT, parseInt(width), parseInt(height));
+			for (var j in config.layers) {
+				var lyr = config.layers[j];
+				if (lyr.type === 'adjustment') {
+					actions.push(new app.Actions.Update_layer_action(lyr.id, { x: 0, y: 0, width: parseInt(width), height: parseInt(height) }));
+					continue;
+				}
+				if (!shift.dx && !shift.dy) continue;
+				var patch = {};
+				if (lyr.x != null && lyr.y != null && lyr.type !== 'group') {
+					patch.x = lyr.x + shift.dx;
+					patch.y = lyr.y + shift.dy;
+				}
+				if (lyr.mask && typeof lyr.mask === 'object') {
+					patch.mask = Object.assign({}, lyr.mask, { x: (lyr.mask.x || 0) + shift.dx, y: (lyr.mask.y || 0) + shift.dy });
+				}
+				if (Object.keys(patch).length) actions.push(new app.Actions.Update_layer_action(lyr.id, patch));
+			}
+		}
 
 		if(data.in_proportion == true) {
 			//resize object and change coordinates

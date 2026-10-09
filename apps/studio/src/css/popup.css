@@ -598,3 +598,22 @@
 #popups .popup.layer_style_dialog .dialog_content {
 	display: block;
 }
+
+/* Canvas Size anchor grid (Photoshop 9-point) */
+.canvas_anchor{
+	display: inline-grid;
+	grid-template-columns: repeat(3, 22px);
+	grid-template-rows: repeat(3, 22px);
+	gap: 2px;
+}
+.canvas_anchor_cell{
+	width: 22px; height: 22px; padding: 0;
+	border: 1px solid var(--vui-border, #555);
+	background: var(--vui-bg, #2a2a2a);
+	border-radius: 3px;
+	cursor: pointer;
+}
+.canvas_anchor_cell.active{
+	background: var(--visteras-accent, #2f6fae);
+	border-color: var(--visteras-accent, #2f6fae);
+}
