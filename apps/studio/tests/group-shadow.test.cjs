@@ -63,7 +63,7 @@ test('nested styled groups render recursively, and hidden groups contribute no p
 
 test('PSD group effects survive import and export with their saved settings', async () => {
 	const { context } = runtime();
-	vm.runInContext(fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8')
+	vm.runInContext((fs.readFileSync(require.resolve('../src/js/libs/psd-unsupported.js'), 'utf8').replace(/\bexport /g, '') + fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8'))
 		.replace(/^import .*;$/gm, '').replace(/\bexport (?=(?:async )?function)/g, ''), context);
 	let imported;
 	context.app = { Documents: { create_document_from_psd_data: data => { imported = data; } } };
@@ -88,7 +88,7 @@ test('user PSD imports its enabled Group 1 shadow', { skip: !process.env.STUDIO_
 	const { ImageData } = require('@napi-rs/canvas');
 	agPsd.initializeCanvas(createCanvas, (w, h) => new ImageData(w, h));
 	context.psdFixture = agPsd.readPsd(fs.readFileSync(process.env.STUDIO_PSD_FIXTURE), { skipThumbnail: true });
-	vm.runInContext(fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8')
+	vm.runInContext((fs.readFileSync(require.resolve('../src/js/libs/psd-unsupported.js'), 'utf8').replace(/\bexport /g, '') + fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8'))
 		.replace(/^import .*;$/gm, '').replace(/\bexport (?=(?:async )?function)/g, ''), context);
 	let imported;
 	context.app = { Documents: { create_document_from_psd_data: data => { imported = data; } } };

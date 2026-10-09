@@ -3275,3 +3275,13 @@ body.canvas-only-mode .canvas_wrapper canvas {
 .layers_list .smart-filter-group .smart-filter-mask { padding:0; }
 .layers_list .smart-filter-label { font-size:12px; color:#ccc; }
 .layers_list .filter.smart-filter-child { margin-left:46px; flex-wrap:nowrap; }
+
+/* PSD adjustment Studio can't apply yet (Levels, Curves, …) */
+.properties_notice{
+	margin: 6px 0 2px;
+	padding: 8px 10px;
+	border-left: 3px solid var(--vui-warning, #e0a800);
+	background: rgba(224, 168, 0, 0.10);
+	font-size: 12px;
+	line-height: 1.4;
+}
