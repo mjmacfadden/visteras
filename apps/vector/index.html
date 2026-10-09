@@ -93,6 +93,12 @@
             <div class="menu_dropdown_item" id="action_deselect_all">Deselect All <span class="menu_dropdown_shortcut">⌘⇧A</span></div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_delete">Delete <span class="menu_dropdown_shortcut">⌫</span></div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item menu_has_submenu" role="menuitem" aria-haspopup="true" id="action_edit_colors_menu">Edit Colors<span class="menu_submenu_arrow" aria-hidden="true">▶</span>
+              <div class="menu_dropdown_list menu_submenu_list" role="menu">
+                <div class="menu_dropdown_item" role="menuitem" id="action_adjust_color_balance" data-fx-type="colorAdjust">Adjust Color Balance…</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -134,9 +140,9 @@
           </div>
         </div>
 
-        <!-- Text Menu -->
+        <!-- Type Menu (Illustrator "Type"; id stays menu_text for stable wiring) -->
         <div class="menu_entry" id="menu_text">
-          <div class="menu_entry_title">Text</div>
+          <div class="menu_entry_title">Type</div>
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_type_on_path" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_separator"></div>
@@ -1627,7 +1633,7 @@
               </div>
             </div>
 
-            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Color Adjust) -->
+            <!-- 2b. Effects (live SVG filters: Drop Shadow, Inner Shadow, Adjust Color Balance) -->
             <div class="prop_section" id="sec_effects" style="display:none;">
               <div class="prop_section_header" data-target="sec_effects_body">
                 <span class="prop_section_arrow"></span>
@@ -2588,7 +2594,7 @@
     mountBlendModes(svgEditor);
     // Window ▸ Transparency (⇧⌘F10): Blend Mode, Opacity, Isolate Blending
     mountTransparency(svgEditor);
-    // Effects: Drop Shadow / Inner Shadow / Color Adjust / Gaussian Blur (live SVG filters)
+    // Effects: Drop Shadow / Inner Shadow / Adjust Color Balance / Gaussian Blur (live SVG filters)
     mountEffects(svgEditor);
     mountAppearance(svgEditor);
     mountObjectLock(svgEditor);
