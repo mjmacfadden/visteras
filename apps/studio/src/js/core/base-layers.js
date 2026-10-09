@@ -1,6 +1,7 @@
 import { resampleRaster } from '../libs/raster-resample.js';
 import { composite_group_layers } from '../libs/group-composite.js';
 import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
+import { crisp_vector_source } from './../libs/vector-smart-render.js';
 /*
  * miniPaint - https://github.com/viliusle/miniPaint
  * author: Vilius L.
@@ -849,6 +850,15 @@ class Base_layers_class {
 			const transform = ctx.getTransform();
 			const targetWidth = Math.max(1, Math.round(Math.abs(object.width) * Math.hypot(transform.a, transform.b)));
 			const targetHeight = Math.max(1, Math.round(Math.abs(object.height) * Math.hypot(transform.c, transform.d)));
+			if (object.type === 'smart') {
+				// Vector Smart Objects re-render from their SVG when drawn larger
+				// than the paste-size preview (only when no Smart Filters are on).
+				const smartSource = config.smart_sources && config.smart_sources[object.smart_source_id];
+				if (smartSource && source === smartSource.link) {
+					const crisp = crisp_vector_source(smartSource, targetWidth, targetHeight, () => this.invalidate({ document: true }));
+					if (crisp) source = crisp;
+				}
+			}
 			source = resampleRaster(source, targetWidth, targetHeight);
 			width = source.naturalWidth || source.width;
 			height = source.naturalHeight || source.height;
