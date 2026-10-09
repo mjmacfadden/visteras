@@ -1,6 +1,7 @@
 import { clipExportToRect, stripExportGuides } from './visteras-export-clip.js';
 import { buildArtboardPdf, pdfPageSpecs } from './visteras-export-pdf.js?v=pdf-1';
 import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
+import { pruneUnusedPanelSymbols, expandInstancesInClone } from './visteras-symbols-model.js?v=gap5-1';
 /**
  * Visteras Vector — File ▸ Export (Export for Screens… ⌥⌘E, Export As…) and
  * Effect ▸ Document Raster Effects Settings….
@@ -175,7 +176,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
    * Standalone SVG for a scope. background = CSS colour or null. Returns
    * { svg, rect, w, h, warnings, fonts }.
    */
-  async function buildExportSvg({ board, scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false } = {}) {
+  async function buildExportSvg({ board, scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false, symbols = 'keep' } = {}) {
     const warnings = [];
     const rect = scopeRect(scope, padding, board);
     if (!rect) throw new Error(scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export');
@@ -183,6 +184,9 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     // While in Symbol Editing Mode, export the committed symbol (not the edit group).
     const clone = window.__visterasSymbolEdit?.cloneCommitted?.() || sc.getSvgContent().cloneNode(true);
     stripExportGuides(clone);
+    // Symbols: always drop unused panel symbols; Expand turns instances into groups
+    // (PDF always expands so svg2pdf never depends on <use>/overflow handling).
+    if (symbols === 'expand') expandInstancesInClone(clone); else pruneUnusedPanelSymbols(clone);
     for (const a of ['x', 'y', 'style', 'id']) clone.removeAttribute(a);
     // XMLSerializer writes xmlns (and xmlns:xlink when used) itself; setting them as
     // plain attributes would duplicate them and make the SVG undecodable.
@@ -277,6 +281,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
         fonts: false,
         images: true,
         forSvgFile: true,
+        symbols: job.symbols || loadSettings().symbols,
       });
       warnings.push(...out.warnings);
       return { blob: new Blob([out.svg], { type: info.mime }), warnings };
@@ -285,7 +290,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       // Single-artboard path (multi-page uses renderPdfDocument).
       const board = job.board || artboard();
       const bg = artboardColor(board);
-      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true });
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true, symbols: 'expand' });
       warnings.push(...built.warnings);
       const out = await buildArtboardPdf({
         title: title(),
@@ -357,7 +362,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const pages = [];
     for (const board of list) {
       const bg = artboardColor(board);
-      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true });
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true, symbols: 'expand' });
       warnings.push(...built.warnings);
       pages.push({ svg: built.svg, width: board.width, height: board.height, name: board.name });
     }
@@ -505,19 +510,23 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
         <label class="vexp_row vexp_jpeg"><span>Quality:</span><input type="range" id="vexp_as_quality" min="0" max="10" step="1" value="${s.asQuality}"><output id="vexp_as_quality_out">${s.asQuality}</output></label>
         <p class="vexp_note vexp_jpeg">JPEG has no transparency: Transparent exports white.</p>
       </fieldset>
+      <fieldset class="vexp_svgopts"><legend>SVG Options</legend>
+        <label class="vexp_row"><span>Symbols:</span><select id="vexp_as_symbols"><option value="keep"${s.symbols !== 'expand' ? ' selected' : ''}>Keep linked (&lt;use&gt;)</option><option value="expand"${s.symbols === 'expand' ? ' selected' : ''}>Expand to groups</option></select></label>
+      </fieldset>
       <p class="vexp_info" id="vexp_as_info"></p>`);
     const $ = (id) => st.dlg.querySelector(`#${id}`);
     const read = () => {
       const format = $('vexp_as_format').value;
       const ppiV = $('vexp_as_ppi').value === 'other' ? Number($('vexp_as_ppi_other').value) || 72 : Number($('vexp_as_ppi').value);
       const scope = $('vexp_as_selection').checked && selected().length ? 'selection' : ($('vexp_as_artboard').checked ? 'artboard' : 'full');
-      return { format, ppi: ppiV, scope, background: $('vexp_as_bg').value, bgColor: $('vexp_as_bgcolor').value, quality: Number($('vexp_as_quality').value) };
+      return { format, ppi: ppiV, scope, background: $('vexp_as_bg').value, bgColor: $('vexp_as_bgcolor').value, quality: Number($('vexp_as_quality').value), symbols: $('vexp_as_symbols')?.value === 'expand' ? 'expand' : 'keep' };
     };
     const sync = () => {
       const v = read();
       syncBoardControls(st,v.scope);
       const raster = v.format === 'png' || v.format === 'jpg';
       st.dlg.querySelector('.vexp_raster').hidden = !raster;
+      const svgOpts = st.dlg.querySelector('.vexp_svgopts'); if (svgOpts) svgOpts.hidden = v.format !== 'svg';
       for (const n of st.dlg.querySelectorAll('.vexp_jpeg')) n.hidden = v.format !== 'jpg';
       $('vexp_as_ppi_other').hidden = $('vexp_as_ppi').value !== 'other';
       $('vexp_as_bgcolor').hidden = v.background !== 'other';
@@ -534,9 +543,9 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     sync();
     st.onOk = async () => {
       const v = read();
-      saveSettings({ ...loadSettings(), asFormat: v.format, asPpi: v.ppi, asQuality: v.quality, asUseArtboard: $('vexp_as_artboard').checked, asSelection: $('vexp_as_selection').checked, background: v.background, bgColor: v.bgColor });
+      saveSettings({ ...loadSettings(), asFormat: v.format, asPpi: v.ppi, asQuality: v.quality, asUseArtboard: $('vexp_as_artboard').checked, asSelection: $('vexp_as_selection').checked, background: v.background, bgColor: v.bgColor, symbols: v.symbols });
       const info = X.formatInfo(v.format);
-      const job = { scope: v.scope, padding: 0, scale: 0, ppi: v.ppi, format: v.format, background: v.background, bgColor: v.bgColor, quality: v.format === 'jpg' ? X.jpegQuality(v.quality) : undefined };
+      const job = { scope: v.scope, padding: 0, scale: 0, ppi: v.ppi, format: v.format, background: v.background, bgColor: v.bgColor, quality: v.format === 'jpg' ? X.jpegQuality(v.quality) : undefined, symbols: v.symbols };
       let boards;try{boards=exportBoards(st,v.format==='pdf'?'artboard':v.scope);}catch(e){toast(e.message,'error');return;}
       const problem = v.format==='pdf' ? null : boards.map(board=>sizeProblem({...job,board})).find(Boolean);
       if (problem) { toast(problem, 'error'); return; }

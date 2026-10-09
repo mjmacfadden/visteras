@@ -386,9 +386,10 @@ export function breakLinkToSymbol(sc, use, { batch: outer = null, select = true 
   g.id = sc.getNextId?.() || `g_${use.id}`;
   const name = readSymbolMeta(sym).name;
   g.setAttribute('aria-label', name);
-  // Full transform: instance transform only (symbol has no viewBox scale).
-  const xf = use.getAttribute('transform');
-  if (xf) g.setAttribute('transform', xf);
+  // Full transform = instance transform (symbol has no viewBox scale); keep
+  // instance appearance (opacity, blend, effects) like Illustrator.
+  copyInstanceAttrs(use, g);
+  if (use.getAttribute('aria-label')) g.setAttribute('aria-label', use.getAttribute('aria-label'));
 
   // Deep-clone children (skip <title>), uniquify ids, rewrite internal hrefs.
   const idMap = new Map();
@@ -436,6 +437,19 @@ export function breakLinks(sc, uses) {
     sc.call?.('changed', groups);
   } catch { /* ignore */ }
   return { groups };
+}
+
+
+/** Instance-level appearance carried onto a broken-link / expanded group. */
+const NON_COPIED_USE_ATTRS = new Set(['id', 'href', 'xlink:href', 'x', 'y', 'width', 'height', ATTR.instance, 'visibility']);
+export function copyInstanceAttrs(use, g, { keepId = false } = {}) {
+  for (const a of [...(use.attributes || [])]) {
+    if (NON_COPIED_USE_ATTRS.has(a.name)) continue;
+    if (a.name === 'aria-label' && g.getAttribute('aria-label')) continue;
+    g.setAttribute(a.name, a.value);
+  }
+  if (keepId && use.id) g.id = use.id;
+  return g;
 }
 
 function uniquifyTree(node, nextId, idMap) {
@@ -632,8 +646,7 @@ export function expandAndDeleteSymbol(sc, symbol) {
     const g = content.ownerDocument.createElementNS(NS, 'g');
     g.id = sc.getNextId?.() || `g_${use.id}`;
     g.setAttribute('aria-label', readSymbolMeta(symbol).name);
-    const xf = use.getAttribute('transform');
-    if (xf) g.setAttribute('transform', xf);
+    copyInstanceAttrs(use, g);
     const idMap = new Map();
     for (const child of [...symbol.childNodes].filter((n) => n.nodeType === 1 && n.localName !== 'title')) {
       const clone = child.cloneNode(true);
@@ -685,19 +698,34 @@ export function dedupeSymbolByUid(content, pastedSymbol) {
 
 export function pruneUnusedPanelSymbols(cloneRoot) {
   // Used by export: drop panel symbols with no instance in the clone.
-  const uses = [...(cloneRoot.querySelectorAll?.('use') || [])];
-  const referenced = new Set(uses.map(symbolIdOfUse).filter(Boolean));
-  for (const sym of [...(cloneRoot.querySelectorAll?.(`symbol[${ATTR.symbol}="1"]`) || [])]) {
-    if (!referenced.has(sym.id)) sym.remove();
+  // Repeat so a symbol used only inside an unused symbol goes too.
+  for (let pass = 0; pass < 16; pass++) {
+    const uses = [...(cloneRoot.querySelectorAll?.('use') || [])];
+    const referenced = new Set(uses.map(symbolIdOfUse).filter(Boolean));
+    let removed = false;
+    for (const sym of [...(cloneRoot.querySelectorAll?.(`symbol[${ATTR.symbol}="1"]`) || [])]) {
+      if (!referenced.has(sym.id)) { sym.remove(); removed = true; }
+    }
+    if (!removed) break;
   }
 }
 
 export function expandInstancesInClone(cloneRoot) {
+  // Nested instances (a symbol containing instances) expand over several passes.
+  for (let pass = 0; pass < 8; pass++) {
+    if (!expandPass(cloneRoot)) break;
+  }
+  pruneUnusedPanelSymbols(cloneRoot);
+}
+
+function expandPass(cloneRoot) {
+  let changed = false;
   const doc = cloneRoot.ownerDocument || (typeof document !== 'undefined' ? document : null);
   const create = (tag) => (doc?.createElementNS
     ? doc.createElementNS('http://www.w3.org/2000/svg', tag)
     : null);
   for (const use of [...(cloneRoot.querySelectorAll?.('use') || [])]) {
+    if (use.closest?.('defs')) continue;
     if (use.getAttribute(ATTR.instance) !== '1' && !symbolIdOfUse(use)) continue;
     const sid = symbolIdOfUse(use);
     if (!sid) continue;
@@ -707,16 +735,13 @@ export function expandInstancesInClone(cloneRoot) {
     if (!sym) continue;
     const g = create('g');
     if (!g) continue;
-    if (use.id) g.id = use.id;
-    const xf = use.getAttribute('transform');
-    if (xf) g.setAttribute('transform', xf);
-    const label = use.getAttribute('aria-label');
-    if (label) g.setAttribute('aria-label', label);
+    copyInstanceAttrs(use, g, { keepId: true });
     for (const child of [...(sym.childNodes || sym.children || [])].filter((n) => n.nodeType === 1 && n.localName !== 'title')) {
       g.appendChild(child.cloneNode(true));
     }
     if (typeof use.replaceWith === 'function') use.replaceWith(g);
     else { use.parentNode?.insertBefore(g, use); use.remove(); }
+    changed = true;
   }
-  pruneUnusedPanelSymbols(cloneRoot);
+  return changed;
 }
