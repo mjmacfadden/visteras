@@ -82,3 +82,15 @@ test('merge.js uses the real compositor, one undo step, and binds Ctrl/⌘E', ()
 	const menu = fs.readFileSync(require.resolve('../src/js/config-menu.js'), 'utf8');
 	assert.match(menu, /name: 'Merge Down',\n\t+shortcut: 'Ctrl \+ E',/);
 });
+
+test('Merge Down onto the locked Background merges into it instead of aborting', () => {
+	const p = merge_down_plan([img(1, 1, { name: 'Background', locked: true }), img(2, 2)], 2);
+	assert.equal(p.ok, true);
+	assert.equal(p.into, 1);
+	assert.deepEqual(plain(p.deleteIds), [2]);
+	const lockedUpper = merge_down_plan([img(1, 1), img(2, 2, { locked: true, name: 'Top' })], 2);
+	assert.equal(lockedUpper.ok, false);
+	assert.match(lockedUpper.error, /"Top" is locked/);
+	const lockedSmart = merge_down_plan([img(1, 1, { type: 'smart', locked: true, name: 'S' }), img(2, 2)], 2);
+	assert.equal(lockedSmart.ok, false);
+});

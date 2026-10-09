@@ -50,27 +50,38 @@ class Layer_merge_class {
 				: [plan.renderUpper, plan.renderLower];
 			const canvas = this.render_pixels(layers);
 			const r = plan.result;
-			const params = {
-				type: 'image',
-				name: r.name,
-				data: canvas.toDataURL('image/png'),
-				x: 0, y: 0,
-				width: canvas.width, height: canvas.height,
-				width_original: canvas.width, height_original: canvas.height,
-				parent_id: r.parent_id,
-				order: r.order,
-				opacity: r.opacity,
-				composition: r.composition,
-				clipped: r.clipped,
-			};
-			await app.State.do_action(
+			const W = canvas.width, H = canvas.height;
+			const steps = plan.into != null
+				? [
+					// Locked Background: merge into it (it stays the locked Background).
+					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H }),
+					new app.Actions.Update_layer_image_action(canvas, plan.into),
+				]
+				: [new app.Actions.Insert_layer_action({
+					type: 'image',
+					name: r.name,
+					data: canvas.toDataURL('image/png'),
+					x: 0, y: 0,
+					width: W, height: H,
+					width_original: W, height_original: H,
+					parent_id: r.parent_id,
+					order: r.order,
+					opacity: r.opacity,
+					composition: r.composition,
+					clipped: r.clipped,
+				}, false)];
+			const res = await app.State.do_action(
 				new app.Actions.Bundle_action('merge_layers', plan.mode === 'group' ? 'Merge Group' : 'Merge Down', [
-					new app.Actions.Insert_layer_action(params, false),
+					...steps,
 					...plan.deleteIds.map((id) => new app.Actions.Delete_layer_action(id)),
 				])
 			);
-			canvas.width = 1;
-			canvas.height = 1;
+			if (res && res.status === 'aborted') {
+				console.warn('Merge Down aborted', res.reason);
+				alertify.error('Merge Down could not be completed.');
+				return false;
+			}
+			if (plan.into != null) await app.State.do_action(new app.Actions.Select_layer_action(plan.into), { skip_history: true });
 			return true;
 		} finally {
 			this.merging = false;

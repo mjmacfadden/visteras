@@ -2,6 +2,7 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { merge_visible_plan } from './../../libs/merge-plan.js';
 
 class Layer_flatten_class {
 
@@ -27,7 +28,7 @@ class Layer_flatten_class {
 			// adjustments and inherited group visibility.
 			this.Base_layers.convert_layers_to_canvas(canvas.getContext('2d'));
 			await app.State.do_action(new app.Actions.Bundle_action(
-				'new_from_visible', 'New from Visible', [
+				'new_from_visible', 'Stamp Visible', [
 					new app.Actions.Insert_layer_action({
 						name: 'New from Visible',
 						type: 'image',
@@ -42,6 +43,53 @@ class Layer_flatten_class {
 			));
 		} finally {
 			this.stamping = false;
+		}
+	}
+
+	/** Layer ▸ Merge Visible (Shift+Ctrl/⌘E): one undo step, hidden layers kept. */
+	async merge_visible() {
+		if (this.merging) return false;
+		const plan = merge_visible_plan(config.layers);
+		if (!plan.ok) {
+			alertify.error(plan.error);
+			return false;
+		}
+		this.merging = true;
+		try {
+			const canvas = document.createElement('canvas');
+			canvas.width = config.WIDTH;
+			canvas.height = config.HEIGHT;
+			this.Base_layers.convert_layers_to_canvas(canvas.getContext('2d'));
+			const W = canvas.width, H = canvas.height;
+			const steps = plan.into != null
+				? [
+					// Locked Background: merge into it, as Photoshop does.
+					new app.Actions.Update_layer_action(plan.into, { x: 0, y: 0, width: W, height: H, width_original: W, height_original: H }),
+					new app.Actions.Update_layer_image_action(canvas, plan.into),
+				]
+				: [new app.Actions.Insert_layer_action({
+					name: plan.result.name,
+					type: 'image',
+					data: canvas.toDataURL('image/png'),
+					x: 0, y: 0,
+					width: W, height: H,
+					width_original: W, height_original: H,
+					parent_id: plan.result.parent_id || null,
+					order: plan.result.order,
+				}, false)];
+			const res = await app.State.do_action(new app.Actions.Bundle_action('merge_visible', 'Merge Visible', [
+				...steps,
+				...plan.deleteIds.map((id) => new app.Actions.Delete_layer_action(id)),
+			]));
+			if (res && res.status === 'aborted') {
+				console.warn('Merge Visible aborted', res.reason);
+				alertify.error('Merge Visible could not be completed.');
+				return false;
+			}
+			if (plan.into != null) await app.State.do_action(new app.Actions.Select_layer_action(plan.into), { skip_history: true });
+			return true;
+		} finally {
+			this.merging = false;
 		}
 	}
 

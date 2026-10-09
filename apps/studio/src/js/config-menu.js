@@ -339,7 +339,8 @@ const menuDefinition = [
 				target: 'layer/new.new'
 			},
 			{
-				name: 'New from Visible',
+				name: 'Stamp Visible',
+				shortcut: 'Ctrl + Alt + Shift + E',
 				target: 'layer/flatten.new_from_visible'
 			},
 			{
@@ -480,6 +481,11 @@ const menuDefinition = [
 				name: 'Merge Down',
 				shortcut: 'Ctrl + E',
 				target: 'layer/merge.merge'
+			},
+			{
+				name: 'Merge Visible',
+				shortcut: 'Ctrl + Shift + E',
+				target: 'layer/flatten.merge_visible'
 			},
 			{
 				name: 'Flatten Image',
