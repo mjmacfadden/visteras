@@ -35,3 +35,12 @@
 #vsym_edit_bar { position: absolute; left: 0; right: 0; top: 0; z-index: 30; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #5a5a5a; color: #f2f2f2; font-size: 12px; border-bottom: 1px solid #444; }
 #vsym_edit_bar button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 13px; padding: 0 4px; }
 #vsym_edit_bar button:hover { color: var(--visteras-accent, #fa7c1b); }
+
+/* Break Link & Continue toast (path-op guard) */
+.vsym_guard_toast {
+  position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%); z-index: 100000;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px;
+  background: var(--vui-bg-elevated, #2b2b2b); color: var(--vui-fg, #eee);
+  border: 1px solid var(--accent, #fa7c1b); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: 12px;
+}
+.vsym_guard_toast .vui-btn { font-size: 12px; }

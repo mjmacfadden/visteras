@@ -32,7 +32,7 @@
   <link href="./css/visteras-appearance-panel.css?v=appearance-stroke-1" rel="stylesheet" media="all">
   <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
   <link href="./css/visteras-export.css?v=export-3" rel="stylesheet" media="all">
-  <link href="./css/visteras-symbols.css?v=gap5-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-symbols.css?v=gap5-2" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -326,6 +326,7 @@
     import { mountArrowheads } from './js/visteras-arrowheads.js?v=gravit-4';
     import { mountSymbols } from './js/visteras-symbols.js?v=gap5-1';
     import { mountSymbolEdit } from './js/visteras-symbol-edit.js?v=gap5-1';
+    import { mountSymbolGuards } from './js/visteras-symbol-guards.js?v=gap5-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
@@ -2622,6 +2623,7 @@
     mountSymbols(svgEditor);
     // Edit Symbol in isolation (dblclick instance / thumbnail; Esc or ◀ exits; one undo step)
     mountSymbolEdit(svgEditor);
+    mountSymbolGuards(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌃⌘7), Release (⌃⌥⌘7)

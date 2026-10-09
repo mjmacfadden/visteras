@@ -41,7 +41,7 @@ test('Object ▸ New Symbol… (F8); hidden Edit/Break Link actions for the cont
   assert.match(html, /id="action_symbol_break_link" hidden>Break Link to Symbol</);
   assert.match(html, /import \{ mountSymbols \} from '\.\/js\/visteras-symbols\.js\?v=gap5-1';/);
   assert.match(html, /mountSymbols\(svgEditor\);/);
-  assert.match(html, /css\/visteras-symbols\.css\?v=gap5-1/);
+  assert.match(html, /css\/visteras-symbols\.css\?v=gap5-\d+/);
 });
 
 test('Panel has Illustrator buttons + panel menu', () => {

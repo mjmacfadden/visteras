@@ -44,7 +44,7 @@ export const WATCHED_ATTRS = ['stroke', 'stroke-width', STROKE_ALIGN_ATTR, STROK
 export const ALIGN_STATE_ATTRS = [STROKE_ALIGN_ATTR, STROKE_WEIGHT_ATTR, STROKE_PAINT_ATTR, STROKE_BODY_ATTR, STROKE_CLIP_ATTR, STROKE_MASK_ATTR];
 const ALIGN_RECORD = [...ALIGN_STATE_ATTRS, 'stroke', 'stroke-width', 'clip-path', 'mask', 'transform'];
 
-const LEAF_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text', 'tspan', 'textPath', 'use']);
+const LEAF_TAGS = new Set(['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text', 'tspan', 'textPath']); // symbol instances (use) never get wrap geometry
 
 // ─── Pure helpers ────────────────────────────────────────────────────────────
 export function isNonePaint(v) {
