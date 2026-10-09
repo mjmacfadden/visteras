@@ -17,7 +17,7 @@ const menuDefinition = [
 				target: 'file/open.open_file'
 			},
 			{
-				name: 'Open as Layer',
+				name: 'Place Embedded',
 				ellipsis: true,
 				target: 'file/open.open_file_as_layer'
 			},
