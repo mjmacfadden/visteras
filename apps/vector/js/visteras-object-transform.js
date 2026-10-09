@@ -55,16 +55,16 @@ function unitLabel() {
   return getBaseUnit();
 }
 
-function matrixFromSVG(m) {
+export function matrixFromSVG(m) {
   return new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f]);
 }
 
-function documentMatrix(sc, el) {
+export function documentMatrix(sc, el) {
   const content = sc.getSvgContent?.() || el.ownerSVGElement;
   return matrixFromSVG(content.getScreenCTM()).inverse().multiply(matrixFromSVG(el.getScreenCTM()));
 }
 
-function localMatrix(el) {
+export function localMatrix(el) {
   let local = new DOMMatrix();
   const list = el.transform?.baseVal;
   if (list) {

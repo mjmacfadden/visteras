@@ -64198,7 +64198,7 @@ ${y}`), [3, 7];
 			n && n.startsWith("#") && t.push(n.substr(1));
 		}
 		return Array.prototype.forEach.call(e, (e, r) => {
-			let i = e.querySelectorAll("linearGradient, radialGradient, filter, marker, svg, symbol");
+			let i = e.querySelectorAll("linearGradient, radialGradient, filter, marker, svg, symbol:not([data-v-symbol])");
 			for (r = i.length; r--;) {
 				let e = i[r], { id: a } = e;
 				t.includes(a) || (Z.setRemovedElements(a, e), e.remove(), n++);
