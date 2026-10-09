@@ -78,7 +78,9 @@
 #tools_top #g_title,
 #tools_top #link_url,
 #tools_top #linkLabel,
-#tools_top #image_url {
+#tools_top #image_url,
+#tools_top #elem_id,
+#tools_top #elem_class {
   display: none !important;
 }
 

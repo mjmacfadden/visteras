@@ -1828,10 +1828,6 @@
               </div>
               <div class="prop_section_body" id="sec_actions_body">
                 <div class="prop_actions_flow" id="slot_action_btns"></div>
-                <div class="prop_row" id="row_elem_id_class" style="margin-top: 4px; display: none;">
-                  <div id="slot_elem_id" style="flex:1;"></div>
-                  <div id="slot_elem_class" style="flex:1;"></div>
-                </div>
               </div>
             </div>
 
@@ -2169,8 +2165,6 @@
       moveEl('tool_delete', 'slot_action_btns');
       moveEl('tool_topath', 'slot_action_btns');
       moveEl('tool_reorient', 'slot_action_btns');
-      moveEl('elem_id', 'slot_elem_id');
-      moveEl('elem_class', 'slot_elem_class');
 
       // Properties header click handler (tab expands if collapsed)
       document.getElementById('properties_panel_header')?.addEventListener('click', () => {
