@@ -1261,6 +1261,26 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 			opacity, hidden: layer.visible === false, clipping: isClipping, blendMode };
 	}
 
+	const hasSkew = (layer.skew_x != null && layer.skew_x !== 0) || (layer.skew_y != null && layer.skew_y !== 0);
+	if (hasSkew) {
+		const canvas = document.createElement('canvas');
+		canvas.width = docWidth;
+		canvas.height = docHeight;
+		app.Layers.render_object(canvas.getContext('2d'), {
+			...layer, parent_id: 0, visible: true, opacity: 100, composition: 'source-over',
+		});
+		return {
+			name: layer.name || 'Layer',
+			canvas,
+			left: 0,
+			top: 0,
+			opacity,
+			hidden: layer.visible === false,
+			clipping: isClipping,
+			blendMode,
+		};
+	}
+
 	const layerCanvas = render_layer_to_canvas(layer, docWidth, docHeight);
 	if (!layerCanvas) return null;
 

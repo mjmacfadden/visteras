@@ -249,6 +249,35 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Free Transform session keyboard handling
+			const transformMod = app.GUI && app.GUI.modules && app.GUI.modules['edit/transform'];
+			if (transformMod && transformMod.is_active()) {
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					transformMod.commit();
+					return;
+				}
+				if (event.key === 'Escape') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					transformMod.cancel();
+					return;
+				}
+				if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					const step = event.shiftKey ? 10 : 1;
+					const dx = event.key === 'ArrowLeft' ? -step : (event.key === 'ArrowRight' ? step : 0);
+					const dy = event.key === 'ArrowUp' ? -step : (event.key === 'ArrowDown' ? step : 0);
+					transformMod.nudge(dx, dy);
+					return;
+				}
+				if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key && event.key.length === 1) {
+					return;
+				}
+			}
+
 			// Fit Window: Illustrator ⌘0 / Ctrl+0 (preventDefault blocks browser zoom reset).
 			// Actual Size stays browser-safe ⌃⌘1 / Ctrl+Alt+1 (⌘1 is a tab shortcut).
 			const isMacOS = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -545,6 +574,17 @@ class GUI_shortcuts_class {
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
 					app.GUI.modules['layer/adjustment'].create_or_edit('levels');
+				}
+				return;
+			}
+
+			// Free Transform: Photoshop ⌘T / Ctrl+T → browser-safe ⌃⌘T on Mac / Ctrl+Alt+T on Win
+			const isMacOSTransform = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesChord(event, { meta: true, key: 'T' }, isMacOSTransform)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/transform']) {
+					app.GUI.modules['edit/transform'].free_transform();
 				}
 				return;
 			}

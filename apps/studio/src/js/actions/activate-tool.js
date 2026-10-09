@@ -28,6 +28,11 @@ export class Activate_tool_action extends Base_action {
 		this.old_key = app.GUI.GUI_tools.active_tool;
 
 		if (this.key !== this.old_key || this.ignore_same_tool) {
+			const transform_module = app.GUI?.modules?.['edit/transform'];
+			if (transform_module && transform_module.is_active()) {
+				await transform_module.commit();
+			}
+
 			if (key !== 'pick_color' && app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.alt_eyedropper_tool && app.GUI.GUI_shortcuts.alt_eyedropper_tool !== key) {
 				app.GUI.GUI_shortcuts.alt_eyedropper_tool = null;
 				app.GUI.GUI_shortcuts._restore_eyedropper_pending = false;

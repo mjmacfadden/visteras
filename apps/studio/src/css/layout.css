@@ -3396,3 +3396,64 @@ body.canvas-only-mode .canvas_wrapper canvas {
 	background: #404040;
 	border-color: var(--visteras-accent, #2f6fae);
 }
+
+/* Free Transform options bar */
+.transform_ref_locator {
+	display: inline-grid;
+	grid-template-columns: repeat(3, 5px);
+	grid-template-rows: repeat(3, 5px);
+	gap: 2px;
+	padding: 2px;
+	border: 1px solid var(--visteras-border, #555);
+	background: var(--input-background-color, #222);
+	margin-right: 8px;
+	align-self: center;
+	cursor: pointer;
+}
+.transform_ref_cell {
+	width: 5px;
+	height: 5px;
+	background: rgba(255, 255, 255, 0.3);
+	border-radius: 1px;
+}
+.transform_ref_cell.active {
+	background: var(--visteras-accent, #2f6fae);
+}
+.transform_btn {
+	background: var(--visteras-accent, #2f6fae);
+	color: #fff;
+	border: none;
+	border-radius: 3px;
+	padding: 3px 8px;
+	font-weight: bold;
+	cursor: pointer;
+	margin-right: 6px;
+	font-size: 13px;
+	line-height: 1;
+}
+.transform_btn:hover {
+	filter: brightness(1.15);
+}
+.transform_btn.cancel {
+	background: #444;
+}
+.transform_btn.cancel:hover {
+	background: #555;
+}
+.transform_link_btn {
+	background: transparent;
+	border: 1px solid transparent;
+	color: #aaa;
+	cursor: pointer;
+	padding: 2px 4px;
+	margin: 0 4px;
+	border-radius: 3px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.transform_link_btn.active {
+	color: #fff;
+	background: var(--visteras-accent, #2f6fae);
+}
+

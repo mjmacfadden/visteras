@@ -68,6 +68,7 @@ class Help_shortcuts_class {
 				{title: `${mod} + R`, value: 'Toggle Rulers'},
 				{title: `${mod} + J`, value: 'Layer via Copy (duplicates the layer when nothing is selected)'},
 				{title: this.Helper.format_shortcut('Ctrl + Alt + L'), value: 'Levels Adjustment Layer'},
+				{title: this.Helper.format_shortcut('Ctrl + Alt + T'), value: 'Free Transform'},
 				{title: `${mod} + E`, value: 'Merge Down (Merge Group on a group)'},
 				{title: `${mod} + Shift + E`, value: 'Merge Visible'},
 				{title: `${mod} + Alt / Option + Shift + E`, value: 'Stamp Visible (new layer from visible)'},

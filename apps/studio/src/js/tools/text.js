@@ -2122,15 +2122,22 @@ class Text_editor_class {
 			const cursorLine = this.selection.isActiveSideEnd ? this.selection.end.line : this.selection.start.line;
 			const cursorCharacter = this.selection.isActiveSideEnd ? this.selection.end.character : this.selection.start.character;
 			const hasRotate = !!layer.rotate && !options.skipRotation;
-			if(hasRotate){
+			const hasSkew = ((layer.skew_x != null && layer.skew_x !== 0) || (layer.skew_y != null && layer.skew_y !== 0)) && !options.skipRotation;
+			if (hasRotate || hasSkew) {
 				const alpha = (layer.rotate * Math.PI) / 180;
 				ctx.save();
-				// Move the canvas to the center before rotating
+				// Move the canvas to the center before rotating/skewing
 				ctx.translate(layer.x + layer.width / 2, layer.y + layer.height / 2);
-				ctx.rotate(alpha);
+				if (hasRotate) {
+					ctx.rotate(alpha);
+				}
+				if (hasSkew) {
+					const sxRad = ((layer.skew_x || 0) * Math.PI) / 180;
+					const syRad = ((layer.skew_y || 0) * Math.PI) / 180;
+					ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+				}
 				// Move it back after it
 				ctx.translate(-layer.x - layer.width / 2, -layer.y - layer.height / 2);
-
 			}
 			const layerScaleX = (layer.params && layer.params.scale_x != null) ? layer.params.scale_x : 1;
 			const layerScaleY = (layer.params && layer.params.scale_y != null) ? layer.params.scale_y : 1;
@@ -2308,7 +2315,7 @@ class Text_editor_class {
 			if (hasLayerScale) {
 				ctx.restore();
 			}
-			if (hasRotate) {
+			if (hasRotate || hasSkew) {
 				ctx.restore();
 			}
 		} catch (error) {

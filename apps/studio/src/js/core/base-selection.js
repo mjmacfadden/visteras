@@ -7,6 +7,8 @@ import config from './../config.js';
 import zoomView from './../libs/zoomView.js';
 import app from './../app.js';
 import Mask_class from './../modules/mask/mask.js';
+import { ref_point, skew_from_drag, snap_angle, scale_about } from './../libs/free-transform.js';
+
 
 var instance = null;
 var settings_all = [];
@@ -320,12 +322,20 @@ class Base_selection_class {
 			this.ctx.setTransform(mm[0], mm[1], mm[2], mm[3], mm[4] + config.TRANSFORM_MARGIN, mm[5] + config.TRANSFORM_MARGIN);
 		}
 
-		let isRotated = false;
-		if (data.rotate != null && data.rotate != 0) {
-			//rotate
-			isRotated = true;
+		let isTransformed = false;
+		const hasRotate = data.rotate != null && data.rotate != 0;
+		const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
+		if (hasRotate || hasSkew) {
+			isTransformed = true;
 			this.ctx.translate(data.x + data.width / 2, data.y + data.height / 2);
-			this.ctx.rotate(data.rotate * Math.PI / 180);
+			if (hasRotate) {
+				this.ctx.rotate(data.rotate * Math.PI / 180);
+			}
+			if (hasSkew) {
+				const sxRad = ((data.skew_x || 0) * Math.PI) / 180;
+				const syRad = ((data.skew_y || 0) * Math.PI) / 180;
+				this.ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+			}
 			x = -data.width / 2;
 			y = -data.height / 2;
 		}
@@ -476,7 +486,42 @@ class Base_selection_class {
 				corner(x, y + h / 2, DRAG_TYPE_LEFT, 'ew-resize');
 				corner(x + w, y + h / 2, DRAG_TYPE_RIGHT, 'ew-resize');
 			}
+
+			const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+			if (transform_module && transform_module.is_active()) {
+				const session = transform_module.session;
+				const ref = session.ref || { x: data.x + data.width / 2, y: data.y + data.height / 2 };
+				const ref_local_x = isTransformed ? (ref.x - (data.x + data.width / 2)) : ref.x;
+				const ref_local_y = isTransformed ? (ref.y - (data.y + data.height / 2)) : ref.y;
+				const r = 5 / config.ZOOM;
+
+				const refPath = new Path2D();
+				refPath.arc(ref_local_x, ref_local_y, r, 0, 2 * Math.PI);
+
+				this.ctx.save();
+				this.ctx.beginPath();
+				this.ctx.arc(ref_local_x, ref_local_y, r, 0, 2 * Math.PI);
+				this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+				this.ctx.strokeStyle = '#000000';
+				this.ctx.lineWidth = 1 / config.ZOOM;
+				this.ctx.fill();
+				this.ctx.stroke();
+
+				this.ctx.beginPath();
+				this.ctx.moveTo(ref_local_x - r * 1.6, ref_local_y);
+				this.ctx.lineTo(ref_local_x + r * 1.6, ref_local_y);
+				this.ctx.moveTo(ref_local_x, ref_local_y - r * 1.6);
+				this.ctx.lineTo(ref_local_x, ref_local_y + r * 1.6);
+				this.ctx.stroke();
+				this.ctx.restore();
+
+				this.selected_obj_positions['ref_point'] = {
+					cursor: 'move',
+					path: refPath,
+				};
+			}
 		}
+
 
 		// Optional tool overlay (e.g. crop straighten reference line) in doc space
 		if (typeof settings.after_draw === 'function') {
@@ -1880,8 +1925,13 @@ class Base_selection_class {
 				//rotate relatively to where the drag started - no jump
 				const start = this.rotate_drag;
 				if (start) {
-					const cx = start.cx;
-					const cy = start.cy;
+					const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+					let cx = start.cx;
+					let cy = start.cy;
+					if (transform_module && transform_module.is_active() && transform_module.session.ref) {
+						cx = transform_module.session.ref.x;
+						cy = transform_module.session.ref.y;
+					}
 					const start_angle = Math.atan2(start.start_y - cy, start.start_x - cx) / Math.PI * 180;
 					const cur_angle = Math.atan2(mouse.y - cy, mouse.x - cx) / Math.PI * 180;
 					//wrap the delta to [-180, 180) so crossing the ±180° boundary is smooth
@@ -1898,13 +1948,77 @@ class Base_selection_class {
 					//with the object during the drag (find_settings() will not
 					//refresh data while mouse_lock === 'selected_object_actions')
 					settings.data.rotate = angle;
+					if (transform_module && transform_module.is_active()) {
+						transform_module.session.box.rotate = angle;
+						transform_module.sync_options_bar();
+					}
 					app.Layers.render_interactive_layer(settings.data.id);
 				}
 			}
 			else if (e.buttons == 1 || typeof e.buttons == "undefined") {
+				const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+				const is_transform_active = !!(transform_module && transform_module.is_active());
+
+				if (drag_type === 'ref_point' && is_transform_active) {
+					const curDocX = (hasRotate || hasSkew) ? (testX + data.x + data.width / 2) : mouse.x;
+					const curDocY = (hasRotate || hasSkew) ? (testY + data.y + data.height / 2) : mouse.y;
+					const locators = ['tl', 'tc', 'tr', 'ml', 'c', 'mr', 'bl', 'bc', 'br'];
+					let closestLoc = null;
+					let closestDist = Infinity;
+					const snapDist = 12 / config.ZOOM;
+					for (const loc of locators) {
+						const pt = ref_point(transform_module.session.box, loc);
+						const d = Math.hypot(curDocX - pt.x, curDocY - pt.y);
+						if (d < snapDist && d < closestDist) {
+							closestDist = d;
+							closestLoc = loc;
+						}
+					}
+					if (closestLoc) {
+						transform_module.session.locator = closestLoc;
+						transform_module.session.ref = ref_point(transform_module.session.box, closestLoc);
+					} else {
+						transform_module.session.locator = null;
+						transform_module.session.ref = { x: curDocX, y: curDocY };
+					}
+					transform_module.sync_options_bar();
+					this.draw_selection();
+					return;
+				}
+
 				const is_corner = (is_drag_type_left || is_drag_type_right) && (is_drag_type_top || is_drag_type_bottom);
 				const is_side_horizontal = (is_drag_type_left || is_drag_type_right) && !is_drag_type_top && !is_drag_type_bottom;
 				const is_side_vertical = (is_drag_type_top || is_drag_type_bottom) && !is_drag_type_left && !is_drag_type_right;
+
+				const is_skew = is_transform_active && (is_side_horizontal || is_side_vertical)
+					&& (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey);
+
+				if (is_skew) {
+					let side = 'top';
+					if (is_drag_type_top) side = 'top';
+					else if (is_drag_type_bottom) side = 'bottom';
+					else if (is_drag_type_left) side = 'left';
+					else if (is_drag_type_right) side = 'right';
+
+					var dx = Math.round(mouse.x - mouse.click_x);
+					var dy = Math.round(mouse.y - mouse.click_y);
+					const { skew_x, skew_y } = skew_from_drag(side, dx, dy, this.click_details);
+					let sx = skew_x;
+					let sy = skew_y;
+					if (e.shiftKey) {
+						if (side === 'top' || side === 'bottom') sx = snap_angle(sx, 5);
+						if (side === 'left' || side === 'right') sy = snap_angle(sy, 5);
+					}
+					settings.data.skew_x = sx;
+					settings.data.skew_y = sy;
+					transform_module.session.box.skew_x = sx;
+					transform_module.session.box.skew_y = sy;
+					transform_module.sync_options_bar();
+					app.Layers.render_interactive_layer(settings.data.id);
+					this.draw_selection();
+					return;
+				}
+
 
 				const is_shift = (e.shiftKey === true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_shift_down);
 				// Tool-specific keep_ratio (e.g. crop aspect presets) wins over select's global aspect_lock
@@ -1974,7 +2088,16 @@ class Base_selection_class {
 					}
 				}
 
-				if (is_alt) {
+				if (is_transform_active && is_alt && transform_module.session.ref) {
+					const refPt = transform_module.session.ref;
+					const sx = width / orig_w;
+					const sy = height / orig_h;
+					const scaled = scale_about(this.click_details, refPt, sx, sy);
+					settings.data.width = width;
+					settings.data.height = height;
+					settings.data.x = Math.round(scaled.x);
+					settings.data.y = Math.round(scaled.y);
+				} else if (is_alt) {
 					var cx = this.click_details.x + this.click_details.width / 2;
 					var cy = this.click_details.y + this.click_details.height / 2;
 
@@ -2076,6 +2199,21 @@ class Base_selection_class {
 					}
 				}
 				new Mask_class().preview_linked_mask_transform(settings.data, this.click_details, settings.data);
+				if (is_transform_active) {
+					const snap = transform_module.session.snapshot.box;
+					const curW = settings.data.width;
+					const curH = settings.data.height;
+					transform_module.session.w_pct = (curW / snap.width) * 100;
+					transform_module.session.h_pct = (curH / snap.height) * 100;
+					transform_module.session.box.width = curW;
+					transform_module.session.box.height = curH;
+					transform_module.session.box.x = settings.data.x;
+					transform_module.session.box.y = settings.data.y;
+					if (transform_module.session.locator) {
+						transform_module.session.ref = ref_point(transform_module.session.box, transform_module.session.locator);
+					}
+					transform_module.sync_options_bar();
+				}
 				app.Layers.render_interactive_layer(settings.data.id);
 			}
 			return;
@@ -2094,18 +2232,39 @@ class Base_selection_class {
 			//leftover transform on the context.
 			let testX = mouse.x;
 			let testY = mouse.y;
-			if (data.rotate != null && data.rotate != 0) {
-				const rot_rad = data.rotate * Math.PI / 180;
-				const cosA = Math.cos(-rot_rad);
-				const sinA = Math.sin(-rot_rad);
+			const hasRotate = data.rotate != null && data.rotate != 0;
+			const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
+			if (hasRotate || hasSkew) {
 				const rx = mouse.x - (x + w / 2);
 				const ry = mouse.y - (y + h / 2);
-				testX = rx * cosA - ry * sinA;
-				testY = rx * sinA + ry * cosA;
+				let ux = rx;
+				let uy = ry;
+				if (hasRotate) {
+					const rot_rad = (data.rotate || 0) * Math.PI / 180;
+					const cosA = Math.cos(-rot_rad);
+					const sinA = Math.sin(-rot_rad);
+					ux = rx * cosA - ry * sinA;
+					uy = rx * sinA + ry * cosA;
+				}
+				if (hasSkew) {
+					const sx = Math.tan(((data.skew_x || 0) * Math.PI) / 180);
+					const sy = Math.tan(((data.skew_y || 0) * Math.PI) / 180);
+					const det = 1 - sx * sy;
+					if (Math.abs(det) > 0.0001) {
+						testX = (ux - sx * uy) / det;
+						testY = (-sy * ux + uy) / det;
+					} else {
+						testX = ux;
+						testY = uy;
+					}
+				} else {
+					testX = ux;
+					testY = uy;
+				}
 			}
 
 			//set mouse move cursor if hovering inside body of layer
-			const inBody = (data.rotate != null && data.rotate != 0)
+			const inBody = (hasRotate || hasSkew)
 				? (testX > -w / 2 && testX < w / 2 && testY > -h / 2 && testY < h / 2)
 				: (mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h);
 
@@ -2134,7 +2293,18 @@ class Base_selection_class {
 						}
 					}
 					if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
-						mainWrapper.style.cursor = position.cursor;
+						const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+						if (transform_module && transform_module.is_active()) {
+							const dt = parseInt(current_drag_type, 10);
+							const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
+							if (is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey)) {
+								mainWrapper.style.cursor = 'pointer';
+							} else {
+								mainWrapper.style.cursor = position.cursor;
+							}
+						} else {
+							mainWrapper.style.cursor = position.cursor;
+						}
 					}
 				}
 			}

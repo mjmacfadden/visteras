@@ -155,6 +155,23 @@ const menuDefinition = [
 			name: 'Paste as New',
 			shortcut: 'Ctrl + Alt + V',
 			target: 'file/new.paste_as_new'
+		},
+		{
+			divider: true
+		},
+		{
+			name: 'Free Transform',
+			shortcut: 'Ctrl + Alt + T',
+			target: 'edit/transform.free_transform'
+		},
+		{
+			name: 'Transform',
+			children: [
+				{
+					name: 'Skew',
+					target: 'edit/transform.skew'
+				}
+			]
 		}
 	]
 },
