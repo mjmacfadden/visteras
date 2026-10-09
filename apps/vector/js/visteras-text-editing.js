@@ -432,25 +432,6 @@ export function mountTextEditing(editor) {
   const css=document.createElement('style');
   css.textContent='body[data-vector-editing-text] #selectorParentGroup {visibility:hidden}';
   document.head.append(css);
-  const panel=document.createElement('div');
-  panel.style.cssText='padding:12px;display:none';
-  panel.innerHTML='<b>Paragraph Text Box</b><label style="display:block;margin-top:8px">Width <input aria-label="Text box width" type="number" min="1" style="width:72px"></label><label style="display:block;margin-top:8px">Height <input aria-label="Text box height" type="number" min="1" style="width:72px"></label>';
-  document.getElementById('properties_panel')?.append(panel);
-  const fields=[...panel.querySelectorAll('input')];
-  const syncPanel=()=>{
-    const text=sc.getSelectedElements().filter(Boolean)[0];
-    const show=text?.hasAttribute('data-text-width');
-    panel.style.display=show?'block':'none';
-    if(show) fields.forEach((f,i)=>{if(document.activeElement!==f)f.value=text.getAttribute(i?'data-text-height':'data-text-width');});
-  };
-  fields.forEach((field,i)=>field.addEventListener('change',()=>{
-    const text=sc.getSelectedElements().filter(Boolean)[0];
-    if(!text?.hasAttribute('data-text-width') || !(Number(field.value)>0))return;
-    const attr=i?'data-text-height':'data-text-width', old=text.getAttribute(attr);
-    text.setAttribute(attr,field.value);layoutParagraph(text);
-    sc.addCommandToHistory(new sc.history.ChangeElementCommand(text,{[attr]:old},'Resize text box'));
-    sc.call('changed',[text]);
-  }));
   const stop=e=>{e.preventDefault();e.stopImmediatePropagation();};
   const position=e=>new DOMPoint(e.clientX,e.clientY).matrixTransform(sc.getSvgContent().getScreenCTM().inverse());
   window.addEventListener('mousedown',e=>{
@@ -502,9 +483,6 @@ export function mountTextEditing(editor) {
   },true);
   window.addEventListener('keydown',e=>{if(gesture && e.key==='Escape'){stop(e);gesture.frame.remove();gesture=null;}},true);
   window.addEventListener('blur',()=>{if(gesture){gesture.frame.remove();gesture=null;}});
-  // Reflow after typography edits and history replay. Content remains SVG text.
-  const originalCall=sc.call;
-  sc.call=function(event,...args){const result=originalCall.call(this,event,...args);if(event==='selected'||event==='changed')syncPanel();return result;};
   if(typeof sc.svgCanvasToString==='function'&&!sc.svgCanvasToString.__visterasNewlines){
     const toString=sc.svgCanvasToString;
     sc.svgCanvasToString=function(...args){return encodeTextContentNewlines(toString.apply(this,args));};
