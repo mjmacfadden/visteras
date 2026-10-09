@@ -62,12 +62,12 @@ test('psd.js wiring: default branch uses the placeholder, warns once, and export
 	assert.match(props, /if \(layer\.psd_unsupported\) \{[\s\S]*id="properties_psd_unsupported"/);
 });
 
-test('end to end: a PSD with Levels imports as a placeholder, warns once, and exports Levels again', async () => {
+test('end to end: a PSD with Levels imports as a real levels layer, Curves as placeholder', async () => {
 	const { createCanvas } = require('@napi-rs/canvas');
 	const warnings = [];
 	const context = vm.createContext({ config: { layers: [] }, console: { log() {}, warn: (...a) => warnings.push('WARN ' + a.map(String).join(' ')) }, alertify: { success() {}, warning: (m) => warnings.push(m), error: (m) => warnings.push('ERR ' + m) }, document: { createElement: () => createCanvas(1, 1) }, performance, HTMLCanvasElement: createCanvas(1, 1).constructor, ImageData: require('@napi-rs/canvas').ImageData });
 	const strip = (f) => fs.readFileSync(require.resolve('../src/js/' + f), 'utf8').replace(/^import .*;$/gm, '').replace(/export default \{[\s\S]*?\};/g, '').replace(/^export default .*;$/gm, '').replace(/\bexport /g, '');
-	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-fill.js', 'libs/psd-unsupported.js'].map(strip).join('\n')
+	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-fill.js', 'libs/psd-unsupported.js', 'libs/levels.js'].map(strip).join('\n')
 		+ fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8').replace(/^import .*;$/gm, '').replace(/\bexport (?=(?:async )?function)/g, ''), context);
 	let imported;
 	context.app = { Documents: { create_document_from_psd_data: (d) => { imported = d; } } };
@@ -81,13 +81,16 @@ test('end to end: a PSD with Levels imports as a placeholder, warns once, and ex
 	await context.load_psd(new ArrayBuffer(0), 'client.psd');
 	assert.ok(imported, JSON.stringify(warnings));
 	const [lv, cv, hs] = imported.layers;
-	assert.equal(lv.name, 'Levels 1 (unsupported)');
-	assert.equal(lv.psd_unsupported.label, 'Levels');
+	assert.equal(lv.name, 'Levels 1');
+	assert.equal(lv.adjustment_type, 'levels');
+	assert.equal(lv.psd_unsupported, undefined);
+	assert.equal(lv.params.rgb.inBlack, 12);
 	assert.equal(cv.name, 'Curves 1 (unsupported)');
 	assert.equal(hs.name, 'Hue/Saturation 1');
 	assert.equal(hs.psd_unsupported, undefined);
 	assert.equal(warnings.length, 1);
-	assert.match(warnings[0], /\(Levels, Curves\)/);
+	assert.match(warnings[0], /\(Curves\)/);
+	assert.doesNotMatch(warnings[0], /Levels/);
 	context.exportLayers = imported.layers;
 	const exported = vm.runInContext('build_psd_children_tree(exportLayers, 0, 40, 24)', context);
 	const types = exported.map((l) => l.adjustment && l.adjustment.type);

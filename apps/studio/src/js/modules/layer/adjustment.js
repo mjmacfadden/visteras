@@ -3,6 +3,7 @@ import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import Helper_class from './../../libs/helpers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { default_levels_params } from './../../libs/levels.js';
 
 class Layer_adjustment_class {
 
@@ -11,6 +12,12 @@ class Layer_adjustment_class {
 		this.Helper = new Helper_class();
 
 		this.ADJUSTMENT_TYPES = {
+			'levels': {
+				title: 'Levels',
+				name: 'Levels',
+				default_params: default_levels_params(),
+				params: []
+			},
 			'brightness': {
 				title: 'Brightness / Contrast',
 				name: 'Brightness',
@@ -186,9 +193,13 @@ class Layer_adjustment_class {
 		this.create_or_edit('threshold');
 	}
 
+	levels() {
+		this.create_or_edit('levels');
+	}
+
 	create_or_edit(type) {
 		const normType = this.normalize_type(type);
-		if (config.layer && config.layer.type === 'adjustment') {
+		if (config.layer && config.layer.type === 'adjustment' && !config.layer.psd_unsupported) {
 			const currentNorm = this.normalize_type(config.layer.adjustment_type);
 			if (currentNorm === normType) {
 				this.edit(config.layer.id);
@@ -218,7 +229,7 @@ class Layer_adjustment_class {
 			name: layerName,
 			type: 'adjustment',
 			adjustment_type: normType,
-			params: { ...conf.default_params },
+			params: JSON.parse(JSON.stringify(conf.default_params)),
 			width: config.WIDTH,
 			height: config.HEIGHT,
 			x: 0,

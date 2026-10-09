@@ -14,6 +14,7 @@ import alertify from './../../../node_modules/alertifyjs/build/alertify.min.js';
 import semver_compare from './../../../node_modules/semver-compare/';
 import { get_renderer } from './renderer/index.js';
 import { migrate_layer_clipping } from './../libs/layer-clip.js';
+import { migrate_psd_unsupported_levels } from './../libs/levels.js';
 
 var instance = null;
 
@@ -284,6 +285,7 @@ class Base_documents_class {
 		if (config.layers) {
 			for (let mi = 0; mi < config.layers.length; mi++) {
 				migrate_layer_clipping(config.layers[mi]);
+				migrate_psd_unsupported_levels(config.layers[mi]);
 			}
 		}
 		const validLayerIds = new Set((config.layers || []).map(l => l.id));
@@ -694,9 +696,11 @@ class Base_documents_class {
 		}
 
 		// Migrate legacy clipping-as-blend (composition source-atop) → layer.clipped
+		// Migrate legacy unsupported Levels placeholders → real Levels layers
 		if (json.layers) {
 			for (let mi = 0; mi < json.layers.length; mi++) {
 				migrate_layer_clipping(json.layers[mi]);
+				migrate_psd_unsupported_levels(json.layers[mi]);
 			}
 		}
 

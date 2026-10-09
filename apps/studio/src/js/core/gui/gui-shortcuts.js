@@ -8,7 +8,7 @@ import app from './../../app.js';
 import config from './../../config.js';
 import Helper_class from './../../libs/helpers.js';
 import View_ruler_class from './../../modules/view/ruler.js';
-import { eventMatchesDigitChord } from './../../libs/browser_shortcuts.js';
+import { eventMatchesChord, eventMatchesDigitChord } from './../../libs/browser_shortcuts.js';
 
 export const BRUSH_SIZE_STEPS = [
 	1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
@@ -533,6 +533,17 @@ class GUI_shortcuts_class {
 					} else {
 						app.GUI.modules['layer/group'].group_layers();
 					}
+				}
+				return;
+			}
+
+			// Levels adjustment layer: Photoshop ⌘L / Ctrl+L → browser-safe ⌃⌘L on Mac / Ctrl+Alt+L on Win
+			const isMacOSLevels = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesChord(event, { meta: true, key: 'L' }, isMacOSLevels)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
+					app.GUI.modules['layer/adjustment'].create_or_edit('levels');
 				}
 				return;
 			}

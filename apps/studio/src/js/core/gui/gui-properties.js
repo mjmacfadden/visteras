@@ -6,6 +6,7 @@ import Tools_translate_class from './../../modules/tools/translate.js';
 import Vector_manager from './../vector/vector-manager.js';
 import { Update_vector_action } from './../../actions/vector/update-vector.js';
 import Tools_bg_auto_class from './../../modules/tools/bg_auto.js';
+import { default_levels_params, auto_levels } from './../../libs/levels.js';
 
 /**
  * GUI class responsible for the Properties panel.
@@ -363,6 +364,11 @@ class GUI_properties_class {
 			this.bound_kind = 'adjustment';
 			return;
 		}
+
+		if (normType === 'levels') {
+			this.render_levels_properties(target, layer, bind_events);
+			return;
+		}
 		html += `<div class="properties_title trn">${this.esc(conf.title)}</div>`;
 
 		for (const p of conf.params) {
@@ -399,6 +405,486 @@ class GUI_properties_class {
 		}
 
 		this.bind_control_events(target, layer.id);
+	}
+
+	render_levels_properties(target, layer, bind_events = false) {
+		const params = layer.params || default_levels_params();
+		if (!layer.params) layer.params = params;
+		const currentChannel = params.channel || 'rgb';
+		const chParams = params[currentChannel] || { inBlack: 0, gamma: 1, inWhite: 255, outBlack: 0, outWhite: 255 };
+
+		const sameLayer = this.bound_layer_id === layer.id
+			&& this.bound_kind === 'adjustment'
+			&& target.querySelector('.levels_properties_controls')
+			&& target.dataset.adjType === 'levels';
+
+		if (sameLayer && !bind_events) {
+			this.update_levels_histogram(target, layer);
+			this.sync_levels_control_values(target, layer);
+			return;
+		}
+
+		let html = '<div class="properties_controls levels_properties_controls">';
+		html += `<div class="properties_title trn">Levels</div>`;
+
+		html += `
+			<div class="properties_row">
+				<label class="properties_label" for="levels_channel_select">Channel:</label>
+				<select class="properties_select" id="levels_channel_select">
+					<option value="rgb"${currentChannel === 'rgb' ? ' selected' : ''}>RGB</option>
+					<option value="red"${currentChannel === 'red' ? ' selected' : ''}>Red</option>
+					<option value="green"${currentChannel === 'green' ? ' selected' : ''}>Green</option>
+					<option value="blue"${currentChannel === 'blue' ? ' selected' : ''}>Blue</option>
+				</select>
+			</div>
+
+			<div class="levels_section_title">Input Levels</div>
+			<div class="levels_histogram_wrap">
+				<canvas class="levels_histogram_canvas" width="256" height="70"></canvas>
+			</div>
+
+			<div class="levels_track_wrap levels_input_track" id="levels_input_track">
+				<div class="levels_triangle levels_tri_black" id="levels_tri_in_black" data-handle="inBlack" title="Shadows" tabindex="0">
+					<svg width="10" height="12" viewBox="0 0 10 12"><polygon points="5,0 10,12 0,12" fill="#000000" stroke="#888888" stroke-width="1"/></svg>
+				</div>
+				<div class="levels_triangle levels_tri_mid" id="levels_tri_gamma" data-handle="gamma" title="Midtones" tabindex="0">
+					<svg width="10" height="12" viewBox="0 0 10 12"><polygon points="5,0 10,12 0,12" fill="#888888" stroke="#ffffff" stroke-width="1"/></svg>
+				</div>
+				<div class="levels_triangle levels_tri_white" id="levels_tri_in_white" data-handle="inWhite" title="Highlights" tabindex="0">
+					<svg width="10" height="12" viewBox="0 0 10 12"><polygon points="5,0 10,12 0,12" fill="#ffffff" stroke="#888888" stroke-width="1"/></svg>
+				</div>
+			</div>
+
+			<div class="levels_inputs_row">
+				<input type="number" class="properties_number" id="levels_in_black" min="0" max="253" step="1" value="${chParams.inBlack}" title="Shadows input" />
+				<input type="number" class="properties_number" id="levels_gamma" min="0.1" max="9.99" step="0.01" value="${parseFloat(Number(chParams.gamma).toFixed(2))}" title="Midtones input (gamma)" />
+				<input type="number" class="properties_number" id="levels_in_white" min="2" max="255" step="1" value="${chParams.inWhite}" title="Highlights input" />
+			</div>
+
+			<div class="levels_section_title">Output Levels</div>
+			<div class="levels_track_wrap levels_output_track" id="levels_output_track">
+				<div class="levels_gradient_bar"></div>
+				<div class="levels_triangle levels_tri_out_black" id="levels_tri_out_black" data-handle="outBlack" title="Shadows output" tabindex="0">
+					<svg width="10" height="12" viewBox="0 0 10 12"><polygon points="5,0 10,12 0,12" fill="#000000" stroke="#888888" stroke-width="1"/></svg>
+				</div>
+				<div class="levels_triangle levels_tri_out_white" id="levels_tri_out_white" data-handle="outWhite" title="Highlights output" tabindex="0">
+					<svg width="10" height="12" viewBox="0 0 10 12"><polygon points="5,0 10,12 0,12" fill="#ffffff" stroke="#888888" stroke-width="1"/></svg>
+				</div>
+			</div>
+
+			<div class="levels_inputs_row">
+				<input type="number" class="properties_number" id="levels_out_black" min="0" max="255" step="1" value="${chParams.outBlack}" title="Shadows output" />
+				<input type="number" class="properties_number" id="levels_out_white" min="0" max="255" step="1" value="${chParams.outWhite}" title="Highlights output" />
+			</div>
+
+			<div class="levels_btn_row">
+				<button type="button" class="levels_btn" id="levels_btn_auto">Auto</button>
+				<button type="button" class="levels_btn" id="levels_btn_reset">Reset</button>
+			</div>
+		`;
+		html += '</div>';
+
+		target.innerHTML = html;
+		target.dataset.adjType = 'levels';
+		delete target.dataset.textSig;
+		this.bound_layer_id = layer.id;
+		this.bound_kind = 'adjustment';
+		this.params_at_interaction_start = null;
+
+		if (config.LANG != 'en') {
+			this.Tools_translate.translate(config.LANG, target);
+		}
+
+		this.update_levels_histogram(target, layer);
+		this.sync_levels_control_values(target, layer);
+		this.bind_levels_events(target, layer.id);
+	}
+
+	compute_levels_histogram_data(layer) {
+		const W = config.WIDTH || 800;
+		const H = config.HEIGHT || 600;
+		if (W === 0 || H === 0) return null;
+
+		let scratchCanvas = null;
+		if (this.Base_layers.adj_scratch_canvas && this.Base_layers.adj_scratch_canvas.width === W && this.Base_layers.adj_scratch_canvas.height === H) {
+			scratchCanvas = this.Base_layers.adj_scratch_canvas;
+		} else if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+			scratchCanvas = document.createElement('canvas');
+			scratchCanvas.width = W;
+			scratchCanvas.height = H;
+			const sCtx = scratchCanvas.getContext('2d');
+			if (sCtx) {
+				const sorted = this.Base_layers.get_sorted_layers ? this.Base_layers.get_sorted_layers() : (config.layers || []);
+				const below = sorted.filter(l => l.order < layer.order && l.visible !== false && l.type != null);
+				const temp = document.createElement('canvas');
+				temp.width = W;
+				temp.height = H;
+				if (typeof this.Base_layers.render_objects === 'function') {
+					this.Base_layers.render_objects(sCtx, temp, below, () => sCtx.save());
+				}
+			}
+		}
+
+		if (!scratchCanvas || typeof scratchCanvas.getContext !== 'function') return null;
+		const ctx = scratchCanvas.getContext('2d');
+		if (!ctx || typeof ctx.getImageData !== 'function') return null;
+		let imgData = null;
+		try {
+			imgData = ctx.getImageData(0, 0, W, H);
+		} catch (e) {
+			return null;
+		}
+		const data = imgData ? imgData.data : null;
+		if (!data) return null;
+
+		const rHist = new Uint32Array(256);
+		const gHist = new Uint32Array(256);
+		const bHist = new Uint32Array(256);
+		const rgbHist = new Uint32Array(256);
+
+		const step = data.length > 2000000 ? Math.ceil(data.length / 2000000) * 4 : 4;
+		for (let i = 0; i < data.length; i += step) {
+			if (data[i + 3] === 0) continue;
+			const r = data[i];
+			const g = data[i + 1];
+			const b = data[i + 2];
+			rHist[r]++;
+			gHist[g]++;
+			bHist[b]++;
+			const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+			rgbHist[lum]++;
+		}
+
+		return { rgb: rgbHist, red: rHist, green: gHist, blue: bHist };
+	}
+
+	update_levels_histogram(target, layer) {
+		const canvas = target.querySelector('.levels_histogram_canvas');
+		if (!canvas) return;
+		const params = layer.params || default_levels_params();
+		const ch = params.channel || 'rgb';
+		const histData = this.compute_levels_histogram_data(layer);
+		this.last_levels_hist_data = histData;
+		if (histData) {
+			this.draw_levels_histogram(canvas, histData, ch);
+		}
+	}
+
+	draw_levels_histogram(canvas, histData, channel) {
+		if (!canvas || !histData) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const W = canvas.width;
+		const H = canvas.height;
+
+		ctx.clearRect(0, 0, W, H);
+		ctx.fillStyle = '#181818';
+		ctx.fillRect(0, 0, W, H);
+
+		const hist = histData[channel] || histData.rgb;
+		if (!hist) return;
+
+		let maxVal = 0;
+		for (let i = 1; i < 255; i++) {
+			if (hist[i] > maxVal) maxVal = hist[i];
+		}
+		if (maxVal === 0) {
+			maxVal = Math.max(hist[0], hist[255], 1);
+		}
+
+		let strokeStyle = '#a0a0a0';
+		let fillStyle = 'rgba(160, 160, 160, 0.4)';
+		if (channel === 'red') {
+			strokeStyle = '#e05555';
+			fillStyle = 'rgba(224, 85, 85, 0.4)';
+		} else if (channel === 'green') {
+			strokeStyle = '#55c055';
+			fillStyle = 'rgba(85, 192, 85, 0.4)';
+		} else if (channel === 'blue') {
+			strokeStyle = '#5588e0';
+			fillStyle = 'rgba(85, 136, 224, 0.4)';
+		}
+
+		ctx.beginPath();
+		ctx.moveTo(0, H);
+		for (let i = 0; i < 256; i++) {
+			const count = hist[i];
+			const val = Math.min(count, maxVal * 1.5);
+			const h = Math.min(H, (val / maxVal) * (H - 4));
+			ctx.lineTo(i, H - h);
+		}
+		ctx.lineTo(255, H);
+		ctx.closePath();
+		ctx.fillStyle = fillStyle;
+		ctx.fill();
+		ctx.strokeStyle = strokeStyle;
+		ctx.lineWidth = 1;
+		ctx.stroke();
+	}
+
+	sync_levels_control_values(target, layer) {
+		const params = layer.params || default_levels_params();
+		const ch = params.channel || 'rgb';
+		const c = params[ch] || { inBlack: 0, gamma: 1, inWhite: 255, outBlack: 0, outWhite: 255 };
+
+		const inBlackEl = target.querySelector('#levels_in_black');
+		const gammaEl = target.querySelector('#levels_gamma');
+		const inWhiteEl = target.querySelector('#levels_in_white');
+		const outBlackEl = target.querySelector('#levels_out_black');
+		const outWhiteEl = target.querySelector('#levels_out_white');
+
+		if (inBlackEl && document.activeElement !== inBlackEl) inBlackEl.value = c.inBlack;
+		if (gammaEl && document.activeElement !== gammaEl) gammaEl.value = parseFloat(Number(c.gamma).toFixed(2));
+		if (inWhiteEl && document.activeElement !== inWhiteEl) inWhiteEl.value = c.inWhite;
+		if (outBlackEl && document.activeElement !== outBlackEl) outBlackEl.value = c.outBlack;
+		if (outWhiteEl && document.activeElement !== outWhiteEl) outWhiteEl.value = c.outWhite;
+
+		const inputTrack = target.querySelector('#levels_input_track');
+		if (inputTrack) {
+			const trackWidth = (inputTrack.getBoundingClientRect && inputTrack.getBoundingClientRect().width) || inputTrack.offsetWidth || 200;
+			const triInBlack = target.querySelector('#levels_tri_in_black');
+			const triGamma = target.querySelector('#levels_tri_gamma');
+			const triInWhite = target.querySelector('#levels_tri_in_white');
+
+			const xBlack = (c.inBlack / 255) * trackWidth;
+			const xWhite = (c.inWhite / 255) * trackWidth;
+
+			const g = Math.max(0.1, Math.min(9.99, Number(c.gamma) || 1));
+			const pos = Math.max(0.01, Math.min(0.99, 0.5 - (Math.log10(g) / 2)));
+			const xGamma = xBlack + pos * (xWhite - xBlack);
+
+			if (triInBlack) triInBlack.style.left = `${xBlack}px`;
+			if (triGamma) triGamma.style.left = `${xGamma}px`;
+			if (triInWhite) triInWhite.style.left = `${xWhite}px`;
+		}
+
+		const outputTrack = target.querySelector('#levels_output_track');
+		if (outputTrack) {
+			const trackWidth = (outputTrack.getBoundingClientRect && outputTrack.getBoundingClientRect().width) || outputTrack.offsetWidth || 200;
+			const triOutBlack = target.querySelector('#levels_tri_out_black');
+			const triOutWhite = target.querySelector('#levels_tri_out_white');
+
+			const xOutBlack = (c.outBlack / 255) * trackWidth;
+			const xOutWhite = (c.outWhite / 255) * trackWidth;
+
+			if (triOutBlack) triOutBlack.style.left = `${xOutBlack}px`;
+			if (triOutWhite) triOutWhite.style.left = `${xOutWhite}px`;
+		}
+	}
+
+	apply_live_levels(layer_id) {
+		const layer = this.Base_layers.get_layer(layer_id, true);
+		if (!layer || layer.type !== 'adjustment') return;
+		this.Base_layers.invalidate({ document: true, preview: true });
+		this.Base_layers.render(true);
+	}
+
+	bind_levels_events(target, layer_id) {
+		const select = target.querySelector('#levels_channel_select');
+		if (select) {
+			select.addEventListener('change', () => {
+				const layer = this.Base_layers.get_layer(layer_id, true);
+				if (!layer || !layer.params) return;
+				layer.params.channel = select.value;
+				this.update_levels_histogram(target, layer);
+				this.sync_levels_control_values(target, layer);
+			});
+		}
+
+		const inputTrack = target.querySelector('#levels_input_track');
+		const outputTrack = target.querySelector('#levels_output_track');
+
+		const setupTriangleDrag = (tri, track, handle) => {
+			if (!tri || !track) return;
+			tri.addEventListener('pointerdown', (e) => {
+				e.preventDefault();
+				if (typeof tri.setPointerCapture === 'function') {
+					try { tri.setPointerCapture(e.pointerId); } catch (_) {}
+				}
+				this.snapshot_params(layer_id);
+				tri.classList.add('active');
+
+				const onPointerMove = (ev) => {
+					const rect = track.getBoundingClientRect();
+					const trackW = rect.width;
+					if (trackW <= 0) return;
+					const relX = Math.max(0, Math.min(trackW, ev.clientX - rect.left));
+					const v = (relX / trackW) * 255;
+
+					const layer = this.Base_layers.get_layer(layer_id, true);
+					if (!layer || !layer.params) return;
+					const ch = layer.params.channel || 'rgb';
+					const c = layer.params[ch];
+					if (!c) return;
+
+					if (handle === 'inBlack') {
+						c.inBlack = Math.max(0, Math.min(c.inWhite - 2, Math.round(v)));
+					} else if (handle === 'inWhite') {
+						c.inWhite = Math.max(c.inBlack + 2, Math.min(255, Math.round(v)));
+					} else if (handle === 'gamma') {
+						const denom = c.inWhite - c.inBlack;
+						if (denom > 0) {
+							const clampedV = Math.max(c.inBlack + 1, Math.min(c.inWhite - 1, v));
+							const pos = (clampedV - c.inBlack) / denom;
+							const clampedPos = Math.max(0.01, Math.min(0.99, pos));
+							let g = Math.pow(10, (0.5 - clampedPos) * 2);
+							c.gamma = Math.max(0.1, Math.min(9.99, parseFloat(g.toFixed(2))));
+						}
+					} else if (handle === 'outBlack') {
+						c.outBlack = Math.max(0, Math.min(255, Math.round(v)));
+					} else if (handle === 'outWhite') {
+						c.outWhite = Math.max(0, Math.min(255, Math.round(v)));
+					}
+
+					this.sync_levels_control_values(target, layer);
+					this.apply_live_levels(layer_id);
+				};
+
+				const onPointerUp = (ev) => {
+					if (typeof tri.releasePointerCapture === 'function') {
+						try { tri.releasePointerCapture(ev.pointerId); } catch (_) {}
+					}
+					tri.classList.remove('active');
+					window.removeEventListener('pointermove', onPointerMove);
+					window.removeEventListener('pointerup', onPointerUp);
+					window.removeEventListener('pointercancel', onPointerUp);
+					this.commit_params(layer_id);
+				};
+
+				window.addEventListener('pointermove', onPointerMove);
+				window.addEventListener('pointerup', onPointerUp);
+				window.addEventListener('pointercancel', onPointerUp);
+			});
+		};
+
+		setupTriangleDrag(target.querySelector('#levels_tri_in_black'), inputTrack, 'inBlack');
+		setupTriangleDrag(target.querySelector('#levels_tri_gamma'), inputTrack, 'gamma');
+		setupTriangleDrag(target.querySelector('#levels_tri_in_white'), inputTrack, 'inWhite');
+		setupTriangleDrag(target.querySelector('#levels_tri_out_black'), outputTrack, 'outBlack');
+		setupTriangleDrag(target.querySelector('#levels_tri_out_white'), outputTrack, 'outWhite');
+
+		const setupNumberInput = (id, handle, min, max, isFloat = false) => {
+			const el = target.querySelector('#' + id);
+			if (!el) return;
+
+			el.addEventListener('focus', () => {
+				this.snapshot_params(layer_id);
+			});
+
+			el.addEventListener('input', () => {
+				const raw = parseFloat(el.value);
+				if (isNaN(raw)) return;
+				const layer = this.Base_layers.get_layer(layer_id, true);
+				if (!layer || !layer.params) return;
+				const ch = layer.params.channel || 'rgb';
+				const c = layer.params[ch];
+				if (!c) return;
+
+				if (isFloat) {
+					c[handle] = Math.max(min, Math.min(max, parseFloat(raw.toFixed(2))));
+				} else {
+					c[handle] = Math.max(min, Math.min(max, Math.round(raw)));
+				}
+				this.sync_levels_control_values(target, layer);
+				this.apply_live_levels(layer_id);
+			});
+
+			el.addEventListener('change', () => {
+				let raw = parseFloat(el.value);
+				const layer = this.Base_layers.get_layer(layer_id, true);
+				if (!layer || !layer.params) return;
+				const ch = layer.params.channel || 'rgb';
+				const c = layer.params[ch];
+				if (!c) return;
+
+				if (isNaN(raw)) {
+					raw = c[handle];
+				}
+				if (handle === 'inBlack') {
+					c.inBlack = Math.max(0, Math.min(c.inWhite - 2, Math.round(raw)));
+				} else if (handle === 'inWhite') {
+					c.inWhite = Math.max(c.inBlack + 2, Math.min(255, Math.round(raw)));
+				} else if (isFloat) {
+					c[handle] = Math.max(min, Math.min(max, parseFloat(raw.toFixed(2))));
+				} else {
+					c[handle] = Math.max(min, Math.min(max, Math.round(raw)));
+				}
+				el.value = isFloat ? parseFloat(Number(c[handle]).toFixed(2)) : c[handle];
+				this.sync_levels_control_values(target, layer);
+				this.apply_live_levels(layer_id);
+				this.commit_params(layer_id);
+			});
+
+			el.addEventListener('keydown', (e) => {
+				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+					e.preventDefault();
+					const step = isFloat ? 0.05 : 1;
+					const inc = e.key === 'ArrowUp';
+					let raw = parseFloat(el.value) || 0;
+					raw = inc ? (raw + step) : (raw - step);
+					const layer = this.Base_layers.get_layer(layer_id, true);
+					if (!layer || !layer.params) return;
+					const ch = layer.params.channel || 'rgb';
+					const c = layer.params[ch];
+					if (!c) return;
+
+					if (handle === 'inBlack') {
+						c.inBlack = Math.max(0, Math.min(c.inWhite - 2, Math.round(raw)));
+					} else if (handle === 'inWhite') {
+						c.inWhite = Math.max(c.inBlack + 2, Math.min(255, Math.round(raw)));
+					} else if (isFloat) {
+						c[handle] = Math.max(min, Math.min(max, parseFloat(raw.toFixed(2))));
+					} else {
+						c[handle] = Math.max(min, Math.min(max, Math.round(raw)));
+					}
+					el.value = isFloat ? parseFloat(Number(c[handle]).toFixed(2)) : c[handle];
+					this.sync_levels_control_values(target, layer);
+					this.apply_live_levels(layer_id);
+					this.commit_params(layer_id);
+				}
+			});
+		};
+
+		setupNumberInput('levels_in_black', 'inBlack', 0, 253, false);
+		setupNumberInput('levels_gamma', 'gamma', 0.1, 9.99, true);
+		setupNumberInput('levels_in_white', 'inWhite', 2, 255, false);
+		setupNumberInput('levels_out_black', 'outBlack', 0, 255, false);
+		setupNumberInput('levels_out_white', 'outWhite', 0, 255, false);
+
+		const autoBtn = target.querySelector('#levels_btn_auto');
+		if (autoBtn) {
+			autoBtn.addEventListener('click', () => {
+				const layer = this.Base_layers.get_layer(layer_id, true);
+				if (!layer) return;
+				this.snapshot_params(layer_id);
+				const histData = this.last_levels_hist_data || this.compute_levels_histogram_data(layer);
+				if (histData) {
+					const newParams = auto_levels(histData);
+					newParams.channel = layer.params ? (layer.params.channel || 'rgb') : 'rgb';
+					layer.params = newParams;
+					this.update_levels_histogram(target, layer);
+					this.sync_levels_control_values(target, layer);
+					this.apply_live_levels(layer_id);
+					this.commit_params(layer_id);
+				}
+			});
+		}
+
+		const resetBtn = target.querySelector('#levels_btn_reset');
+		if (resetBtn) {
+			resetBtn.addEventListener('click', () => {
+				const layer = this.Base_layers.get_layer(layer_id, true);
+				if (!layer) return;
+				this.snapshot_params(layer_id);
+				const ch = layer.params ? (layer.params.channel || 'rgb') : 'rgb';
+				layer.params = default_levels_params();
+				layer.params.channel = ch;
+				this.update_levels_histogram(target, layer);
+				this.sync_levels_control_values(target, layer);
+				this.apply_live_levels(layer_id);
+				this.commit_params(layer_id);
+			});
+		}
 	}
 
 	format_value(val, step) {
