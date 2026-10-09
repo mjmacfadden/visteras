@@ -42,6 +42,6 @@ test('size.js: Relative + Anchor in the dialog; content, masks and adjustments f
 	assert.match(src, /\{name: "relative", title: "Relative:", value: false\},\n\t+\{title: "Anchor:", html: anchor_grid_html\(DEFAULT_ANCHOR\)\},/);
 	assert.match(src, /var shift = anchor_offset\(data\.anchor \|\| DEFAULT_ANCHOR, config\.WIDTH, config\.HEIGHT/);
 	assert.match(src, /patch\.mask = Object\.assign\(\{\}, lyr\.mask, \{ x: \(lyr\.mask\.x \|\| 0\) \+ shift\.dx/);
-	assert.match(src, /if \(lyr\.type === 'adjustment'\) \{/);
+	assert.match(src, /if \(lyr\.type === 'adjustment'\) \{[\s\S]*adjPatch\.mask = Object\.assign\(\{\}, lyr\.mask, \{ x: \(lyr\.mask\.x \|\| 0\) \+ shift\.dx/);
 	assert.match(src, /resolve_canvas_size\(old_w, old_h/);
 });
