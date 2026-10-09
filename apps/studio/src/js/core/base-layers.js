@@ -1158,7 +1158,7 @@ class Base_layers_class {
 
 		const type = layer.adjustment_type ? layer.adjustment_type.toLowerCase().replace(/_/g, '-') : null;
 		const filterString = this.get_adjustment_filter_string(layer);
-		if (type !== 'threshold' && type !== 'exposure' && (!filterString || filterString === 'none')) return;
+		if (type !== 'threshold' && type !== 'exposure' && type !== 'levels' && (!filterString || filterString === 'none')) return;
 
 		const W = targetCtx.canvas.width;
 		const H = targetCtx.canvas.height;

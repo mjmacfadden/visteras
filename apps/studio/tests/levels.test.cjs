@@ -190,4 +190,35 @@ test('source assertions: menu, shortcuts, and Adjustments panel integration', ()
 
 	const helpShortcutsSrc = fs.readFileSync(path.resolve(__dirname, '../src/js/modules/help/shortcuts.js'), 'utf8');
 	assert.match(helpShortcutsSrc, /format_shortcut\(['"]Ctrl \+ Alt \+ L['"]\)/);
+
+	const baseLayersSrc = fs.readFileSync(path.resolve(__dirname, '../src/js/core/base-layers.js'), 'utf8');
+	assert.match(baseLayersSrc, /type !== 'threshold' && type !== 'exposure' && type !== 'levels'/);
+	assert.match(baseLayersSrc, /case 'levels':|type === 'levels'/);
+});
+
+test('render_adjustment pipeline: Levels adjustment modifies canvas pixels', () => {
+	const { createCanvas } = require('@napi-rs/canvas');
+	const { apply_levels, default_levels_params } = require('../src/js/libs/levels.js');
+
+	// Create a 2x2 canvas with gray (128, 128, 128, 255) pixels
+	const canvas = createCanvas(2, 2);
+	const ctx = canvas.getContext('2d');
+	ctx.fillStyle = 'rgb(128, 128, 128)';
+	ctx.fillRect(0, 0, 2, 2);
+
+	const imgDataBefore = ctx.getImageData(0, 0, 2, 2);
+	assert.equal(imgDataBefore.data[0], 128);
+
+	// Apply levels: inBlack 100, inWhite 200 -> 128 maps to ~71
+	const params = default_levels_params();
+	params.rgb = { inBlack: 100, gamma: 1, inWhite: 200, outBlack: 0, outWhite: 255 };
+
+	apply_levels(imgDataBefore.data, params);
+	ctx.putImageData(imgDataBefore, 0, 0);
+
+	const imgDataAfter = ctx.getImageData(0, 0, 2, 2);
+	assert.equal(imgDataAfter.data[0], 71, 'pixels are modified by Levels');
+	assert.equal(imgDataAfter.data[1], 71);
+	assert.equal(imgDataAfter.data[2], 71);
+	assert.equal(imgDataAfter.data[3], 255);
 });

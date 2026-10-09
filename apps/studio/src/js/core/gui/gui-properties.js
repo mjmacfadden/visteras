@@ -675,7 +675,7 @@ class GUI_properties_class {
 	apply_live_levels(layer_id) {
 		const layer = this.Base_layers.get_layer(layer_id, true);
 		if (!layer || layer.type !== 'adjustment') return;
-		this.Base_layers.invalidate({ document: true });
+		this.Base_layers.invalidate({ document: true, preview: true });
 		this.Base_layers.render(true);
 	}
 
