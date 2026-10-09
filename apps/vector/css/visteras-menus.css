@@ -18,3 +18,8 @@
 /* Popup menus that reuse the menu-bar look (Properties fx button) */
 .vmenu-popup { position: fixed; display: none; top: 0; left: 0; }
 .vmenu-popup.open { display: block; }
+
+/* Window menu: Illustrator-style checkmark column (state from visteras-window-menu.js). */
+#menu_window .menu_dropdown_item { position: relative; padding-left: 22px; }
+#menu_window .menu_dropdown_item > .menu_check { position: absolute; left: 7px; width: 12px; text-align: center; color: var(--studio-orange, #fa7c1b); }
+.prop_section.vwin-flash > .prop_section_header { box-shadow: inset 2px 0 0 var(--studio-orange, #fa7c1b); background: #3a3a3a; }

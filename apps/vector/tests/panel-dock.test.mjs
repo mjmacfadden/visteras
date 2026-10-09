@@ -43,7 +43,7 @@ test('HTML: Window menu contains all dock panels, properties, and pathfinder wit
   assert.match(content, /id="action_window_gradient"[^>]*>Gradient\s+<span class="menu_dropdown_shortcut">⌘F9<\/span>/);
   assert.match(content, /id="action_window_layers"[^>]*>Layers\s+<span class="menu_dropdown_shortcut">F7<\/span>/);
   assert.match(content, /id="action_window_properties"[^>]*>Properties<\/div>/);
-  assert.match(content, /id="action_window_pathfinder"[^>]*>Pathfinder<\/div>/);
+  assert.match(content, /id="action_window_pathfinder"[^>]*>Pathfinder\s+<span class="menu_dropdown_shortcut">⇧⌘F9<\/span>/);
 });
 
 test('HTML: Window menu items wire to __visterasDock API', () => {

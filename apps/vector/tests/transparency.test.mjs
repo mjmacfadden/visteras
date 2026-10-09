@@ -59,7 +59,7 @@ test('Transparency: Isolate Blending writes isolation + stored attr; rehydrates 
 });
 
 test('Window menu: Transparency ⇧⌘F10 and Appearance ⇧F6 (placeholder); panel mounted', () => {
-  assert.match(html, /id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10<\/span>/);
+  assert.match(html, /id="action_window_transparency"[^>]*>Transparency <span class="menu_dropdown_shortcut">⇧⌘F10<\/span>/);
   assert.match(html, /id="action_window_appearance"[^>]*>Appearance <span class="menu_dropdown_shortcut">⇧F6<\/span>/);
   assert.match(html, /mountBlendModes\(svgEditor\);[\s\S]*?mountTransparency\(svgEditor\);/);
   const dock = fs.readFileSync(new URL('../js/visteras-panel-dock.js', import.meta.url), 'utf8');

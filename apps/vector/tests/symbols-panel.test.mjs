@@ -27,7 +27,7 @@ test('F8 = New Symbol only without modifiers', async () => {
 });
 
 test('Window ▸ Symbols menu item, dock icon, pane and flyout wiring', () => {
-  assert.match(html, /id="action_window_symbols">Symbols <span class="menu_dropdown_shortcut">⇧⌘F11<\/span>/);
+  assert.match(html, /id="action_window_symbols"[^>]*>Symbols <span class="menu_dropdown_shortcut">⇧⌘F11<\/span>/);
   assert.match(dock, /data-panel="symbols" title="Symbols \(⇧⌘F11 \/ Shift\+Ctrl\+F11\)"/);
   assert.match(dock, /symbolsPane\.id = 'vdock_symbols_panel';/);
   assert.match(dock, /symbols: symbolsPane,/);

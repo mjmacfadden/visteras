@@ -27,7 +27,7 @@ test('Window Menu: Pathfinder is a single option in Window menu', () => {
   const windowMenuContent = windowMenuMatch[1];
 
   assert.match(windowMenuContent, /<div class="menu_entry_title">Window<\/div>/);
-  assert.match(windowMenuContent, /<div class="menu_dropdown_item" id="action_window_pathfinder">Pathfinder<\/div>/);
+  assert.match(windowMenuContent, /<div class="menu_dropdown_item" id="action_window_pathfinder"[^>]*>Pathfinder <span class="menu_dropdown_shortcut">⇧⌘F9<\/span><\/div>/);
   assert.equal(windowMenuContent.includes('id="action_pathfinder_unite"'), false, 'Individual actions should not be in dropdown');
 });
 

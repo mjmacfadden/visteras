@@ -30,7 +30,7 @@
   <link href="./css/visteras-gradient.css?v=gradient-2" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-fx.css?v=gravit-5-ui" rel="stylesheet" media="all">
   <link href="./css/visteras-appearance-panel.css?v=appearance-stroke-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-menus.css?v=gravit-5-ui" rel="stylesheet" media="all">
   <link href="./css/visteras-export.css?v=export-3" rel="stylesheet" media="all">
   <link href="./css/visteras-symbols.css?v=gap5-2" rel="stylesheet" media="all">
 
@@ -198,19 +198,22 @@
         <div class="menu_entry" id="menu_window">
           <div class="menu_entry_title">Window</div>
           <div class="menu_dropdown_list">
-            <div class="menu_dropdown_item" id="action_window_color">Color <span class="menu_dropdown_shortcut">F6</span></div>
-            <div class="menu_dropdown_item" id="action_window_swatches">Swatches</div>
-            <div class="menu_dropdown_item" id="action_window_stroke">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
-            <div class="menu_dropdown_item" id="action_window_gradient">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
-            <div class="menu_dropdown_item" id="action_window_artboards">Artboards</div>
-            <div class="menu_dropdown_item" id="action_window_effects">Effects</div>
-            <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
-            <div class="menu_dropdown_item" id="action_window_symbols">Symbols <span class="menu_dropdown_shortcut">⇧⌘F11</span></div>
-            <div class="menu_dropdown_item" id="action_window_appearance">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
-            <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
+            <div class="menu_dropdown_item" id="action_window_align" role="menuitemcheckbox" aria-checked="false">Align <span class="menu_dropdown_shortcut">⇧F7</span></div>
+            <div class="menu_dropdown_item" id="action_window_appearance" role="menuitemcheckbox" aria-checked="false">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
+            <div class="menu_dropdown_item" id="action_window_artboards" role="menuitemcheckbox" aria-checked="false">Artboards</div>
+            <div class="menu_dropdown_item" id="action_window_color" role="menuitemcheckbox" aria-checked="false">Color <span class="menu_dropdown_shortcut">F6</span></div>
+            <div class="menu_dropdown_item" id="action_window_effects" role="menuitemcheckbox" aria-checked="false">Effects</div>
+            <div class="menu_dropdown_item" id="action_window_gradient" role="menuitemcheckbox" aria-checked="false">Gradient <span class="menu_dropdown_shortcut">⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_layers" role="menuitemcheckbox" aria-checked="false">Layers <span class="menu_dropdown_shortcut">F7</span></div>
+            <div class="menu_dropdown_item" id="action_window_pathfinder" role="menuitemcheckbox" aria-checked="false">Pathfinder <span class="menu_dropdown_shortcut">⇧⌘F9</span></div>
+            <div class="menu_dropdown_item" id="action_window_stroke" role="menuitemcheckbox" aria-checked="false">Stroke <span class="menu_dropdown_shortcut">⌘F10</span></div>
+            <div class="menu_dropdown_item" id="action_window_swatches" role="menuitemcheckbox" aria-checked="false">Swatches</div>
+            <div class="menu_dropdown_item" id="action_window_symbols" role="menuitemcheckbox" aria-checked="false">Symbols <span class="menu_dropdown_shortcut">⇧⌘F11</span></div>
+            <div class="menu_dropdown_item" id="action_window_transform" role="menuitemcheckbox" aria-checked="false">Transform <span class="menu_dropdown_shortcut">⇧F8</span></div>
+            <div class="menu_dropdown_item" id="action_window_transparency" role="menuitemcheckbox" aria-checked="false">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
+            <div class="menu_dropdown_item menu_has_submenu" id="menu_window_type" role="menuitem" aria-haspopup="true">Type<span class="menu_submenu_arrow" aria-hidden="true">▸</span><div class="menu_dropdown_list menu_submenu_list" role="menu"><div class="menu_dropdown_item" id="action_window_character" role="menuitemcheckbox" aria-checked="false">Character</div><div class="menu_dropdown_item" id="action_window_paragraph" role="menuitemcheckbox" aria-checked="false">Paragraph <span class="menu_dropdown_shortcut">⌥⌘T</span></div></div></div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_window_properties">Properties</div>
-            <div class="menu_dropdown_item" id="action_window_pathfinder">Pathfinder</div>
+            <div class="menu_dropdown_item" id="action_window_properties" role="menuitemcheckbox" aria-checked="false">Properties</div>
           </div>
         </div>
 
@@ -321,6 +324,7 @@
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=gravit-5';
+    import { mountWindowMenu } from './js/visteras-window-menu.js?v=gravit-5';
     import { mountPathOps } from './js/visteras-path-ops.js?v=gravit-4';
     import { mountArtboardExtras } from './js/visteras-artboard-extras.js?v=gap5-paste-1';
     import { mountArrowheads } from './js/visteras-arrowheads.js?v=gravit-4';
@@ -1093,6 +1097,12 @@
         }
         window.__visterasDock?.updateWindowMenuCheckmarks?.();
       }
+      window.__visterasPathfinderPanel = {
+        toggle(force) {
+          const open = !!pathfinderPanel && pathfinderPanel.style.display !== 'none';
+          if (force == null || !!force !== open) togglePathfinderPanel();
+        },
+      };
 
       // Window Menu Panel Toggles
       document.getElementById('action_window_color')?.addEventListener('click', () => {
@@ -2630,6 +2640,8 @@
     mountClippingMask(svgEditor);
     // Type ▸ Create Outlines (⇧⌘O) / Convert to Path
     mountTextOutlines(svgEditor);
+    // Window menu: every panel, Type ▸ Character / Paragraph, live checkmarks, ⇧F7 / ⇧F8 / ⇧⌘F9
+    mountWindowMenu();
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
