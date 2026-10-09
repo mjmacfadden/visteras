@@ -310,6 +310,7 @@
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=gravit-4';
     import { mountPathOps } from './js/visteras-path-ops.js?v=gravit-4';
+    import { mountArtboardExtras } from './js/visteras-artboard-extras.js?v=gravit-4';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
@@ -2607,6 +2608,7 @@
     // Gradients: Window ▸ Gradient panel (⌘F9), Gradient tool (G), annotator, swatches
     mountGradient(svgEditor);
     mountArtboards(svgEditor);
+    mountArtboardExtras(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌃⌘7), Release (⌃⌥⌘7)

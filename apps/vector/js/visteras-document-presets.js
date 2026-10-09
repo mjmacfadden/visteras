@@ -23,12 +23,15 @@ export const DOCUMENT_PRESETS = {
     { id: 'print_a3', name: 'A3', width: 297, height: 420, unit: 'mm', category: 'print', description: '297 × 420 mm' },
   ],
   social: [
+    { id: 'social_ig_post', name: 'Instagram Post', width: 1080, height: 1080, unit: 'px', category: 'social', description: '1080 × 1080' },
     { id: 'social_ig_square', name: 'Instagram Square', width: 1080, height: 1080, unit: 'px', category: 'social', description: '1080 × 1080' },
     { id: 'social_ig_portrait', name: 'Instagram Portrait', width: 1080, height: 1350, unit: 'px', category: 'social', description: '1080 × 1350' },
-    { id: 'social_ig_story', name: 'Instagram Story / Reel', width: 1080, height: 1920, unit: 'px', category: 'social', description: '1080 × 1920' },
-    { id: 'social_yt_thumb', name: 'YouTube Thumbnail', width: 1280, height: 720, unit: 'px', category: 'social', description: '1280 × 720' },
-    { id: 'social_x_post', name: 'X / Twitter Post', width: 1600, height: 900, unit: 'px', category: 'social', description: '1600 × 900' },
+    { id: 'social_ig_story', name: 'Instagram Story', width: 1080, height: 1920, unit: 'px', category: 'social', description: '1080 × 1920' },
+    { id: 'social_x_post', name: 'X Post', width: 1600, height: 900, unit: 'px', category: 'social', description: '1600 × 900' },
+    { id: 'social_fb_cover', name: 'Facebook Cover', width: 820, height: 312, unit: 'px', category: 'social', description: '820 × 312' },
     { id: 'social_fb_post', name: 'Facebook Post', width: 1200, height: 630, unit: 'px', category: 'social', description: '1200 × 630' },
+    { id: 'social_yt_thumb', name: 'YouTube Thumbnail', width: 1280, height: 720, unit: 'px', category: 'social', description: '1280 × 720' },
+    { id: 'social_li_post', name: 'LinkedIn Post', width: 1200, height: 627, unit: 'px', category: 'social', description: '1200 × 627' },
   ],
   mobile: [
     { id: 'mobile_iphone', name: 'iPhone 16 / 15 Pro', width: 1179, height: 2556, unit: 'px', category: 'mobile', description: '1179 × 2556' },
