@@ -180,7 +180,8 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const rect = scopeRect(scope, padding, board);
     if (!rect) throw new Error(scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export');
     const { w, h } = forSvgFile ? { w: X.pixelSize(rect, 1).w, h: X.pixelSize(rect, 1).h } : X.pixelSize(rect, scale);
-    const clone = sc.getSvgContent().cloneNode(true);
+    // While in Symbol Editing Mode, export the committed symbol (not the edit group).
+    const clone = window.__visterasSymbolEdit?.cloneCommitted?.() || sc.getSvgContent().cloneNode(true);
     stripExportGuides(clone);
     for (const a of ['x', 'y', 'style', 'id']) clone.removeAttribute(a);
     // XMLSerializer writes xmlns (and xmlns:xlink when used) itself; setting them as

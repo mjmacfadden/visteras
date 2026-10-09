@@ -93,7 +93,7 @@ test('Arrowheads export parity: marker defs + refs survive SVG / PNG / PDF pipel
   // Clone pipeline keeps <defs>/<marker> (NON_RENDER children are never pruned).
   assert.match(exp, /const NON_RENDER = new Set\(\[[^\]]*'defs'[^\]]*'marker'/);
   assert.match(exp, /if \(NON_RENDER\.has\(c\.tagName\.toLowerCase\(\)\) \|\| keep\.has\(c\)\) continue;/);
-  assert.match(exp, /const clone = sc\.getSvgContent\(\)\.cloneNode\(true\);/);
+  assert.match(exp, /const clone = (?:window\.__visterasSymbolEdit\?\.cloneCommitted\?\.\(\) \|\| )?sc\.getSvgContent\(\)\.cloneNode\(true\);/);
   // PNG = the same SVG drawn through <img>; PDF = svg2pdf of the same SVG.
   assert.match(exp, /img\.src = url;/);
   const pdf = fs.readFileSync(new URL('../js/visteras-export-pdf.js', import.meta.url), 'utf8');

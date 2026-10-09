@@ -31,7 +31,7 @@ test('Export: no popup window — exportHandler / exportedPDF delegate to the ex
 });
 
 test('Export: pipeline — clone, scope viewBox, background inside the SVG, fonts/images inlined, picker before render', () => {
-  assert.match(src, /const clone = sc\.getSvgContent\(\)\.cloneNode\(true\);/);
+  assert.match(src, /const clone = (?:window\.__visterasSymbolEdit\?\.cloneCommitted\?\.\(\) \|\| )?sc\.getSvgContent\(\)\.cloneNode\(true\);/);
   assert.match(src, /clone\.setAttribute\('viewBox', `\$\{rect\.x\} \$\{rect\.y\} \$\{rect\.width\} \$\{rect\.height\}`\);/);
   assert.match(src, /clone\.insertBefore\(bg, first \|\| null\);/, 'background is the first painted child, not a canvas fill');
   assert.match(src, /window\.__visterasEffects\?\.getVisualBounds\?\.\(el\)/, 'selection / full use effect-aware bounds');
