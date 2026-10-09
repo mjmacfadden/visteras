@@ -249,7 +249,7 @@ export function mountAppearance(editor) {
       || document.activeElement?.id === 'vapp_stroke_weight_presets';
     if (empty) {
       pane.innerHTML = `<div class="vapp_empty">Select an object to see its appearance.</div>
-        <p class="vapp_gaps">Gaps vs Illustrator: one Fill and one Stroke (no stacking / reorder); effects are object-level only; no Graphic Styles; arrowheads deferred (see arrowheads-deferred.test.mjs).</p>`;
+        <p class="vapp_gaps">Gaps vs Illustrator: one Fill and one Stroke (no stacking / reorder); effects are object-level only; no Graphic Styles.</p>`;
       return;
     }
     // Don't clobber the weight field while the user is typing in it.
@@ -291,7 +291,7 @@ export function mountAppearance(editor) {
           </div>`;
         }).join('')}
       </div>
-      <p class="vapp_gaps">Gaps vs Illustrator: one Fill/Stroke (no stacking or drag-reorder); object-level effects only; no Graphic Styles; Stroke options reuse the Stroke dock (arrowheads deferred); Inner Shadow shown when present but not under fx Add.</p>`;
+      <p class="vapp_gaps">Gaps vs Illustrator: one Fill/Stroke (no stacking or drag-reorder); object-level effects only; no Graphic Styles; Stroke options (incl. arrowheads) live in the Stroke dock; Inner Shadow shown when present but not under fx Add.</p>`;
     wireWeightControls();
   };
 
