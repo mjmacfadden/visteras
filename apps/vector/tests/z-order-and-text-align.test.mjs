@@ -281,7 +281,9 @@ test('Typography: Standard Left, Center, and Right text alignment buttons replac
   const vectorThemeCss = fs.readFileSync(path.join(vectorRoot, 'css/visteras-theme.css'), 'utf8');
   assert.match(vectorThemeCss, /#tool_text_anchor[\s\S]*?display:\s*none\s*!important/);
   assert.match(vectorThemeCss, /\.visteras_text_align_btn[\s\S]*?width:\s*28px/);
-  assert.match(vectorThemeCss, /\.visteras_text_align_btn\.active[\s\S]*?box-shadow:\s*0 -1px 0 0 #ffffff inset/);
+  // Active look is the shared @visteras/ui icon-button state (accent border), not a white underline.
+  assert.match(vectorThemeCss, /\.visteras_text_align_btn:not\(\.vui-icon-btn\)\.active/);
+  assert.match(fs.readFileSync(new URL('../../../packages/ui/src/ui.css', import.meta.url), 'utf8'), /\.vui-icon-btn\[aria-pressed="?true"?\][\s\S]*?var\(--visteras-accent/);
 
   const bridgeCode = fs.readFileSync(path.join(vectorRoot, 'js/visteras-font-bridge.js'), 'utf8');
   assert.match(bridgeCode, /text_align_\$\{a\}/);

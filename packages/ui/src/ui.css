@@ -151,3 +151,25 @@ a.logo-omarchy-active img {
 img.logo-omarchy-active {
   filter: brightness(0) saturate(100%) invert(32%) sepia(98%) saturate(2250%) hue-rotate(212deg) brightness(98%) contrast(97%) !important;
 }
+
+/* ── Icon button groups (panels / Properties) ──────────────────────────────
+ * One look for every icon toggle/action row: fixed-size cells, left-aligned,
+ * equal gaps, no stretched cells; one active state (accent border, darker
+ * fill — the accent is the app's --visteras-accent). Works on <button> and
+ * on SVG-Edit <se-button> hosts (Vector neutralises their inner box).
+ * !important + the group selector: wins over older per-app button rules.
+ */
+.vui-icon-group { display: flex !important; flex-wrap: wrap !important; justify-content: flex-start !important; align-items: center !important; gap: var(--vui-icon-btn-gap, 2px) !important; box-sizing: border-box !important; }
+.vui-icon-group > .vui-icon-btn { flex: 0 0 var(--vui-icon-btn-width, 28px) !important; width: var(--vui-icon-btn-width, 28px) !important; min-width: 0 !important; height: var(--vui-icon-btn-height, 24px) !important; margin: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; box-sizing: border-box !important; background: #2a2a2a !important; border: 1px solid #3d3d3d !important; border-radius: var(--vui-icon-btn-radius, 3px) !important; color: #cccccc !important; box-shadow: none !important; cursor: pointer !important; transition: background-color 0.12s, border-color 0.12s, color 0.12s !important; }
+.vui-icon-group > .vui-icon-btn svg,
+.vui-icon-group > .vui-icon-btn img { width: var(--vui-icon-btn-icon-size, 16px) !important; height: var(--vui-icon-btn-icon-size, 16px) !important; display: block !important; pointer-events: none !important; }
+.vui-icon-group > .vui-icon-btn:hover { background: #383838 !important; border-color: #555555 !important; color: #ffffff !important; }
+.vui-icon-group > .vui-icon-btn.active,
+.vui-icon-group > .vui-icon-btn[aria-pressed="true"],
+.vui-icon-group > .vui-icon-btn[pressed] { background: #1a1a1a !important; border-color: var(--visteras-accent) !important; color: #ffffff !important; box-shadow: none !important; }
+.vui-icon-group > .vui-icon-btn:disabled,
+.vui-icon-group > .vui-icon-btn[disabled],
+.vui-icon-group > .vui-icon-btn.disabled { opacity: 0.4 !important; cursor: default !important; background: #2a2a2a !important; border-color: #3d3d3d !important; }
+.vui-icon-group > .vui-icon-btn[hidden],
+.vui-icon-group > .vui-icon-btn[style*="display: none"],
+.vui-icon-group > .vui-icon-btn[style*="display:none"] { display: none !important; }

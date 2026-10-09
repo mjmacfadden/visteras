@@ -19,9 +19,9 @@
   <link href="./svgedit.css" rel="stylesheet" media="all">
 
   <!-- Visteras Studio Companion Theme -->
-  <link href="./lib/visteras-ui/tokens.css?v=ui-tokens-1" rel="stylesheet" media="all">
-  <link href="./css/visteras-theme.css?v=ui-tokens-1" rel="stylesheet" media="all">
-  <link href="./lib/visteras-ui/ui.css?v=ui-2" rel="stylesheet" media="all">
+  <link href="./lib/visteras-ui/tokens.css?v=ui-tokens-2" rel="stylesheet" media="all">
+  <link href="./css/visteras-theme.css?v=gravit-5-ui" rel="stylesheet" media="all">
+  <link href="./lib/visteras-ui/ui.css?v=ui-3" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css?v=guides-2" rel="stylesheet" media="all">
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
@@ -325,6 +325,8 @@
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
     import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=gravit-5';
     import { mountWindowMenu } from './js/visteras-window-menu.js?v=gravit-5';
+    import { mountIconButtons } from './js/visteras-icon-buttons.js?v=gravit-5';
+    import { mountTypeCursor } from './js/visteras-type-cursor.js?v=gravit-5';
     import { mountPathOps } from './js/visteras-path-ops.js?v=gravit-4';
     import { mountArtboardExtras } from './js/visteras-artboard-extras.js?v=gap5-paste-1';
     import { mountArrowheads } from './js/visteras-arrowheads.js?v=gravit-4';
@@ -2642,6 +2644,10 @@
     mountTextOutlines(svgEditor);
     // Window menu: every panel, Type ▸ Character / Paragraph, live checkmarks, ⇧F7 / ⇧F8 / ⇧⌘F9
     mountWindowMenu();
+    // One icon-button style (packages/ui .vui-icon-group / .vui-icon-btn) across Properties and panels
+    mountIconButtons();
+    // Type tool: I-beam over type and while editing; Illustrator type cursor elsewhere
+    mountTypeCursor();
 
     // Canvas text editing (#text buffer) state tracking and commit shortcut
     function wireTextInputBuffer() {
