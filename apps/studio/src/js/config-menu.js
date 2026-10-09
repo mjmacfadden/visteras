@@ -244,7 +244,6 @@ const menuDefinition = [
 		children: [
 			{
 				name: 'Information',
-				shortcut: 'I',
 				ellipsis: true,
 				target: 'image/information.information'
 			},

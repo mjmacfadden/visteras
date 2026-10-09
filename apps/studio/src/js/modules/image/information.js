@@ -19,22 +19,6 @@ class Image_information_class {
 		this.POP = new Dialog_class();
 		this.Helper = new Helper_class();
 		this.Tools_settings = new Tools_settings_class();
-
-		this.set_events();
-	}
-
-	set_events() {
-		document.addEventListener('keydown', (event) => {
-			if (!event.key) return;
-			var code = event.key.toLowerCase();
-			if (this.Helper.is_input(event.target))
-				return;
-
-			if (code == "i") {
-				this.information();
-				event.preventDefault();
-			}
-		}, false);
 	}
 
 	information() {

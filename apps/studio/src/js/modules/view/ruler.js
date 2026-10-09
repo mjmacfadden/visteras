@@ -42,16 +42,6 @@ class View_ruler_class {
 			_this.render_ruler();
 		}, false);
 
-		document.addEventListener('keydown', (event) => {
-			if (this.Helper.is_input(event.target))
-				return;
-
-			if (event.code == "KeyU" && event.ctrlKey != true && event.metaKey != true) {
-				_this.ruler();
-				event.preventDefault();
-			}
-		}, false);
-
 		var ruler_top = document.getElementById('ruler_top');
 		var ruler_left = document.getElementById('ruler_left');
 
