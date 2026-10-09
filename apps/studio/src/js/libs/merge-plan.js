@@ -128,3 +128,29 @@ export function merge_visible_plan(layers) {
 		deleteIds: [...leaves.filter((l) => l.id !== into).map((l) => l.id), ...groups.map((g) => g.id)],
 	};
 }
+
+/**
+ * Photoshop Flatten Image planning — pure, no DOM.
+ * Discards all layers and produces a single locked Background layer.
+ */
+export function flatten_plan(layers) {
+	const list = layers || [];
+	if (!list.length) return { ok: false, error: 'No layers to flatten.' };
+	const hasHidden = list.some((l) => l.visible === false);
+	return {
+		ok: true,
+		hasHidden,
+		deleteIds: list.map((l) => l.id),
+		result: {
+			name: 'Background',
+			locked: true,
+			type: 'image',
+			order: 1,
+			parent_id: null,
+			opacity: 100,
+			composition: 'source-over',
+			mask: null,
+			filters: [],
+		},
+	};
+}
