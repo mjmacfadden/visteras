@@ -370,6 +370,12 @@ const menuDefinition = [
 						target: 'layer/adjustment.brightness'
 					},
 					{
+						name: 'Levels',
+						ellipsis: true,
+						shortcut: 'Ctrl + Alt + L',
+						target: 'layer/adjustment.levels'
+					},
+					{
 						name: 'Contrast',
 						ellipsis: true,
 						target: 'layer/adjustment.contrast'

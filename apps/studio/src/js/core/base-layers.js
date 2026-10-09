@@ -23,6 +23,7 @@ import Composite_cache_class from "./renderer/composite-cache.js";
 import { is_group, is_effectively_visible, get_descendant_ids, get_effective_layer_filters } from "./../libs/layer-tree.js";
 import { is_layer_clipped, get_render_composition } from './../libs/layer-clip.js';
 import Vector_renderer from "./vector/vector-renderer.js";
+import { apply_levels } from "./../libs/levels.js";
 
 var instance = null;
 
@@ -1242,7 +1243,12 @@ class Base_layers_class {
 	apply_adjustment_effect(destCtx, srcCanvas, layer, W, H) {
 		const type = layer.adjustment_type ? layer.adjustment_type.toLowerCase().replace(/_/g, '-') : null;
 
-		if (type === 'threshold') {
+		if (type === 'levels') {
+			destCtx.drawImage(srcCanvas, 0, 0);
+			const imgData = destCtx.getImageData(0, 0, W, H);
+			apply_levels(imgData.data, layer.params);
+			destCtx.putImageData(imgData, 0, 0);
+		} else if (type === 'threshold') {
 			destCtx.drawImage(srcCanvas, 0, 0);
 			const imgData = destCtx.getImageData(0, 0, W, H);
 			const buf32 = new Uint32Array(imgData.data.buffer);
