@@ -79,6 +79,7 @@ test('merge.js uses the real compositor, one undo step, and binds Ctrl/⌘E', ()
 	assert.doesNotMatch(src, /globalCompositeOperation = /, 'no raw composite ops');
 	assert.match(src, /new app\.Actions\.Bundle_action\('merge_layers'/);
 	assert.match(src, /event\.code !== 'KeyE'/);
+	assert.match(src, /new app\.Actions\.Update_layer_action\(plan\.into, \{[\s\S]*mask:\s*null,\s*filters:\s*\[\]/);
 	const menu = fs.readFileSync(require.resolve('../src/js/config-menu.js'), 'utf8');
 	assert.match(menu, /name: 'Merge Down',\n\t+shortcut: 'Ctrl \+ E',/);
 });
