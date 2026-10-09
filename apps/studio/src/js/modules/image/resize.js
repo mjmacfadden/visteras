@@ -37,17 +37,8 @@ class Image_resize_class {
 	}
 
 	set_events() {
-		document.addEventListener('keydown', (event) => {
-			var code = event.keyCode;
-			if (this.Helper.is_input(event.target))
-				return;
-
-			if (code == 82 && event.ctrlKey != true && event.metaKey != true) {
-				//R - resize
-				this.resize();
-				event.preventDefault();
-			}
-		}, false);
+		// No hotkey: plain R / Alt+R used to pop this dialog (in Photoshop R is
+		// Rotate View). Image ▸ Resize… stays in the menu.
 	}
 
 	resize() {

@@ -191,7 +191,7 @@ const menuDefinition = [
 			},
 			{
 				name: 'Grid',
-				shortcut: 'G',
+				shortcut: "Ctrl + '",
 				target: 'view/grid.grid'
 			},
 			{
@@ -256,7 +256,6 @@ const menuDefinition = [
 			{
 				name: 'Trim',
 				ellipsis: true,
-				shortcut: 'T',
 				target: 'image/trim.trim'
 			},
 			{
@@ -265,7 +264,6 @@ const menuDefinition = [
 			{
 				name: 'Resize',
 				ellipsis: true,
-				shortcut: 'R',
 				target: 'image/resize.resize'
 			},
 			{

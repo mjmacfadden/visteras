@@ -25,8 +25,10 @@ class View_grid_class {
 			if (this.Helper.is_input(event.target))
 				return;
 
-			if (code == 71 && event.ctrlKey != true && event.metaKey != true) {
-				//G - grid
+			// Photoshop: View ▸ Show ▸ Grid is Ctrl/⌘+' (Alt+G used to toggle it;
+			// plain G is the Gradient tool).
+			if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey
+				&& (event.code === 'Quote' || event.key === "'")) {
 				this.grid({visible: !this.GUI.grid});
 				event.preventDefault();
 			}

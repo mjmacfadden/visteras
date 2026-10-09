@@ -26,19 +26,9 @@ class Image_rotate_class {
 	}
 
 	set_events() {
-		document.addEventListener('keydown', (event) => {
-			if (event.target.id === 'text_tool_keyboard_input')
-				return;
-			var code = event.keyCode;
-			if (this.Helper.is_input(event.target))
-				return;
-
-			if (code == 76) {
-				//L - rotate left
-				this.left();
-				event.preventDefault();
-			}
-		}, false);
+		// No hotkey: Ctrl/⌘+L and Alt+L used to rotate the active layer −90°
+		// (in Photoshop Ctrl+L is Levels; plain L is the Lasso tool).
+		// Image ▸ Rotate… stays in the menu.
 	}
 
 	rotate() {

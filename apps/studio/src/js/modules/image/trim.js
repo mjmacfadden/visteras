@@ -26,17 +26,8 @@ class Image_trim_class {
 	}
 
 	set_events() {
-		document.addEventListener('keydown', (event) => {
-			var code = event.keyCode;
-			if (this.Helper.is_input(event.target))
-				return;
-
-			if (code == 84) {
-				//trim
-				this.trim();
-				event.preventDefault();
-			}
-		}, false);
+		// No hotkey: Alt+T / Ctrl+T used to trim the canvas (Photoshop Ctrl+T is
+		// Free Transform; plain T is the Type tool). Image ▸ Trim… stays in the menu.
 	}
 
 	trim() {
