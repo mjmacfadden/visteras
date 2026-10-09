@@ -34,6 +34,7 @@ class Help_shortcuts_class {
 				{title: "U", value: 'Rectangle / Shape Tool'},
 				{title: "J", value: 'Spot Healing Brush'},
 				{title: "H", value: 'Hand Tool'},
+				{title: "Z", value: 'Zoom Tool'},
 				{title: "O", value: 'Bulge/Pinch Tool'},
 				{title: "A", value: 'Direct Select Tool'},
 				{title: "Paint Bucket", value: 'Same toolbar slot as Gradient (Shift+G to cycle)'},

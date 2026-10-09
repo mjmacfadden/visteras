@@ -71,6 +71,7 @@ class GUI_shortcuts_class {
 			'u': 'rectangle',
 			'j': 'spot_heal',
 			'h': 'pan',
+			'z': 'zoom',
 			'o': 'bulge_pinch',
 			'a': 'direct_select',
 		};
