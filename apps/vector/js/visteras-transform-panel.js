@@ -1,4 +1,5 @@
 import {convertToPixels,convertFromPixels} from './visteras-document-presets.js';
+import {layoutParagraph} from './visteras-text-editing.js';
 export function referencePosition(bounds, reference) {
   return {x:bounds.x+bounds.width*reference.x,y:bounds.y+bounds.height*reference.y};
 }
@@ -7,6 +8,7 @@ export function dimensionScale(bounds, field, value, locked) {
   if(locked) field==='w'?sy=sx:sx=sy;
   return {sx,sy};
 }
+export const isAreaText=el=>el?.tagName?.toLowerCase()==='text'&&Number(el.getAttribute?.('data-text-width'))>0;
 export function mountTransformPanel(editor) {
   const sc=editor.svgCanvas, body=document.getElementById('sec_transform_body');
   let reference={x:0,y:0}, locked=false, pending;
@@ -45,12 +47,19 @@ export function mountTransformPanel(editor) {
     #prop_row_rotate_flip {display:grid!important;grid-template-columns:26px minmax(0,1fr) minmax(0,1fr) 20px;gap:5px;align-items:center}
     #slot_angle {grid-column:2;min-width:0}#slot_flip {grid-column:3;display:flex;justify-content:center;gap:8px}
   `;document.head.append(style);
-  const selected=()=>sc.getSelectedElements().filter(el=>el?.isConnected);
-  const matrix=m=>new DOMMatrix([m.a,m.b,m.c,m.d,m.e,m.f]);
-  const documentMatrix=el=>matrix(sc.getSvgContent().getScreenCTM()).inverse().multiply(matrix(el.getScreenCTM()));
+  const selected=()=>sc.getSelectedElements().filter(el=>el&&el.isConnected!==false);
+  const matrix=m=>(typeof DOMMatrix!=='undefined'?new DOMMatrix([m.a,m.b,m.c,m.d,m.e,m.f]):{a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f});
+  const documentMatrix=el=>{
+    const c=sc.getSvgContent?.(), ctm=c?.getScreenCTM?.(), elCtm=el?.getScreenCTM?.();
+    if(!ctm||!elCtm||typeof DOMMatrix==='undefined') return typeof DOMMatrix!=='undefined'?new DOMMatrix():{a:1,b:0,c:0,d:1,e:0,f:0};
+    return matrix(ctm).inverse().multiply(matrix(elCtm));
+  };
   const bounds=elements=>{
   // Area text reports its frame (data-text-width/height), not its glyphs — Illustrator area type.
-  const frameBBox=el=>{const w=Number(el.getAttribute?.('data-text-width'));return el.tagName==='text'&&w>0?{x:Number(el.getAttribute('x'))||0,y:Number(el.getAttribute('y'))||0,width:w,height:Number(el.getAttribute('data-text-height'))||0}:el.getBBox();};
+  const frameBBox=el=>{const w=Number(el.getAttribute?.('data-text-width'));return el.tagName==='text'&&w>0?{x:Number(el.getAttribute('x'))||0,y:Number(el.getAttribute('y'))||0,width:w,height:Number(el.getAttribute('data-text-height'))||0}:(el.getBBox?.()||{x:0,y:0,width:0,height:0});};
+    if(typeof DOMPoint==='undefined'||typeof DOMMatrix==='undefined'||!sc.getSvgContent?.()?.getScreenCTM){
+      const b=frameBBox(elements[0]||{});return{x:b.x,y:b.y,width:b.width,height:b.height};
+    }
     const points=elements.flatMap(el=>{const b=frameBBox(el),m=documentMatrix(el);return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(m));});
     const x=Math.min(...points.map(p=>p.x)),y=Math.min(...points.map(p=>p.y));return{x,y,width:Math.max(...points.map(p=>p.x))-x,height:Math.max(...points.map(p=>p.y))-y};
   };
@@ -62,7 +71,32 @@ export function mountTransformPanel(editor) {
   function change(key,value){
     const elements=selected(),boards=window.__visterasArtboards,board=boards?.propertyMode()?boards.active():null;if((!elements.length&&!board)||!Number.isFinite(value)){sync();return;}
     if(board)value=convertToPixels(value,window.__visterasDocumentShell.getBaseUnit());
-    const b=board||bounds(elements),p=referencePosition(b,reference);let transform=new DOMMatrix();
+    const b=board||bounds(elements),p=referencePosition(b,reference);
+    if(!board&&elements.length===1&&isAreaText(elements[0])&&(key==='w'||key==='h')){
+      if(value<=0){sync();return;}
+      const text=elements[0];
+      const oldAttrs={};
+      if(locked){
+        const curW=Number(text.getAttribute('data-text-width'))||b.width||1;
+        const curH=Number(text.getAttribute('data-text-height'))||b.height||1;
+        const {sx,sy}=dimensionScale({width:curW,height:curH},key,value,locked);
+        const oldW=text.getAttribute('data-text-width'), oldH=text.getAttribute('data-text-height');
+        oldAttrs['data-text-width']=oldW;
+        oldAttrs['data-text-height']=oldH;
+        text.setAttribute('data-text-width',String(Number((curW*sx).toFixed(3))));
+        text.setAttribute('data-text-height',String(Number((curH*sy).toFixed(3))));
+      } else {
+        const attr=key==='w'?'data-text-width':'data-text-height', old=text.getAttribute(attr);
+        oldAttrs[attr]=old;
+        text.setAttribute(attr,String(value));
+      }
+      (window.__visterasLayoutParagraph||layoutParagraph)(text);
+      sc.addCommandToHistory(new sc.history.ChangeElementCommand(text,oldAttrs,'Resize text box'));
+      sc.call('changed',[text]);
+      sync();
+      return;
+    }
+    let transform=new DOMMatrix();
     if(key==='x'||key==='y')transform=transform.translate(key==='x'?value-p.x:0,key==='y'?value-p.y:0);
     else {if(value<=0||!b.width||!b.height){sync();return;}const {sx,sy}=dimensionScale(b,key,value,locked);transform=transform.translate(p.x,p.y).scale(sx,sy).translate(-p.x,-p.y);}
     if(board){boards.transformBounds(transform,key==='x'||key==='y');sync();return;}
@@ -75,4 +109,5 @@ export function mountTransformPanel(editor) {
   window.addEventListener('visteras:artboard-properties',sync);
   const call=sc.call;sc.call=function(event,...args){const result=call.call(this,event,...args);if(event==='selected'||event==='changed'||event==='sourcechanged')sync();return result;};
   new MutationObserver(records=>{if(records.some(r=>sc.getSvgContent().contains(r.target))&&!pending)pending=requestAnimationFrame(sync);}).observe(sc.getSvgRoot(),{subtree:true,attributes:true,childList:true});sync();
+  return { panel, fields, sync, change };
 }
