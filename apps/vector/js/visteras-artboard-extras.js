@@ -1,10 +1,46 @@
 /**
  * Artboard extras (gravit-gap-4): size presets, Rearrange All, panel up/down,
- * Edit ▸ Paste on All Artboards (⌥⇧⌘V).
+ * Edit ▸ Paste on All Artboards (⌥⇧⌘V): pastes the clipboard on every artboard.
  */
 import { DOCUMENT_PRESETS, convertToPixels } from './visteras-document-presets.js';
 import { artboardState, associatedArtboard, ArtboardCommand } from './visteras-artboard-model.js';
 import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
+
+/** The internal (⌘V) buffer: SVG-Edit element JSON array, or null when empty. */
+export function parseClipboardBuffer(raw) {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) && v.length ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One offset per artboard so the paste keeps the source's position relative
+ * to the artboard it came from (the artboard it overlaps most; else the
+ * active one). Boards are returned in document order.
+ */
+export function pasteOffsets(sourceBounds, boards, activeId = null) {
+  const list = boards || [];
+  const srcId = (sourceBounds && associatedArtboard(sourceBounds, list)) || activeId || list[0]?.id;
+  const source = list.find((b) => b.id === srcId) || list[0] || { x: 0, y: 0 };
+  return { source, offsets: list.map((b) => ({ board: b, dx: b.x - source.x, dy: b.y - source.y })) };
+}
+
+/** Fold every history entry since `pointer` into one batch. */
+export function foldHistorySince(undoMgr, pointer, BatchCommand, label) {
+  if (!undoMgr || !BatchCommand) return false;
+  const end = undoMgr.undoStackPointer;
+  if (end - pointer < 2) return false;
+  const batch = new BatchCommand(label);
+  for (const c of undoMgr.undoStack.slice(pointer, end)) batch.addSubCommand(c);
+  undoMgr.undoStack = undoMgr.undoStack.slice(0, pointer);
+  undoMgr.undoStack.push(batch);
+  undoMgr.undoStackPointer = pointer + 1;
+  return true;
+}
 
 /** Print + social presets for new artboards / Artboard Options. */
 export function artboardSizePresets() {
@@ -307,54 +343,89 @@ export function mountArtboardExtras(editor) {
     };
   }
 
-  function pasteOnAllArtboards() {
+  /**
+   * Illustrator Paste on All Artboards: pastes the CLIPBOARD (what ⌘V would
+   * paste), one copy per artboard at the source's position relative to its
+   * artboard, as one undo step. Internal buffer first (lossless; symbol
+   * instances stay linked), then the system clipboard via the clipboard
+   * bridge (same read/permission path as Edit ▸ Paste). Nothing → no-op.
+   */
+  let pasting = false;
+  async function pasteOnAllArtboards() {
+    if (pasting) return [];
     const a = api();
     const d = doc();
-    if (!a || !d?.artboards?.length) return;
-    const selected = (sc.getSelectedElements?.() || []).filter(Boolean);
-    if (!selected.length) return;
-    const activeBoard = a.active();
-    if (!activeBoard) return;
+    if (!a || !d?.artboards?.length) return [];
+    pasting = true;
+    try {
+      const clipId = typeof sc.getClipboardID === 'function' ? sc.getClipboardID() : 'svgedit_clipboard';
+      let buffer = null;
+      try { buffer = parseClipboardBuffer(sessionStorage.getItem(clipId)); } catch { buffer = null; }
+      if (buffer) return pasteInternalOnAll(d.artboards, a.active());
+      const svgText = await window.__visterasReadSystemSvg?.().catch?.(() => null);
+      if (svgText) return pasteSystemOnAll(d.artboards, a.active(), svgText);
+      return [];
+    } finally {
+      pasting = false;
+    }
+  }
+
+  function boundsOf(els) {
+    try {
+      const b = sc.getStrokedBBox?.(els);
+      if (b && Number.isFinite(b.x)) return b;
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  function finish(p0, created) {
+    if (!created.length) return [];
+    foldHistorySince(sc.undoMgr, p0, sc.history?.BatchCommand, 'Paste on All Artboards');
+    try { sc.clearSelection(); sc.addToSelection(created, true); } catch { /* ignore */ }
+    sc.call?.('changed', created);
+    return created;
+  }
+
+  function pasteInternalOnAll(boards, activeBoard) {
+    const p0 = sc.undoMgr?.undoStackPointer ?? 0;
+    const created = [];
+    let plan = null;
+    for (let i = 0; i < boards.length; i++) {
+      sc.pasteElements('in_place');
+      const els = (sc.getSelectedElements?.() || []).filter(Boolean);
+      if (!els.length) break;
+      if (!plan) plan = pasteOffsets(boundsOf(els), boards, activeBoard?.id);
+      const { dx, dy } = plan.offsets[i];
+      if (dx || dy) sc.moveSelectedElements(els.map(() => dx), els.map(() => dy), true);
+      created.push(...els);
+    }
+    return finish(p0, created);
+  }
+
+  function pasteSystemOnAll(boards, activeBoard, svgText) {
+    const p0 = sc.undoMgr?.undoStackPointer ?? 0;
+    try { sc.importSvgString(svgText); } catch { return []; }
+    if ((sc.undoMgr?.undoStackPointer ?? 0) === p0) return [];
+    const placed = (sc.getSelectedElements?.() || []).filter(Boolean);
+    if (!placed.length) return [];
+    const plan = pasteOffsets(boundsOf(placed), boards, activeBoard?.id);
     const { BatchCommand, InsertElementCommand } = sc.history || {};
     const batch = BatchCommand ? new BatchCommand('Paste on All Artboards') : null;
-    const created = [];
-    for (const board of d.artboards) {
-      if (board.id === activeBoard.id) continue;
-      const dx = board.x - activeBoard.x;
-      const dy = board.y - activeBoard.y;
-      for (const el of selected) {
+    const created = [...placed];
+    plan.offsets.forEach(({ dx, dy }) => {
+      if (!dx && !dy) return;
+      for (const el of placed) {
         const clone = el.cloneNode(true);
-        const ids = new Map();
-        for (const n of [clone, ...clone.querySelectorAll('[id]')]) {
-          if (n.id) {
-            const old = n.id;
-            const id = sc.getNextId();
-            n.id = id;
-            ids.set(old, id);
-          }
-        }
-        for (const n of [clone, ...clone.querySelectorAll('*')]) {
-          for (const attr of [...n.attributes]) {
-            let v = attr.value;
-            for (const [old, id] of ids) {
-              v = v.split(`url(#${old})`).join(`url(#${id})`);
-              if (v === `#${old}`) v = `#${id}`;
-            }
-            if (v !== attr.value) n.setAttribute(attr.name, v);
-          }
-        }
+        for (const n of [clone, ...clone.querySelectorAll('[id]')]) if (n.id) n.id = sc.getNextId();
         const prev = clone.getAttribute('transform') || '';
         clone.setAttribute('transform', `translate(${dx} ${dy})${prev ? ` ${prev}` : ''}`);
         el.parentNode.insertBefore(clone, el.nextSibling);
         if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(clone));
         created.push(clone);
       }
-    }
-    if (created.length && batch) sc.addCommandToHistory?.(batch);
-    if (created.length) {
-      try { sc.clearSelection(); sc.addToSelection(created, true); } catch { /* ignore */ }
-      sc.call?.('changed', created);
-    }
+    });
+    if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
+    return finish(p0, created);
   }
 
   const editList = document.querySelector('#menu_edit .menu_dropdown_list');

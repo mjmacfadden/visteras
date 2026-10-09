@@ -517,6 +517,17 @@ export function installVisterasClipboardBridge(opts = {}) {
 		return importSvg(svgCanvas, svgText);
 	};
 
+	// System-clipboard SVG for Paste on All Artboards (same read/permission
+	// path as Edit ▸ Paste); null when there is nothing importable.
+	window.__visterasReadSystemSvg = async () => {
+		try {
+			const svgText = await readSvgFromEvent(null);
+			return svgText || window.__visterasLastVectorClip || null;
+		} catch (err) {
+			return window.__visterasLastVectorClip || null;
+		}
+	};
+
 	console.info('Visteras Vector clipboard bridge installed');
 }
 
