@@ -481,6 +481,7 @@ const menuDefinition = [
 			},
 			{
 				name: 'Merge Down',
+				shortcut: 'Ctrl + E',
 				target: 'layer/merge.merge'
 			},
 			{
