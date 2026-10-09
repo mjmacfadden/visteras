@@ -1,4 +1,5 @@
 import config from "../config";
+import { RESERVED_LETTERS } from "./browser_shortcuts.js";
 
 /**
  * various helpers
@@ -603,6 +604,22 @@ class Helper_class {
 				return isMac ? ('Cmd + 0') : ('Ctrl + 0');
 			}
 			return isMac ? ('Ctrl + Cmd + ' + d) : ('Ctrl + Alt + ' + d);
+		}
+		// Browser-safe reserved letters (e.g. ⌘L address bar, ⌘M minimize, ⌘T tab, etc.)
+		const letterAlt = String(shortcut).match(/^\s*Ctrl\s*\+\s*Alt\s*\+\s*([a-z])\s*$/i);
+		if (letterAlt && RESERVED_LETTERS.has(letterAlt[1].toUpperCase())) {
+			const l = letterAlt[1].toUpperCase();
+			return isMac ? ('Ctrl + Cmd + ' + l) : ('Ctrl + Alt + ' + l);
+		}
+		const letterAltShift = String(shortcut).match(/^\s*Ctrl\s*\+\s*Alt\s*\+\s*Shift\s*\+\s*([a-z])\s*$/i);
+		if (letterAltShift && RESERVED_LETTERS.has(letterAltShift[1].toUpperCase())) {
+			const l = letterAltShift[1].toUpperCase();
+			return isMac ? ('Ctrl + Shift + Cmd + ' + l) : ('Ctrl + Alt + Shift + ' + l);
+		}
+		const letterBare = String(shortcut).match(/^\s*Ctrl\s*\+\s*([a-z])\s*$/i);
+		if (letterBare && RESERVED_LETTERS.has(letterBare[1].toUpperCase())) {
+			const l = letterBare[1].toUpperCase();
+			return isMac ? ('Ctrl + Cmd + ' + l) : ('Ctrl + Alt + ' + l);
 		}
 		if (isMac) {
 			return shortcut.replace(/\bCtrl\b/gi, 'Cmd').replace(/\bAlt\b/gi, 'Option');
