@@ -84,12 +84,12 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Quick Save',
+				name: 'Snapshot to Browser',
 				shortcut: 'F9',
 				target: 'file/quicksave.quicksave'
 			},
 			{
-				name: 'Quick Load',
+				name: 'Restore Browser Snapshot',
 				shortcut: 'F10',
 				target: 'file/quickload.quickload'
 			}
@@ -137,7 +137,7 @@ const menuDefinition = [
 				target: 'edit/copy.copy_to_clipboard'
 			},
 			{
-				name: 'Copy Selection to Layer',
+				name: 'Layer via Copy',
 				shortcut: 'Ctrl + J',
 				target: 'layer/new.new_selection'
 			},
@@ -262,7 +262,7 @@ const menuDefinition = [
 				divider: true
 			},
 			{
-				name: 'Resize',
+				name: 'Image Size',
 				ellipsis: true,
 				target: 'image/resize.resize'
 			},
@@ -410,7 +410,6 @@ const menuDefinition = [
 			},
 			{
 				name: 'Duplicate',
-				shortcut: 'Ctrl + J',
 				target: 'layer/duplicate.duplicate'
 			},
 			{
@@ -667,7 +666,7 @@ const menuDefinition = [
 				]
 			},
 			{
-				name: 'Black and White',
+				name: 'Threshold (B/W)',
 				ellipsis: true,
 				target: 'effects/black_and_white.black_and_white'
 			},
@@ -788,7 +787,7 @@ const menuDefinition = [
 				target: 'tools/keypoints.keypoints'
 			},
 			{
-				name: 'Content Fill',
+				name: 'Extend Canvas Fill',
 				ellipsis: true,
 				target: 'tools/content_fill.content_fill'
 			},

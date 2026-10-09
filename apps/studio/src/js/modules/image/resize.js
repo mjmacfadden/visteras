@@ -51,7 +51,7 @@ class Image_resize_class {
 		var height = this.Helper.get_user_unit(config.HEIGHT, units, resolution);
 
 		var settings = {
-			title: 'Resize',
+			title: 'Image Size',
 			params: [
 				{name: "width", title: "Width:", value: '', placeholder: width, comment: units},
 				{name: "height", title: "Height:", value: '', placeholder: height, comment: units},

@@ -25,7 +25,7 @@ test('menu labels match: no R / T / G single-key labels for Resize, Trim, Grid',
 	const menu = read('config-menu.js');
 	assert.match(menu, /name: 'Grid',\n\t+shortcut: "Ctrl \+ '",/);
 	assert.doesNotMatch(menu, /name: 'Trim',\n\t+ellipsis: true,\n\t+shortcut:/);
-	assert.doesNotMatch(menu, /name: 'Resize',\n\t+ellipsis: true,\n\t+shortcut:/);
+	assert.doesNotMatch(menu, /name: 'Image Size',\n\t+ellipsis: true,\n\t+shortcut:/);
 });
 
 test('no Studio keydown handler binds a Chrome-reserved chord (Ctrl/⌘+T/N/W, ⌥⌘I/J/C)', () => {

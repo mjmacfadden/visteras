@@ -69,7 +69,8 @@ class GUI_shortcuts_class {
 			'm': 'selection',
 			'w': 'magic_wand',
 			'u': 'rectangle',
-			'j': 'desaturate',
+			'j': 'spot_heal',
+			'h': 'pan',
 			'o': 'bulge_pinch',
 			'a': 'direct_select',
 		};

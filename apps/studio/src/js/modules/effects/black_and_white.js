@@ -30,7 +30,7 @@ class Effects_backAndWhite_class {
 		var default_level = this.thresholding(ctx, canvas.width, canvas.height, true);
 
 		var settings = {
-			title: 'Black and White',
+			title: 'Threshold (B/W)',
 			preview: true,
 			effects: true,
 			params: [
