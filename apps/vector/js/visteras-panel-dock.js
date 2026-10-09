@@ -21,17 +21,19 @@ const DEFAULT_WIDTH = 240;
 
 /**
  * Illustrator panel shortcuts → panel id. Shift is significant:
- * F6 Color · ⇧F6 Appearance · F7 Layers · ⌘F10 Stroke · ⇧⌘F10 Transparency · ⌘F9 Gradient.
+ * F6 Color · ⇧F6 Appearance · F7 Layers · ⌘F10 Stroke · ⇧⌘F10 Transparency · ⌘F9 Gradient · ⇧⌘F11 Symbols.
  */
 export function panelForShortcut(e) {
   const key = e?.key === 'F6' || e?.code === 'F6' ? 'F6' : e?.key === 'F7' || e?.code === 'F7' ? 'F7'
-    : e?.key === 'F9' || e?.code === 'F9' ? 'F9' : e?.key === 'F10' || e?.code === 'F10' ? 'F10' : null;
+    : e?.key === 'F9' || e?.code === 'F9' ? 'F9' : e?.key === 'F10' || e?.code === 'F10' ? 'F10'
+    : e?.key === 'F11' || e?.code === 'F11' ? 'F11' : null;
   if (!key || e.altKey) return null;
   const cmd = !!(e.metaKey || e.ctrlKey), shift = !!e.shiftKey;
   if (key === 'F6' && !cmd) return shift ? 'appearance' : 'color';
   if (key === 'F7' && !cmd && !shift) return 'layers';
   if (key === 'F10' && cmd) return shift ? 'transparency' : 'stroke';
   if (key === 'F9' && cmd && !shift) return 'gradient';
+  if (key === 'F11' && cmd && shift) return 'symbols';
   return null;
 }
 
@@ -170,6 +172,16 @@ export function mountVisterasPanelDock({ svgEditor }) {
         <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
           <circle cx="7.5" cy="10" r="5.2" fill="none" stroke="currentColor" stroke-width="1.3"/>
           <circle cx="12.5" cy="10" r="5.2" opacity="0.55"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Group 4c: Symbols (⇧⌘F11) -->
+    <div class="vdock-group" id="vdock_grp_symbols">
+      <button type="button" class="vdock-icon" data-panel="symbols" title="Symbols (⇧⌘F11 / Shift+Ctrl+F11)" aria-label="Symbols (⇧⌘F11 / Shift+Ctrl+F11)" aria-expanded="false" aria-controls="vdock_flyout">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <rect x="3.5" y="3.5" width="10" height="10" rx="1.5"/>
+          <rect x="10.5" y="10.5" width="10" height="10" rx="1.5" stroke-dasharray="2.5 2"/>
         </svg>
       </button>
     </div>
@@ -467,6 +479,12 @@ export function mountVisterasPanelDock({ svgEditor }) {
   appearancePane.className = 'vdock-panel-pane';
   flyoutBody.appendChild(appearancePane);
 
+  // (E1) Symbols Panel (#vdock_symbols_panel) — filled by js/visteras-symbols.js
+  const symbolsPane = document.createElement('div');
+  symbolsPane.id = 'vdock_symbols_panel';
+  symbolsPane.className = 'vdock-panel-pane';
+  flyoutBody.appendChild(symbolsPane);
+
   // (E2) Transparency Panel (#vdock_transparency_panel) — filled by js/visteras-transparency.js
   const transparencyPane = document.createElement('div');
   transparencyPane.id = 'vdock_transparency_panel';
@@ -518,13 +536,14 @@ export function mountVisterasPanelDock({ svgEditor }) {
       effects: 'Effects',
       appearance: 'Appearance',
       transparency: 'Transparency',
+      symbols: 'Symbols',
       layers: 'Layers',
     };
     slot.innerHTML = `<span class="vdock-flyout-title">${titles[panelId] || panelId}</span>`;
   }
 
   function updateWindowMenuCheckmarks() {
-    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers', 'artboards'];
+    const panels = ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'symbols', 'layers', 'artboards'];
     panels.forEach(p => {
       const item = document.getElementById(`action_window_${p}`);
       if (item) {
@@ -597,6 +616,7 @@ export function mountVisterasPanelDock({ svgEditor }) {
       effects: effectsPane,
       appearance: appearancePane,
       transparency: transparencyPane,
+      symbols: symbolsPane,
       layers: layerPanel,
     };
 

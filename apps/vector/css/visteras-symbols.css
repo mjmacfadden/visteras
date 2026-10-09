@@ -1,0 +1,46 @@
+/* Visteras Vector — Symbols panel + dialogs (gravit-gap-5). Orange accent. */
+#vdock_symbols_panel { padding: 6px 8px; font-size: 12px; color: #ddd; }
+.vsym_toolbar, .vsym_footer { display: flex; align-items: center; gap: 4px; }
+.vsym_footer { border-top: 1px solid #3a3a3a; padding-top: 6px; margin-top: 6px; justify-content: flex-end; }
+.vsym_spacer { flex: 1; }
+.vsym_btn { background: transparent; border: 1px solid transparent; color: #ccc; border-radius: 4px; min-width: 26px; height: 24px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.vsym_btn:hover:not(:disabled) { border-color: #555; color: #fff; }
+.vsym_btn:disabled { opacity: .4; cursor: default; }
+.vsym_list { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; max-height: 320px; overflow: auto; padding: 4px 0; }
+.vsym_list.vsym_list_rows { grid-template-columns: 1fr; }
+.vsym_item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; background: #2b2b2b; border: 1px solid #3a3a3a; border-radius: 4px; color: #ddd; cursor: pointer; }
+.vsym_list_rows .vsym_item { flex-direction: row; justify-content: flex-start; gap: 8px; }
+.vsym_item[aria-selected="true"] { border-color: var(--visteras-accent, #fa7c1b); box-shadow: 0 0 0 1px var(--visteras-accent, #fa7c1b) inset; }
+.vsym_thumb { background: #fff; border-radius: 2px; }
+.vsym_name { font-size: 10px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vsym_list:not(.vsym_list_rows) .vsym_name { display: none; }
+.vsym_badge { position: absolute; top: 1px; right: 3px; font-size: 10px; color: var(--visteras-accent, #fa7c1b); font-weight: 700; }
+.vsym_empty { grid-column: 1 / -1; color: #999; padding: 12px 4px; text-align: center; }
+.vsym_menu { position: absolute; right: 8px; z-index: 20; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; display: flex; flex-direction: column; padding: 4px 0; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.vsym_menu[hidden] { display: none; }
+.vsym_menu button { background: none; border: 0; color: #ddd; text-align: left; padding: 5px 14px; font-size: 12px; cursor: pointer; }
+.vsym_menu button:hover { background: var(--visteras-accent, #fa7c1b); color: #111; }
+.vsym_overlay { position: fixed; inset: 0; z-index: 6000; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; }
+.vsym_dialog { width: 340px; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; color: #ddd; padding: 14px 16px; font-size: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+.vsym_dlg_title { font-size: 13px; margin: 0 0 10px; font-weight: 600; }
+.vsym_field { display: flex; align-items: center; gap: 8px; margin: 8px 0; border: 0; padding: 0; }
+.vsym_field > span, .vsym_field legend { min-width: 92px; color: #bbb; }
+.vsym_field input[type="text"], .vsym_field select { flex: 1; background: #1f1f1f; border: 1px solid #555; color: #eee; border-radius: 3px; padding: 3px 6px; }
+.vsym_radio { flex-direction: column; align-items: flex-start; }
+.vsym_reg_grid { display: grid; grid-template-columns: repeat(3, 14px); gap: 4px; }
+.vsym_reg { width: 14px; height: 14px; padding: 0; border: 1px solid #777; background: #1f1f1f; border-radius: 2px; cursor: pointer; }
+.vsym_reg.active { background: var(--visteras-accent, #fa7c1b); border-color: var(--visteras-accent, #fa7c1b); }
+.vsym_dlg_actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+/* Symbol Editing Mode bar (Illustrator gray isolation bar) */
+#vsym_edit_bar { position: absolute; left: 0; right: 0; top: 0; z-index: 30; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #5a5a5a; color: #f2f2f2; font-size: 12px; border-bottom: 1px solid #444; }
+#vsym_edit_bar button { background: none; border: 0; color: #fff; cursor: pointer; font-size: 13px; padding: 0 4px; }
+#vsym_edit_bar button:hover { color: var(--visteras-accent, #fa7c1b); }
+
+/* Break Link & Continue toast (path-op guard) */
+.vsym_guard_toast {
+  position: fixed; left: 50%; bottom: 48px; transform: translateX(-50%); z-index: 100000;
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px;
+  background: var(--vui-bg-elevated, #2b2b2b); color: var(--vui-fg, #eee);
+  border: 1px solid var(--accent, #fa7c1b); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.35); font-size: 12px;
+}
+.vsym_guard_toast .vui-btn { font-size: 12px; }

@@ -43,7 +43,7 @@ test('HTML: Window menu contains all dock panels, properties, and pathfinder wit
   assert.match(content, /id="action_window_gradient"[^>]*>Gradient\s+<span class="menu_dropdown_shortcut">⌘F9<\/span>/);
   assert.match(content, /id="action_window_layers"[^>]*>Layers\s+<span class="menu_dropdown_shortcut">F7<\/span>/);
   assert.match(content, /id="action_window_properties"[^>]*>Properties<\/div>/);
-  assert.match(content, /id="action_window_pathfinder"[^>]*>Pathfinder<\/div>/);
+  assert.match(content, /id="action_window_pathfinder"[^>]*>Pathfinder\s+<span class="menu_dropdown_shortcut">⇧⌘F9<\/span>/);
 });
 
 test('HTML: Window menu items wire to __visterasDock API', () => {
@@ -513,7 +513,7 @@ test('Panel Dock: mounts #vdock strip and #vdock_flyout with the shared panel gr
   // Verify every dock panel icon in the strip
   const icons = vdock.querySelectorAll('.vdock-icon');
   const panels = icons.map(i => i.dataset.panel);
-  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'layers']);
+  assert.deepEqual(panels, ['color', 'swatches', 'stroke', 'gradient', 'effects', 'appearance', 'transparency', 'symbols', 'layers']);
 
   // Verify flyout exists
   const flyout = env.doc.getElementById('vdock_flyout');

@@ -35,4 +35,11 @@
   --vui-tab-zoom-font-size: 10px;
   --vui-new-tab-size: 28px;
   --vui-new-tab-font-size: 16px;
+
+  /* Icon buttons in panels (.vui-icon-group / .vui-icon-btn in ui.css) */
+  --vui-icon-btn-width: 28px;
+  --vui-icon-btn-height: 24px;
+  --vui-icon-btn-gap: 2px;
+  --vui-icon-btn-radius: 3px;
+  --vui-icon-btn-icon-size: 16px;
 }

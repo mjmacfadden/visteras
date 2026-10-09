@@ -386,7 +386,7 @@ export function migrateLegacyBlur(content) {
   const done = [];
   if (!content) return done;
   for (const el of content.querySelectorAll('[filter]')) {
-    if (el.closest('defs') || el.hasAttribute(FX_ATTR) || !el.id) continue;
+    if ((el.closest('defs') && !el.closest('symbol')) || el.hasAttribute(FX_ATTR) || !el.id) continue;
     const id = referencedFilterId(el);
     if (!id || id.startsWith(FX_PREFIX)) continue;
     const f = el.ownerDocument.getElementById(id);
@@ -408,7 +408,7 @@ export function syncAllFx(content, defs) {
   if (!content || !defs) return;
   const keep = new Set();
   for (const el of content.querySelectorAll(`[${FX_ATTR}]`)) {
-    if (el.closest('defs')) continue;
+    if (el.closest('defs') && !el.closest('symbol')) continue;
     const f = syncElementFx(el, defs);
     if (f) keep.add(f.id);
   }

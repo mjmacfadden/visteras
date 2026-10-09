@@ -820,7 +820,7 @@ html, body {
   display: none !important;
 }
 
-.prop_row {
+.prop_row:not(.vui-icon-group) {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -865,7 +865,7 @@ html, body {
   box-sizing: border-box !important;
 }
 
-.prop_actions_flow se-button {
+.prop_actions_flow se-button:not(.vui-icon-btn) {
   flex: 0 0 calc(25% - 3px) !important;
   min-width: 28px !important;
   height: 24px !important;
@@ -891,7 +891,7 @@ html, body {
   justify-content: flex-start !important;
 }
 
-#properties_panel se-button {
+#properties_panel se-button:not(.vui-icon-btn) {
   background: #333333 !important;
   border: 1px solid #444444 !important;
   border-radius: 2px !important;
@@ -905,14 +905,14 @@ html, body {
   box-sizing: border-box !important;
 }
 
-#properties_panel se-button:hover {
+#properties_panel se-button:not(.vui-icon-btn):hover {
   background: #3d3d3d !important;
   border-color: #555555 !important;
 }
 
 /* Type-style buttons: Studio-parity styling (dark grey, 1px border, white bottom bar when active) */
-#slot_text_styles se-button,
-#properties_panel #slot_text_styles se-button {
+#slot_text_styles se-button:not(.vui-icon-btn),
+#properties_panel #slot_text_styles se-button:not(.vui-icon-btn) {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -920,9 +920,9 @@ html, body {
   margin: 0 !important;
 }
 
-#slot_text_styles se-button:hover,
-#properties_panel #slot_text_styles se-button:hover,
-#properties_panel #slot_text_styles se-button[pressed] {
+#slot_text_styles se-button:not(.vui-icon-btn):hover,
+#properties_panel #slot_text_styles se-button:not(.vui-icon-btn):hover,
+#properties_panel #slot_text_styles se-button:not(.vui-icon-btn)[pressed] {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -1809,7 +1809,7 @@ body.pan-dragging #svgcontent *,
   gap: 2px !important;
 }
 
-.visteras_text_align_btn {
+.visteras_text_align_btn:not(.vui-icon-btn) {
   width: 28px !important;
   height: 24px !important;
   display: flex !important;
@@ -1826,13 +1826,13 @@ body.pan-dragging #svgcontent *,
   transition: background-color 0.12s, color 0.12s !important;
 }
 
-.visteras_text_align_btn:hover {
+.visteras_text_align_btn:not(.vui-icon-btn):hover {
   background: #383838 !important;
   color: #ffffff !important;
 }
 
-.visteras_text_align_btn.active,
-.visteras_text_align_btn[aria-pressed="true"] {
+.visteras_text_align_btn:not(.vui-icon-btn).active,
+.visteras_text_align_btn:not(.vui-icon-btn)[aria-pressed="true"] {
   background: #1e1e1e !important;
   color: #ffffff !important;
   box-shadow: 0 -1px 0 0 #ffffff inset !important;
@@ -1859,3 +1859,10 @@ body.pan-dragging #svgcontent *,
 #workarea.wireframe #visteras-artboard-backgrounds text {
   fill: #000000 !important;
 }
+
+
+/* Properties ▸ Typography / Paragraph panel: labels left, fields on one tidy 2-column grid. */
+#sec_typography_body .prop_row[style*="flex-direction:column"] { align-items: flex-start !important; }
+.prop_row.vpara_row { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 4px 6px !important; align-items: center !important; }
+.prop_row.vpara_row > .vpara_field { min-width: 0; }
+#sec_typography_body .prop_row:has(> #slot_word_spacing) { justify-content: flex-start !important; }

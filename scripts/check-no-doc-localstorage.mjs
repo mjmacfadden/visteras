@@ -71,6 +71,8 @@ export const ALLOWLIST = [
   { file: 'apps/vector/js/visteras-gradient.js', key: 'GRADIENT_LAST_KEY', reason: "last-used gradient default ('visteras-vector-gradient-last')" },
   { file: 'apps/vector/js/visteras-gradient.js', key: 'GRADIENT_ANNOTATOR_KEY', reason: "View ▸ Show Gradient Annotator on/off ('visteras-vector-gradient-annotator')" },
   { file: 'apps/vector/js/visteras-export.js', key: 'X.SETTINGS_KEY', reason: "remembered File ▸ Export settings ('visteras-vector-export-settings': formats, scales, background, padding — no document content)" },
+  { file: 'apps/vector/js/visteras-symbol-edit.js', key: 'EDIT_ALERT_KEY', reason: "Edit Symbol 'changes affect all instances' alert — Don't Show Again ('visteras-vector-symbol-edit-alert')" },
+  { file: 'apps/vector/js/visteras-symbols.js', key: 'VIEW_KEY', reason: "Symbols panel thumbnail/list view ('visteras-vector-symbols-view'; no document content)" },
   { file: 'apps/vector/js/visteras-grid.js', key: 'GRID_STORAGE_KEY', reason: "View/Preferences Guides & Grid settings ('visteras-vector-grid': show, snap, color, style, spacing, subdivisions — no document content)" },
   { file: 'apps/vector/js/visteras-pen-auto.js', key: 'PEN_PREF_KEY', reason: 'Pen auto add/delete preference' },
   { file: 'apps/vector/js/visteras-pen-tools.js', key: "'visteras_vector_snap_points'", reason: 'snap-to-point toggle' },

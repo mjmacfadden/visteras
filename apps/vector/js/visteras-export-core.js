@@ -140,7 +140,11 @@ export const DEFAULT_ROWS = [
 export const DEFAULT_SETTINGS = Object.freeze({
   v: 1, asFormat: 'png', asPpi: 72, asQuality: 8, asUseArtboard: true, asSelection: false,
   scope: 'artboard', rows: DEFAULT_ROWS, prefix: '', background: 'transparent', bgColor: '#ffffff', padding: 0, subfolders: true,
+  symbols: 'keep',
 });
+
+/** SVG export: symbol instances stay linked (<use>) or expand to groups. */
+export const SYMBOL_EXPORT_MODES = ['keep', 'expand'];
 
 function normRow(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -171,6 +175,7 @@ export function normalizeSettings(raw) {
     bgColor: hex6(s.bgColor, d.bgColor),
     padding: clamp(s.padding, 0, 2000, d.padding),
     subfolders: typeof s.subfolders === 'boolean' ? s.subfolders : d.subfolders,
+    symbols: SYMBOL_EXPORT_MODES.includes(s.symbols) ? s.symbols : d.symbols,
   };
 }
 
