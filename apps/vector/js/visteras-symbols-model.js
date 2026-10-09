@@ -85,6 +85,28 @@ export function writeSymbolMeta(sym, meta) {
   if (meta.rev != null) sym.setAttribute(ATTR.rev, String(meta.rev));
 }
 
+
+/* ── History helpers (SVG-Edit command semantics) ─────────────────────────
+ * RemoveElementCommand(elem, oldNextSibling, oldParent) after removal;
+ * MoveElementCommand(elem, oldNextSibling, oldParent) after the move;
+ * InsertElementCommand(elem) after insertion; ChangeElementCommand(elem, old) after change. */
+function removeWithCmd(H, el) {
+  const parent = el.parentNode, next = el.nextSibling;
+  el.remove();
+  return H?.RemoveElementCommand ? new H.RemoveElementCommand(el, next, parent) : null;
+}
+function moveWithCmd(H, el, newParent, ref = null) {
+  const oldParent = el.parentNode, oldNext = el.nextSibling;
+  newParent.insertBefore(el, ref);
+  if (H?.MoveElementCommand) return new H.MoveElementCommand(el, oldNext, oldParent);
+  return null;
+}
+function insertWithCmd(H, el, parent, ref = null) {
+  parent.insertBefore(el, ref);
+  return H?.InsertElementCommand ? new H.InsertElementCommand(el) : null;
+}
+const add = (batch, cmd) => { if (batch && cmd) batch.addSubCommand(cmd); };
+
 /** Registration point of a bbox as document-space (x,y). Default center. */
 export function registrationPoint(bbox, reg = REG_DEFAULT) {
   const { x, y, width: w, height: h } = bbox;
@@ -167,21 +189,29 @@ export function wouldCreateCycle(content, symbolId, elements) {
   return false;
 }
 
-/** Shift every element's translate (or append one) by (dx,dy). */
+/**
+ * Move an element by (dx,dy) in its parent's space. Untransformed rect/image and
+ * circle/ellipse shift their x/y (cx/cy) so geometry stays clean; everything else
+ * gets translate(dx dy) prepended to its transform.
+ */
 export function shiftElement(el, dx, dy) {
   const t = el.getAttribute('transform');
-  const tr = parseTranslate(t);
-  const rest = t ? t.replace(/translate\([^)]*\)|matrix\([^)]*\)/, '').trim() : '';
-  const next = translateString(tr.x + dx, tr.y + dy) + (rest ? ` ${rest}` : '');
-  el.setAttribute('transform', next.trim());
-  // Also shift x/y for shapes that use them without transform.
-  for (const axis of ['x', 'y', 'cx', 'cy']) {
-    if (!el.hasAttribute(axis)) continue;
-    const v = Number(el.getAttribute(axis));
-    if (!Number.isFinite(v)) continue;
-    el.setAttribute(axis, String(v + (axis === 'x' || axis === 'cx' ? dx : dy)));
+  const tag = el.localName;
+  const num = (k) => Number(el.getAttribute(k));
+  if (!t && (tag === 'rect' || tag === 'image') && Number.isFinite(num('x') || 0) && Number.isFinite(num('y') || 0)) {
+    el.setAttribute('x', String(r6((num('x') || 0) + dx)));
+    el.setAttribute('y', String(r6((num('y') || 0) + dy)));
+    return;
   }
+  if (!t && (tag === 'circle' || tag === 'ellipse')) {
+    el.setAttribute('cx', String(r6((num('cx') || 0) + dx)));
+    el.setAttribute('cy', String(r6((num('cy') || 0) + dy)));
+    return;
+  }
+  el.setAttribute('transform', `${translateString(dx, dy)}${t ? ` ${t}` : ''}`);
 }
+
+const r6 = (n) => Math.round(n * 1e6) / 1e6;
 
 /**
  * Pure create: given a list of elements (already detached or still in place),
@@ -219,6 +249,23 @@ export function planNewSymbol(elements, {
   };
 }
 
+
+function sortByDocumentOrder(els) {
+  return [...els].sort((a, b) => {
+    const pos = a.compareDocumentPosition?.(b) || 0;
+    if (pos & 4) return -1; // b follows a
+    if (pos & 2) return 1;
+    return 0;
+  });
+}
+function attrsSnapshot(el) {
+  return {
+    transform: el.getAttribute('transform'),
+    x: el.getAttribute('x'), y: el.getAttribute('y'),
+    cx: el.getAttribute('cx'), cy: el.getAttribute('cy'),
+  };
+}
+
 /**
  * Apply New Symbol on a live svgCanvas. One BatchCommand.
  * Returns { symbol, use } or { error }.
@@ -248,41 +295,29 @@ export function createSymbol(sc, elements, options = {}) {
   if (plan.error) return plan;
 
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand, RemoveElementCommand, ChangeElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('New Symbol') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand('New Symbol') : null;
   const id = sc.getNextId?.() || `symbol_${plan.meta.uid.slice(0, 8)}`;
   const sym = content.ownerDocument.createElementNS(NS, 'symbol');
   sym.id = id;
   writeSymbolMeta(sym, plan.meta);
 
-  // Move in z-order (document order = bottom→top; keep as-is).
-  const sorted = [...els].sort((a, b) => {
-    const pos = a.compareDocumentPosition?.(b);
-    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  });
-
-  // Anchor: where the topmost element lived (same parent, after last).
+  // Keep z-order: document order = bottom → top.
+  const sorted = sortByDocumentOrder(els);
   const top = sorted[sorted.length - 1];
   const parent = top.parentNode;
-  const next = top.nextSibling;
+  // Anchor for the instance: the first following sibling that is not moving.
+  let anchorNext = top.nextSibling;
+  while (anchorNext && sorted.includes(anchorNext)) anchorNext = anchorNext.nextSibling;
 
+  // Insert the (empty) symbol first so moves land in a live node.
+  add(batch, insertWithCmd(H, sym, defs, null));
   for (const el of sorted) {
-    if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(el));
-    // Bake a translate into symbol space. Prefer shifting via transform; also
-    // shift x/y so primitives without a transform still land correctly.
-    const before = {
-      transform: el.getAttribute('transform'),
-      x: el.getAttribute('x'), y: el.getAttribute('y'),
-      cx: el.getAttribute('cx'), cy: el.getAttribute('cy'),
-    };
+    const before = attrsSnapshot(el);
     shiftElement(el, plan.offset.dx, plan.offset.dy);
-    if (batch && ChangeElementCommand) batch.addSubCommand(new ChangeElementCommand(el, before));
-    sym.appendChild(el);
+    add(batch, H.ChangeElementCommand ? new H.ChangeElementCommand(el, before) : null);
+    add(batch, moveWithCmd(H, el, sym, null));
   }
-  defs.appendChild(sym);
-  if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(sym));
 
   const use = content.ownerDocument.createElementNS(NS, 'use');
   use.id = sc.getNextId?.() || `use_${id}`;
@@ -290,8 +325,7 @@ export function createSymbol(sc, elements, options = {}) {
   use.setAttribute(ATTR.instance, '1');
   use.setAttribute('aria-label', plan.meta.name);
   use.setAttribute('transform', plan.useTransform);
-  if (next) parent.insertBefore(use, next); else parent.appendChild(use);
-  if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(use));
+  add(batch, insertWithCmd(H, use, parent, anchorNext && anchorNext.parentNode === parent ? anchorNext : null));
 
   if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   try {
@@ -315,19 +349,16 @@ export function placeInstance(sc, symbol, { x = 0, y = 0, parent = null } = {}) 
   if (!layer) return { error: 'No layer' };
   const meta = readSymbolMeta(symbol);
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('Place Symbol') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand('Place Symbol') : null;
   const use = content.ownerDocument.createElementNS(NS, 'use');
   use.id = sc.getNextId?.() || `use_${symbol.id}`;
   use.setAttribute('href', `#${symbol.id}`);
   use.setAttribute(ATTR.instance, '1');
   use.setAttribute('aria-label', meta.name);
   use.setAttribute('transform', translateString(x, y));
-  layer.appendChild(use);
-  if (batch && InsertElementCommand) {
-    batch.addSubCommand(new InsertElementCommand(use));
-    sc.addCommandToHistory(batch);
-  }
+  add(batch, insertWithCmd(H, use, layer, null));
+  if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   try {
     sc.clearSelection?.();
     sc.addToSelection?.([use], true);
@@ -341,15 +372,15 @@ export function placeInstance(sc, symbol, { x = 0, y = 0, parent = null } = {}) 
  * Break Link: expand one instance into a <g> with the full use→content matrix.
  * Keeps the symbol in the panel. One BatchCommand. Does NOT further ungroup.
  */
-export function breakLinkToSymbol(sc, use) {
+export function breakLinkToSymbol(sc, use, { batch: outer = null, select = true } = {}) {
   if (!use || use.localName !== 'use') return { error: 'Not an instance' };
   const content = sc.getSvgContent?.();
   const sid = symbolIdOfUse(use);
   const sym = sid && (content.ownerDocument.getElementById(sid) || content.querySelector(`#${CSS.escape?.(sid) || sid}`));
   if (!sym) return { error: 'Symbol not found' };
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand, RemoveElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('Break Link to Symbol') : null;
+  const H = sc.history || {};
+  const batch = outer || (H.BatchCommand ? new H.BatchCommand('Break Link to Symbol') : null);
 
   const g = content.ownerDocument.createElementNS(NS, 'g');
   g.id = sc.getNextId?.() || `g_${use.id}`;
@@ -371,19 +402,40 @@ export function breakLinkToSymbol(sc, use) {
 
   const parent = use.parentNode;
   const next = use.nextSibling;
-  if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(use));
-  use.remove();
-  if (next) parent.insertBefore(g, next); else parent.appendChild(g);
-  if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(g));
+  add(batch, insertWithCmd(H, g, parent, next));
+  add(batch, removeWithCmd(H, use));
   // Intentionally do NOT delete the symbol even if no instances remain.
+  if (!outer && batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
+  if (select) {
+    try {
+      sc.clearSelection?.();
+      sc.addToSelection?.([g], true);
+      sc.call?.('selected', [g]);
+      sc.call?.('changed', [g]);
+    } catch { /* ignore */ }
+  }
+  return { group: g, symbol: sym };
+}
+
+/** Break Link on several instances as ONE history step. */
+export function breakLinks(sc, uses) {
+  const list = (uses || []).filter((u) => u?.localName === 'use');
+  if (!list.length) return { error: 'No instances selected' };
+  const { BatchCommand } = sc.history || {};
+  const batch = BatchCommand ? new BatchCommand('Break Link to Symbol') : null;
+  const groups = [];
+  for (const u of list) {
+    const r = breakLinkToSymbol(sc, u, { batch, select: false });
+    if (r.group) groups.push(r.group);
+  }
   if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   try {
     sc.clearSelection?.();
-    sc.addToSelection?.([g], true);
-    sc.call?.('selected', [g]);
-    sc.call?.('changed', [g]);
+    if (groups.length) sc.addToSelection?.(groups, true);
+    sc.call?.('selected', groups);
+    sc.call?.('changed', groups);
   } catch { /* ignore */ }
-  return { group: g, symbol: sym };
+  return { groups };
 }
 
 function uniquifyTree(node, nextId, idMap) {
@@ -415,8 +467,8 @@ export function duplicateSymbol(sc, symbol) {
   const defs = sc.findDefs?.() || content.querySelector('defs');
   const meta = readSymbolMeta(symbol);
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('Duplicate Symbol') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand('Duplicate Symbol') : null;
   const clone = symbol.cloneNode(true);
   const idMap = new Map();
   uniquifyTree(clone, () => sc.getNextId?.() || `svg_${Math.random().toString(36).slice(2, 8)}`, idMap);
@@ -428,11 +480,8 @@ export function duplicateSymbol(sc, symbol) {
     name: `${meta.name} copy`,
     rev: 1,
   });
-  defs.appendChild(clone);
-  if (batch && InsertElementCommand) {
-    batch.addSubCommand(new InsertElementCommand(clone));
-    sc.addCommandToHistory(batch);
-  }
+  add(batch, insertWithCmd(H, clone, defs, symbol.nextSibling));
+  if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   return { symbol: clone };
 }
 
@@ -487,45 +536,42 @@ export function redefineSymbol(sc, symbol, elements, { keepArtwork = false } = {
   if (plan.error) return plan;
 
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand, RemoveElementCommand, ChangeElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('Redefine Symbol') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand('Redefine Symbol') : null;
+  const metaBefore = {};
+  for (const k of [ATTR.rev, ATTR.reg]) metaBefore[k] = symbol.getAttribute(k);
 
   // Remove old children (keep <title>).
-  for (const child of [...symbol.childNodes]) {
-    if (child.nodeType === 1 && child.localName === 'title') continue;
-    if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(child));
-    child.remove();
+  for (const child of [...symbol.children]) {
+    if (child.localName === 'title') continue;
+    add(batch, removeWithCmd(H, child));
   }
 
-  const sorted = [...els].sort((a, b) => {
-    const pos = a.compareDocumentPosition?.(b);
-    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  });
+  const sorted = sortByDocumentOrder(els);
   const top = sorted[sorted.length - 1];
   const parent = top.parentNode;
-  const next = top.nextSibling;
+  let anchorNext = top.nextSibling;
+  while (anchorNext && sorted.includes(anchorNext)) anchorNext = anchorNext.nextSibling;
 
   for (const el of sorted) {
-    const src = keepArtwork ? el.cloneNode(true) : el;
-    if (!keepArtwork) {
-      if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(el));
-    } else if (batch && InsertElementCommand) {
-      // clone is new — recorded as insert into symbol below
+    if (keepArtwork) {
+      const clone = el.cloneNode(true);
+      // Clones need fresh ids inside the symbol.
+      const idMap = new Map();
+      uniquifyTree(clone, () => sc.getNextId?.() || `svg_${Math.random().toString(36).slice(2, 8)}`, idMap);
+      rewriteHrefs(clone, idMap);
+      shiftElement(clone, plan.offset.dx, plan.offset.dy);
+      add(batch, insertWithCmd(H, clone, symbol, null));
+    } else {
+      const before = attrsSnapshot(el);
+      shiftElement(el, plan.offset.dx, plan.offset.dy);
+      add(batch, H.ChangeElementCommand ? new H.ChangeElementCommand(el, before) : null);
+      add(batch, moveWithCmd(H, el, symbol, null));
     }
-    const before = {
-      transform: src.getAttribute('transform'),
-      x: src.getAttribute('x'), y: src.getAttribute('y'),
-      cx: src.getAttribute('cx'), cy: src.getAttribute('cy'),
-    };
-    shiftElement(src, plan.offset.dx, plan.offset.dy);
-    if (batch && ChangeElementCommand) batch.addSubCommand(new ChangeElementCommand(src, before));
-    symbol.appendChild(src);
-    if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(src));
   }
 
-  writeSymbolMeta(symbol, { ...meta, rev: meta.rev + 1, reg: plan.meta.reg });
+  writeSymbolMeta(symbol, { rev: meta.rev + 1, reg: plan.meta.reg });
+  add(batch, H.ChangeElementCommand ? new H.ChangeElementCommand(symbol, metaBefore) : null);
 
   let use = null;
   if (!keepArtwork) {
@@ -535,8 +581,7 @@ export function redefineSymbol(sc, symbol, elements, { keepArtwork = false } = {
     use.setAttribute(ATTR.instance, '1');
     use.setAttribute('aria-label', meta.name);
     use.setAttribute('transform', plan.useTransform);
-    if (next) parent.insertBefore(use, next); else parent.appendChild(use);
-    if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(use));
+    add(batch, insertWithCmd(H, use, parent, anchorNext && anchorNext.parentNode === parent ? anchorNext : null));
   }
 
   if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
@@ -557,22 +602,18 @@ export function deleteSymbol(sc, symbol, mode = 'delete') {
   if (!isPanelSymbol(symbol)) return { error: 'Not a panel symbol' };
   const content = sc.getSvgContent?.();
   const uses = instancesOf(content, symbol.id);
-  const { BatchCommand, RemoveElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand(mode === 'expand' ? 'Expand Instances' : 'Delete Symbol') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand(mode === 'expand' ? 'Expand Instances' : 'Delete Symbol') : null;
 
   if (mode === 'unused' && uses.length) return { error: 'Symbol still has instances' };
 
   if (mode === 'expand') {
     return expandAndDeleteSymbol(sc, symbol);
   } else if (mode === 'delete') {
-    for (const u of uses) {
-      if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(u));
-      u.remove();
-    }
+    for (const u of uses) add(batch, removeWithCmd(H, u));
   }
 
-  if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(symbol));
-  symbol.remove();
+  add(batch, removeWithCmd(H, symbol));
   if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   sc.call?.('changed', []);
   return { ok: true };
@@ -584,8 +625,8 @@ export function expandAndDeleteSymbol(sc, symbol) {
   const content = sc.getSvgContent?.();
   const uses = instancesOf(content, symbol.id);
   const NS = 'http://www.w3.org/2000/svg';
-  const { BatchCommand, InsertElementCommand, RemoveElementCommand } = sc.history || {};
-  const batch = BatchCommand ? new BatchCommand('Expand Instances') : null;
+  const H = sc.history || {};
+  const batch = H.BatchCommand ? new H.BatchCommand('Expand Instances') : null;
   const groups = [];
   for (const use of uses) {
     const g = content.ownerDocument.createElementNS(NS, 'g');
@@ -600,15 +641,11 @@ export function expandAndDeleteSymbol(sc, symbol) {
       g.appendChild(clone);
     }
     rewriteHrefs(g, idMap);
-    const parent = use.parentNode, next = use.nextSibling;
-    if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(use));
-    use.remove();
-    if (next) parent.insertBefore(g, next); else parent.appendChild(g);
-    if (batch && InsertElementCommand) batch.addSubCommand(new InsertElementCommand(g));
+    add(batch, insertWithCmd(H, g, use.parentNode, use.nextSibling));
+    add(batch, removeWithCmd(H, use));
     groups.push(g);
   }
-  if (batch && RemoveElementCommand) batch.addSubCommand(new RemoveElementCommand(symbol));
-  symbol.remove();
+  add(batch, removeWithCmd(H, symbol));
   if (batch && !batch.isEmpty?.()) sc.addCommandToHistory(batch);
   return { groups };
 }

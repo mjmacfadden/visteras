@@ -135,13 +135,23 @@ test('writeSymbolMeta / readSymbolMeta round-trip', () => {
   assert.ok(isPanelSymbol(sym));
 });
 
-test('shiftElement updates translate and x/y', () => {
+test('shiftElement: rect/circle shift geometry once; others prepend a translate', () => {
   const el = new N('rect');
   el.setAttribute('x', '10'); el.setAttribute('y', '20');
   shiftElement(el, -10, -20);
   assert.equal(el.getAttribute('x'), '0');
   assert.equal(el.getAttribute('y'), '0');
-  assert.ok(el.getAttribute('transform').includes('matrix'));
+  assert.equal(el.getAttribute('transform'), null, 'no double offset');
+  const c = new N('circle'); c.setAttribute('cx', '5'); c.setAttribute('cy', '6');
+  shiftElement(c, 1, 2);
+  assert.equal(c.getAttribute('cx'), '6'); assert.equal(c.getAttribute('cy'), '8');
+  const p = new N('path'); p.setAttribute('d', 'M0 0L10 10');
+  shiftElement(p, 3, 4);
+  assert.equal(p.getAttribute('transform'), 'matrix(1 0 0 1 3 4)');
+  const r = new N('rect'); r.setAttribute('x', '1'); r.setAttribute('transform', 'rotate(30)');
+  shiftElement(r, 3, 4);
+  assert.equal(r.getAttribute('x'), '1');
+  assert.equal(r.getAttribute('transform'), 'matrix(1 0 0 1 3 4) rotate(30)');
 });
 
 test('pruneUnusedPanelSymbols + expandInstancesInClone', () => {
@@ -210,6 +220,7 @@ test('createSymbol / placeInstance / breakLinkToSymbol / duplicate / replace (fa
   class InsertElementCommand { constructor(el) { this.el = el; } }
   class RemoveElementCommand { constructor(el) { this.el = el; } }
   class ChangeElementCommand { constructor(el, old) { this.el = el; this.old = old; } }
+  class MoveElementCommand { constructor(el, next, parent) { this.el = el; this.next = next; this.parent = parent; } }
   class BatchCommand {
     constructor(text) { this.text = text; this.stack = []; }
     addSubCommand(c) { this.stack.push(c); }
@@ -233,7 +244,7 @@ test('createSymbol / placeInstance / breakLinkToSymbol / duplicate / replace (fa
     call() {},
     setUseData() {},
     addCommandToHistory: (c) => history.push(c),
-    history: { BatchCommand, InsertElementCommand, RemoveElementCommand, ChangeElementCommand },
+    history: { BatchCommand, InsertElementCommand, RemoveElementCommand, ChangeElementCommand, MoveElementCommand },
   };
 
   const created = M.createSymbol(sc, [rect], { name: 'Coin', reg: 'c' });

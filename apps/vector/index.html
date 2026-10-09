@@ -32,6 +32,7 @@
   <link href="./css/visteras-appearance-panel.css?v=appearance-stroke-1" rel="stylesheet" media="all">
   <link href="./css/visteras-menus.css?v=effect-menu-1" rel="stylesheet" media="all">
   <link href="./css/visteras-export.css?v=export-3" rel="stylesheet" media="all">
+  <link href="./css/visteras-symbols.css?v=gap5-1" rel="stylesheet" media="all">
 
   <!-- Vector Pathfinder Engine (Paper.js Core) -->
   <script src="./lib/paper-core.min.js"></script>
@@ -137,6 +138,10 @@
             <div class="menu_dropdown_item" id="action_offset_path">Offset Path… <span class="menu_dropdown_shortcut">⌥⌘O</span></div>
             <div class="menu_dropdown_item" id="action_outline_stroke">Outline Stroke</div>
             <div class="menu_dropdown_item" id="action_scale_strokes" role="menuitemcheckbox" aria-checked="true">Scale Strokes</div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_symbol_new" title="Make a symbol from the selection">New Symbol… <span class="menu_dropdown_shortcut">F8</span></div>
+            <div class="menu_dropdown_item" id="action_symbol_edit" hidden>Edit Symbol</div>
+            <div class="menu_dropdown_item" id="action_symbol_break_link" hidden>Break Link to Symbol</div>
           </div>
         </div>
 
@@ -200,6 +205,7 @@
             <div class="menu_dropdown_item" id="action_window_artboards">Artboards</div>
             <div class="menu_dropdown_item" id="action_window_effects">Effects</div>
             <div class="menu_dropdown_item" id="action_window_transparency">Transparency <span class="menu_dropdown_shortcut">⇧⌘F10</span></div>
+            <div class="menu_dropdown_item" id="action_window_symbols">Symbols <span class="menu_dropdown_shortcut">⇧⌘F11</span></div>
             <div class="menu_dropdown_item" id="action_window_appearance">Appearance <span class="menu_dropdown_shortcut">⇧F6</span></div>
             <div class="menu_dropdown_item" id="action_window_layers">Layers <span class="menu_dropdown_shortcut">F7</span></div>
             <div class="menu_dropdown_separator"></div>
@@ -318,6 +324,7 @@
     import { mountPathOps } from './js/visteras-path-ops.js?v=gravit-4';
     import { mountArtboardExtras } from './js/visteras-artboard-extras.js?v=gravit-4';
     import { mountArrowheads } from './js/visteras-arrowheads.js?v=gravit-4';
+    import { mountSymbols } from './js/visteras-symbols.js?v=gap5-1';
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=area-resize-1';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
@@ -2610,6 +2617,8 @@
     mountArtboards(svgEditor);
     mountArtboardExtras(svgEditor);
     mountArrowheads(svgEditor);
+    // Window ▸ Symbols (⇧⌘F11), New Symbol (F8), Place / Break Link / Replace / Redefine
+    mountSymbols(svgEditor);
     // File ▸ Export ▸ Export for Screens… (⌥⌘E) / Export As…; Effect ▸ Document Raster Effects Settings…
     mountExport({ editor: svgEditor, saveFile, downloadBlob, toast: (m, t) => showStudioToast(m, t, t === 'error' ? 5000 : 3500) });
     // Object ▸ Clipping Mask ▸ Make (⌃⌘7), Release (⌃⌥⌘7)

@@ -101,6 +101,13 @@ export function mountVectorWorkspace(editor) {
   function objectLabel(element) {
     const name = element.getAttribute('aria-label') || element.querySelector(':scope > title')?.textContent;
     if (name) return name;
+    if (element.localName === 'use') {
+      // Symbol instance: show the symbol's name (Illustrator Layers panel).
+      const href = element.getAttribute('href') || element.getAttribute('xlink:href') || '';
+      const sym = href.startsWith('#') ? element.ownerDocument.getElementById(href.slice(1)) : null;
+      const symName = sym?.getAttribute('data-v-symbol-name') || sym?.querySelector(':scope > title')?.textContent;
+      if (symName) return symName;
+    }
     if (element.localName === 'image') return (element.id || 'raster').replace(/^svg_(\d+)$/, 'raster_$1');
     return element.id || element.localName;
   }

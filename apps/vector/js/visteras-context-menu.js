@@ -89,6 +89,11 @@ export function contextMenuItems(sc, { mac = detectMac() } = {}) {
 
   if (n >= 2) add({ id: 'group', label: 'Group', actionId: 'action_group', shortcut: formatBrowserSafeShortcut({ meta: true, key: 'G', mac }) });
   if (n === 1 && isGroup(elements[0])) add({ id: 'ungroup', label: 'Ungroup', actionId: 'action_ungroup', shortcut: formatBrowserSafeShortcut({ meta: true, shift: true, key: 'G', mac }) });
+  // Symbol instance: Edit Symbol / Break Link (Illustrator); never "Ungroup".
+  if (n >= 1 && elements.every((el) => el?.localName === 'use')) {
+    if (n === 1) add({ id: 'symbol_edit', label: 'Edit Symbol', actionId: 'action_symbol_edit' });
+    add({ id: 'symbol_break_link', label: 'Break Link to Symbol', actionId: 'action_symbol_break_link' });
+  }
   sep();
 
   if (n >= 1) {
