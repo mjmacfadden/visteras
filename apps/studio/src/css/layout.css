@@ -587,6 +587,7 @@ IMPORTANT: any new icon should also must be added on /service-worker.js + its ve
 .sidebar_left .bulge_pinch:after{ background-image: url('../images/icons/bulge_pinch.svg'); }
 .sidebar_left .animation:after{ background-image: url('../images/icons/animation.svg'); }
 .sidebar_left .pan:after{ background-image: url('../images/icons/pan.svg'); }
+.sidebar_left .zoom:after{ background-image: url('../images/icons/zoom.svg'); }
 
 /* pan (hand) tool - grab/grabbing cursor, overrides inline cursor set by selection code */
 body.tool-pan #main_wrapper,
@@ -598,6 +599,18 @@ body.tool-pan.pan-dragging #main_wrapper,
 body.tool-pan.pan-dragging .middle_area,
 body.tool-pan.pan-dragging #canvas_minipaint{
 	cursor: grabbing !important;
+}
+
+/* zoom tool - magnifier cursor (+ by default, - when Alt is held) */
+body.tool-zoom #main_wrapper,
+body.tool-zoom .middle_area,
+body.tool-zoom #canvas_minipaint{
+	cursor: zoom-in !important;
+}
+body.tool-zoom.zoom-out #main_wrapper,
+body.tool-zoom.zoom-out .middle_area,
+body.tool-zoom.zoom-out #canvas_minipaint{
+	cursor: zoom-out !important;
 }
 
 /* tool group - button shows the active sub-tool icon */

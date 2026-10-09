@@ -1133,6 +1133,11 @@ config.TOOLS = [
 		title: 'Hand Tool',
 		attributes: {},
 	},
+	{
+		name: 'zoom',
+		title: 'Zoom Tool',
+		attributes: {},
+	},
 ];
 
 // Default active tool (Move Tool 'select')
