@@ -113,3 +113,9 @@ test('Arrowheads: Stroke dock UI wired; ext-markers retired; deferred note gone'
   assert.doesNotMatch(app, /arrowheads deferred/i);
   assert.ok(!fs.existsSync(new URL('./arrowheads-deferred.test.mjs', import.meta.url)));
 });
+
+test('Arrowheads: stroke changes without a changed event still recolor (MutationObserver)', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-arrowheads.js', import.meta.url), 'utf8');
+  assert.match(src, /attributeFilter: \['stroke', 'style'\]/);
+  assert.match(src, /refreshArrowheadColors\(sc, el\);\n\s*\}\n\s*\}\);/);
+});

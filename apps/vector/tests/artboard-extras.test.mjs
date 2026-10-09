@@ -56,3 +56,9 @@ test('Artboard extras wiring: menu, shortcut, panel hooks', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /mountArtboardExtras\(svgEditor\)/);
 });
+
+test('Artboard extras: panel buttons re-inject if the artboards pane is rebuilt', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-artboard-extras.js', import.meta.url), 'utf8');
+  assert.match(src, /if \(actions && !actions\.querySelector\('\[data-act="up"\]'\)\)/);
+  assert.match(src, /\}\)\.observe\(pane, \{ childList: true \}\);/);
+});

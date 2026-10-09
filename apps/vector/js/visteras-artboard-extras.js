@@ -137,10 +137,18 @@ export function mountArtboardExtras(editor) {
 
   const enhancePanel = () => {
     const pane = document.getElementById('vdock_artboards_panel');
-    if (!pane || pane.dataset.extras === '1') return;
-    pane.dataset.extras = '1';
+    if (!pane) return;
+    // The artboards module may rebuild the pane's innerHTML after we ran: re-inject
+    // per content (buttons / preset select), bind the delegated click handler once.
+    if (pane.dataset.extrasObserved !== '1' && typeof MutationObserver !== 'undefined') {
+      pane.dataset.extrasObserved = '1';
+      new MutationObserver(() => {
+        const acts = pane.querySelector('.vab-actions');
+        if ((acts && !acts.querySelector('[data-act="up"]')) || !pane.querySelector('#vab_new_preset')) enhancePanel();
+      }).observe(pane, { childList: true });
+    }
     const actions = pane.querySelector('.vab-actions');
-    if (actions) {
+    if (actions && !actions.querySelector('[data-act="up"]')) {
       for (const [act, title, text] of [
         ['up', 'Move artboard up in order', '↑'],
         ['down', 'Move artboard down in order', '↓'],
@@ -179,6 +187,8 @@ export function mountArtboardExtras(editor) {
         });
       });
     }
+    if (pane.dataset.extras === '1') return;
+    pane.dataset.extras = '1';
     pane.addEventListener('click', (e) => {
       const act = e.target?.dataset?.act;
       const a = api();

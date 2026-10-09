@@ -383,6 +383,21 @@ export function mountArrowheads(editor) {
       }
       return result;
     };
+    // Stroke color can change without a 'changed' event (e.g. changeSelectedAttribute,
+    // Color panel, eyedropper): watch stroke/style on arrowed elements and resync.
+    const root = sc.getSvgContent?.();
+    if (root && typeof MutationObserver !== 'undefined' && !root.__visterasArrowObserver) {
+      root.__visterasArrowObserver = new MutationObserver((records) => {
+        const seen = new Set();
+        for (const r of records) {
+          const el = r.target;
+          if (seen.has(el) || !el.hasAttribute?.(ATTR.start) && !el.hasAttribute?.(ATTR.end)) continue;
+          seen.add(el);
+          refreshArrowheadColors(sc, el);
+        }
+      });
+      root.__visterasArrowObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ['stroke', 'style'] });
+    }
     window.__visterasArrowheadsRender = render;
     render();
   };
