@@ -75,6 +75,7 @@ class Base_selection_class {
 		this.current_angle = null;
 		// state captured when a rotate drag starts (for relative rotation)
 		this.rotate_drag = null;
+		this.is_skew_drag = false;
 		// marching ants animation state
 		this.ant_offset = 0;
 		this.ant_keep_rendering = false;
@@ -322,6 +323,8 @@ class Base_selection_class {
 			this.ctx.setTransform(mm[0], mm[1], mm[2], mm[3], mm[4] + config.TRANSFORM_MARGIN, mm[5] + config.TRANSFORM_MARGIN);
 		}
 
+		this.ctx.save();
+
 		let isTransformed = false;
 		const hasRotate = data.rotate != null && data.rotate != 0;
 		const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
@@ -487,20 +490,20 @@ class Base_selection_class {
 				corner(x + w, y + h / 2, DRAG_TYPE_RIGHT, 'ew-resize');
 			}
 
+			this.ctx.restore();
+
 			const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
 			if (transform_module && transform_module.is_active()) {
 				const session = transform_module.session;
 				const ref = session.ref || { x: data.x + data.width / 2, y: data.y + data.height / 2 };
-				const ref_local_x = isTransformed ? (ref.x - (data.x + data.width / 2)) : ref.x;
-				const ref_local_y = isTransformed ? (ref.y - (data.y + data.height / 2)) : ref.y;
 				const r = 5 / config.ZOOM;
 
 				const refPath = new Path2D();
-				refPath.arc(ref_local_x, ref_local_y, r, 0, 2 * Math.PI);
+				refPath.arc(ref.x, ref.y, r, 0, 2 * Math.PI);
 
 				this.ctx.save();
 				this.ctx.beginPath();
-				this.ctx.arc(ref_local_x, ref_local_y, r, 0, 2 * Math.PI);
+				this.ctx.arc(ref.x, ref.y, r, 0, 2 * Math.PI);
 				this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
 				this.ctx.strokeStyle = '#000000';
 				this.ctx.lineWidth = 1 / config.ZOOM;
@@ -508,10 +511,10 @@ class Base_selection_class {
 				this.ctx.stroke();
 
 				this.ctx.beginPath();
-				this.ctx.moveTo(ref_local_x - r * 1.6, ref_local_y);
-				this.ctx.lineTo(ref_local_x + r * 1.6, ref_local_y);
-				this.ctx.moveTo(ref_local_x, ref_local_y - r * 1.6);
-				this.ctx.lineTo(ref_local_x, ref_local_y + r * 1.6);
+				this.ctx.moveTo(ref.x - r * 1.6, ref.y);
+				this.ctx.lineTo(ref.x + r * 1.6, ref.y);
+				this.ctx.moveTo(ref.x, ref.y - r * 1.6);
+				this.ctx.lineTo(ref.x, ref.y + r * 1.6);
 				this.ctx.stroke();
 				this.ctx.restore();
 
@@ -520,6 +523,8 @@ class Base_selection_class {
 					path: refPath,
 				};
 			}
+		} else {
+			this.ctx.restore();
 		}
 
 
@@ -1822,6 +1827,9 @@ class Base_selection_class {
 			return;
 		}
 
+		const hasRotate = data.rotate != null && data.rotate != 0;
+		const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
+
 		var x = settings.data.x;
 		var y = settings.data.y;
 		var w = settings.data.width;
@@ -1885,6 +1893,9 @@ class Base_selection_class {
 				y: settings.data.y,
 				width: settings.data.width,
 				height: settings.data.height,
+				rotate: settings.data.rotate || 0,
+				skew_x: settings.data.skew_x || 0,
+				skew_y: settings.data.skew_y || 0,
 				mask: settings.data.mask ? {
 					x: settings.data.mask.x,
 					y: settings.data.mask.y,
@@ -1960,8 +1971,8 @@ class Base_selection_class {
 				const is_transform_active = !!(transform_module && transform_module.is_active());
 
 				if (drag_type === 'ref_point' && is_transform_active) {
-					const curDocX = (hasRotate || hasSkew) ? (testX + data.x + data.width / 2) : mouse.x;
-					const curDocY = (hasRotate || hasSkew) ? (testY + data.y + data.height / 2) : mouse.y;
+					const curDocX = mouse.x;
+					const curDocY = mouse.y;
 					const locators = ['tl', 'tc', 'tr', 'ml', 'c', 'mr', 'bl', 'bc', 'br'];
 					let closestLoc = null;
 					let closestDist = Infinity;
@@ -1991,7 +2002,7 @@ class Base_selection_class {
 				const is_side_vertical = (is_drag_type_top || is_drag_type_bottom) && !is_drag_type_left && !is_drag_type_right;
 
 				const is_skew = is_transform_active && (is_side_horizontal || is_side_vertical)
-					&& (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey);
+					&& (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey || this.is_skew_drag);
 
 				if (is_skew) {
 					let side = 'top';
@@ -2000,9 +2011,17 @@ class Base_selection_class {
 					else if (is_drag_type_left) side = 'left';
 					else if (is_drag_type_right) side = 'right';
 
+					mainWrapper.style.cursor = (side === 'top' || side === 'bottom') ? 'ew-resize' : 'ns-resize';
+
 					var dx = Math.round(mouse.x - mouse.click_x);
 					var dy = Math.round(mouse.y - mouse.click_y);
-					const { skew_x, skew_y } = skew_from_drag(side, dx, dy, this.click_details);
+					const rotRad = ((data.rotate || 0) * Math.PI) / 180;
+					const cosA = Math.cos(rotRad);
+					const sinA = Math.sin(rotRad);
+					const local_dx = dx * cosA + dy * sinA;
+					const local_dy = -dx * sinA + dy * cosA;
+
+					const { skew_x, skew_y } = skew_from_drag(side, local_dx, local_dy, this.click_details);
 					let sx = skew_x;
 					let sy = skew_y;
 					if (e.shiftKey) {
@@ -2013,9 +2032,17 @@ class Base_selection_class {
 					settings.data.skew_y = sy;
 					transform_module.session.box.skew_x = sx;
 					transform_module.session.box.skew_y = sy;
+					if (transform_module.session.snapshot && transform_module.session.snapshot.layers) {
+						for (const s of transform_module.session.snapshot.layers) {
+							const l = app.Layers.get_layer(s.id, true);
+							if (l) {
+								l.skew_x = sx;
+								l.skew_y = sy;
+							}
+						}
+					}
 					transform_module.sync_options_bar();
-					app.Layers.render_interactive_layer(settings.data.id);
-					this.draw_selection();
+					app.Layers.render();
 					return;
 				}
 
@@ -2222,6 +2249,7 @@ class Base_selection_class {
 			//reset
 			this.mouse_lock = null;
 			this.rotate_drag = null;
+			this.is_skew_drag = false;
 		}
 
 		if (!this.mouse_lock) {
@@ -2232,8 +2260,6 @@ class Base_selection_class {
 			//leftover transform on the context.
 			let testX = mouse.x;
 			let testY = mouse.y;
-			const hasRotate = data.rotate != null && data.rotate != 0;
-			const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
 			if (hasRotate || hasSkew) {
 				const rx = mouse.x - (x + w / 2);
 				const ry = mouse.y - (y + h / 2);
@@ -2281,30 +2307,56 @@ class Base_selection_class {
 			}
 
 			let handleMatched = false;
-			for (let current_drag_type in this.selected_obj_positions) {
-				const position = this.selected_obj_positions[current_drag_type];
-				if (position.path && this.ctx && this.ctx.isPointInPath(position.path, testX, testY)) {
-					// match
+			const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+			const is_transform_active = !!(transform_module && transform_module.is_active());
+
+			if (is_transform_active && this.selected_obj_positions['ref_point']) {
+				const session = transform_module.session;
+				const ref = session.ref || { x: data.x + data.width / 2, y: data.y + data.height / 2 };
+				const refDist = Math.hypot(mouse.x - ref.x, mouse.y - ref.y);
+				if (refDist <= 8 / config.ZOOM) {
 					handleMatched = true;
 					if (event_type == 'mousedown') {
 						if (e.buttons == 1 || typeof e.buttons == "undefined") {
 							this.mouse_lock = 'selected_object_actions';
-							this.selected_object_drag_type = current_drag_type;
+							this.selected_object_drag_type = 'ref_point';
 						}
 					}
 					if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
-						const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
-						if (transform_module && transform_module.is_active()) {
-							const dt = parseInt(current_drag_type, 10);
-							const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
-							if (is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey)) {
-								mainWrapper.style.cursor = 'pointer';
+						mainWrapper.style.cursor = 'move';
+					}
+				}
+			}
+
+			if (!handleMatched) {
+				for (let current_drag_type in this.selected_obj_positions) {
+					if (current_drag_type === 'ref_point') continue;
+					const position = this.selected_obj_positions[current_drag_type];
+					if (position.path && this.ctx && this.ctx.isPointInPath(position.path, testX, testY)) {
+						handleMatched = true;
+						if (event_type == 'mousedown') {
+							if (e.buttons == 1 || typeof e.buttons == "undefined") {
+								this.mouse_lock = 'selected_object_actions';
+								this.selected_object_drag_type = current_drag_type;
+								const dt = parseInt(current_drag_type, 10);
+								const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
+								this.is_skew_drag = is_transform_active && is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey);
+							}
+						}
+						if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
+							if (is_transform_active) {
+								const dt = parseInt(current_drag_type, 10);
+								const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
+								if (is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey)) {
+									mainWrapper.style.cursor = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM) ? 'ew-resize' : 'ns-resize';
+								} else {
+									mainWrapper.style.cursor = position.cursor;
+								}
 							} else {
 								mainWrapper.style.cursor = position.cursor;
 							}
-						} else {
-							mainWrapper.style.cursor = position.cursor;
 						}
+						break;
 					}
 				}
 			}
