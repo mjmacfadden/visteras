@@ -46,25 +46,10 @@ class Zoom_tool_class extends Base_tools_class {
 
 	load() {
 		this.default_events();
-		this.setup_alt_cursor();
-	}
-
-	setup_alt_cursor() {
-		const updateCursor = (e) => {
-			if (config.TOOL && config.TOOL.name === 'zoom') {
-				if (e.altKey) {
-					document.body.classList.add('zoom-out');
-				} else {
-					document.body.classList.remove('zoom-out');
-				}
-			}
-		};
-		window.addEventListener('keydown', updateCursor);
-		window.addEventListener('keyup', updateCursor);
 	}
 
 	mousedown(e) {
-		if (e.which != 1 && e.type.indexOf('touch') < 0)
+		if (!this.get_mouse_info(e).click_valid || (e.button !== 0 && e.which !== 1 && e.type.indexOf('touch') < 0))
 			return;
 
 		const main_wrapper = document.getElementById('main_wrapper');

@@ -140,6 +140,8 @@ export class Activate_tool_action extends Base_action {
 			}
 			// Toggle pan tool class on body (grab/grabbing cursor)
 			document.body.classList.toggle('tool-pan', config.TOOL && config.TOOL.name === 'pan');
+			document.body.classList.toggle('tool-zoom', config.TOOL?.name === 'zoom');
+			document.body.classList.toggle('zoom-out', config.TOOL?.name === 'zoom' && app.GUI.GUI_shortcuts?.is_alt_down);
 
 			// Type tool: seed Size from baked span/params BEFORE mounting the options bar.
 			// Prior fixes synced after show_action_attributes(); the Size widget was created
@@ -336,6 +338,8 @@ export class Activate_tool_action extends Base_action {
 		}
 		// Toggle pan tool class on body (grab/grabbing cursor)
 		document.body.classList.toggle('tool-pan', config.TOOL && config.TOOL.name === 'pan');
+		document.body.classList.toggle('tool-zoom', config.TOOL?.name === 'zoom');
+		document.body.classList.toggle('zoom-out', config.TOOL?.name === 'zoom' && app.GUI.GUI_shortcuts?.is_alt_down);
 
 		// Show brush cursor immediately if switching to a brush tool
 		if (brushTools.includes(config.TOOL.name)) {

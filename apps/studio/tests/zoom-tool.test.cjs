@@ -48,3 +48,12 @@ test('calc_zoom_step zooms in and out across thresholds', () => {
 	assert.equal(calc_zoom_step(0.5, -1), 0.4);
 	assert.equal(calc_zoom_step(0.05, -1), 0.04);
 });
+
+test('Zoom click validates canvas input and modifier cursor uses centralized handling', () => {
+ const source=read('tools/zoom.js');
+ assert.match(source,/get_mouse_info\(e\)\.click_valid/);
+ assert.doesNotMatch(source,/addEventListener\(['"]key(?:down|up)/);
+ const activation=read('actions/activate-tool.js');
+ assert.match(activation,/classList\.toggle\('tool-zoom'/);
+ assert.match(read('core/gui/gui-shortcuts.js'),/classList\.toggle\('zoom-out'/);
+});
