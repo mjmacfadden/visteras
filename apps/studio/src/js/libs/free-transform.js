@@ -117,23 +117,26 @@ export function snap_angle(deg, step = 15) {
  * side: 'top' | 'bottom' | 'left' | 'right' (or 'tc', 'bc', 'ml', 'mr').
  */
 export function skew_from_drag(side, dx, dy, box) {
-	let skew_x = box.skew_x || 0;
-	let skew_y = box.skew_y || 0;
-	const w = box.width || 1;
-	const h = box.height || 1;
+	let initial_skew_x = (box && box.skew_x) || 0;
+	let initial_skew_y = (box && box.skew_y) || 0;
+	const w = (box && box.width) || 1;
+	const h = (box && box.height) || 1;
+
+	let skew_x = initial_skew_x;
+	let skew_y = initial_skew_y;
 
 	if (side === 'top' || side === 'tc') {
-		const deg = (Math.atan2(-dx, h) * 180) / Math.PI;
-		skew_x = Math.round(deg * 10) / 10;
+		const delta = (Math.atan2(-dx, h) * 180) / Math.PI;
+		skew_x = Math.round((initial_skew_x + delta) * 10) / 10;
 	} else if (side === 'bottom' || side === 'bc') {
-		const deg = (Math.atan2(dx, h) * 180) / Math.PI;
-		skew_x = Math.round(deg * 10) / 10;
+		const delta = (Math.atan2(dx, h) * 180) / Math.PI;
+		skew_x = Math.round((initial_skew_x + delta) * 10) / 10;
 	} else if (side === 'left' || side === 'ml') {
-		const deg = (Math.atan2(-dy, w) * 180) / Math.PI;
-		skew_y = Math.round(deg * 10) / 10;
+		const delta = (Math.atan2(-dy, w) * 180) / Math.PI;
+		skew_y = Math.round((initial_skew_y + delta) * 10) / 10;
 	} else if (side === 'right' || side === 'mr') {
-		const deg = (Math.atan2(dy, w) * 180) / Math.PI;
-		skew_y = Math.round(deg * 10) / 10;
+		const delta = (Math.atan2(dy, w) * 180) / Math.PI;
+		skew_y = Math.round((initial_skew_y + delta) * 10) / 10;
 	}
 
 	return { skew_x, skew_y };
