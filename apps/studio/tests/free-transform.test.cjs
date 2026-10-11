@@ -82,6 +82,11 @@ test('Commit and cancel logic: snapshot is restored exactly', () => {
 		{ id: 2, x: 50, y: 60, width: 80, height: 80, rotate: 10, skew_x: 5, skew_y: 0 },
 	];
 	const session = create_transform_session(layers);
+	assert.ok(session.box, 'session.box must be defined');
+	assert.equal(session.box.x, 10);
+	assert.equal(session.box.y, 20);
+	const refC = ref_point(session.box, 'c');
+	assert.ok(refC && typeof refC.x === 'number', 'ref_point(session.box) must return coordinates');
 
 	// Mutate layers during transform session
 	layers[0].x = 100;

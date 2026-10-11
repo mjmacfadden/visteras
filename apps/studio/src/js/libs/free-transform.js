@@ -8,22 +8,23 @@
  * Locator can be 'tl', 'tc', 'tr', 'ml', 'c', 'mr', 'bl', 'bc', 'br'.
  */
 export function ref_point(box, locator = 'c') {
-	const cx = (box.x || 0) + (box.width || 0) / 2;
-	const cy = (box.y || 0) + (box.height || 0) / 2;
+	const b = box || { x: 0, y: 0, width: 0, height: 0 };
+	const cx = (b.x || 0) + (b.width || 0) / 2;
+	const cy = (b.y || 0) + (b.height || 0) / 2;
 	let lx, ly;
 	switch (locator) {
-		case 'tl': lx = box.x; ly = box.y; break;
-		case 'tc': lx = cx; ly = box.y; break;
-		case 'tr': lx = (box.x || 0) + (box.width || 0); ly = box.y; break;
-		case 'ml': lx = box.x; ly = cy; break;
+		case 'tl': lx = b.x || 0; ly = b.y || 0; break;
+		case 'tc': lx = cx; ly = b.y || 0; break;
+		case 'tr': lx = (b.x || 0) + (b.width || 0); ly = b.y || 0; break;
+		case 'ml': lx = b.x || 0; ly = cy; break;
 		case 'c':  lx = cx; ly = cy; break;
-		case 'mr': lx = (box.x || 0) + (box.width || 0); ly = cy; break;
-		case 'bl': lx = box.x; ly = (box.y || 0) + (box.height || 0); break;
-		case 'bc': lx = cx; ly = (box.y || 0) + (box.height || 0); break;
-		case 'br': lx = (box.x || 0) + (box.width || 0); ly = (box.y || 0) + (box.height || 0); break;
+		case 'mr': lx = (b.x || 0) + (b.width || 0); ly = cy; break;
+		case 'bl': lx = b.x || 0; ly = (b.y || 0) + (b.height || 0); break;
+		case 'bc': lx = cx; ly = (b.y || 0) + (b.height || 0); break;
+		case 'br': lx = (b.x || 0) + (b.width || 0); ly = (b.y || 0) + (b.height || 0); break;
 		default:   lx = cx; ly = cy; break;
 	}
-	const angle = ((box.rotate || 0) * Math.PI) / 180;
+	const angle = ((b.rotate || 0) * Math.PI) / 180;
 	if (!angle) {
 		return { x: lx, y: ly };
 	}
@@ -34,6 +35,7 @@ export function ref_point(box, locator = 'c') {
 		y: cy + dx * Math.sin(angle) + dy * Math.cos(angle),
 	};
 }
+
 
 /**
  * Scales a box about a reference point with scale factors sx and sy.
@@ -182,7 +184,7 @@ export function apply_numeric(box, params = {}, ref = 'c') {
  */
 export function create_transform_session(layers) {
 	const list = (layers || []).filter(Boolean);
-	const snapshot = list.map((l) => ({
+	const layerSnapshots = list.map((l) => ({
 		id: l.id,
 		x: l.x,
 		y: l.y,
@@ -195,29 +197,81 @@ export function create_transform_session(layers) {
 		mask: l.mask ? JSON.parse(JSON.stringify(l.mask)) : null,
 	}));
 
+	let box;
+	if (list.length === 1) {
+		box = {
+			x: list[0].x,
+			y: list[0].y,
+			width: list[0].width,
+			height: list[0].height,
+			rotate: list[0].rotate || 0,
+			skew_x: list[0].skew_x || 0,
+			skew_y: list[0].skew_y || 0,
+		};
+	} else if (list.length > 1) {
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (const l of list) {
+			minX = Math.min(minX, l.x);
+			minY = Math.min(minY, l.y);
+			maxX = Math.max(maxX, l.x + l.width);
+			maxY = Math.max(maxY, l.y + l.height);
+		}
+		box = {
+			x: minX,
+			y: minY,
+			width: maxX - minX,
+			height: maxY - minY,
+			rotate: 0,
+			skew_x: 0,
+			skew_y: 0,
+		};
+	} else {
+		box = { x: 0, y: 0, width: 0, height: 0, rotate: 0, skew_x: 0, skew_y: 0 };
+	}
+
 	return {
 		active: true,
-		snapshot,
+		box: { ...box },
+		snapshot: {
+			box: { ...box },
+			layers: layerSnapshots,
+		},
 		reference_locator: 'c',
+		locator: 'c',
 		reference_point: null,
 		aspect_locked: true,
 	};
 }
 
 export function restore_transform_session(session, layers) {
-	if (!session || !session.snapshot || !layers) return;
-	const snapMap = new Map(session.snapshot.map((s) => [s.id, s]));
-	for (const l of layers) {
-		const s = snapMap.get(l.id);
-		if (!s) continue;
-		l.x = s.x;
-		l.y = s.y;
-		l.width = s.width;
-		l.height = s.height;
-		l.rotate = s.rotate;
-		l.skew_x = s.skew_x;
-		l.skew_y = s.skew_y;
-		if (s.params) l.params = JSON.parse(JSON.stringify(s.params));
-		if (s.mask) l.mask = JSON.parse(JSON.stringify(s.mask));
+	if (!session || !session.snapshot) return;
+	const layerSnaps = session.snapshot.layers || (Array.isArray(session.snapshot) ? session.snapshot : []);
+	const snapMap = new Map(layerSnaps.map((s) => [s.id, s]));
+
+	let targetLayers = layers;
+	if (!targetLayers && typeof app !== 'undefined' && app.Layers && typeof app.Layers.get_layer === 'function') {
+		targetLayers = layerSnaps.map(s => app.Layers.get_layer(s.id, true)).filter(Boolean);
+	}
+	if (!targetLayers && Array.isArray(layers)) {
+		targetLayers = layers;
+	}
+	if (targetLayers) {
+		for (const l of targetLayers) {
+			const s = snapMap.get(l.id);
+			if (!s) continue;
+			l.x = s.x;
+			l.y = s.y;
+			l.width = s.width;
+			l.height = s.height;
+			l.rotate = s.rotate;
+			l.skew_x = s.skew_x;
+			l.skew_y = s.skew_y;
+			if (s.params) l.params = JSON.parse(JSON.stringify(s.params));
+			if (s.mask) l.mask = JSON.parse(JSON.stringify(s.mask));
+		}
+	}
+	if (session.snapshot.box) {
+		session.box = { ...session.snapshot.box };
 	}
 }
+
