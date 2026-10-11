@@ -344,6 +344,8 @@ class Mask_class {
 		var lh = (layer.height != null && layer.height > 0) ? layer.height : sh;
 		var rotate = layer.rotate || 0;
 		var rad = rotate * Math.PI / 180;
+		var skewX = Math.tan((layer.skew_x || 0) * Math.PI / 180);
+		var skewY = Math.tan((layer.skew_y || 0) * Math.PI / 180);
 		var mx = (mask.x != null) ? mask.x : 0;
 		var my = (mask.y != null) ? mask.y : 0;
 		var mw = (mask.width != null && mask.width > 0) ? mask.width : (config.WIDTH || sw);
@@ -359,11 +361,12 @@ class Mask_class {
 		var cover = this._get_scratch_canvas(ctx.canvas.width, ctx.canvas.height);
 		var cctx = cover.getContext('2d');
 		cctx.setTransform(a, b, c, d, e, f);
-		cctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0);
+		cctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0 || skewX !== 0 || skewY !== 0);
 
-		if (rad !== 0 && mask.linked !== false) {
+		if ((rad !== 0 || skewX !== 0 || skewY !== 0) && mask.linked !== false) {
 			cctx.translate(lx + lw / 2, ly + lh / 2);
 			cctx.rotate(rad);
+			cctx.transform(1, skewY, skewX, 1, 0, 0);
 			cctx.translate(-lw / 2, -lh / 2);
 			cctx.drawImage(alpha, 0, 0, sw, sh, mx - lx, my - ly, mw, mh);
 		}
