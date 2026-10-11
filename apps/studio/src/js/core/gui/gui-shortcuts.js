@@ -115,13 +115,14 @@ class GUI_shortcuts_class {
 			}
 			if (key === 'Alt' || key === 'AltGraph' || code === 'AltLeft' || code === 'AltRight' || event.keyCode === 18) {
 				this.is_alt_down = isDown;
+				document.body.classList.toggle('zoom-out', isDown && config.TOOL?.name === 'zoom');
 				if (config.TOOL && config.TOOL.name === 'clone' && app.GUI && app.GUI.GUI_tools) {
 					const cloneTool = app.GUI.GUI_tools.tools_modules['clone']?.object;
 					if (cloneTool && typeof cloneTool.update_cursor === 'function') {
 						cloneTool.update_cursor(isDown);
 					}
 				}
-				this.handle_alt_eyedropper(isDown, event);
+				if (!app.GUI?.modules?.['edit/transform']?.is_active()) this.handle_alt_eyedropper(isDown, event);
 			}
 			if (key === 'Shift' || code === 'ShiftLeft' || code === 'ShiftRight' || event.keyCode === 16) {
 				this.is_shift_down = isDown;
@@ -146,6 +147,7 @@ class GUI_shortcuts_class {
 			this.is_meta_down = false;
 			this.is_ctrl_down = false;
 			this.is_alt_down = false;
+			document.body.classList.remove('zoom-out');
 			this.is_shift_down = false;
 			if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_aspect_lock_ui === 'function') {
 				app.GUI.GUI_tools.update_aspect_lock_ui(false);
@@ -273,9 +275,8 @@ class GUI_shortcuts_class {
 					transformMod.nudge(dx, dy);
 					return;
 				}
-				if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key && event.key.length === 1) {
-					return;
-				}
+				event.stopImmediatePropagation();
+				return;
 			}
 
 			// Fit Window: Illustrator ⌘0 / Ctrl+0 (preventDefault blocks browser zoom reset).

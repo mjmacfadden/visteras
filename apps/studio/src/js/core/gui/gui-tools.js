@@ -514,6 +514,9 @@ class GUI_tools_class {
 	 * "Fill", "Square", "Circle", "Radial", "Anti aliasing", "Circle", "Strict", "Burn"
 	 */
 	show_action_attributes() {
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) { transform.render_options_bar(); return; }
+		document.getElementById('action_attributes')?.classList.remove('free-transform-options');
 		var _this = this;
 		var target_id = "action_attributes";
 

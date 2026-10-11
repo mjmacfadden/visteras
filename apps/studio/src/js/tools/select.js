@@ -11,7 +11,6 @@ import { is_box_text, is_point_text } from './text.js';
 import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tree.js';
 import { get_layer_content_bounds, get_selection_content_bounds } from './../libs/layer-bounds.js';
 import { Subpath } from './../core/vector/vector-model.js';
-import { ref_point } from './../libs/free-transform.js';
 
 
 const hydrate_vector_paths = (paths) => (paths || []).map((path) =>
@@ -53,6 +52,9 @@ class Select_tool_class extends Base_tools_class {
 			enable_rotation: true,
 			enable_move: true,
 			data_function: () => {
+				const transform = app.GUI?.modules?.['edit/transform'];
+				if (transform?.is_active()) return { ...config.layer, ...transform.session.box };
+
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
@@ -298,6 +300,11 @@ class Select_tool_class extends Base_tools_class {
 
 	async mousedown(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) {
+			if (mouse.click_valid && config.mouse_lock !== true) transform.pointer_down(mouse, e);
+			return;
+		}
 		if (mouse.click_valid == false || config.mouse_lock === true) {
 			return;
 		}
@@ -485,6 +492,11 @@ class Select_tool_class extends Base_tools_class {
 
 	mousemove(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) {
+			transform.pointer_move(mouse, e);
+			return;
+		}
 		if (mouse.is_drag == false || mouse.click_valid == false || config.mouse_lock === true) {
 			return;
 		}
@@ -684,6 +696,8 @@ class Select_tool_class extends Base_tools_class {
 
 	async mouseup(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) { transform.pointer_up(); return; }
 		if (this.marquee) {
 			const box = this.marquee;
 			this.marquee = null;
@@ -716,29 +730,6 @@ class Select_tool_class extends Base_tools_class {
 		}
 
 		this.Base_selection.selected_object_actions(e);
-
-		const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
-		if (transform_module && transform_module.is_active()) {
-			this.resizing = false;
-			this.moving = false;
-			this.is_rotating = false;
-			this._resizing_point_text = false;
-			if (config.layer) {
-				transform_module.session.box.x = config.layer.x;
-				transform_module.session.box.y = config.layer.y;
-				transform_module.session.box.width = config.layer.width;
-				transform_module.session.box.height = config.layer.height;
-				transform_module.session.box.rotate = config.layer.rotate || 0;
-				transform_module.session.box.skew_x = config.layer.skew_x || 0;
-				transform_module.session.box.skew_y = config.layer.skew_y || 0;
-				if (transform_module.session.locator) {
-					transform_module.session.ref = ref_point(transform_module.session.box, transform_module.session.locator);
-				}
-				transform_module.sync_options_bar();
-			}
-			this.Base_layers.render();
-			return;
-		}
 
 		if (this.resizing) {
 			if (this.is_rotating) {
