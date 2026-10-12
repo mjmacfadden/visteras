@@ -164,3 +164,34 @@ test('legacy selection resumes after the transform session ends', async () => {
  h.selection.selected_object_actions({type:'pointermove'});
  assert.equal(reads,1);
 });
+
+for (const type of ['image','rectangle']) for (const locator of ['tl','tr','bl','br']) for (const axis of ['x','y']) {
+ test(`Command ${locator} ${axis}-drag skews ${type} without resizing`, async () => {
+  const layer={id:1,type,x:100,y:100,width:200,height:120,rotate:25};
+  const h=harness([layer]); await h.transform.free_transform();
+  const original={...h.config.layer}; const box={...h.transform.session.box};
+  const start=h.math.ref_point(box,locator); const r=25*Math.PI/180;
+  const dx=axis==='x' ? 40 : 0,dy=axis==='y' ? 40 : 0;
+  const end={x:start.x+dx*Math.cos(r)-dy*Math.sin(r),y:start.y+dx*Math.sin(r)+dy*Math.cos(r)};
+  h.transform.pointer_down(start,{metaKey:true});
+  // Keep the modifier chosen at press even when later pointer events omit it.
+  h.transform.pointer_move(end,{}); h.transform.pointer_up();
+  assert.equal(layer.width,200); assert.equal(layer.height,120); assert.equal(layer.rotate,25);
+  assert.ok(Math.abs(layer[axis==='x' ? 'skew_x' : 'skew_y'])>1);
+  const fixedLocators=axis==='x' ? (locator.startsWith('t') ? ['bl','br'] : ['tl','tr']) : (locator.endsWith('l') ? ['tr','br'] : ['tl','bl']);
+  for(const fixed of fixedLocators) {
+   const before=h.math.ref_point(original,fixed),after=h.math.ref_point(layer,fixed);
+   assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<1e-8);
+  }
+  await h.transform.commit(); assert.equal(h.history.length,1);
+  for(const action of h.history[0].actions) action.undo();
+  assert.deepEqual(plain(layer),plain(original));
+ });
+}
+
+test('unmodified corner drag remains proportional resize', async () => {
+ const h=harness(); await h.transform.free_transform();
+ const start=h.math.ref_point(h.transform.session.box,'br');
+ h.transform.pointer_down(start,{}); h.transform.pointer_move({x:start.x+40,y:start.y+24},{});
+ assert.ok(h.config.layer.width>100); assert.equal(h.config.layer.skew_x,0); assert.equal(h.config.layer.skew_y,0);
+});

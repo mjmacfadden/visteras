@@ -283,7 +283,7 @@ export default class Transform_edit_class {
 	pointer_down(mouse, event) {
 		const box = this.session.box;
 		const handle = this.hit_handle(mouse);
-		this.drag = handle ? { handle, start: { x: mouse.x, y: mouse.y }, box: { ...box }, ref: { ...this.session.ref } } : null;
+		this.drag = handle ? { handle, start: { x: mouse.x, y: mouse.y }, box: { ...box }, ref: { ...this.session.ref }, skew: !!(event.metaKey || event.ctrlKey || this.is_skew_mode()) } : null;
 	}
 
 	pointer_move(mouse, event) {
@@ -295,6 +295,7 @@ export default class Transform_edit_class {
 				: handle === 'ref' || handle === 'move' ? 'move'
 				: [1, 2].includes(handle) ? (event.metaKey || event.ctrlKey || this.is_skew_mode() ? 'ew-resize' : 'ns-resize')
 				: [4, 8].includes(handle) ? (event.metaKey || event.ctrlKey || this.is_skew_mode() ? 'ns-resize' : 'ew-resize')
+				: [5, 6, 9, 10].includes(handle) && (event.metaKey || event.ctrlKey || this.is_skew_mode()) ? 'move'
 				: [5, 10].includes(handle) ? 'nwse-resize' : [6, 9].includes(handle) ? 'nesw-resize' : 'default';
 			return;
 		}
@@ -317,11 +318,20 @@ export default class Transform_edit_class {
 			let delta = (Math.atan2(mouse.y - ref.y, mouse.x - ref.x) - Math.atan2(start.y - ref.y, start.x - ref.x)) * 180 / Math.PI;
 			if (event.shiftKey) delta = snap_angle((box.rotate || 0) + delta) - (box.rotate || 0);
 			next = rotate_about(box, ref, delta);
-		} else if ([1, 2, 4, 8].includes(handle) && (this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
+		} else if ([1, 2, 4, 8, 5, 6, 9, 10].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
 			const a = local_point(box, start), b = local_point(box, mouse);
-			const side = { 1: 'top', 2: 'bottom', 4: 'left', 8: 'right' }[handle];
+			// Corner skew follows the dominant local drag axis, then keeps that
+			// edge for the remainder of the gesture to avoid direction jumps.
+			let side = { 1: 'top', 2: 'bottom', 4: 'left', 8: 'right' }[handle];
+			if (!side) {
+				if (!drag.skew_side && Math.hypot(b.x - a.x, b.y - a.y) < 1 / config.ZOOM) return;
+				side = drag.skew_side || (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
+					? ([5, 9].includes(handle) ? 'top' : 'bottom')
+					: ([5, 6].includes(handle) ? 'left' : 'right'));
+				drag.skew_side = side;
+			}
 			const skew = skew_from_drag(side, b.x - a.x, b.y - a.y, box);
-			const opposite = { 1: 'bc', 2: 'tc', 4: 'mr', 8: 'ml' }[handle];
+			const opposite = { top: 'bc', bottom: 'tc', left: 'mr', right: 'ml' }[side];
 			const fixed = ref_point(box, opposite);
 			next = { ...box, skew_x: Math.max(-80, Math.min(80, skew.skew_x)), skew_y: Math.max(-80, Math.min(80, skew.skew_y)) };
 			const moved = ref_point(next, opposite);
