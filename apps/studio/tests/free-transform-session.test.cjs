@@ -15,9 +15,12 @@ function harness(layers = [{ id: 1, type: 'image', x: 10, y: 20, width: 100, hei
  const math = read('libs/free-transform.js').replace(/^export /gm, '');
  const module = read('modules/edit/transform.js').replace(/^import [\s\S]*?;\n/gm, '').replace('export default class', 'class');
  vm.runInContext(math + '\n' + module + '\nthis.Transform = Transform_edit_class; this.math = {ref_point,local_point,resize_from_drag,transform_layer_geometry,scale_about,rotate_about,skew_from_drag};', context);
+ const selectionSource = read('core/base-selection.js').replace(/^import .*;$/gm, '').replace(/export default \w+;/, 'this.Selection = Base_selection_class;');
+ vm.runInContext('(function(){' + selectionSource + '}).call(this);', context);
+ const selection = Object.create(context.Selection.prototype);
  const transform = new context.Transform(); app.GUI.modules['edit/transform'] = transform;
  transform.render_options_bar = () => {}; transform.sync_options_bar = () => {};
- return { transform, config, app, history, math: context.math };
+ return { transform, config, app, history, selection, math: context.math };
 }
 
 test('menu null argument and asynchronous switch from Brush keep session open', async () => {
@@ -101,4 +104,63 @@ test('vector resize previews actual path points and cancel restores paths withou
 test('no-op pointer preview does not manufacture an undo step for absent skew fields', async () => {
  const h=harness(); await h.transform.free_transform(); h.transform.preview_box({...h.transform.session.box}); await h.transform.commit();
  assert.equal(h.history.length,0);
+});
+
+// The legacy selection listener and active tool receive the same document events.
+// Exercise the listener before and after the session to cover registration order.
+for (const legacyFirst of [true, false]) {
+ test(`Command side drag has one geometry owner (legacy first: ${legacyFirst})`, async () => {
+  const h = harness(); await h.transform.free_transform();
+  let legacyReads = 0;
+  h.selection.find_settings = () => { legacyReads++; throw new Error('legacy geometry must not run'); };
+  const initial = {...h.transform.session.box};
+  const start = h.math.ref_point(initial, 'mr');
+  const fixed = h.math.ref_point(initial, 'ml');
+  const dispatch = (type, point) => {
+   const event = {type, metaKey:true, buttons:type === 'pointerup' ? 0 : 1};
+   const session = () => type === 'pointerdown' ? h.transform.pointer_down(point,event) : type === 'pointermove' ? h.transform.pointer_move(point,event) : h.transform.pointer_up();
+   if (legacyFirst) h.selection.selected_object_actions(event);
+   session();
+   if (!legacyFirst) h.selection.selected_object_actions(event);
+  };
+  dispatch('pointerdown',start); dispatch('pointermove',{x:start.x,y:start.y+30}); dispatch('pointerup',start);
+  assert.equal(legacyReads,0); assert.ok(h.config.layer.skew_y>0);
+  for (const locator of ['tl','tr','bl','br']) {
+   const before=h.math.ref_point(initial,locator), after=h.math.ref_point(h.config.layer,locator);
+   assert.ok(Math.abs(after.x-before.x)<1e-8);
+   assert.ok(Math.abs(after.y-before.y-(locator.endsWith('r') ? 30 : 0))<(locator.endsWith('r') ? 0.15 : 1e-8)); // skew angles round to 0.1 degrees
+  }
+  const actual = h.math.ref_point(h.config.layer,'ml');
+  assert.ok(Math.hypot(actual.x-fixed.x,actual.y-fixed.y)<1e-8);
+  await h.transform.commit(); assert.equal(h.history.length,1);
+ });
+}
+
+test('rotation around a moved custom pivot maps every layer corner and keeps pivot fixed', async () => {
+ const h = harness([{id:1,type:'image',x:100,y:100,width:200,height:120}]);
+ await h.transform.free_transform();
+ h.selection.find_settings = () => { throw new Error('legacy rotation must not run'); };
+ const original = {...h.config.layer}; const center=h.math.ref_point(original);
+ const pivot={x:250,y:130};
+ h.transform.pointer_down(center,{}); h.transform.pointer_move(pivot,{}); h.transform.pointer_up();
+ assert.equal(h.transform.session.locator,null);
+ const start={x:320,y:160}; // just beyond the right edge, outside every handle
+ const end={x:pivot.x-(start.y-pivot.y),y:pivot.y+(start.x-pivot.x)};
+ h.transform.pointer_down(start,{}); assert.equal(h.transform.drag.handle,'rotate');
+ h.selection.selected_object_actions({type:'pointermove',buttons:1});
+ h.transform.pointer_move(end,{}); h.transform.pointer_up();
+ assert.deepEqual(plain(h.transform.session.ref),pivot);
+ for(const locator of ['tl','tr','bl','br']) {
+  const before=h.math.ref_point(original,locator); const after=h.math.ref_point(h.config.layer,locator);
+  assert.ok(Math.hypot(after.x-(pivot.x-(before.y-pivot.y)),after.y-(pivot.y+(before.x-pivot.x)))<1e-8);
+ }
+ assert.equal(h.config.layer.rotate,90);
+ h.transform.cancel(); assert.deepEqual(plain(h.config.layer),plain(original));
+});
+
+test('legacy selection resumes after the transform session ends', async () => {
+ const h=harness(); await h.transform.free_transform(); h.transform.cancel();
+ let reads=0; h.selection.find_settings=()=>{reads++;return null;};
+ h.selection.selected_object_actions({type:'pointermove'});
+ assert.equal(reads,1);
 });

@@ -1816,6 +1816,10 @@ class Base_selection_class {
 	}
 
 	selected_object_actions(e) {
+		// Free Transform owns pointer geometry and hit testing. These document
+		// listeners also receive the tool's events; running both mutates the
+		// session box before its preview can transform the actual layer.
+		if (app.GUI?.modules?.['edit/transform']?.is_active()) return;
 		var settings = this.find_settings();
 		if (!settings || !settings.data) {
 			return;
