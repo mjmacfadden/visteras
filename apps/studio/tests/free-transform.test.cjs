@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const src = fs.readFileSync(require.resolve('../src/js/libs/free-transform.js'), 'utf8');
 const ctx = vm.createContext({});
-vm.runInContext(src.replace(/^export /gm, '') +
+vm.runInContext(fs.readFileSync(require.resolve('../src/js/libs/quad-transform.js'),'utf8').replace(/^export /gm,'') + '\n' + src.replace(/^import .*;$/gm,'').replace(/^export /gm, '') +
 	'\nthis.api = { ref_point, scale_about, rotate_about, snap_angle, skew_from_drag, apply_numeric, create_transform_session, restore_transform_session };', ctx);
 const {
 	ref_point,

@@ -307,6 +307,11 @@ class Base_selection_class {
 		//shifts the bounding box off the layer's pixel edges, introducing
 		//padding/misalignment when zooming.
 
+		const transform=app.GUI?.modules?.['edit/transform'];
+		if ((transform?.is_active() || data.transform_quad) && overlay_ctx && settings.enable_controls) {
+			this.draw_transform_controls(overlay_ctx,data,transform?.session?.ref,screen_handle);
+			return;
+		}
 		var block_size = block_size_default;
 
 		this.ctx.save();
@@ -540,6 +545,25 @@ class Base_selection_class {
 			//reset the overlay transform so next frame's clear spans the whole canvas
 			overlay_ctx.setTransform(1, 0, 0, 1, 0, 0);
 		}
+	}
+
+	/** Draw controls in screen space so layer shear never distorts the squares. */
+	draw_transform_controls(ctx,box,reference,size=8) {
+		this.selected_obj_positions={};
+		const m=zoomView.matrix,margin=config.TRANSFORM_MARGIN||0;
+		const screen=p=>({x:m[0]*p.x+m[2]*p.y+m[4]+margin,y:m[1]*p.x+m[3]*p.y+m[5]+margin});
+		ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
+		ctx.strokeStyle='#3f8ff7';ctx.fillStyle='#fff';ctx.lineWidth=1;
+		const corners=['tl','tr','br','bl'].map(loc=>screen(ref_point(box,loc)));
+		ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();
+		for(const loc of ['tl','tc','tr','ml','mr','bl','bc','br']) {
+			const p=screen(ref_point(box,loc)),x=Math.round(p.x-size/2)+.5,y=Math.round(p.y-size/2)+.5;
+			ctx.fillRect(x,y,size,size);ctx.strokeRect(x,y,size,size);
+		}
+		const p=screen(reference||ref_point(box)),r=5;
+		ctx.strokeStyle='#222';ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.stroke();
+		ctx.beginPath();ctx.moveTo(p.x-r*1.6,p.y);ctx.lineTo(p.x+r*1.6,p.y);ctx.moveTo(p.x,p.y-r*1.6);ctx.lineTo(p.x,p.y+r*1.6);ctx.stroke();
+		ctx.restore();
 	}
 
 	/**
@@ -1819,7 +1843,7 @@ class Base_selection_class {
 		// Free Transform owns pointer geometry and hit testing. These document
 		// listeners also receive the tool's events; running both mutates the
 		// session box before its preview can transform the actual layer.
-		if (app.GUI?.modules?.['edit/transform']?.is_active()) return;
+		if (app.GUI?.modules?.['edit/transform']?.is_active() || (config.TOOL?.name==='select' && config.layer?.transform_quad)) return;
 		var settings = this.find_settings();
 		if (!settings || !settings.data) {
 			return;

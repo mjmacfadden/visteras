@@ -1,3 +1,5 @@
+import { draw_quad } from './../libs/quad-transform.js';
+import { ref_point } from './../libs/free-transform.js';
 import { resampleRaster } from '../libs/raster-resample.js';
 import { composite_group_layers } from '../libs/group-composite.js';
 import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
@@ -832,6 +834,14 @@ class Base_layers_class {
 	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
 	 */
 	_draw_layer_content(ctx, object, is_preview) {
+		if (object.transform_quad) {
+			const source=document.createElement('canvas');
+			source.width=Math.max(1,Math.ceil(object.width));source.height=Math.max(1,Math.ceil(object.height));
+			const scratch=source.getContext('2d');scratch.translate(-object.x,-object.y);
+			this._draw_layer_content(scratch,{...object,transform_quad:undefined,rotate:0,skew_x:0,skew_y:0},is_preview);
+			draw_quad(ctx,source,['tl','tr','br','bl'].map(loc=>ref_point(object,loc)),()=>document.createElement('canvas'));
+			return;
+		}
 		const hasRotate = object.type !== 'text' && object.rotate != null && object.rotate !== 0;
 		const hasSkew = object.type !== 'text' && ((object.skew_x != null && object.skew_x !== 0) || (object.skew_y != null && object.skew_y !== 0));
 		if (hasRotate || hasSkew) {

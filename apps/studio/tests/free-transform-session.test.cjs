@@ -12,7 +12,7 @@ function harness(layers = [{ id: 1, type: 'image', x: 10, y: 20, width: 100, hei
  app.Actions.Update_layer_action = class { constructor(id, changes) { this.id = id; this.changes = changes; } do() { this.old = { ...app.Layers.get_layer(this.id) }; Object.assign(app.Layers.get_layer(this.id), this.changes); } undo() { const l = app.Layers.get_layer(this.id); for (const key of Object.keys(this.changes)) { if (key in this.old) l[key] = this.old[key]; else delete l[key]; } } };
  app.Actions.Bundle_action = class { constructor(id, name, actions) { this.name = name; this.actions = actions; } };
  const context = vm.createContext({ app, config, document: { getElementById: () => null }, Base_layers_class: class { render() {} }, alertify: { warning() {} }, get_layer_content_bounds: () => null, Subpath: { fromJSON: p => p } });
- const math = read('libs/free-transform.js').replace(/^export /gm, '');
+ const math = read('libs/quad-transform.js').replace(/^export /gm,'') + '\n' + read('libs/free-transform.js').replace(/^import .*;$/gm,'').replace(/^export /gm, '');
  const module = read('modules/edit/transform.js').replace(/^import [\s\S]*?;\n/gm, '').replace('export default class', 'class');
  vm.runInContext(math + '\n' + module + '\nthis.Transform = Transform_edit_class; this.math = {ref_point,local_point,resize_from_drag,transform_layer_geometry,scale_about,rotate_about,skew_from_drag};', context);
  const selectionSource = read('core/base-selection.js').replace(/^import .*;$/gm, '').replace(/export default \w+;/, 'this.Selection = Base_selection_class;');
@@ -166,7 +166,7 @@ test('legacy selection resumes after the transform session ends', async () => {
 });
 
 for (const type of ['image','rectangle']) for (const locator of ['tl','tr','bl','br']) for (const axis of ['x','y']) {
- test(`Command ${locator} ${axis}-drag skews ${type} without resizing`, async () => {
+ test(`Command ${locator} ${axis}-drag moves one ${type} corner without resizing`, async () => {
   const layer={id:1,type,x:100,y:100,width:200,height:120,rotate:25};
   const h=harness([layer]); await h.transform.free_transform();
   const original={...h.config.layer}; const box={...h.transform.session.box};
@@ -177,11 +177,11 @@ for (const type of ['image','rectangle']) for (const locator of ['tl','tr','bl',
   // Keep the modifier chosen at press even when later pointer events omit it.
   h.transform.pointer_move(end,{}); h.transform.pointer_up();
   assert.equal(layer.width,200); assert.equal(layer.height,120); assert.equal(layer.rotate,25);
-  assert.ok(Math.abs(layer[axis==='x' ? 'skew_x' : 'skew_y'])>1);
-  const fixedLocators=axis==='x' ? (locator.startsWith('t') ? ['bl','br'] : ['tl','tr']) : (locator.endsWith('l') ? ['tr','br'] : ['tl','bl']);
-  for(const fixed of fixedLocators) {
+  assert.ok(layer.transform_quad);
+  for(const fixed of ['tl','tr','bl','br']) {
    const before=h.math.ref_point(original,fixed),after=h.math.ref_point(layer,fixed);
-   assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<1e-8);
+   const expected=fixed===locator?end:before;
+   assert.ok(Math.hypot(expected.x-after.x,expected.y-after.y)<1e-8);
   }
   await h.transform.commit(); assert.equal(h.history.length,1);
   for(const action of h.history[0].actions) action.undo();
@@ -194,4 +194,11 @@ test('unmodified corner drag remains proportional resize', async () => {
  const start=h.math.ref_point(h.transform.session.box,'br');
  h.transform.pointer_down(start,{}); h.transform.pointer_move({x:start.x+40,y:start.y+24},{});
  assert.ok(h.config.layer.width>100); assert.equal(h.config.layer.skew_x,0); assert.equal(h.config.layer.skew_y,0);
+});
+
+test('committed corner transform can reopen, move, and cancel without mutating its saved quad',async()=>{
+ const h=harness([{id:1,type:'rectangle',x:100,y:100,width:200,height:120}]);await h.transform.free_transform();
+ const start=h.math.ref_point(h.transform.session.box,'br');h.transform.pointer_down(start,{metaKey:true});h.transform.pointer_move({x:start.x+30,y:start.y-20},{});await h.transform.commit();
+ const saved=plain(h.config.layer);await h.transform.free_transform();await h.transform.commit();assert.equal(h.history.length,1);
+ await h.transform.free_transform();h.transform.nudge(5,10);h.transform.cancel();assert.deepEqual(plain(h.config.layer),saved);
 });

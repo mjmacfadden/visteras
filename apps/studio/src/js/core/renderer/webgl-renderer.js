@@ -593,7 +593,7 @@ class WebGL_renderer_class {
 				continue;
 
 			// The GPU shader only supports rotation; Canvas is authoritative for skew.
-			if (layer.skew_x || layer.skew_y) return false;
+			if (layer.transform_quad || layer.skew_x || layer.skew_y) return false;
 
 			// Smart source pixels can have a different scale from their instance.
 			// GPU filter padding currently assumes layer-local pixels; use the

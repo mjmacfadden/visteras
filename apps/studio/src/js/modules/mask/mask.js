@@ -1,3 +1,5 @@
+import { draw_quad, quad_matrix, inverse_matrix, map_point } from './../../libs/quad-transform.js';
+import { ref_point } from './../../libs/free-transform.js';
 import { activeEffectTarget, effectMaskImageAction } from '../../libs/effect-masks.js';
 import app from './../../app.js';
 import config from './../../config.js';
@@ -363,7 +365,12 @@ class Mask_class {
 		cctx.setTransform(a, b, c, d, e, f);
 		cctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0 || skewX !== 0 || skewY !== 0);
 
-		if ((rad !== 0 || skewX !== 0 || skewY !== 0) && mask.linked !== false) {
+		if (layer.transform_quad && mask.linked !== false) {
+			const matrix=quad_matrix(['tl','tr','br','bl'].map(loc=>ref_point(layer,loc)));
+			const corners=[[mx,my],[mx+mw,my],[mx+mw,my+mh],[mx,my+mh]].map(([x,y])=>map_point(matrix,{x:(x-lx)/lw,y:(y-ly)/lh}));
+			draw_quad(cctx,alpha,corners,()=>document.createElement('canvas'));
+		}
+		else if ((rad !== 0 || skewX !== 0 || skewY !== 0) && mask.linked !== false) {
 			cctx.translate(lx + lw / 2, ly + lh / 2);
 			cctx.rotate(rad);
 			cctx.transform(1, skewY, skewX, 1, 0, 0);
@@ -721,7 +728,11 @@ class Mask_class {
 
 		var px = x;
 		var py = y;
-		if (layer.rotate && layer.mask && layer.mask.linked !== false) {
+		if (layer.transform_quad && layer.mask && layer.mask.linked !== false) {
+			const matrix=inverse_matrix(quad_matrix(['tl','tr','br','bl'].map(loc=>ref_point(layer,loc))));
+			const p=map_point(matrix,{x,y});px=layer.x+p.x*layer.width;py=layer.y+p.y*layer.height;
+		}
+		else if (layer.rotate && layer.mask && layer.mask.linked !== false) {
 			var rad = -layer.rotate * Math.PI / 180;
 			var cx = (layer.x || 0) + (layer.width || 0) / 2;
 			var cy = (layer.y || 0) + (layer.height || 0) / 2;

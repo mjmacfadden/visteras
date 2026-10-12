@@ -1,3 +1,4 @@
+import { valid_quad } from './../../libs/quad-transform.js';
 import { get_layer_content_bounds } from './../../libs/layer-bounds.js';
 import { Subpath } from './../../core/vector/vector-model.js';
 import app from './../../app.js';
@@ -104,7 +105,11 @@ export default class Transform_edit_class {
 
 		// Create transform session
 		const session = create_transform_session(layers);
-		if (layers.length === 1 && layers[0].type === 'image') {
+		if(layers.length===1 && layers[0].transform_quad) {
+			const bounds=get_layer_content_bounds(layers[0]);
+			if(bounds) {session.box={...bounds};session.snapshot.box={...bounds};}
+		}
+		if (layers.length === 1 && layers[0].type === 'image' && !layers[0].transform_quad) {
 			const bounds = get_layer_content_bounds(layers[0]);
 			if (bounds) {
 				// Content bounds retain local coordinates; rotate the offset about the full layer center.
@@ -233,6 +238,7 @@ export default class Transform_edit_class {
 			const layer = app.Layers.get_layer(old.id, true);
 			if (!layer) continue;
 			const next = transform_layer_geometry(old, initial, box);
+			if(next.transform_quad) layer.transform_quad=next.transform_quad; else delete layer.transform_quad;
 			for (const key of ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y']) layer[key] = next[key] || 0;
 			const vec = this.vector_for(layer);
 			if (vec && old.vector_paths) {
@@ -271,6 +277,17 @@ export default class Transform_edit_class {
 		if (!handle) for (const [loc, id] of Object.entries(locators)) {
 			const p = ref_point(box, loc);
 			if (Math.hypot(mouse.x - p.x, mouse.y - p.y) < radius) { handle = id; break; }
+		}
+		if (!handle && box.transform_quad) {
+			const q=['tl','tr','br','bl'].map(loc=>ref_point(box,loc));
+			let inside=false,distance=Infinity;
+			for(let i=0,j=3;i<4;j=i++) {
+				const a=q[j],b=q[i];
+				if((a.y>mouse.y)!==(b.y>mouse.y) && mouse.x<(b.x-a.x)*(mouse.y-a.y)/(b.y-a.y)+a.x) inside=!inside;
+				const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((mouse.x-a.x)*dx+(mouse.y-a.y)*dy)/(dx*dx+dy*dy)));
+				distance=Math.min(distance,Math.hypot(mouse.x-a.x-t*dx,mouse.y-a.y-t*dy));
+			}
+			return inside?'move':distance<46/config.ZOOM?'rotate':null;
 		}
 		if (!handle) {
 			const p = local_point(box, mouse);
@@ -318,18 +335,18 @@ export default class Transform_edit_class {
 			let delta = (Math.atan2(mouse.y - ref.y, mouse.x - ref.x) - Math.atan2(start.y - ref.y, start.x - ref.x)) * 180 / Math.PI;
 			if (event.shiftKey) delta = snap_angle((box.rotate || 0) + delta) - (box.rotate || 0);
 			next = rotate_about(box, ref, delta);
-		} else if ([1, 2, 4, 8, 5, 6, 9, 10].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
+		} else if ([5,6,9,10].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
+			const locators=['tl','tr','br','bl'];
+			const points=locators.map(loc=>ref_point(box,loc));
+			const index={5:0,9:1,10:2,6:3}[handle];
+			let dx=mouse.x-start.x,dy=mouse.y-start.y;
+			if(event.shiftKey) { if(Math.abs(dx)>=Math.abs(dy)) dy=0;else dx=0; }
+			points[index]={x:points[index].x+dx,y:points[index].y+dy};
+			if(!valid_quad(points)) return;
+			next={...box,transform_quad:points.map(p=>{const local=local_point(box,p);return {x:local.x/box.width+.5,y:local.y/box.height+.5};})};
+		} else if ([1, 2, 4, 8].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
 			const a = local_point(box, start), b = local_point(box, mouse);
-			// Corner skew follows the dominant local drag axis, then keeps that
-			// edge for the remainder of the gesture to avoid direction jumps.
-			let side = { 1: 'top', 2: 'bottom', 4: 'left', 8: 'right' }[handle];
-			if (!side) {
-				if (!drag.skew_side && Math.hypot(b.x - a.x, b.y - a.y) < 1 / config.ZOOM) return;
-				side = drag.skew_side || (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
-					? ([5, 9].includes(handle) ? 'top' : 'bottom')
-					: ([5, 6].includes(handle) ? 'left' : 'right'));
-				drag.skew_side = side;
-			}
+			const side = { 1: 'top', 2: 'bottom', 4: 'left', 8: 'right' }[handle];
 			const skew = skew_from_drag(side, b.x - a.x, b.y - a.y, box);
 			const opposite = { top: 'bc', bottom: 'tc', left: 'mr', right: 'ml' }[side];
 			const fixed = ref_point(box, opposite);

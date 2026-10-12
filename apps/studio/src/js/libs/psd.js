@@ -1262,7 +1262,7 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 	}
 
 	const hasSkew = (layer.skew_x != null && layer.skew_x !== 0) || (layer.skew_y != null && layer.skew_y !== 0);
-	if (hasSkew) {
+	if (hasSkew || layer.transform_quad) {
 		const canvas = document.createElement('canvas');
 		canvas.width = docWidth;
 		canvas.height = docHeight;

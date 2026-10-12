@@ -54,6 +54,7 @@ class Select_tool_class extends Base_tools_class {
 			data_function: () => {
 				const transform = app.GUI?.modules?.['edit/transform'];
 				if (transform?.is_active()) return { ...config.layer, ...transform.session.box };
+				if(config.layer?.transform_quad) return {...config.layer,...get_layer_content_bounds(config.layer)};
 
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
@@ -301,6 +302,7 @@ class Select_tool_class extends Base_tools_class {
 	async mousedown(e) {
 		var mouse = this.get_mouse_info(e);
 		const transform = app.GUI?.modules?.['edit/transform'];
+		if(config.layer?.transform_quad && transform && !transform.is_active() && mouse.click_valid) await transform.free_transform();
 		if (transform?.is_active()) {
 			if (mouse.click_valid && config.mouse_lock !== true) transform.pointer_down(mouse, e);
 			return;
@@ -1494,7 +1496,7 @@ class Select_tool_class extends Base_tools_class {
 	check_hit_region(e, ctx, layer) {
 		var mouse = this.get_mouse_info(e);
 
-		if(layer.type == 'image' && !layer.rotate && !layer.skew_x && !layer.skew_y && Math.abs(layer.width * layer.height / 1000000) > 5){
+		if(layer.type == 'image' && !layer.rotate && !layer.skew_x && !layer.skew_y && !layer.transform_quad && Math.abs(layer.width * layer.height / 1000000) > 5){
 			//too big to check using getImageData - use simple way
 			if (mouse.x > layer.x && mouse.x < layer.x + layer.width &&
 				mouse.y > layer.y && mouse.y < layer.y + layer.height) {

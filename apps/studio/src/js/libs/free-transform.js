@@ -1,3 +1,4 @@
+import { quad_matrix, inverse_matrix, map_point } from './quad-transform.js';
 /**
  * Pure math and session state for Free Transform (Edit ▸ Free Transform).
  * No app or DOM dependencies.
@@ -23,6 +24,12 @@ export function ref_point(box, locator = 'c') {
 		case 'bc': lx = cx; ly = (b.y || 0) + (b.height || 0); break;
 		case 'br': lx = (b.x || 0) + (b.width || 0); ly = (b.y || 0) + (b.height || 0); break;
 		default:   lx = cx; ly = cy; break;
+	}
+	if (b.transform_quad) {
+		const q=b.transform_quad;
+		const positions={tl:q[0],tr:q[1],br:q[2],bl:q[3],tc:{x:(q[0].x+q[1].x)/2,y:(q[0].y+q[1].y)/2},mr:{x:(q[1].x+q[2].x)/2,y:(q[1].y+q[2].y)/2},bc:{x:(q[2].x+q[3].x)/2,y:(q[2].y+q[3].y)/2},ml:{x:(q[3].x+q[0].x)/2,y:(q[3].y+q[0].y)/2},c:map_point(quad_matrix(q),{x:.5,y:.5})};
+		const p=positions[locator]||positions.c;
+		lx=b.x+p.x*b.width;ly=b.y+p.y*b.height;
 	}
 	const angle = ((b.rotate || 0) * Math.PI) / 180;
 	const dx0 = lx - cx;
@@ -170,6 +177,7 @@ export function create_transform_session(layers) {
 			rotate: list[0].rotate || 0,
 			skew_x: list[0].skew_x || 0,
 			skew_y: list[0].skew_y || 0,
+			transform_quad: list[0].transform_quad ? list[0].transform_quad.map(p=>({...p})) : undefined,
 		};
 	} else if (list.length > 1) {
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -230,11 +238,11 @@ export function restore_transform_session(session, layers) {
 }
 
 
-export const TRANSFORM_FIELDS = ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y', 'params', 'data', 'mask'];
+export const TRANSFORM_FIELDS = ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y', 'params', 'data', 'mask', 'transform_quad'];
 function clone_transform_value(key, value) {
 	// Mask bitmap/canvas references must retain their identity.
 	if (key === 'mask') return value ? { ...value } : value;
-	if ((key === 'params' || key === 'data' || key === 'vector_paths') && value && typeof value === 'object') return JSON.parse(JSON.stringify(value));
+	if ((key === 'params' || key === 'data' || key === 'vector_paths' || key === 'transform_quad') && value && typeof value === 'object') return JSON.parse(JSON.stringify(value));
 	return value;
 }
 export function snapshot_transform_layer(layer) {
@@ -294,6 +302,20 @@ function multiply(a, b) {
 }
 /** Apply a common affine box change to a layer, including rotated multi-selections. */
 export function transform_layer_geometry(layer, from, to) {
+	if(['x','y','width','height','rotate','skew_x','skew_y'].every(k=>(from[k]||0)===(to[k]||0)) && JSON.stringify(from.transform_quad)===JSON.stringify(to.transform_quad)) return {...layer};
+	if (from.transform_quad || to.transform_quad) {
+		const locators=['tl','tr','br','bl'];
+		const source=inverse_matrix(quad_matrix(locators.map(loc=>ref_point(from,loc))));
+		const destination=quad_matrix(locators.map(loc=>ref_point(to,loc)));
+		const cleanFrom={...from,transform_quad:undefined},cleanTo={...to,transform_quad:undefined};
+		const next=transform_layer_geometry({...layer,transform_quad:undefined},cleanFrom,cleanTo);
+		next.transform_quad=locators.map(loc=>{
+			const p=map_point(destination,map_point(source,ref_point(layer,loc)));
+			const local=local_point(next,p);
+			return {x:local.x/next.width+.5,y:local.y/next.height+.5};
+		});
+		return next;
+	}
 	if (['x','y','width','height','rotate','skew_x','skew_y'].every(k => (from[k] || 0) === (to[k] || 0))) return { ...layer };
 	const a = axes(from), b = axes(to), det = a[0]*a[3]-a[1]*a[2];
 	const sx = to.width / from.width, sy = to.height / from.height;
