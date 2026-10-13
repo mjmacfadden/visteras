@@ -15,6 +15,7 @@ import { unsupported_adjustment_fields, unsupported_labels, unsupported_import_m
 import filesaver from './../../../node_modules/file-saver/dist/FileSaver.min.js';
 import { is_group, get_children, get_parent_id, is_psd_group } from './layer-tree.js';
 import { is_layer_clipped } from './layer-clip.js';
+import { psd_curves_to_studio, studio_curves_to_psd } from './curves.js';
 import { psd_levels_to_studio, studio_levels_to_psd } from './levels.js';
 
 // Lazy-load ag-psd on first open/save so the editor shell does not pay for it at boot.
@@ -610,6 +611,11 @@ function convert_psd_adjustment(psdLayer, id, name, opacity, visible, compositio
 				// PS/ag-psd gamma is ~0.01..9.99; UI defaults to 0.1..3 but preserve wider on import
 				gamma: Math.max(0.01, Math.min(9.99, gamma)),
 			};
+			break;
+		}
+		case 'curves': {
+			adjustment_type = 'curves';
+			params = psd_curves_to_studio(adj);
 			break;
 		}
 		case 'levels': {
@@ -1214,6 +1220,8 @@ function export_layer_to_psd(layer, docWidth, docHeight) {
 				offset: Math.max(-0.5, Math.min(0.5, offset)),
 				gamma: Math.max(0.01, Math.min(9.99, gamma)),
 			};
+		} else if (normType === 'curves') {
+			adjObj = studio_curves_to_psd(layer.params);
 		} else if (normType === 'levels') {
 			adjObj = studio_levels_to_psd(layer.params);
 		}

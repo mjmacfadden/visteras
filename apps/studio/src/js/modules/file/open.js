@@ -11,6 +11,7 @@ import EXIF from './../../../../node_modules/exif-js/exif.js';
 import GUI_tools_class from "../../core/gui/gui-tools";
 import semver_compare from './../../../../node_modules/semver-compare/';
 import { migrate_layer_clipping } from './../../libs/layer-clip.js';
+import { migrate_psd_unsupported_curves } from './../../libs/curves.js';
 import { migrate_psd_unsupported_levels } from './../../libs/levels.js';
 import { drop_mode, fit_place_rect, is_blank_start_document } from './../../libs/drop-routing.js';
 
@@ -1200,6 +1201,7 @@ class File_open_class {
 			for (var mi in json.layers) {
 				migrate_layer_clipping(json.layers[mi]);
 				migrate_psd_unsupported_levels(json.layers[mi]);
+				migrate_psd_unsupported_curves(json.layers[mi]);
 			}
 		}
 		await app.State.do_action(

@@ -62,17 +62,18 @@ test('psd.js wiring: default branch uses the placeholder, warns once, and export
 	assert.match(props, /if \(layer\.psd_unsupported\) \{[\s\S]*id="properties_psd_unsupported"/);
 });
 
-test('end to end: a PSD with Levels imports as a real levels layer, Curves as placeholder', async () => {
+test('end to end: a PSD with Levels imports as a real Levels and Curves layers, Color Balance as placeholder', async () => {
 	const { createCanvas } = require('@napi-rs/canvas');
 	const warnings = [];
 	const context = vm.createContext({ config: { layers: [] }, console: { log() {}, warn: (...a) => warnings.push('WARN ' + a.map(String).join(' ')) }, alertify: { success() {}, warning: (m) => warnings.push(m), error: (m) => warnings.push('ERR ' + m) }, document: { createElement: () => createCanvas(1, 1) }, performance, HTMLCanvasElement: createCanvas(1, 1).constructor, ImageData: require('@napi-rs/canvas').ImageData });
 	const strip = (f) => fs.readFileSync(require.resolve('../src/js/' + f), 'utf8').replace(/^import .*;$/gm, '').replace(/export default \{[\s\S]*?\};/g, '').replace(/^export default .*;$/gm, '').replace(/\bexport /g, '');
-	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-fill.js', 'libs/psd-unsupported.js', 'libs/levels.js'].map(strip).join('\n')
+	vm.runInContext(['libs/layer-tree.js', 'libs/layer-clip.js', 'libs/text-geometry.js', 'libs/psd-fill.js', 'libs/psd-unsupported.js', 'libs/levels.js', 'libs/curves.js'].map(strip).join('\n')
 		+ fs.readFileSync(require.resolve('../src/js/libs/psd.js'), 'utf8').replace(/^import .*;$/gm, '').replace(/\bexport (?=(?:async )?function)/g, ''), context);
 	let imported;
 	context.app = { Documents: { create_document_from_psd_data: (d) => { imported = d; } } };
 	context.psdFixture = { width: 40, height: 24, children: [
 		{ name: 'Levels 1', adjustment: { type: 'levels', rgb: { shadowInput: 12, highlightInput: 230, midtoneInput: 1.1, shadowOutput: 0, highlightOutput: 255 } } },
+		{ name: 'Color Balance 1', adjustment: { type: 'color balance' } },
 		{ name: 'Curves 1', adjustment: { type: 'curves', rgb: [{ input: 0, output: 0 }, { input: 255, output: 255 }] } },
 		{ name: 'Hue/Saturation 1', adjustment: { type: 'hue/saturation', master: { hue: 10, saturation: 0, lightness: 0 } } },
 		{ name: 'Faded', fillOpacity: 0.4, left: 0, top: 0, right: 4, bottom: 4, canvas: createCanvas(4, 4) },
@@ -80,17 +81,20 @@ test('end to end: a PSD with Levels imports as a real levels layer, Curves as pl
 	vm.runInContext('agPsdModulePromise = Promise.resolve({readPsd: () => psdFixture})', context);
 	await context.load_psd(new ArrayBuffer(0), 'client.psd');
 	assert.ok(imported, JSON.stringify(warnings));
-	const [lv, cv, hs] = imported.layers;
+	const [lv, cb, cv, hs] = imported.layers;
 	assert.equal(lv.name, 'Levels 1');
 	assert.equal(lv.adjustment_type, 'levels');
 	assert.equal(lv.psd_unsupported, undefined);
 	assert.equal(lv.params.rgb.inBlack, 12);
-	assert.equal(cv.name, 'Curves 1 (unsupported)');
+	assert.equal(cv.name, 'Curves 1');
+	assert.equal(cv.adjustment_type, 'curves');
+	assert.equal(cv.psd_unsupported, undefined);
+	assert.equal(cb.name, 'Color Balance 1 (unsupported)');
 	assert.equal(hs.name, 'Hue/Saturation 1');
 	assert.equal(hs.psd_unsupported, undefined);
 	assert.equal(warnings.length, 1);
-	assert.match(warnings[0], /\(Curves\)/);
-	assert.doesNotMatch(warnings[0], /Levels/);
+	assert.match(warnings[0], /\(Color Balance\)/);
+	assert.doesNotMatch(warnings[0], /Levels|Curves/);
 	context.exportLayers = imported.layers;
 	const exported = vm.runInContext('build_psd_children_tree(exportLayers, 0, 40, 24)', context);
 	const types = exported.map((l) => l.adjustment && l.adjustment.type);

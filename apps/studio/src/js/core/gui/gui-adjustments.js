@@ -18,6 +18,7 @@ class GUI_adjustments_class {
 
 		const adjustments = [
 			{ name: 'Brightness', target: 'layer/adjustment.brightness', type: 'brightness' },
+			{ name: 'Curves', target: 'layer/adjustment.curves', type: 'curves' },
 			{ name: 'Levels', target: 'layer/adjustment.levels', type: 'levels' },
 			{ name: 'Contrast', target: 'layer/adjustment.contrast', type: 'contrast' },
 			{ name: 'Hue / Saturation', target: 'layer/adjustment.hue_saturation', type: 'hue-saturation' },

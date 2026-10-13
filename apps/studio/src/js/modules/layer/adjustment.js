@@ -3,6 +3,7 @@ import config from './../../config.js';
 import Base_layers_class from './../../core/base-layers.js';
 import Helper_class from './../../libs/helpers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { default_curves_params } from './../../libs/curves.js';
 import { default_levels_params } from './../../libs/levels.js';
 
 class Layer_adjustment_class {
@@ -12,6 +13,7 @@ class Layer_adjustment_class {
 		this.Helper = new Helper_class();
 
 		this.ADJUSTMENT_TYPES = {
+			'curves': { title: 'Curves', name: 'Curves', default_params: default_curves_params(), params: [] },
 			'levels': {
 				title: 'Levels',
 				name: 'Levels',
@@ -191,6 +193,10 @@ class Layer_adjustment_class {
 
 	threshold() {
 		this.create_or_edit('threshold');
+	}
+
+	curves() {
+		this.create_or_edit('curves');
 	}
 
 	levels() {

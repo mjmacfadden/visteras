@@ -64,7 +64,7 @@ export function eventMatchesChord(e, spec, isMac) {
   if (isDigitKey(key)) {
     keyOk = e.key === key || e.code === `Digit${key}` || e.code === `Numpad${key}`;
   } else if (/^[a-zA-Z]$/.test(key)) {
-    keyOk = e.code === `Key${key.toUpperCase()}` || (e.key && e.key.toUpperCase() === key.toUpperCase());
+    keyOk = e.code ? e.code === `Key${key.toUpperCase()}` : !!e.key && e.key.toUpperCase() === key.toUpperCase();
   } else {
     keyOk = e.key === key || e.code === key;
   }

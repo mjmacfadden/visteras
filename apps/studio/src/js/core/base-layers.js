@@ -25,6 +25,7 @@ import Composite_cache_class from "./renderer/composite-cache.js";
 import { is_group, is_effectively_visible, get_descendant_ids, get_effective_layer_filters } from "./../libs/layer-tree.js";
 import { is_layer_clipped, get_render_composition } from './../libs/layer-clip.js';
 import Vector_renderer from "./vector/vector-renderer.js";
+import { apply_curves } from "./../libs/curves.js";
 import { apply_levels } from "./../libs/levels.js";
 
 var instance = null;
@@ -1176,7 +1177,7 @@ class Base_layers_class {
 
 		const type = layer.adjustment_type ? layer.adjustment_type.toLowerCase().replace(/_/g, '-') : null;
 		const filterString = this.get_adjustment_filter_string(layer);
-		if (type !== 'threshold' && type !== 'exposure' && type !== 'levels' && (!filterString || filterString === 'none')) return;
+		if (type !== 'threshold' && type !== 'exposure' && type !== 'levels' && type !== 'curves' && (!filterString || filterString === 'none')) return;
 
 		const W = targetCtx.canvas.width;
 		const H = targetCtx.canvas.height;
@@ -1261,7 +1262,12 @@ class Base_layers_class {
 	apply_adjustment_effect(destCtx, srcCanvas, layer, W, H) {
 		const type = layer.adjustment_type ? layer.adjustment_type.toLowerCase().replace(/_/g, '-') : null;
 
-		if (type === 'levels') {
+		if (type === 'curves') {
+			destCtx.drawImage(srcCanvas, 0, 0);
+			const imgData = destCtx.getImageData(0, 0, W, H);
+			apply_curves(imgData.data, layer.params);
+			destCtx.putImageData(imgData, 0, 0);
+		} else if (type === 'levels') {
 			destCtx.drawImage(srcCanvas, 0, 0);
 			const imgData = destCtx.getImageData(0, 0, W, H);
 			apply_levels(imgData.data, layer.params);

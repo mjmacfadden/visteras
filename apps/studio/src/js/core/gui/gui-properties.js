@@ -6,6 +6,7 @@ import Tools_translate_class from './../../modules/tools/translate.js';
 import Vector_manager from './../vector/vector-manager.js';
 import { Update_vector_action } from './../../actions/vector/update-vector.js';
 import Tools_bg_auto_class from './../../modules/tools/bg_auto.js';
+import { default_curves_params, normalize_curve, curves_lut } from './../../libs/curves.js';
 import { default_levels_params, auto_levels } from './../../libs/levels.js';
 
 /**
@@ -365,6 +366,10 @@ class GUI_properties_class {
 			return;
 		}
 
+		if (normType === 'curves') {
+			this.render_curves_properties(target, layer, bind_events);
+			return;
+		}
 		if (normType === 'levels') {
 			this.render_levels_properties(target, layer, bind_events);
 			return;
@@ -405,6 +410,145 @@ class GUI_properties_class {
 		}
 
 		this.bind_control_events(target, layer.id);
+	}
+
+	render_curves_properties(target, layer, bind_events = false) {
+		if (!layer.params) layer.params = default_curves_params();
+		if (this.bound_layer_id === layer.id && target.dataset.adjType === 'curves' && !bind_events) {
+			target.querySelector('#curves_channel').value = layer.params.channel;
+			this.draw_curves_graph(target, layer);
+			return;
+		}
+		target.innerHTML = `<div class="properties_controls curves_properties_controls">
+			<div class="properties_title trn">Curves</div>
+			<div class="properties_row"><label class="properties_label" for="curves_channel">Channel:</label>
+			<select class="properties_select" id="curves_channel">${['rgb', 'red', 'green', 'blue'].map(ch =>
+				`<option value="${ch}">${ch === 'rgb' ? 'RGB' : ch[0].toUpperCase() + ch.slice(1)}</option>`).join('')}</select></div>
+			<canvas class="curves_graph levels_histogram_canvas" width="256" height="256" aria-label="Curves graph: click to add a point, drag to adjust, drag an interior point outside to remove"></canvas>
+			<div class="properties_label">Click to add a point. Drag outside to remove it.</div>
+			<div class="levels_btn_row"><button type="button" class="levels_btn" id="curves_reset">Reset</button></div>
+		</div>`;
+		target.dataset.adjType = 'curves';
+		this.bound_layer_id = layer.id;
+		this.bound_kind = 'adjustment';
+		this.params_at_interaction_start = null;
+		const select = target.querySelector('#curves_channel');
+		select.value = layer.params.channel || 'rgb';
+		select.addEventListener('change', () => {
+			layer.params.channel = select.value;
+			this.curves_selected_point = null;
+			this.update_levels_histogram(target, layer);
+			this.draw_curves_graph(target, layer);
+		});
+		target.querySelector('#curves_reset').addEventListener('click', () => {
+			this.snapshot_params(layer.id);
+			const channel = layer.params.channel;
+			layer.params = default_curves_params();
+			layer.params.channel = channel;
+			this.curves_selected_point = null;
+			this.apply_live_levels(layer.id);
+			this.draw_curves_graph(target, layer);
+			this.commit_params(layer.id);
+		});
+		const canvas = target.querySelector('.curves_graph');
+		canvas.addEventListener('pointerdown', e => {
+			if (e.button !== 0) return;
+			e.preventDefault();
+			const channel = layer.params.channel;
+			const original = normalize_curve(layer.params[channel]);
+			const position = ev => {
+				const rect = canvas.getBoundingClientRect();
+				return { input: (ev.clientX - rect.left) / rect.width * 255,
+					output: (1 - (ev.clientY - rect.top) / rect.height) * 255 };
+			};
+			const start = position(e);
+			let index = original.findIndex(p => Math.hypot(p.input - start.input, p.output - start.output) < 10);
+			this.snapshot_params(layer.id);
+			if (index < 0) {
+				const input = Math.round(start.input);
+				// Keep distinct input coordinates and at most Photoshop's 16 anchors.
+				if (original.length >= 16 || input <= original[0].input || input >= original[original.length - 1].input
+					|| original.some(p => p.input === input)) { this.params_at_interaction_start = null; return; }
+				original.push({ input, output: Math.max(0, Math.min(255, Math.round(start.output))) });
+				original.sort((a, b) => a.input - b.input);
+				index = original.findIndex(p => p.input === input);
+			}
+			canvas.setPointerCapture(e.pointerId);
+			const endpoint = index === 0 || index === original.length - 1;
+			const move = ev => {
+				const pos = position(ev);
+				const outside = pos.input < 0 || pos.input > 255 || pos.output < 0 || pos.output > 255;
+				const points = original.map(p => ({ ...p }));
+				if (outside && !endpoint) {
+					points.splice(index, 1);
+					this.curves_selected_point = null;
+				} else {
+					points[index] = {
+						input: Math.max(index === 0 ? 0 : original[index - 1].input + 1,
+							Math.min(index === original.length - 1 ? 255 : original[index + 1].input - 1, Math.round(pos.input))),
+						output: Math.max(0, Math.min(255, Math.round(pos.output)))
+					};
+					this.curves_selected_point = index;
+				}
+				layer.params[channel] = points;
+				this.apply_live_levels(layer.id);
+				this.draw_curves_graph(target, layer);
+			};
+			const finish = ev => {
+				canvas.removeEventListener('pointermove', move);
+				canvas.removeEventListener('pointerup', finish);
+				canvas.removeEventListener('pointercancel', finish);
+				if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+				if (ev.type === 'pointercancel') {
+					layer.params = this.params_at_interaction_start;
+					this.params_at_interaction_start = null;
+					this.apply_live_levels(layer.id);
+					this.draw_curves_graph(target, layer);
+				} else this.commit_params(layer.id);
+			};
+			canvas.addEventListener('pointermove', move);
+			canvas.addEventListener('pointerup', finish);
+			canvas.addEventListener('pointercancel', finish);
+			move(e);
+		});
+		this.curves_selected_point = null;
+		this.update_levels_histogram(target, layer);
+		this.draw_curves_graph(target, layer);
+	}
+
+	draw_curves_graph(target, layer) {
+		const canvas = target.querySelector('.curves_graph');
+		if (!canvas) return;
+		const ctx = canvas.getContext('2d');
+		const channel = layer.params.channel || 'rgb';
+		if (this.last_levels_hist_data) this.draw_levels_histogram(canvas, this.last_levels_hist_data, channel);
+		else ctx.clearRect(0, 0, 256, 256);
+		const style = getComputedStyle(canvas);
+		ctx.strokeStyle = style.getPropertyValue('--visteras-accent').trim();
+		ctx.globalAlpha = 0.25;
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		for (let i = 0; i <= 4; i++) {
+			const v = i * 255 / 4;
+			ctx.moveTo(v, 0); ctx.lineTo(v, 255);
+			ctx.moveTo(0, v); ctx.lineTo(255, v);
+		}
+		ctx.moveTo(0, 255); ctx.lineTo(255, 0);
+		ctx.stroke();
+		ctx.globalAlpha = 1;
+		ctx.lineWidth = 2;
+		const points = normalize_curve(layer.params[channel]), lut = curves_lut(points);
+		ctx.beginPath();
+		for (let x = 0; x < 256; x++) {
+			if (x === 0) ctx.moveTo(x, 255 - lut[x]);
+			else ctx.lineTo(x, 255 - lut[x]);
+		}
+		ctx.stroke();
+		ctx.fillStyle = ctx.strokeStyle;
+		points.forEach((p, i) => {
+			const size = i === this.curves_selected_point ? 8 : 6;
+			ctx.fillRect(p.input - size / 2, 255 - p.output - size / 2, size, size);
+		});
 	}
 
 	render_levels_properties(target, layer, bind_events = false) {

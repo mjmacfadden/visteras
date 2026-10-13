@@ -386,6 +386,12 @@ const menuDefinition = [
 						target: 'layer/adjustment.brightness'
 					},
 					{
+						name: 'Curves',
+						ellipsis: true,
+						shortcut: 'Ctrl + Alt + M',
+						target: 'layer/adjustment.curves'
+					},
+					{
 						name: 'Levels',
 						ellipsis: true,
 						shortcut: 'Ctrl + Alt + L',

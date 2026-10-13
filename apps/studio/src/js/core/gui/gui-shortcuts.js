@@ -581,6 +581,17 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Curves adjustment layer: Photoshop ⌘M / Ctrl+M → browser-safe ⌃⌘M on Mac / Ctrl+Alt+M on Win
+			const isMacOSCurves = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesChord(event, { meta: true, key: 'M' }, isMacOSCurves)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
+					app.GUI.modules['layer/adjustment'].create_or_edit('curves');
+				}
+				return;
+			}
+
 			// Free Transform: Photoshop ⌘T / Ctrl+T → browser-safe ⌃⌘T on Mac / Ctrl+Alt+T on Win
 			const isMacOSTransform = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
 			if (eventMatchesChord(event, { meta: true, key: 'T' }, isMacOSTransform)) {
