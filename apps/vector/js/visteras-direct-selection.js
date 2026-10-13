@@ -1,3 +1,4 @@
+import { anchorGuideSnap } from './visteras-anchor-snap.js';
 import { cutAnchors } from './visteras-pen-geometry.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';
 import { normalizeEditablePath } from './visteras-path-geometry.js';
@@ -267,6 +268,7 @@ export function mountDirectSelection(editor) {
     }
   }
   function finish(cancel = false) {
+    window.__visterasGuideManager?.clearSmartGuides?.();
     hideSnapMarker();
     hoverSnap = null;
     if (!gesture) return;
@@ -631,7 +633,9 @@ export function mountDirectSelection(editor) {
       g.moved = true;
       if (e.shiftKey) Math.abs(dx) > Math.abs(dy) ? dy = 0 : dx = 0;
 
-      if (isSnapPointEnabled()) {
+      const guideManager = window.__visterasGuideManager;
+      guideManager?.clearSmartGuides?.();
+      if (isSnapPointEnabled() || (g.type === 'anchors' && guideManager?.smartGuidesEnabled)) {
         const contentScreenCTM = sc.getSvgContent().getScreenCTM();
         if (contentScreenCTM) {
           if (g.type === 'anchors') {
@@ -666,7 +670,17 @@ export function mountDirectSelection(editor) {
             if (leaderOrigContent) {
               const proposedContent = { x: leaderOrigContent.x + dx, y: leaderOrigContent.y + dy };
               const proposedScreen = new DOMPoint(proposedContent.x, proposedContent.y).matrixTransform(contentScreenCTM);
-              const snap = findSnapTarget(proposedScreen, excludeAnchors) || artboardSnapTarget(sc, proposedScreen);
+              let snap = isSnapPointEnabled()
+                ? findSnapTarget(proposedScreen, excludeAnchors) || artboardSnapTarget(sc, proposedScreen)
+                : null;
+              if (!snap) {
+                // Anchor drags share resize handles' guide/alignment targets.
+                // Shift restricts which coordinate may snap; Snap to Point is independent.
+                const dir = e.shiftKey ? (dx === 0 ? 'n' : 'e') : 'ne';
+                snap = anchorGuideSnap(guideManager, proposedContent,
+                  g.before.filter(item => item.rec.selected.size).map(item => item.rec.el), dir);
+                if (snap) snap.screenPt = new DOMPoint(snap.contentPt.x, snap.contentPt.y).matrixTransform(contentScreenCTM);
+              }
               if (snap) {
                 dx = snap.contentPt.x - leaderOrigContent.x;
                 dy = snap.contentPt.y - leaderOrigContent.y;
