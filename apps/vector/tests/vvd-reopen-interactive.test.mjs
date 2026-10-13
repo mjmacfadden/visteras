@@ -60,14 +60,14 @@ test('.vvd Reopen: Editor.js getMouseTarget selects across layers and syncs acti
   // Verify getMouseTarget walks up until a layer or svgContent, without unbounded parent traversal
   assert.match(
     code,
-    /!nv\.isLayer\(t\.parentNode\) && !t\.parentNode\.isSameNode\(svgContent\)/,
+    /!nv\.isLayer\(t\.parentNode\) && !t\.parentNode\.hasAttribute\?\.\('data-visteras-sublayer'\) && !t\.parentNode\.isSameNode\(svgContent\)/,
     'getMouseTarget must stop walking up when reaching a layer group or svgContent'
   );
 
   // Verify getMouseTarget switches active layer to the clicked object layer
   assert.match(
     code,
-    /if \(nv\.isLayer\(t\.parentNode\)\) \{\s*let layerName = fv\(t\.parentNode\);/,
+    /if \(nv\.isLayer\(containingLayer\)\) \{\s*let layerName = fv\(containingLayer\);/,
     'getMouseTarget must identify layer of clicked element'
   );
   assert.match(

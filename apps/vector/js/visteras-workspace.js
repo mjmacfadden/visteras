@@ -1,5 +1,6 @@
+import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js';
 import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js';
-import { ensureHost } from './visteras-object-transform.js';
+import { ensureHost, documentMatrix, localMatrix } from './visteras-object-transform.js';
 /** Shared viewport gestures and object rows for the Vector workspace. */
 export function mountVectorWorkspace(editor) {
   // The editor can be re-initialized by the document shell. Do not attach a
@@ -61,6 +62,8 @@ export function mountVectorWorkspace(editor) {
   let pending = false;
   let dragged = null;
   const collapsedLayers = new WeakSet();
+  const rowsByElement = new Map();
+  let targeted = null;
   const LOCK_ATTR = 'data-visteras-locked';
   const isLocked = element => element?.getAttribute?.(LOCK_ATTR) === '1';
   const hasLockedAncestor = element => {
@@ -90,7 +93,7 @@ export function mountVectorWorkspace(editor) {
   const addToSelection = sc.addToSelection?.bind(sc);
   if (addToSelection) {
     sc.addToSelection = (elements, ...args) => addToSelection(
-      (elements || []).filter(element => !hasLockedAncestor(element)), ...args
+      selectableArtwork(elements || []).filter(element => !hasLockedAncestor(element)), ...args
     );
   }
   function captureLayerScroll() {
@@ -104,7 +107,7 @@ export function mountVectorWorkspace(editor) {
   let editing = null;
   function startRename(element, label) {
     if (editing) editing.blur();
-    const layer = sc.isLayer(element);
+    const layer = sc.isLayer(element), sublayer = isSublayer(element);
     const title = [...element.children].find(el => el.localName === 'title');
     const input = document.createElement('input');
     input.className = 'vector-layer-name-input';
@@ -122,6 +125,14 @@ export function mountVectorWorkspace(editor) {
           if (next !== title?.textContent && !sc.getCurrentDrawing().hasLayer(next)) {
             sc.setCurrentLayer(title.textContent);
             sc.renameCurrentLayer(next); // SVG-Edit records the title change in its undo manager.
+          }
+        } else if (sublayer) {
+          const next = name || nextLayerName(layerNames(sc.getSvgContent()));
+          const old = title.textContent;
+          if (next !== old) {
+            title.textContent = next;
+            sc.addCommandToHistory(new sc.history.ChangeElementCommand(title, { '#text': old }, 'Rename sublayer'));
+            sc.call('changed', [element]);
           }
         } else renameObject(sc, element, name);
       }
@@ -176,8 +187,70 @@ export function mountVectorWorkspace(editor) {
     const name = nextLayerName([...names, `Layer ${names.length}`]);
     if (options) layerOptions(name, create); else create(name);
   }
+  function newSublayer(options = false) {
+    const current = sc.getCurrentDrawing().getCurrentLayer();
+    const parent = targeted && sc.getSvgContent().contains(targeted) && isLayerContainer(targeted) ? targeted : current;
+    if (!parent || hasLockedAncestor(parent)) return;
+    const names = layerNames(sc.getSvgContent()), name = nextLayerName([...names, `Layer ${names.length}`]);
+    const create = name => {
+      const layer = createSublayer(document, name, sc.getNextId());
+      parent.appendChild(layer); // last SVG child paints first in the panel's reverse order
+      sc.addCommandToHistory(new sc.history.InsertElementCommand(layer, 'Create sublayer'));
+      for (const ancestor of rowPath(layer, sc.getSvgContent())) collapsedLayers.delete(ancestor);
+      targeted = layer;
+      sc.call('changed', [layer]); renderObjects();
+      const label = rowsByElement.get(layer)?.querySelector('.vector-object-name');
+      if (!options && label) startRename(layer, label);
+    };
+    if (options) layerOptions(name, create); else create(name);
+  }
+  function locateObject() {
+    const element = topmostSelected(sc.getSelectedElements(), sc.getSvgContent());
+    if (!element) return;
+    window.__visterasDock?.open('layers');
+    for (const parent of rowPath(element, sc.getSvgContent())) collapsedLayers.delete(parent);
+    renderObjects();
+    const row = rowsByElement.get(element);
+    row?.scrollIntoView({ block: 'nearest' });
+    row?.classList.add('vector-layer-located');
+    setTimeout(() => row?.classList.remove('vector-layer-located'), 1100);
+  }
+  const buttons = document.getElementById('layerbuttons');
+  function addPanelButton(id, title, icon, action) {
+    const button = document.createElement('button');
+    button.id = id; button.type = 'button'; button.title = title; button.setAttribute('aria-label', title);
+    button.innerHTML = icon; button.addEventListener('click', action);
+    return button;
+  }
+  const newSublayerButton = addPanelButton('layer_new_sublayer', 'Create New Sublayer',
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 19V6h7l2 3h9v10H3Z M12 11v6M9 14h6"/></svg>', e => newSublayer(e.altKey));
+  document.getElementById('layer_new')?.after(newSublayerButton);
+  buttons?.append(addPanelButton('layer_locate', 'Locate Object', '<img src="./images/zoom.svg" alt=""/>', locateObject));
+  const menu = document.createElement('div');
+  menu.className = 'vector-layer-panel-menu'; menu.hidden = true; menu.setAttribute('role', 'menu');
+  const menuActions = [
+    ['New Layer…', () => newLayer(true), 'new_layer_options'],
+    ['New Sublayer…', () => newSublayer(true), 'new_sublayer_options'],
+    ['Locate Object', locateObject, 'locate_object'],
+    ['Duplicate Layer', () => editor.layersPanel.cloneLayer(), 'duplicate_layer'],
+    ['Delete Layer', () => editor.layersPanel.deleteLayer(), 'delete_layer'],
+    ['Merge Down', () => editor.layersPanel.mergeLayer(), 'merge_down'],
+    ['Merge All', () => { sc.mergeAllLayers(); editor.layersPanel.populateLayers(); }, 'merge_all'],
+  ];
+  for (const [label, action, id] of menuActions) {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
+    button.dataset.layerCommand = id; button.setAttribute('role', 'menuitem');
+    button.addEventListener('click', () => { menu.hidden = true; action(); }); menu.append(button);
+  }
+  document.getElementById('layerpanel')?.append(menu);
+  document.getElementById('layer_moreopts')?.addEventListener('click', e => {
+    e.preventDefault(); e.stopImmediatePropagation(); menu.hidden = !menu.hidden;
+  }, true);
+  document.addEventListener('mousedown', e => {
+    if (!menu.contains(e.target) && !e.target.closest?.('#layer_moreopts')) menu.hidden = true;
+  });
   editor.__visterasLayers = {
-    newLayer,
+    newLayer, newSublayer, locateObject,
     renameCurrent() {
       const layer = sc.getCurrentDrawing().getCurrentLayer();
       const row = [...list.querySelectorAll('tr.layer')].find(row => row.querySelector('.layername')?.textContent === displayName(layer));
@@ -193,12 +266,14 @@ export function mountVectorWorkspace(editor) {
     if (editing) return;
     observer.disconnect();
     list.querySelectorAll('.vector-object-row').forEach(row => row.remove());
+    rowsByElement.clear();
     const drawing = sc.getCurrentDrawing();
     const selected = sc.getSelectedElements().filter(Boolean);
     for (const row of list.querySelectorAll('tr.layer')) {
       const name = row.querySelector('.layername')?.textContent;
       const layer = drawing.getLayerByName(name);
       if (!layer) continue;
+      rowsByElement.set(layer, row);
       let nameCell = row.querySelector('.layername');
       // Native mouseup handlers rebuild the row between double-clicks. Own the
       // name cell so the inline editor remains mounted through selection.
@@ -208,6 +283,7 @@ export function mountVectorWorkspace(editor) {
         nameCell.replaceWith(replacement); nameCell = replacement;
         nameCell.addEventListener('click', event => {
           if (event.target.closest('input, .vector-layer-disclosure')) return;
+          targeted = layer;
           sc.setCurrentLayer(displayName(layer));
           list.querySelectorAll('tr.layer').forEach(other => other.classList.toggle('layersel', other === row));
         });
@@ -245,6 +321,9 @@ export function mountVectorWorkspace(editor) {
           if (['title','desc','defs','metadata'].includes(element.localName)) continue;
           const child = document.createElement('tr');
           child.className = 'vector-object-row';
+          if (isSublayer(element)) child.classList.add('vector-sublayer-row');
+          if (targeted === element) child.classList.add('vector-layer-targeted');
+          rowsByElement.set(element, child);
           const cell = document.createElement('td');
           const eyeCell = document.createElement('td');
           const eye = document.createElement('button');
@@ -303,9 +382,11 @@ export function mountVectorWorkspace(editor) {
           eyeCell.append(lock);
           const button = document.createElement('button');
           button.type = 'button';
+          button.className = 'vector-object-name';
           button.textContent = objectLabel(element);
-          button.addEventListener('dblclick', e => { e.stopPropagation(); startRename(element, button); });
-          button.style.cssText = `width:100%;text-align:left;padding:5px 8px 5px ${30+depth*16}px;border:0;background:${selected.includes(element)?'#465366':'transparent'};color:inherit;font:inherit;cursor:grab`;
+          let selectTimer;
+          button.addEventListener('dblclick', e => { clearTimeout(selectTimer); e.stopPropagation(); startRename(element, button); });
+          button.style.cssText = `width:100%;text-align:left;padding:5px 8px 5px ${30+depth*16}px;border:0;background:${selected.includes(element)?'color-mix(in srgb, var(--visteras-accent) 25%, transparent)':'transparent'};color:inherit;font:inherit;cursor:grab`;
           button.title = 'Drag to reorder within this layer or group';
           button.draggable = true;
           button.addEventListener('dragstart', event => {
@@ -319,7 +400,7 @@ export function mountVectorWorkspace(editor) {
             queue();
           });
           child.addEventListener('dragover', event => {
-            if (!dragged || dragged === element || dragged.parentNode !== parent) return;
+            if (!dragged || dragged === element || dragged.contains(element) || (dragged.parentNode !== parent && !isSublayer(element)) || hasLockedAncestor(element)) return;
             event.preventDefault();
             event.dataTransfer.dropEffect = 'move';
             list.querySelectorAll('[data-drop]').forEach(row => row.removeAttribute('data-drop'));
@@ -327,30 +408,53 @@ export function mountVectorWorkspace(editor) {
             child.dataset.drop = event.clientY < rect.top + rect.height / 2 ? 'above' : 'below';
           });
           child.addEventListener('drop', event => {
-            if (!dragged || dragged === element || dragged.parentNode !== parent) return;
+            if (!dragged || dragged === element || dragged.contains(element) || (dragged.parentNode !== parent && !isSublayer(element)) || hasLockedAncestor(element)) return;
             event.preventDefault();
-            const moved = dragged, oldNext = moved.nextSibling;
+            const moved = dragged, oldNext = moved.nextSibling, oldParent = moved.parentNode;
+            const oldTransform = moved.getAttribute('transform');
+            const world = isSublayer(element) && oldParent !== element ? documentMatrix(sc, oldParent).multiply(localMatrix(moved)) : null;
             // Panel order is the reverse of SVG paint order: the top row paints last.
             const rect = child.getBoundingClientRect();
             const above = event.clientY < rect.top + rect.height / 2;
-            parent.insertBefore(moved, above ? element.nextSibling : element);
-            if (moved.nextSibling !== oldNext) {
-              sc.addCommandToHistory(new sc.history.MoveElementCommand(moved, oldNext, parent, 'Reorder object'));
+            if (isSublayer(element)) { element.appendChild(moved); collapsedLayers.delete(element); }
+            else parent.insertBefore(moved, above ? element.nextSibling : element);
+            if (moved.parentNode !== oldParent || moved.nextSibling !== oldNext) {
+              const batch = new sc.history.BatchCommand('Move object');
+              batch.addSubCommand(new sc.history.MoveElementCommand(moved, oldNext, oldParent, 'Reorder object'));
+              if (world) {
+                moved.setAttribute('transform', documentMatrix(sc, moved.parentNode).inverse().multiply(world).toString());
+                batch.addSubCommand(new sc.history.ChangeElementCommand(moved, { transform: oldTransform }, 'Preserve object position'));
+              }
+              sc.addCommandToHistory(batch);
               sc.call('changed', [moved]);
             }
             dragged = null;
             queue();
           });
           button.addEventListener('click', event => {
-            if (isLocked(element)) return;
-            sc.setCurrentLayer(name);
-            if (!event.shiftKey) sc.clearSelection();
-            sc.addToSelection([element]);
-            // Keep the name node alive long enough to receive a double-click.
-            setTimeout(queue, 350);
+            clearTimeout(selectTimer);
+            // Native selection can rebuild the table; defer a single click so
+            // a double-click can open the name editor before its node is removed.
+            selectTimer = setTimeout(() => {
+              if (isLocked(element)) return;
+              if (editing) return;
+              targeted = isSublayer(element) ? element : parent;
+              sc.setCurrentLayer(name);
+              if (isSublayer(element)) { sc.clearSelection(); queue(); return; }
+              if (!event.shiftKey) sc.clearSelection();
+              sc.addToSelection([element]); queue();
+            }, 280);
           });
+          if (isSublayer(element)) {
+            const disclosure = document.createElement('button'); disclosure.type = 'button'; disclosure.className = 'vector-layer-disclosure';
+            disclosure.setAttribute('aria-expanded', String(!collapsedLayers.has(element)));
+            disclosure.setAttribute('aria-label', `${collapsedLayers.has(element) ? 'Expand' : 'Collapse'} ${displayName(element)}`);
+            disclosure.addEventListener('click', e => { e.stopPropagation();
+              if (collapsedLayers.has(element)) collapsedLayers.delete(element); else collapsedLayers.add(element); queue(); });
+            cell.append(disclosure);
+          }
           cell.append(button); child.append(eyeCell, cell); previous.after(child); previous = child;
-          if (element.localName === 'g') append(element, depth+1);
+          if (element.localName === 'g' && !collapsedLayers.has(element)) append(element, depth+1);
         }
       }
       append(layer,0);
@@ -372,7 +476,7 @@ export function mountVectorWorkspace(editor) {
     return result;
   };
   const contentObserver = new MutationObserver(queue);
-  contentObserver.observe(sc.getSvgRoot(),{childList:true,subtree:true,attributes:true,characterData:true,attributeFilter:['display', 'data-visteras-name']});
+  contentObserver.observe(sc.getSvgRoot(),{childList:true,subtree:true,attributes:true,characterData:true,attributeFilter:['display', 'data-visteras-name', 'data-visteras-locked']});
   queue();
   editor.__visterasWorkspaceMounted = { refresh: queue };
   return editor.__visterasWorkspaceMounted;

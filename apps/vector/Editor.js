@@ -38109,7 +38109,10 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 		if (e) {
 			let n = e.children;
 			Array.from(n, (e) => {
-				e.getBBox && t.push(e);
+				// Visteras: marquee traverses sublayers, while ordinary groups remain atomic.
+				if (e.hasAttribute?.('data-visteras-sublayer')) {
+					if (e.getAttribute('display') !== 'none') t.push(...Sg(e).reverse());
+				} else e.getBBox && t.push(e);
 			});
 		}
 		return t.reverse();
@@ -40515,15 +40518,19 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 			for (; t && t.parentNode && !t.parentNode.isSameNode(curGroup);) t = t.parentNode;
 			return t || ny.getSvgRoot();
 		}
-		for (; t && t.parentNode && !nv.isLayer(t.parentNode) && !t.parentNode.isSameNode(svgContent);) {
+		// Visteras: sublayers are selection boundaries, just like top-level layers.
+		for (; t && t.parentNode && !nv.isLayer(t.parentNode) && !t.parentNode.hasAttribute?.('data-visteras-sublayer') && !t.parentNode.isSameNode(svgContent);) {
 			if (t.parentNode.isSameNode(ny.getSvgRoot()) || t.parentNode.isSameNode(ny.getDOMContainer())) {
 				return ny.getSvgRoot();
 			}
 			t = t.parentNode;
 		}
 		if (!t || !t.parentNode || t.isSameNode(svgContent)) return ny.getSvgRoot();
-		if (nv.isLayer(t.parentNode)) {
-			let layerName = fv(t.parentNode);
+		// Visteras: sublayers keep their containing top-level layer current.
+		let containingLayer = t.parentNode;
+		while (containingLayer && !nv.isLayer(containingLayer) && containingLayer !== svgContent) containingLayer = containingLayer.parentNode;
+		if (nv.isLayer(containingLayer)) {
+			let layerName = fv(containingLayer);
 			if (layerName && ny.getCurrentDrawing().getCurrentLayerName() !== layerName) {
 				ny.getCurrentDrawing().setCurrentLayer(layerName);
 			}

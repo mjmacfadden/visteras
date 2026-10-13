@@ -44,3 +44,55 @@ test('core layer commands use inline rename and immediate create, without browse
   assert.match(workspace, /aria-label="Layer Options"/);
   assert.match(workspace, /renameCurrentLayer\(next\)/);
 });
+
+import { createSublayer, isSublayer, rowPath, topmostSelected, selectableArtwork } from '../js/visteras-sublayers.js';
+function attach(parent, child) { parent.children.push(child); child.parentNode = parent; return child; }
+test('sublayer creation writes the serializable marker and title', () => {
+  const doc = { createElementNS(ns, tag) { const el = fakeEl(tag); el.appendChild = child => attach(el, child); return el; } };
+  const layer = createSublayer(doc, 'Details', 'svg_12');
+  assert.equal(isSublayer(layer), true); assert.equal(layer.id, 'svg_12'); assert.equal(displayName(layer), 'Details');
+});
+test('Locate follows nested ancestors and chooses the topmost selected artwork', () => {
+  const root = fakeEl('svg'), lower = attach(root, fakeEl('g', { class:'layer' }));
+  const sub = attach(lower, fakeEl('g', {'data-visteras-sublayer':'1'})), rect = attach(sub, fakeEl('rect'));
+  const upper = attach(root, fakeEl('g', { class:'layer' })), ellipse = attach(upper, fakeEl('ellipse'));
+  assert.deepEqual(rowPath(rect, root), [lower, sub, rect]);
+  assert.equal(topmostSelected([ellipse, rect], root), ellipse);
+  assert.equal(topmostSelected([rect, ellipse], root), ellipse);
+});
+test('Select All and marquee flatten sublayers, preserving normal groups and skipping hidden artwork', () => {
+  const sub = fakeEl('g', {'data-visteras-sublayer':'1'}), rect = attach(sub, fakeEl('rect'));
+  attach(sub, fakeEl('title'));
+  const group = fakeEl('g'), hidden = fakeEl('g', {'data-visteras-sublayer':'1',display:'none'});
+  attach(hidden, fakeEl('ellipse'));
+  assert.deepEqual(selectableArtwork([sub, group, hidden]), [rect, group]);
+});
+test('sublayers are canvas boundaries and Locate has button and menu entry', () => {
+  const core = fs.readFileSync(new URL('../Editor.js', import.meta.url), 'utf8');
+  assert.match(core, /Visteras: sublayers are selection boundaries/);
+  assert.match(core, /!t.parentNode.hasAttribute\?\.\('data-visteras-sublayer'\)/);
+  assert.match(core, /Visteras: marquee traverses sublayers/);
+  const workspace = fs.readFileSync(new URL('../js/visteras-workspace.js', import.meta.url), 'utf8');
+  assert.match(workspace, /'layer_locate', 'Locate Object'/);
+  assert.match(workspace, /\['Locate Object', locateObject, 'locate_object'\]/);
+  assert.match(workspace, /__visterasDock\?\.open\('layers'\)/);
+  assert.match(workspace, /new sc.history.MoveElementCommand\(moved, oldNext, oldParent/);
+});
+
+import vm from 'node:vm';
+test('actual core hit-test selects a child within nested sublayers, keeping ordinary groups atomic', () => {
+  const code = fs.readFileSync(new URL('../Editor.js', import.meta.url), 'utf8');
+  const start = code.indexOf('oy = (e) => {'), end = code.indexOf('\n\t}, sy =', start);
+  const root = fakeEl('svg'), layer = attach(root, fakeEl('g', {class:'layer'}));
+  const sub = attach(layer, fakeEl('g', {'data-visteras-sublayer':'1'}));
+  const rect = attach(sub, fakeEl('rect')), group = attach(sub, fakeEl('g')), path = attach(group, fakeEl('path'));
+  for (const el of [root, layer, sub, rect, group, path]) { el.isSameNode = other => other === el; el.namespaceURI = 'svg'; }
+  let active = 'Other';
+  const drawing = { getCurrentLayer: () => layer, getCurrentLayerName: () => active, setCurrentLayer: name => { active = name; } };
+  const context = { Eh: {}, nv: { isLayer: el => el === layer }, Wh: () => false, fv: () => 'Art', ny: {
+    getCurrentDrawing: () => drawing, getSvgRoot: () => root, getDOMContainer: () => ({}), getSvgContent: () => root, getCurrentGroup: () => null,
+  } };
+  vm.runInNewContext('const ' + code.slice(start, end) + '\n}; this.hit = oy;', context);
+  assert.equal(context.hit({ target: rect }), rect); assert.equal(active, 'Art');
+  assert.equal(context.hit({ target: path }), group);
+});

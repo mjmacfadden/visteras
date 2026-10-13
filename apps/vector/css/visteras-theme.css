@@ -1869,3 +1869,15 @@ body.pan-dragging #svgcontent *,
 
 .vector-layer-name-input { width: 100%; min-width: 0; box-sizing: border-box; color: inherit; background: var(--input-background-color); border: 1px solid var(--visteras-accent); font: inherit; }
 .vector-layer-name { cursor: text; }
+
+#layerbuttons > button { width: 20px; height: 20px; padding: 2px; color: inherit; background: transparent; border: 0; cursor: pointer; }
+#layerbuttons > button svg, #layerbuttons > button img { width: 16px; height: 16px; }
+#layerpanel { position: relative; }
+.vector-layer-panel-menu { position: absolute; top: 30px; right: 4px; z-index: 5; min-width: 190px; background: var(--block-background-color, #292929); border: 1px solid var(--visteras-accent); box-shadow: 0 3px 12px #0008; }
+.vector-layer-panel-menu[hidden] { display: none; }
+.vector-layer-panel-menu button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 7px 10px; background: transparent; color: inherit; border: 0; text-align: left; font: inherit; }
+.vector-layer-panel-menu button:hover { background: color-mix(in srgb, var(--visteras-accent) 25%, transparent); }
+.vector-layer-located { outline: 2px solid var(--visteras-accent); outline-offset: -2px; }
+.vector-layer-targeted { background: color-mix(in srgb, var(--visteras-accent) 20%, transparent); }
+.vector-sublayer-row td:last-child { position: relative; }
+.vector-sublayer-row .vector-layer-disclosure { position: absolute; left: 12px; top: 5px; z-index: 1; }
