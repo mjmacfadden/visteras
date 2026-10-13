@@ -54,6 +54,9 @@ test('Lasso pointer gestures replace/add/subtract and Esc cancels without moving
  try{
    const tool=mountLasso({svgCanvas:sc});tool.activate();
    function loop(extra){fire('pointerdown',extra);fire('pointermove',{clientX:10,clientY:0});fire('pointermove',{clientX:10,clientY:10});fire('pointermove',{clientX:0,clientY:10});fire('pointerup');}
+   fire('pointerdown');fire('pointermove',{clientX:10,clientY:0});fire('pointermove',{clientX:10,clientY:10});
+   assert.equal(nodes.get('visteras-lasso-overlay').attrs.d,'M0 0 L10 0 L10 10');
+   assert.equal(selection.size,0,'selection waits for release');fire('pointercancel');
    loop({});assert.deepEqual([...selection.get(el)],[0]);
    selection=new Map([[el,new Set([1])]]);loop({shiftKey:true});assert.deepEqual([...selection.get(el)],[1,0]);
    loop({altKey:true});assert.deepEqual([...selection.get(el)],[1]);

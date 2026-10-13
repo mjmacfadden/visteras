@@ -37,7 +37,7 @@ export function mountLasso(editor){
    if(!line){line=document.createElementNS('http://www.w3.org/2000/svg','path');line.id='visteras-lasso-overlay';line.setAttribute('fill','none');line.setAttribute('stroke','var(--visteras-accent)');line.setAttribute('stroke-width','1');line.setAttribute('stroke-dasharray','4 3');line.setAttribute('pointer-events','none');line.style.cssText='position:fixed;z-index:99999';
      const root=document.createElementNS('http://www.w3.org/2000/svg','svg');root.id='visteras-lasso-screen';root.style.cssText='position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:99999';root.append(line);document.body.append(root);
    }
-   line.setAttribute('d',gesture.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' ')+'Z');
+   line.setAttribute('d',gesture.points.map((p,i)=>`${i?'L':'M'}${p.x} ${p.y}`).join(' '));
  }
  function cancel(){document.getElementById('visteras-lasso-screen')?.remove();clear();}
  document.addEventListener('modeChange',()=>{
