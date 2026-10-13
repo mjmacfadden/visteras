@@ -20,7 +20,7 @@ function harness(layers = [{ id: 1, type: 'image', x: 10, y: 20, width: 100, hei
  const selection = Object.create(context.Selection.prototype);
  const transform = new context.Transform(); app.GUI.modules['edit/transform'] = transform;
  transform.render_options_bar = () => {}; transform.sync_options_bar = () => {};
- return { transform, config, app, history, selection, math: context.math };
+ return { transform, config, app, history, selection, math: context.math, document: context.document };
 }
 
 test('menu null argument and asynchronous switch from Brush keep session open', async () => {
@@ -201,4 +201,39 @@ test('committed corner transform can reopen, move, and cancel without mutating i
  const start=h.math.ref_point(h.transform.session.box,'br');h.transform.pointer_down(start,{metaKey:true});h.transform.pointer_move({x:start.x+30,y:start.y-20},{});await h.transform.commit();
  const saved=plain(h.config.layer);await h.transform.free_transform();await h.transform.commit();assert.equal(h.history.length,1);
  await h.transform.free_transform();h.transform.nudge(5,10);h.transform.cancel();assert.deepEqual(plain(h.config.layer),saved);
+});
+
+
+test('transform cursors follow rotation and distinguish independent corner skew', async () => {
+ const h = harness(); await h.transform.free_transform();
+ assert.equal(h.transform.cursor_for_handle(5), 'nwse-resize');
+ assert.equal(h.transform.cursor_for_handle(5, { ctrlKey: true }), 'crosshair');
+ assert.equal(h.transform.cursor_for_handle(9, { metaKey: true }), 'crosshair');
+ assert.equal(h.transform.cursor_for_handle(1, { ctrlKey: true }), 'ew-resize');
+ h.transform.session.box.rotate = 90;
+ assert.equal(h.transform.cursor_for_handle(1), 'ew-resize');
+ assert.equal(h.transform.cursor_for_handle(1, { ctrlKey: true }), 'ns-resize');
+ assert.equal(h.transform.cursor_for_handle(5), 'nesw-resize');
+});
+
+test('corner cursor updates on modifiers and stays correct throughout a skew drag', async () => {
+ const h = harness(); await h.transform.free_transform();
+ const wrapper = { style: {} }; h.document.getElementById = id => id === 'main_wrapper' ? wrapper : null;
+ const corner = h.math.ref_point(h.transform.session.box, 'tl');
+ h.transform.pointer_move(corner, {}); assert.equal(wrapper.style.cursor, 'nwse-resize');
+ h.transform.update_cursor({ ctrlKey: true }); assert.equal(wrapper.style.cursor, 'crosshair');
+ h.transform.update_cursor({}); assert.equal(wrapper.style.cursor, 'nwse-resize');
+ h.transform.pointer_down(corner, { ctrlKey: true }); assert.equal(wrapper.style.cursor, 'crosshair');
+ h.transform.pointer_move({ x: corner.x - 20, y: corner.y + 5 }, {});
+ assert.equal(wrapper.style.cursor, 'crosshair');
+ h.transform.pointer_up(); assert.notEqual(wrapper.style.cursor, 'crosshair');
+});
+
+
+test('cancel clears a transform cursor so it cannot leak into the next tool', async () => {
+ const h = harness(); await h.transform.free_transform();
+ const wrapper = { style: {} }; h.document.getElementById = id => id === 'main_wrapper' ? wrapper : null;
+ h.transform.pointer_move(h.math.ref_point(h.transform.session.box, 'tl'), { ctrlKey: true });
+ assert.equal(wrapper.style.cursor, 'crosshair');
+ h.transform.cancel(); assert.equal(wrapper.style.cursor, 'default'); assert.equal(h.transform.last_pointer, null);
 });

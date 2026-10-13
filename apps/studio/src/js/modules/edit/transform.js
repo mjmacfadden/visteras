@@ -163,6 +163,9 @@ export default class Transform_edit_class {
 		const session = this.session;
 		this.drag = null;
 		this.session = null;
+		this.last_pointer = null;
+		const wrapper = document.getElementById('main_wrapper');
+		if (wrapper) wrapper.style.cursor = 'default';
 		const settings = app.GUI.GUI_tools.tools_modules?.select?.object?.Base_selection?.find_settings();
 		if (settings && session.previous_controls !== undefined) settings.enable_controls = session.previous_controls;
 		document.getElementById('action_attributes')?.classList.remove('free-transform-options');
@@ -210,6 +213,9 @@ export default class Transform_edit_class {
 		const session = this.session;
 		this.drag = null;
 		this.session = null;
+		this.last_pointer = null;
+		const wrapper = document.getElementById('main_wrapper');
+		if (wrapper) wrapper.style.cursor = 'default';
 		const settings = app.GUI.GUI_tools.tools_modules?.select?.object?.Base_selection?.find_settings();
 		if (settings && session.previous_controls !== undefined) settings.enable_controls = session.previous_controls;
 		document.getElementById('action_attributes')?.classList.remove('free-transform-options');
@@ -300,22 +306,46 @@ export default class Transform_edit_class {
 	pointer_down(mouse, event) {
 		const box = this.session.box;
 		const handle = this.hit_handle(mouse);
+		this.last_pointer = { x: mouse.x, y: mouse.y };
+		this.last_pointer_event = event;
 		this.drag = handle ? { handle, start: { x: mouse.x, y: mouse.y }, box: { ...box }, ref: { ...this.session.ref }, skew: !!(event.metaKey || event.ctrlKey || this.is_skew_mode()) } : null;
+		this.update_cursor(event);
+	}
+
+	cursor_for_handle(handle, event = {}) {
+		if (handle === 'rotate') return "url('images/icons/rotate.svg') 12 12, default";
+		if (handle === 'ref' || handle === 'move') return 'move';
+		const locators = { 1: 'tc', 2: 'bc', 4: 'ml', 8: 'mr', 5: 'tl', 6: 'bl', 9: 'tr', 10: 'br' };
+		if (!locators[handle]) return 'default';
+		const skew = this.drag?.skew || event.metaKey || event.ctrlKey || this.is_skew_mode();
+		// Corner distortion moves a single point freely, rather than resizing the box.
+		if (skew && [5, 6, 9, 10].includes(handle)) return 'crosshair';
+		const box = this.session.box;
+		let from, to;
+		if (skew) {
+			const edge = { 1: ['tl', 'tr'], 2: ['bl', 'br'], 4: ['tl', 'bl'], 8: ['tr', 'br'] }[handle];
+			from = ref_point(box, edge[0]); to = ref_point(box, edge[1]);
+		} else {
+			const opposite = { 1: 'bc', 2: 'tc', 4: 'mr', 8: 'ml', 5: 'br', 6: 'tr', 9: 'bl', 10: 'tl' };
+			from = ref_point(box, opposite[handle]); to = ref_point(box, locators[handle]);
+		}
+		const angle = (Math.atan2(to.y - from.y, to.x - from.x) * 180 / Math.PI + 180) % 180;
+		return ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'][Math.round(angle / 45) % 4];
+	}
+
+	update_cursor(event = {}) {
+		if (!this.is_active() || !this.last_pointer) return;
+		this.last_pointer_event = event;
+		const wrapper = document.getElementById('main_wrapper');
+		if (wrapper) wrapper.style.cursor = this.cursor_for_handle(this.drag?.handle || this.hit_handle(this.last_pointer), event);
 	}
 
 	pointer_move(mouse, event) {
+		this.last_pointer = { x: mouse.x, y: mouse.y };
+		this.last_pointer_event = event;
+		this.update_cursor(event);
 		const drag = this.drag;
-		if (!drag) {
-			const handle = this.hit_handle(mouse);
-			const wrapper = document.getElementById('main_wrapper');
-			if (wrapper) wrapper.style.cursor = handle === 'rotate' ? "url('images/icons/rotate.svg') 12 12, default"
-				: handle === 'ref' || handle === 'move' ? 'move'
-				: [1, 2].includes(handle) ? (event.metaKey || event.ctrlKey || this.is_skew_mode() ? 'ew-resize' : 'ns-resize')
-				: [4, 8].includes(handle) ? (event.metaKey || event.ctrlKey || this.is_skew_mode() ? 'ns-resize' : 'ew-resize')
-				: [5, 6, 9, 10].includes(handle) && (event.metaKey || event.ctrlKey || this.is_skew_mode()) ? 'move'
-				: [5, 10].includes(handle) ? 'nwse-resize' : [6, 9].includes(handle) ? 'nesw-resize' : 'default';
-			return;
-		}
+		if (!drag) return;
 		const { box, start, ref, handle } = drag;
 		if (handle === 'ref') {
 			this.session.locator = null;
@@ -357,9 +387,10 @@ export default class Transform_edit_class {
 			next = resize_from_drag(box, handle, start, mouse, this.session.aspect_locked !== !!event.shiftKey, event.altKey ? ref : null);
 		}
 		this.preview_box(next);
+		this.update_cursor(event);
 	}
 
-	pointer_up() { this.drag = null; }
+	pointer_up() { this.drag = null; this.update_cursor(this.last_pointer_event); }
 
 	vector_for(layer) {
 		if (!layer || layer.type !== 'vector') return null;

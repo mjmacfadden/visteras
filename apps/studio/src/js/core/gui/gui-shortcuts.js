@@ -130,6 +130,8 @@ class GUI_shortcuts_class {
 					app.GUI.GUI_tools.update_aspect_lock_ui(isDown);
 				}
 			}
+			const transform = app.GUI?.modules?.['edit/transform'];
+			if (transform?.is_active()) transform.update_cursor({ metaKey: this.is_meta_down, ctrlKey: this.is_ctrl_down, shiftKey: this.is_shift_down });
 		};
 		window.addEventListener('keydown', (event) => updateModifierState(event, true), { capture: true, passive: true });
 		window.addEventListener('keyup', (event) => updateModifierState(event, false), { capture: true, passive: true });
