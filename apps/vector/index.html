@@ -20,7 +20,7 @@
 
   <!-- Visteras Studio Companion Theme -->
   <link href="./lib/visteras-ui/tokens.css?v=ui-tokens-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-theme.css?v=layers-parity-4" rel="stylesheet" media="all">
+  <link href="./css/visteras-theme.css?v=layers-parity-6" rel="stylesheet" media="all">
   <link href="./lib/visteras-ui/ui.css?v=ui-3" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css?v=guides-2" rel="stylesheet" media="all">
   <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
@@ -88,7 +88,7 @@
             <div class="menu_dropdown_item" id="action_copy">Copy <span class="menu_dropdown_shortcut">⌘C</span></div>
             <div class="menu_dropdown_item" id="action_paste">Paste <span class="menu_dropdown_shortcut">⌘V</span></div>
             <div class="menu_dropdown_item" id="action_paste_in_place">Paste in Place <span class="menu_dropdown_shortcut">⌘F / ⌘⇧V</span></div>
-            <div class="menu_dropdown_item" id="action_clone">Duplicate <span class="menu_dropdown_shortcut">⌘D</span></div>
+            <div class="menu_dropdown_item" id="action_clone">Duplicate</div>
             <div class="menu_dropdown_separator"></div>
             <div class="menu_dropdown_item" id="action_select_all">Select All <span class="menu_dropdown_shortcut">⌘A</span></div>
             <div class="menu_dropdown_item" id="action_deselect_all">Deselect All <span class="menu_dropdown_shortcut">⌘⇧A</span></div>
@@ -298,9 +298,9 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=layers-parity-4';
+    import Editor from './Editor.js?v=layers-parity-6';
     import { mountOutlineImages } from './js/visteras-outline-images.js';
-    import { mountVectorWorkspace } from './js/visteras-workspace.js?v=layers-parity-4';
+    import { mountVectorWorkspace } from './js/visteras-workspace.js?v=layers-parity-6';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
@@ -315,8 +315,8 @@
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-2';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-2';
-    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=safe-2';
-    import { mountObjectTransform } from './js/visteras-object-transform.js?v=layers-parity-4';
+    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=layers-parity-6';
+    import { mountObjectTransform } from './js/visteras-object-transform.js?v=layers-parity-6';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
     import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
     import { mountGrid } from './js/visteras-grid.js?v=grid-1';

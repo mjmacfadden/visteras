@@ -1,3 +1,4 @@
+import { eventMatchesChord, formatBrowserSafeShortcut, browserSafeChord } from './visteras-browser-shortcuts.js';
 import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js';
 import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js';
 import { ensureHost, documentMatrix, localMatrix } from './visteras-object-transform.js';
@@ -84,6 +85,10 @@ export function mountVectorWorkspace(editor) {
   let previousSelected;
   previousSelected = sc.bind?.('selected', (_window, elements) => {
     if (rejectingLockedSelection || !elements?.some?.(hasLockedAncestor)) {
+      const selected = elements?.find?.(Boolean);
+      for (let parent = selected?.parentNode; parent && parent !== sc.getSvgContent(); parent = parent.parentNode) {
+        if (isLayerContainer(parent)) { targeted = parent; break; }
+      }
       previousSelected?.(_window, elements);
       return;
     }
@@ -114,6 +119,7 @@ export function mountVectorWorkspace(editor) {
     input.setAttribute('aria-label', 'Name');
     input.value = layer ? title?.textContent || '' : element.getAttribute('data-visteras-name') || '';
     if (!input.value && !layer && element.getAttribute('data-visteras-sublayer')) input.value = title?.textContent || '';
+    const draggable = label.draggable; label.draggable = false;
     let finished = false;
     const finish = cancel => {
       if (finished) return;
@@ -136,6 +142,7 @@ export function mountVectorWorkspace(editor) {
           }
         } else renameObject(sc, element, name);
       }
+      label.draggable = draggable;
       label.textContent = displayName(element);
       queue();
     };
@@ -178,6 +185,7 @@ export function mountVectorWorkspace(editor) {
     const create = name => {
       const drawing = sc.getCurrentDrawing(), index = drawing.indexCurrentLayer();
       const layer = drawing.createLayer(name);
+      targeted = layer;
       if (index >= 0) drawing.setCurrentLayerPosition(index + 1);
       sc.addCommandToHistory(new sc.history.InsertElementCommand(layer, 'Create layer'));
       sc.clearSelection(); sc.call('changed', [layer]);
@@ -229,6 +237,7 @@ export function mountVectorWorkspace(editor) {
   const menu = document.createElement('div');
   menu.className = 'vector-layer-panel-menu'; menu.hidden = true; menu.setAttribute('role', 'menu');
   const menuActions = [
+    ['New Layer', () => newLayer(), 'new_layer'],
     ['New Layer…', () => newLayer(true), 'new_layer_options'],
     ['New Sublayer…', () => newSublayer(true), 'new_sublayer_options'],
     ['Locate Object', locateObject, 'locate_object'],
@@ -240,6 +249,13 @@ export function mountVectorWorkspace(editor) {
   for (const [label, action, id] of menuActions) {
     const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
     button.dataset.layerCommand = id; button.setAttribute('role', 'menuitem');
+    if (id === 'new_layer' || id === 'new_layer_options') {
+      const spec = { meta: true, alt: id === 'new_layer_options', key: 'L' };
+      const label = document.createElement('span'); label.className = 'menu_dropdown_shortcut';
+      const mapped = browserSafeChord(spec);
+      label.dataset.shortcut = [mapped.ctrl && 'Ctrl', mapped.alt && 'Alt', mapped.shift && 'Shift', mapped.meta && 'Meta', 'L'].filter(Boolean).join('+');
+      label.textContent = formatBrowserSafeShortcut(spec); button.append(label);
+    }
     button.addEventListener('click', () => { menu.hidden = true; action(); }); menu.append(button);
   }
   document.getElementById('layerpanel')?.append(menu);
@@ -252,11 +268,25 @@ export function mountVectorWorkspace(editor) {
   editor.__visterasLayers = {
     newLayer, newSublayer, locateObject,
     renameCurrent() {
+      if (isSublayer(targeted) && sc.getSvgContent().contains(targeted)) {
+        const label = rowsByElement.get(targeted)?.querySelector('.vector-object-name');
+        if (label) startRename(targeted, label);
+        return;
+      }
       const layer = sc.getCurrentDrawing().getCurrentLayer();
       const row = [...list.querySelectorAll('tr.layer')].find(row => row.querySelector('.layername')?.textContent === displayName(layer));
       if (row) startRename(layer, row.querySelector('.vector-layer-name'));
     },
   };
+  window.addEventListener('keydown', event => {
+    const focus = document.activeElement;
+    if (['input','textarea','select'].includes(focus?.tagName?.toLowerCase()) || focus?.isContentEditable
+      || event.target?.isContentEditable || window.__visterasIsTypingDirectly) return;
+    if (document.querySelector('#visteras-transform-dialog-host .vtx-overlay')) return;
+    const options = eventMatchesChord(event, { meta: true, alt: true, key: 'L' });
+    if (!options && !eventMatchesChord(event, { meta: true, key: 'L' })) return;
+    event.preventDefault(); event.stopImmediatePropagation(); newLayer(options);
+  }, true);
   document.getElementById('layer_new')?.addEventListener('click', e => {
     e.preventDefault(); e.stopImmediatePropagation(); newLayer(e.altKey);
   }, true);
@@ -340,7 +370,7 @@ export function mountVectorWorkspace(editor) {
             if (hidden) element.removeAttribute('display');
             else element.setAttribute('display', 'none');
             sc.addCommandToHistory(new sc.history.ChangeElementCommand(element, {display: old}, 'Toggle object visibility'));
-            if (!hidden && sc.getSelectedElements().includes(element)) sc.clearSelection();
+            if (!hidden && sc.getSelectedElements().some(selected => selected && (selected === element || element.contains(selected)))) sc.clearSelection();
             sc.call('changed', [element]);
             queue();
           });

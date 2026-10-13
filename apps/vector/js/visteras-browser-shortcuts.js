@@ -16,6 +16,9 @@
  * usually safer but still flagged in tests/docs.
  */
 
+/** Canonical spec { meta: true, key: 'L' } means Illustrator's Cmd/Ctrl+L. */
+export const RESERVED_LETTERS = new Set(['L']);
+
 import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
 
 /** True if `key` is a digit 0–9 (Illustrator tab/zoom style bindings). */
@@ -31,7 +34,7 @@ export function browserSafeChord(spec = {}) {
   const mac = spec.mac != null ? !!spec.mac : detectMac();
   const key = String(spec.key ?? '').trim();
   let { meta = false, ctrl = false, alt = false, shift = false } = spec;
-  if (!isDigitKey(key)) {
+  if (!isDigitKey(key) && !RESERVED_LETTERS.has(key.toUpperCase())) {
     return { meta: !!meta, ctrl: !!ctrl, alt: !!alt, shift: !!shift, key, mac };
   }
   // Digit 0: keep Illustrator chords. Chrome zoom-reset is preventDefault-able
@@ -77,6 +80,11 @@ export function isBrowserReservedChord(spec = {}) {
   const shift = !!spec.shift;
   const primary = mac ? meta : (ctrl || meta);
 
+  if (RESERVED_LETTERS.has(key.toUpperCase()) && primary) {
+    if (mac && !ctrl) return true;
+    if (!mac && !alt) return true;
+  }
+
   // Tab switching: primary+digit 1–9 with no safety modifier is reserved.
   // Digit 0 is NOT reserved here: browsers reset zoom on ⌘0/Ctrl+0, but the
   // page can preventDefault that (verified in Chrome). Fit Artboard uses it.
@@ -107,11 +115,9 @@ export function eventMatchesChord(e, spec = {}) {
   const key = String(want.key);
   const codeDigit = isDigitKey(key) ? `Digit${key}` : null;
   const codeNumpad = isDigitKey(key) ? `Numpad${key}` : null;
-  const keyOk =
-    e.key === key ||
-    e.key === key.toUpperCase() ||
-    (codeDigit && e.code === codeDigit) ||
-    (codeNumpad && e.code === codeNumpad);
+  const keyOk = /^[a-z]$/i.test(key)
+    ? (e.code ? e.code === `Key${key.toUpperCase()}` : String(e.key).toUpperCase() === key.toUpperCase())
+    : e.key === key || e.key === key.toUpperCase() || (codeDigit && e.code === codeDigit) || (codeNumpad && e.code === codeNumpad);
   if (!keyOk) return false;
 
   if (mac) {

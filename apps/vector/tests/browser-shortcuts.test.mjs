@@ -110,3 +110,27 @@ test('hygiene: Vector digit 1–9 labels remapped; ⌘0 / ⌥⌘0 allowed for Fi
   assert.match(compound, /eventMatchesChord/);
   assert.match(compound, /formatBrowserSafeShortcut/);
 });
+
+test('New Layer reserved L maps to Ctrl+Cmd on Mac and Alt+Ctrl on Windows', () => {
+  assert.equal(formatBrowserSafeShortcut({ meta:true, key:'L', mac:true }), '⌃⌘L');
+  assert.equal(formatBrowserSafeShortcut({ meta:true, key:'L', mac:false }), 'Alt+Ctrl+L');
+  assert.equal(formatBrowserSafeShortcut({ meta:true, alt:true, key:'L', mac:true }), '⌃⌥⌘L');
+  assert.equal(formatBrowserSafeShortcut({ meta:true, alt:true, key:'L', mac:false }), 'Shift+Alt+Ctrl+L');
+});
+test('New Layer matches physical L even when Option changes its key, and rejects bare browser chords', () => {
+  for (const mac of [true, false]) {
+    const spec = { meta:true, key:'L', mac }, e = { code:'KeyL', key:'ł', metaKey:mac, ctrlKey:true, altKey:!mac };
+    assert.equal(eventMatchesChord(e, spec), true);
+    assert.equal(eventMatchesChord({ ...e, ctrlKey:!mac, altKey:false }, spec), false);
+    assert.equal(isBrowserReservedChord({ meta:true, key:'L', mac }), true);
+    assert.equal(isBrowserReservedChord(browserSafeChord(spec)), false);
+    const options = { meta:true, alt:true, key:'L', mac };
+    assert.equal(eventMatchesChord({ ...e, altKey:true, shiftKey:!mac }, options), true);
+  }
+});
+test('Non-reserved letters retain their existing labels and Move is preventDefault-able', () => {
+  for (const mac of [true, false]) {
+    for (const key of ['Z','G','J']) assert.equal(formatBrowserSafeShortcut({meta:true,key,mac}), mac ? `⌘${key}` : `Ctrl+${key}`);
+    assert.equal(isBrowserReservedChord({meta:true,shift:true,key:'M',mac}), false);
+  }
+});

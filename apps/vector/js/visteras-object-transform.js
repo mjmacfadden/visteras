@@ -831,7 +831,9 @@ export function mountObjectTransform(editor) {
       syncTransformMenu(sc);
       return;
     }
-    // Move…: Shift+Meta+M
+    // Move…: Shift+Meta+M. Chrome binds IDC_SHOW_AVATAR_MENU here, but
+    // BrowserCommandController::IsReservedCommandOrKey does not reserve it;
+    // capture-phase preventDefault keeps Illustrator's chord on the canvas.
     if (e.shiftKey && !e.altKey && (e.key === 'm' || e.key === 'M')) {
       e.preventDefault();
       e.stopPropagation();

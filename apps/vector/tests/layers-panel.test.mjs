@@ -96,3 +96,27 @@ test('actual core hit-test selects a child within nested sublayers, keeping ordi
   assert.equal(context.hit({ target: rect }), rect); assert.equal(active, 'Art');
   assert.equal(context.hit({ target: path }), group);
 });
+
+test('Duplicate has no advertised Cmd+D, and core clone buttons have no bare D/C', () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="action_clone">Duplicate<\/div>/);
+  assert.doesNotMatch(html, /Duplicate[^<]*<span[^>]*>⌘D/);
+  const core = fs.readFileSync(new URL('../Editor.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(core, /id=\\"tool_clone(?:_multi)?\\"[^>]*shortcut=\\"[DC]\\"/);
+  const workspace = fs.readFileSync(new URL('../js/visteras-workspace.js', import.meta.url), 'utf8');
+  assert.match(workspace, /window.addEventListener\('keydown'/);
+  assert.match(workspace, /event.preventDefault\(\); event.stopImmediatePropagation\(\); newLayer\(options\)/);
+  assert.match(workspace, /__visterasIsTypingDirectly/);
+});
+
+import { captureDocumentSnapshot, serializeDocumentSnapshot } from '../js/visteras-document-save.js';
+test('VVD native file payload preserves object names, layer titles and sublayer markers', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><g class="layer"><title>Art</title><g data-visteras-sublayer="1"><title>Details</title><rect data-visteras-name="Logo box" width="20" height="10"/></g></g></svg>';
+  const snapshot = captureDocumentSnapshot({id:1,title:'Layers',artboards:[]}, {svg,width:100,height:100,unit:'px'});
+  const reopened = JSON.parse(serializeDocumentSnapshot(snapshot, 'Layers', null));
+  assert.equal(reopened.svg, svg);
+  assert.match(reopened.svg, /data-visteras-name="Logo box"/);
+  assert.match(reopened.svg, /data-visteras-sublayer="1"/);
+  const core = fs.readFileSync(new URL('../Editor.js', import.meta.url), 'utf8');
+  assert.match(core, /o\.startsWith\("data-"\)/); // custom SVG metadata is preserved by the existing sanitizer
+});
