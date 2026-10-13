@@ -77,10 +77,7 @@ class Media_class extends Base_tools_class {
 				if (searchButton) {
 					searchButton.textContent = 'Search';
 					searchButton.dataset.defaultLabel = 'Search';
-					searchButton.addEventListener('click', () => {
-						searchButton.disabled = true;
-						searchButton.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
-					});
+					searchButton.classList.add('media-search-submit');
 				}
 				// Handle Enter before the generic dialog's input/document
 				// handlers, which otherwise submit on both keydown and keyup.
@@ -92,10 +89,7 @@ class Media_class extends Base_tools_class {
 					event.stopImmediatePropagation();
 					if (event.type === 'keydown' && !event.repeat) {
 						const btn = popup.el.querySelector('[data-id="popup_ok"]');
-						if (btn) {
-							btn.disabled = true;
-							btn.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';
-						}
+						if (btn && btn.disabled) return;
 						_this.POP.save();
 					}
 				};
@@ -106,9 +100,11 @@ class Media_class extends Base_tools_class {
 				}
 			},
 			on_finish: async function (params) {
+				// Own this dialog's button for the whole request, including cleanup.
+				const searchButton = _this.POP.el && _this.POP.el.querySelector('[data-id="popup_ok"]');
+				if (!searchButton || searchButton.disabled) return false;
 				const setSearchingState = (loading) => {
-					const searchButton = (_this.POP && _this.POP.el ? _this.POP.el : document).querySelector('[data-id="popup_ok"]');
-					if (!searchButton) return;
+					searchButton.setAttribute('aria-busy', String(loading));
 					if (loading) {
 						searchButton.disabled = true;
 						searchButton.innerHTML = '<span class="media-search-spinner" aria-hidden="true"></span><span>Searching…</span>';

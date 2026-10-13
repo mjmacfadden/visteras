@@ -617,3 +617,9 @@
 	background: var(--visteras-accent, #2f6fae);
 	border-color: var(--visteras-accent, #2f6fae);
 }
+
+/* Loading search disables submission, but its progress must remain visible. */
+#popups .popup .media-search-submit:disabled {
+	visibility: visible;
+	cursor: wait;
+}
