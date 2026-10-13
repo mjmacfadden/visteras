@@ -1,3 +1,5 @@
+import { parseCornerData, cornerDataIsCurrent } from './visteras-live-corners.js';
+import { mountCornerWidgets } from './visteras-corner-widgets.js';
 import { anchorGuideSnap } from './visteras-anchor-snap.js';
 import { cutAnchors } from './visteras-pen-geometry.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';
@@ -106,9 +108,13 @@ export function mountDirectSelection(editor) {
     return [...new Set(elements.flatMap(el => el.matches?.(SHAPES) ? [el] : [...(el.querySelectorAll?.(SHAPES) || [])]))]
       .filter(el => el.isConnected && !el.closest('defs,clipPath,mask,[data-visteras-trace]') && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden' && getComputedStyle(el).pointerEvents !== 'none');
   }
-  function readGeometry(el) {
+  function readGeometry(el, d) {
+    if(d===undefined&&el.hasAttribute('data-visteras-corners')){
+      const data=parseCornerData(el.getAttribute('data-visteras-corners'));
+      if(!cornerDataIsCurrent(data,el.getAttribute('d')))el.removeAttribute('data-visteras-corners');
+    }
     const path = document.createElementNS(svgNS, 'path');
-    path.setAttribute('d', sc.getPathDataForElement(el) || '');
+    path.setAttribute('d', d ?? sc.getPathDataForElement(el) ?? '');
     normalizeEditablePath(path, p => sc.pathActions.convertPath(p));
     return readSegments(path);
   }
@@ -195,6 +201,7 @@ export function mountDirectSelection(editor) {
         create('rect', { x: p.x*zoom-4, y: p.y*zoom-4, width: 8, height: 8, fill: selected ? '#3f8ff7' : '#fff', stroke: '#3f8ff7', 'data-direct-record': recordIndex, 'data-direct-anchor': anchor.index, style: `cursor:url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M4 4L21 12H12V21Z" fill="black" stroke="white" stroke-width="1"/></svg>')}") 4 4,default` });
       }
     }
+    cornerWidgets.render(create,records,zoom);
     if (gesture?.type === 'marquee') {
       const a = gesture.start, b = gesture.current || a;
       create('rect', { x: Math.min(a.x,b.x)*zoom, y: Math.min(a.y,b.y)*zoom, width: Math.abs(a.x-b.x)*zoom, height: Math.abs(a.y-b.y)*zoom, fill: '#3f8ff710', stroke: '#3f8ff7', 'stroke-dasharray': '4 3', 'pointer-events': 'none' });
@@ -224,6 +231,7 @@ export function mountDirectSelection(editor) {
     document.getElementById('tool_redo').disabled = sc.undoMgr.getRedoStackSize() === 0;
   }
   function schedule() { if (!pending) pending = requestAnimationFrame(refresh); }
+  const cornerWidgets=mountCornerWidgets(editor,{getRecords:()=>records,readGeometry,write,schedule,point,matrix,stop});
   function clearPoints() { for (const rec of records) rec.selected.clear(); }
   // Illustrator: clicking another object without Shift fully deselects the
   // previous ones (no leftover hollow anchors, outlines or handles).

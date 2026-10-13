@@ -183,6 +183,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const { w, h } = forSvgFile ? { w: X.pixelSize(rect, 1).w, h: X.pixelSize(rect, 1).h } : X.pixelSize(rect, scale);
     // While in Symbol Editing Mode, export the committed symbol (not the edit group).
     const clone = window.__visterasSymbolEdit?.cloneCommitted?.() || sc.getSvgContent().cloneNode(true);
+    for(const path of clone.querySelectorAll('[data-visteras-corners]'))path.removeAttribute('data-visteras-corners');
     stripExportGuides(clone);
     // Symbols: always drop unused panel symbols; Expand turns instances into groups
     // (PDF always expands so svg2pdf never depends on <use>/overflow handling).
