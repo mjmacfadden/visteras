@@ -24,7 +24,7 @@ function setup() {
   }, updateCanvas() { originX = 400 * zoom; originY = 300 * zoom; area.scrollLeft = 100; area.scrollTop = 100; },
   configObj: { curConfig: { showRulers: false } } };
   const script = source.slice(0, source.indexOf("  const list =")) + '\n}';
-  vm.runInNewContext(script.replace('export ', '') + '\nmountVectorWorkspace(editor);', {
+  vm.runInNewContext(script.replace(/^import .*;$/gm, '').replace('export ', '') + '\nmountVectorWorkspace(editor);', {
     editor, DOMPoint: Point, document: { getElementById: id => id === 'workarea' ? area : null },
   });
   return {

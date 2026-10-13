@@ -69990,18 +69990,8 @@ var { $id: Pz, $click: Fz } = JI, Iz = class {
 		e === void 0 ? this.editor.$svgEditor.classList.toggle("open") : e ? this.editor.$svgEditor.classList.add("open") : this.editor.$svgEditor.classList.remove("open");
 	}
 	newLayer() {
-		let e, t = this.editor.svgCanvas.getCurrentDrawing().getNumLayers();
-		do
-			e = this.editor.i18next.t("layers.layer") + " " + ++t;
-		while (this.editor.svgCanvas.getCurrentDrawing().hasLayer(e));
-		let n = prompt(this.editor.i18next.t("notification.enterUniqueLayerName"), e);
-		if (n) {
-			if (this.editor.svgCanvas.getCurrentDrawing().hasLayer(n)) {
-				alert(this.editor.i18next.t("notification.dupeLayerName"));
-				return;
-			}
-			this.editor.svgCanvas.createLayer(n), this.updateContextPanel(), this.populateLayers();
-		}
+		// Visteras: create immediately; Option-click uses Layer Options in the workspace.
+		this.editor.__visterasLayers?.newLayer();
 	}
 	deleteLayer() {
 		if (this.editor.svgCanvas.deleteCurrentLayer()) {
@@ -70033,14 +70023,8 @@ var { $id: Pz, $click: Fz } = JI, Iz = class {
 		t !== -1 && (this.editor.svgCanvas.setCurrentLayerPosition(t - e), this.populateLayers());
 	}
 	layerRename() {
-		let e = document.querySelector("#layerlist tr.layersel td.layername"), t = e ? e.textContent : "", n = prompt(this.editor.i18next.t("notification.enterNewLayerName"), "");
-		if (n) {
-			if (t === n || this.editor.svgCanvas.getCurrentDrawing().hasLayer(n)) {
-				alert(this.editor.i18next.t("notification.layerHasThatName"));
-				return;
-			}
-			this.editor.svgCanvas.renameCurrentLayer(n), this.populateLayers();
-		}
+		// Visteras: use the same inline editor as double-clicking a layer name.
+		this.editor.__visterasLayers?.renameCurrent();
 	}
 	toggleHighlightLayer(e) {
 		let t, n = [], r = this.editor.svgCanvas.getCurrentDrawing().getNumLayers();

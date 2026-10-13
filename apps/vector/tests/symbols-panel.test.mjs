@@ -62,8 +62,8 @@ test('Ungroup and Object ▸ Expand on an instance route to Break Link', () => {
 });
 
 test('Layers label shows symbol name; context menu offers Edit Symbol / Break Link', () => {
-  const ws = read('../js/visteras-workspace.js');
-  assert.match(ws, /sym\?\.getAttribute\('data-v-symbol-name'\)/);
+  const ws = read('../js/visteras-layer-names.js');
+  assert.match(ws, /symbol\?\.getAttribute\?\.\('data-v-symbol-name'\)/);
   const cm = read('../js/visteras-context-menu.js');
   assert.match(cm, /id: 'symbol_edit', label: 'Edit Symbol', actionId: 'action_symbol_edit'/);
   assert.match(cm, /id: 'symbol_break_link', label: 'Break Link to Symbol', actionId: 'action_symbol_break_link'/);

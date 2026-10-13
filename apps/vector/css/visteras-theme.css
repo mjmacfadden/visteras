@@ -1866,3 +1866,6 @@ body.pan-dragging #svgcontent *,
 .prop_row.vpara_row { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 4px 6px !important; align-items: center !important; }
 .prop_row.vpara_row > .vpara_field { min-width: 0; }
 #sec_typography_body .prop_row:has(> #slot_word_spacing) { justify-content: flex-start !important; }
+
+.vector-layer-name-input { width: 100%; min-width: 0; box-sizing: border-box; color: inherit; background: var(--input-background-color); border: 1px solid var(--visteras-accent); font: inherit; }
+.vector-layer-name { cursor: text; }

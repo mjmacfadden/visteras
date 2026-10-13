@@ -411,7 +411,7 @@ export function resetBoundingBox(sc, elements = null) {
 
 /* ─── Dialog UI ─────────────────────────────────────────────────────────── */
 
-function ensureHost() {
+export function ensureHost() {
   let host = document.getElementById(DIALOG_HOST);
   if (host) return host;
   host = document.createElement('div');
