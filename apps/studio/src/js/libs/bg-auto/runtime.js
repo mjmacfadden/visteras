@@ -9,6 +9,7 @@ var worker = null;
 var reqId = 0;
 var pending = new Map();
 var progressEl = null;
+var forceWasm = false;
 
 var MAX_INPUT_MP = 8; // hard cap ~8 megapixels
 var MODEL_MAX_SIDE = 1024;
@@ -57,6 +58,18 @@ function ensure_worker() {
 			return;
 		}
 		if (msg.type === 'error') {
+			if (msg.code === 'retry_wasm' && !forceWasm) {
+				forceWasm = true;
+				worker.terminate();
+				worker = null;
+				var retries = Array.from(pending.values());
+				pending.clear();
+				retries.forEach(function (request) {
+					call_worker(Object.assign({}, request.payload, { device: 'wasm', dtype: 'q8' }), request.onProgress)
+						.then(request.resolve, request.reject);
+				});
+				return;
+			}
 			pending.delete(msg.id);
 			if (!entry.silent) {
 				hide_progress_ui();
@@ -88,16 +101,19 @@ function call_worker(payload, onProgress) {
 			reject: reject,
 			onProgress: onProgress,
 			silent: !!payload.silent,
+			payload: payload,
 		});
 		var transfer = [];
 		if (payload.pixels && payload.pixels.buffer) {
-			transfer.push(payload.pixels.buffer);
+			// Keep the original pixels for a CPU retry after terminating a failed GPU worker.
+			var pixels = payload.pixels.slice();
+			transfer.push(pixels.buffer);
 		}
 		worker.postMessage(Object.assign({
 			id: id,
 			transformersCdn: get_transformers_cdn(),
 			ortWasmCdn: get_ort_wasm_cdn(),
-		}, payload), transfer);
+		}, payload, forceWasm ? { device: 'wasm', dtype: 'q8' } : {}, pixels ? { pixels: pixels } : {}), transfer);
 	});
 }
 

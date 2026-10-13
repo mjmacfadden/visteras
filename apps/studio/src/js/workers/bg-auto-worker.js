@@ -105,7 +105,13 @@ async function ensure_pipeline(modelLocation, preferDevice, preferDtype, progres
 		loadedDtype = null;
 	}
 
-	var rawAttempts = get_pipeline_attempts(preferDevice, preferDtype);
+	// Test the adapter before ONNX initialization: a failed session poisons
+	// Transformers.js's shared webInitChain, including subsequent WASM attempts.
+	var gpuAvailable = false;
+	if (preferDevice !== 'wasm' && typeof navigator !== 'undefined' && navigator.gpu) {
+		try { gpuAvailable = !!(await navigator.gpu.requestAdapter()); } catch (e) { /* CPU fallback */ }
+	}
+	var rawAttempts = get_pipeline_attempts(gpuAvailable ? preferDevice : 'wasm', preferDtype);
 	var seen = new Set();
 	var attempts = [];
 	for (var a = 0; a < rawAttempts.length; a++) {
@@ -137,6 +143,13 @@ async function ensure_pipeline(modelLocation, preferDevice, preferDtype, progres
 		} catch (err) {
 			lastError = err;
 			pipe = null;
+			// Retrying in this realm reuses the rejected library initialization chain.
+			// Ask the caller to retry on CPU in a fresh worker instead.
+			if (target.device === 'webgpu') {
+				var fallbackError = new Error(err && err.message ? err.message : String(err));
+				fallbackError.code = 'retry_wasm';
+				throw fallbackError;
+			}
 		}
 	}
 	throw lastError || new Error('Failed to load background-removal model');
@@ -227,7 +240,7 @@ self.onmessage = async function (event) {
 		throw new Error('Unknown worker message type: ' + msg.type);
 	} catch (err) {
 		var message = (err && err.message) ? err.message : String(err);
-		var code = 'infer_failed';
+		var code = (err && err.code) || 'infer_failed';
 		if (/fetch|network|Failed to fetch|Load failed|HTTP|Failed to resolve module/i.test(message)) {
 			code = 'download_failed';
 		} else if (/memory|out of memory|OOM|allocation/i.test(message)) {

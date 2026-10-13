@@ -194,3 +194,60 @@ test('bg-auto runtime: refine_matte_edges sharpens blurred mask edges against hi
 	assert.ok(refinedAlphas[7] < initialRow[7], `Expected refinedAlphas[7] (${refinedAlphas[7]}) < initialRow[7] (${initialRow[7]})`);
 	assert.ok(refinedAlphas[8] > initialRow[8], `Expected refinedAlphas[8] (${refinedAlphas[8]}) > initialRow[8] (${initialRow[8]})`);
 });
+
+function pipelineContext(gpu, pipeline) {
+	const context = vm.createContext({ Set, navigator: { gpu }, self: {}, pipelineMock: pipeline });
+	vm.runInContext(workerCode, context);
+	vm.runInContext('load_transformers = async function () { return { env: {}, pipeline: pipelineMock }; };', context);
+	return context;
+}
+
+test('bg-auto skips GPU initialization when the adapter is unavailable', async () => {
+	for (const gpu of [undefined, { requestAdapter: async () => null }, { requestAdapter: async () => { throw new Error('blocked'); } }]) {
+		const devices = [];
+		const context = pipelineContext(gpu, async (task, model, options) => {
+			devices.push(options.device);
+			return {};
+		});
+		const result = await context.ensure_pipeline('', 'auto', null, null);
+		assert.equal(result.device, 'wasm');
+		assert.deepEqual(devices, ['wasm']);
+	}
+});
+
+test('bg-auto requests a fresh CPU worker after a GPU session failure', async () => {
+	const devices = [];
+	const context = pipelineContext({ requestAdapter: async () => ({}) }, async (task, model, options) => {
+		devices.push(options.device);
+		throw new Error('Failed to get GPU adapter');
+	});
+	await assert.rejects(context.ensure_pipeline('', 'auto', null, null), error => error.code === 'retry_wasm');
+	assert.deepEqual(devices, ['webgpu']);
+});
+
+test('bg-auto replays pending requests in a fresh CPU worker with intact pixels', async () => {
+	const workers = [];
+	class Worker {
+		constructor() { this.messages = []; workers.push(this); }
+		postMessage(message, transfer) { this.messages.push(structuredClone(message, { transfer })); }
+		terminate() { this.terminated = true; }
+	}
+	let code = runtimeCode.slice(runtimeCode.indexOf('var worker = null;'), runtimeCode.indexOf('function format_progress('));
+	code = code.replace(/new URL\([^;]+import.meta.url\)/, "'worker.js'");
+	const context = vm.createContext({ Worker, Map, config: {}, structuredClone });
+	vm.runInContext(code, context);
+	const pixels = new Uint8ClampedArray([1, 2, 3, 4]);
+	const result = context.call_worker({ type: 'infer', pixels, device: 'auto' });
+	const warm = context.call_worker({ type: 'load', silent: true });
+	workers[0].onmessage({ data: { id: workers[0].messages[0].id, type: 'error', code: 'retry_wasm' } });
+	assert.equal(workers[0].terminated, true);
+	assert.equal(workers.length, 2);
+	assert.equal(workers[1].messages.length, 2);
+	assert.equal(workers[1].messages[0].device, 'wasm');
+	assert.equal(workers[1].messages[0].dtype, 'q8');
+	assert.deepEqual(Array.from(workers[1].messages[0].pixels), [1, 2, 3, 4]);
+	assert.equal(pixels.byteLength, 4);
+	vm.runInContext('hide_progress_ui = function () {};', context);
+	for (const message of workers[1].messages) workers[1].onmessage({ data: { id: message.id, type: 'ready' } });
+	await Promise.all([result, warm]);
+});
