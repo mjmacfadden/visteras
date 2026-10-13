@@ -1,5 +1,5 @@
 import { parseCornerData, cornerDataIsCurrent, sameCornerGeometry } from './visteras-live-corners.js';
-import { mountCornerWidgets } from './visteras-corner-widgets.js?v=live-corners-3';
+import { mountCornerWidgets } from './visteras-corner-widgets.js?v=live-corners-4';
 import { anchorGuideSnap } from './visteras-anchor-snap.js';
 import { cutAnchors } from './visteras-pen-geometry.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';

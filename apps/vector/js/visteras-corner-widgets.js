@@ -41,7 +41,9 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
        const r=data.corners.find(v=>v.index===c.index)?.r||0;
        const m=matrix(rec.el),p=point(c.p.x,c.p.y,m),b=point(c.p.x+c.basis.bisector.x,c.p.y+c.basis.bisector.y,m),length=Math.hypot(b.x-p.x,b.y-p.y)||1;
        const offset=Math.max(14/zoom,r/c.basis.sinHalf*length+8/zoom);
-       create('circle',{cx:(p.x+(b.x-p.x)/length*offset)*zoom,cy:(p.y+(b.y-p.y)/length*offset)*zoom,r:4.5,fill:'var(--visteras-panel-bg, #333)',stroke:'#3f8ff7','stroke-width':1.5,'data-corner-record':i,'data-corner-index':c.index,'vector-effect':'non-scaling-stroke',style:'cursor:crosshair'});
+       const cx=(p.x+(b.x-p.x)/length*offset)*zoom,cy=(p.y+(b.y-p.y)/length*offset)*zoom;
+       create('circle',{cx,cy,r:6.5,fill:'#fff',stroke:'#3f8ff7','stroke-width':1.5,'data-corner-record':i,'data-corner-index':c.index,'vector-effect':'non-scaling-stroke',style:'cursor:crosshair'});
+       create('circle',{cx,cy,r:3,fill:'#3f8ff7','pointer-events':'none'});
      }
    }
  }
