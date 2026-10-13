@@ -59,12 +59,16 @@ export const UNITS = [
   { id: 'in', label: 'Inches (in)' },
   { id: 'cm', label: 'Centimeters (cm)' },
   { id: 'mm', label: 'Millimeters (mm)' },
+  { id: 'pt', label: 'Points (pt)' },
+  { id: 'pc', label: 'Picas (pc)' },
 ];
 
 export function convertToPixels(val, unit, pxPerInch = PX_PER_INCH) {
   const num = parseFloat(val) || 0;
   const ppi = parseFloat(pxPerInch) || PX_PER_INCH;
   switch (unit) {
+    case 'pt': return num * ppi / 72;
+    case 'pc': return num * ppi / 6;
     case 'in': return num * ppi;
     case 'cm': return (num / 2.54) * ppi;
     case 'mm': return (num / 25.4) * ppi;
@@ -77,6 +81,8 @@ export function convertFromPixels(pixels, targetUnit, pxPerInch = PX_PER_INCH) {
   const px = parseFloat(pixels) || 0;
   const ppi = parseFloat(pxPerInch) || PX_PER_INCH;
   switch (targetUnit) {
+    case 'pt': return parseFloat((px * 72 / ppi).toFixed(3));
+    case 'pc': return parseFloat((px * 6 / ppi).toFixed(3));
     case 'in': return parseFloat((px / ppi).toFixed(3));
     case 'cm': return parseFloat(((px / ppi) * 2.54).toFixed(2));
     case 'mm': return parseFloat(((px / ppi) * 25.4).toFixed(1));

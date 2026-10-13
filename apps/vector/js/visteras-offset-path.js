@@ -1,3 +1,4 @@
+import { bindNumericField, readNumericField } from './visteras-numeric-field.js';
 /**
  * Visteras Vector — Offset Path  (Object → Offset Path…, ⌥⌘O)
  *
@@ -92,7 +93,7 @@ function buildDialog() {
             Offset Distance
           </div>
           <div style="display:flex;align-items:center;gap:8px">
-            <input id="${DIALOG_ID}-offset" type="number" value="${DEFAULT_OFFSET_OPTIONS.offset}" step="any" inputmode="decimal"
+            <input id="${DIALOG_ID}-offset" type="text" value="${DEFAULT_OFFSET_OPTIONS.offset}" step="any" inputmode="decimal"
               style="
                 flex:1;
                 background:#18181b;
@@ -204,12 +205,7 @@ function buildDialog() {
   // Offset field: whole-number steps (↑/↓ = 1, Shift = 10) while typed
   // decimals stay valid (step="any", so 2.5 is never flagged as invalid).
   const offsetEl = overlay.querySelector(`#${DIALOG_ID}-offset`);
-  offsetEl.addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-    e.preventDefault(); e.stopPropagation();
-    offsetEl.value = String(stepOffsetValue(offsetEl.value, e.key === 'ArrowUp' ? 1 : -1, e.shiftKey));
-    offsetEl.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  bindNumericField(offsetEl,{unit:()=> 'px'});
 
   // Keyboard: Enter = OK, Escape = cancel
   overlay.addEventListener('keydown', (e) => {
@@ -246,8 +242,11 @@ function hideDialog() {
 }
 
 function readDialogValues() {
+  const field = document.getElementById(`${DIALOG_ID}-offset`);
+  const parsed = readNumericField(field, 'px');
+  if (parsed === null) { field.value = field.dataset.numericCurrent; return null; }
   return {
-    offset: (() => { const v = parseFloat(document.getElementById(`${DIALOG_ID}-offset`)?.value); return Number.isFinite(v) ? v : DEFAULT_OFFSET_OPTIONS.offset; })(),
+    offset: parsed,
     joins: document.getElementById(`${DIALOG_ID}-joins`)?.value || DEFAULT_OFFSET_OPTIONS.joins,
     miterLimit: Math.max(1, parseFloat(document.getElementById(`${DIALOG_ID}-miter`)?.value) || DEFAULT_OFFSET_OPTIONS.miterLimit),
     copyOriginal: document.getElementById(`${DIALOG_ID}-copy`)?.checked ?? true,
@@ -599,6 +598,7 @@ export function mountOffsetPath(editor) {
   // Wire dialog OK button
   document.getElementById(`${DIALOG_ID}-ok`)?.addEventListener('click', () => {
     const opts = readDialogValues();
+    if (!opts) return;
     hideDialog();
     executeOffsetPath(editor, opts);
   });

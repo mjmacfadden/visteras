@@ -36,6 +36,7 @@ test('Transform W/H on area text resizes frame attributes without adding transfo
       this.children = [];
       this.style = {};
       this.listeners = {};
+      this.dataset = {};
       this.parentNode = null;
       this.textContent = '';
       this._html = '';

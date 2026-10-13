@@ -1,3 +1,4 @@
+import { bindNumericField } from './visteras-numeric-field.js';
 import {convertToPixels,convertFromPixels} from './visteras-document-presets.js';
 import {layoutParagraph} from './visteras-text-editing.js';
 export function referencePosition(bounds, reference) {
@@ -24,10 +25,9 @@ export function mountTransformPanel(editor) {
   const fields={};
   for(const key of ['x','w','y','h']) {
     const label=document.createElement('label');label.className='transform-'+key;label.textContent=key.toUpperCase()+':';
-    const input=document.createElement('input');input.type='number';input.step='any';input.setAttribute('aria-label',({x:'X position',y:'Y position',w:'Width',h:'Height'})[key]);if(key==='w'||key==='h')input.min='0.001';
+    const input=document.createElement('input');input.type='text';input.setAttribute('inputmode','decimal');input.setAttribute('aria-label',({x:'X position',y:'Y position',w:'Width',h:'Height'})[key]);if(key==='w'||key==='h')input.min='0.001';
     label.append(input);panel.append(label);fields[key]=input;
-    input.addEventListener('change',()=>change(key,Number(input.value)));
-    input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
+    bindNumericField(input,{unit:()=>window.__visterasArtboards?.propertyMode()?window.__visterasDocumentShell.getBaseUnit():'px',apply:value=>change(key,value)});
   }
   const lock=document.createElement('button');lock.type='button';lock.className='transform-lock';lock.title='Maintain width and height proportions';lock.setAttribute('aria-label',lock.title);
   const lockIcon=()=>{lock.setAttribute('aria-pressed',String(locked));lock.innerHTML='<svg width="18" height="24" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 10V6a3 3 0 0 1 6 0v4M6 14v4a3 3 0 0 0 6 0v-4"/>'+(locked?'<path d="M9 8v8"/>':'<path d="M3 5l12 14"/>')+'</svg>'; };lockIcon();
@@ -66,7 +66,7 @@ export function mountTransformPanel(editor) {
   function sync(){
     pending=null;const elements=selected(),boards=window.__visterasArtboards,board=boards?.propertyMode()?boards.active():null;if(!elements.length&&!board)return;
     const b=board||bounds(elements),p=referencePosition(b,reference),values={x:p.x,y:p.y,w:b.width,h:b.height};
-    for(const [key,input]of Object.entries(fields)){input.disabled=(key==='w'&&!b.width)||(key==='h'&&!b.height);if(document.activeElement!==input)input.value=String(Number((board?convertFromPixels(values[key],window.__visterasDocumentShell.getBaseUnit()):values[key]).toFixed(3)));}
+    for(const [key,input]of Object.entries(fields)){input.disabled=(key==='w'&&!b.width)||(key==='h'&&!b.height);input.dataset.numericCurrent=String(board?convertFromPixels(values[key],window.__visterasDocumentShell.getBaseUnit()):values[key]);if(document.activeElement!==input)input.value=String(Number(Number(input.dataset.numericCurrent).toFixed(3)));}
   }
   function change(key,value){
     const elements=selected(),boards=window.__visterasArtboards,board=boards?.propertyMode()?boards.active():null;if((!elements.length&&!board)||!Number.isFinite(value)){sync();return;}

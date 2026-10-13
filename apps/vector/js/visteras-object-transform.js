@@ -1,3 +1,4 @@
+import { bindNumericField, readNumericField } from './visteras-numeric-field.js';
 /**
  * Visteras Vector — Object ▸ Transform (Illustrator UX)
  *
@@ -564,7 +565,7 @@ function openTransformDialog(sc, {
 
     const commit = (copy) => {
       clearPreview();
-      const rec = readRecord(form) || defaultRecord;
+      const rec = readRecord(form);
       if (!rec) {
         finish(false);
         return;
@@ -610,12 +611,13 @@ export function openMoveDialog(sc) {
         <div class="vtx-row"><label>Mode</label>
           <select name="mode"><option value="rect">Horizontal / Vertical</option><option value="polar">Distance / Angle</option></select>
         </div>
-        <div class="vtx-row vtx-rect"><label>Horizontal</label><input name="h" type="number" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
-        <div class="vtx-row vtx-rect"><label>Vertical</label><input name="v" type="number" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
-        <div class="vtx-row vtx-polar" hidden><label>Distance</label><input name="dist" type="number" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
-        <div class="vtx-row vtx-polar" hidden><label>Angle</label><input name="ang" type="number" step="any" value="0" /><span class="vtx-unit">°</span></div>
+        <div class="vtx-row vtx-rect"><label>Horizontal</label><input name="h" type="text" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
+        <div class="vtx-row vtx-rect"><label>Vertical</label><input name="v" type="text" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
+        <div class="vtx-row vtx-polar" hidden><label>Distance</label><input name="dist" type="text" step="any" value="0" /><span class="vtx-unit">${u}</span></div>
+        <div class="vtx-row vtx-polar" hidden><label>Angle</label><input name="ang" type="text" step="any" value="0" /><span class="vtx-unit">°</span></div>
         <div class="vtx-hint">Positive Horizontal moves right; positive Vertical moves down.</div>
       `;
+      form.querySelectorAll('input').forEach(input => bindNumericField(input,{unit:()=>input.name==='ang'?'px':u}));
       const mode = form.querySelector('[name=mode]');
       const sync = () => {
         const polar = mode.value === 'polar';
@@ -627,9 +629,12 @@ export function openMoveDialog(sc) {
     },
     readRecord(form) {
       const mode = form.querySelector('[name=mode]').value;
+      const read = name => readNumericField(form.querySelector(`[name=${name}]`),name==='ang'?'px':u);
+      const required = mode==='polar'?['dist','ang']:['h','v'];
+      if(required.some(name=>read(name)===null)) return null;
       const fields = mode === 'polar'
-        ? { mode: 'polar', distance: toDoc(form.querySelector('[name=dist]').value), angle: Number(form.querySelector('[name=ang]').value) || 0 }
-        : { mode: 'rect', horizontal: toDoc(form.querySelector('[name=h]').value), vertical: toDoc(form.querySelector('[name=v]').value) };
+        ? { mode: 'polar', distance: toDoc(read('dist')), angle: read('ang') }
+        : { mode: 'rect', horizontal: toDoc(read('h')), vertical: toDoc(read('v')) };
       const { dx, dy } = moveDeltaFromFields(fields);
       return { kind: 'move', dx, dy };
     },
