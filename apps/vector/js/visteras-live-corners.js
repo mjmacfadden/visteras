@@ -17,7 +17,8 @@ export function maxRadius(prev,p,next,neighbourUse=.5){
 }
 export function cornerGeometry(prev,p,next,r,type='round'){
  const g=cornerBasis(prev,p,next);if(!g)return null;
- const radius=Math.max(0,Math.min(Number(r)||0,maxRadius(prev,p,next,0))),t=radius/g.tanHalf;
+ const cap=type==='inverted'?Math.min(g.a,g.b):maxRadius(prev,p,next,0);
+ const radius=Math.max(0,Math.min(Number(r)||0,cap)),t=type==='inverted'?radius:radius/g.tanHalf;
  const start={x:p.x+g.u.x*t,y:p.y+g.u.y*t},end={x:p.x+g.v.x*t,y:p.y+g.v.y*t};
  let segment={type:4,x:end.x,y:end.y};
  if(type!=='chamfer'&&radius>EPS){
@@ -80,3 +81,11 @@ export function parseCornerData(str){
 }
 export function serializeCornerData(obj){return JSON.stringify(obj);}
 export const cornerDataIsCurrent=(data,d)=>!!data&&data.gen===d;
+/** SVG-Edit's two-decimal serialization can change the last displayed digit. */
+export function sameCornerGeometry(a,b){
+ return a.length===b.length&&a.every((segment,i)=>{
+   const other=b[i],keys=Object.keys(segment);
+   return keys.length===Object.keys(other).length&&keys.every(key=>(key==='type'||typeof segment[key]!=='number')?segment[key]===other[key]:Math.abs(segment[key]-other[key])<=.010000001);
+ });
+}
+export const cornerRadiusScale=m=>Math.sqrt(Math.abs(m.a*m.d-m.b*m.c))||1;

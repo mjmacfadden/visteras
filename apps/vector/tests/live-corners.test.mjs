@@ -67,3 +67,42 @@ test('Widgets, preference, history, numeric radius and export are wired',()=>{
  assert.ok(read('../../../scripts/check-no-doc-localstorage.mjs').includes('STORAGE_KEY_CORNER_WIDGET'));
  assert.ok(read('../js/visteras-export.js').includes("removeAttribute('data-visteras-corners')"));
 });
+
+import {captureDocumentSnapshot} from '../js/visteras-document-save.js';
+test('VVD file payload preserves visible corners and editable base metadata',()=>{
+ const base=serializeSegments(square),corners=[{contour:0,index:0,r:10,type:'round'}],gen=serializeSegments(applyCorners(square,corners));
+ const data=serializeCornerData({base,gen,corners});
+ const svg=`<svg><path d="${gen}" data-visteras-corners='${data}'/></svg>`;
+ const saved=captureDocumentSnapshot({id:'corners',title:'Corners',artboards:[]},{svg,width:100,height:100,unit:'px'}).payload;
+ const reopened=JSON.parse(JSON.stringify(saved));assert.equal(reopened.svg,svg);
+ const parsed=parseCornerData(reopened.svg.match(/data-visteras-corners='([^']*)'/)[1]);assert.ok(cornerDataIsCurrent(parsed,gen));assert.equal(parsed.base,base);
+});
+
+import vm from 'node:vm';
+test('Anchor-edit history restores corner metadata together with generated d',()=>{
+ const source=fs.readFileSync(new URL('../js/visteras-direct-selection.js',import.meta.url),'utf8');
+ const el={getAttribute:name=>name==='d'?'edited':null},commands=[];
+ class BatchCommand{constructor(){this.commands=[];}addSubCommand(c){this.commands.push(c);}}
+ class ChangeElementCommand{constructor(el,attrs){this.attrs=attrs;}}
+ const context=vm.createContext({sc:{history:{BatchCommand,ChangeElementCommand},addCommandToHistory:c=>commands.push(c),call(){}},schedule(){},before:[{rec:{el},d:'rounded',cornerData:'stored metadata'}]});
+ vm.runInContext(source.slice(source.indexOf('  function commit(before, title) {'),source.indexOf('  function move(before, dx, dy) {'))+"\ncommit(before,'Move anchor');",context);
+ assert.equal(commands[0].commands[0].attrs.d,'rounded');assert.equal(commands[0].commands[0].attrs['data-visteras-corners'],'stored metadata');
+});
+
+import {sameCornerGeometry} from '../js/visteras-live-corners.js';
+test('SVG-Edit precision changes preserve metadata; real anchor edits invalidate it',()=>{
+ const a=[{type:2,x:0,y:0},{type:6,x1:3.107,y1:2,x2:4,y2:1,x:10,y:0}];
+ assert.ok(sameCornerGeometry(a,[a[0],{...a[1],x1:3.1}]));
+ assert.equal(sameCornerGeometry(a,[a[0],{...a[1],x:11}]),false);
+ assert.equal(sameCornerGeometry(a,[a[0],{...a[1],type:4}]),false);
+});
+
+test('Inverted round radius stays centered on the original corner at non-right angles',()=>{
+ const g=cornerGeometry({x:100,y:0},{x:0,y:0},{x:50,y:86.6025403784},10,'inverted');
+ near(Math.hypot(g.start.x,g.start.y),10);near(Math.hypot(g.end.x,g.end.y),10);
+});
+
+import {cornerRadiusScale} from '../js/visteras-live-corners.js';
+test('Radius dialog scaling uses document size for scaled and rotated paths',()=>{
+ assert.equal(cornerRadiusScale({a:2,b:0,c:0,d:2}),2);assert.equal(cornerRadiusScale({a:0,b:2,c:-2,d:0}),2);assert.equal(cornerRadiusScale({a:-2,b:0,c:0,d:2}),2);
+});

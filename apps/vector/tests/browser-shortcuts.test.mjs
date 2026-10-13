@@ -134,3 +134,12 @@ test('Non-reserved letters retain their existing labels and Move is preventDefau
     assert.equal(isBrowserReservedChord({meta:true,shift:true,key:'M',mac}), false);
   }
 });
+
+test('Lasso Q is plain Q on Mac and Windows; command chords are never captured',()=>{
+ const event={key:'q',code:'KeyQ',metaKey:false,ctrlKey:false,altKey:false,shiftKey:false};
+ for(const mac of [true,false]){
+   const matches=e=>!e.metaKey&&!e.ctrlKey&&!e.altKey&&eventMatchesChord(e,{key:'Q',mac});
+   assert.equal(matches(event),true);assert.equal(matches({...event,metaKey:true}),false);assert.equal(matches({...event,ctrlKey:true}),false);assert.equal(matches({...event,shiftKey:true}),false);
+   assert.equal(formatBrowserSafeShortcut({key:'Q',mac}),'Q');
+ }
+});

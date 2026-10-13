@@ -1,4 +1,4 @@
-import { mountDirectSelection } from './visteras-direct-selection.js?v=live-corners-1';
+import { mountDirectSelection } from './visteras-direct-selection.js?v=lasso-2';
 import { mountNudge } from './visteras-nudge.js?v=nudge-1';
 /** Selection overlays belong to the editor, never to the exported artwork. */
 export function mountSelectionTools(editor) {
@@ -283,7 +283,7 @@ export function mountSelectionTools(editor) {
   }, true);
   // One route for toolbar clicks and Illustrator tool keys. Capture prevents legacy
   // SVGEdit bindings (A=select all, D=duplicate, Ctrl-only Undo) from also firing.
-  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', g: 'tool_gradient', h: 'ext-panning', c: 'tool_scissors', '\\': 'tool_line' };
+  const toolKeys = { v: 'tool_select', a: 'tool_direct_select', m: 'tool_rect', l: 'tool_ellipse', p: 'tool_path', n: 'tool_fhpath', t: 'tool_text', z: 'tool_zoom', i: 'tool_eyedropper', g: 'tool_gradient', h: 'ext-panning', c: 'tool_scissors', q: 'tool_lasso', '\\': 'tool_line' };
   document.addEventListener('keydown', e => {
     if (e.isComposing || window.__visterasIsTypingDirectly || e.composedPath().some(el => el?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el?.nodeName))) return;
     const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;

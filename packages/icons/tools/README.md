@@ -13,6 +13,7 @@ prologs and comments were removed.
 |------|--------|
 | selection.svg | Vector select.svg |
 | direct-selection.svg | Vector direct_select.svg |
+| lasso.svg | Studio lasso.svg |
 | pen.svg, text.svg, rectangle.svg, ellipse.svg, polygon.svg, star.svg, pencil.svg | Studio (same names) |
 | eyedropper.svg | Studio pick_color.svg |
 | eraser.svg | Studio erase.svg |

@@ -1,4 +1,4 @@
-import {CORNER_TYPES,eligibleCorners,buildCorners,maxRadius,parseCornerData,serializeCornerData} from './visteras-live-corners.js';
+import {CORNER_TYPES,eligibleCorners,buildCorners,maxRadius,parseCornerData,serializeCornerData,cornerRadiusScale} from './visteras-live-corners.js';
 import {serializeSegments,anchors} from './visteras-anchor-model.js';
 import {bindNumericField,readNumericField} from './visteras-numeric-field.js';
 import {convertFromPixels,convertToPixels} from './visteras-document-presets.js';
@@ -29,10 +29,11 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    return {data,all,corners:eligible.filter(c=>all||(built.map.get(c.index)||[c.index]).some(i=>rec.selected.has(i)))};
  }
  function render(create,records,zoom){
-   if(!visible||sc.getMode()!=='pathedit')return;
+   if(sc.getMode()!=='pathedit')return;
    const rectangle=records.length===1&&records[0].el.localName==='rect'?records[0]:null;
    const row=document.getElementById('prop_row_radius');if(row)row.style.display=rectangle?'flex':'none';
    if(rectangle){const field=document.getElementById('rect_rx');if(field)field.value=Number(rectangle.el.getAttribute('rx'))||0;}
+   if(!visible)return;
    for(const [i,rec]of records.entries()){
      if(!rec.el.isConnected)continue;
      const {data,corners}=candidates(rec);
@@ -49,6 +50,7 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    return {rec,data,target,targets:corners,all,original:rec.el,selection:new Set(rec.selected),attrs:Object.fromEntries(['d',ATTR,'rx','ry'].map(a=>[a,rec.el.getAttribute(a)])),before:null,r:data.corners.find(c=>c.index===index)?.r||0,type:data.corners.find(c=>c.index===index)?.type||'round'};
  }
  function restore(g){
+   g.original.removeAttribute('data-corner-limit');
    if(g.before?.conversion){g.rec.el.replaceWith(g.original);g.rec.el=g.original;}
    for(const [a,v]of Object.entries(g.attrs))v===null?g.original.removeAttribute(a):g.original.setAttribute(a,v);
    g.rec.selected=new Set(g.selection);g.before=null;
@@ -73,7 +75,7 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    schedule();
  }
  function commit(g){
-   g.rec.el.removeAttribute('data-corner-limit');
+   g.original.removeAttribute('data-corner-limit');g.rec.el.removeAttribute('data-corner-limit');
    const {BatchCommand,ChangeElementCommand,RemoveElementCommand,InsertElementCommand}=sc.history;
    const batch=new BatchCommand('Live Corners');
    if(g.before?.conversion){const c=g.before.conversion;batch.addSubCommand(new RemoveElementCommand(c.original,c.next,c.parent));batch.addSubCommand(new InsertElementCommand(c.path));}
@@ -114,8 +116,9 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    const g=begin(getRecords()[Number(node.getAttribute('data-corner-record'))],Number(node.getAttribute('data-corner-index')));if(g)dialog(g);
  },true);
  function dialog(g){
+   const scale=cornerRadiusScale(matrix(g.rec.el));
    const overlay=document.createElement('div');overlay.className='vui-overlay';
-   overlay.innerHTML=`<div class="vui-dialog" role="dialog" aria-label="Corners"><div class="vui-dialog-header"><span class="vui-dialog-title">Corners</span></div><div class="vui-dialog-body"><div class="vui-field"><span>Corner</span><div class="corner-types"></div></div><label class="vui-field">Radius <input type="text" inputmode="decimal" aria-label="Radius" value="${convertFromPixels(g.r,unit())}"> ${unit()}</label><fieldset><legend>Rounding</legend><label><input type="radio" name="rounding" checked> Absolute</label> <label title="Later"><input type="radio" name="rounding" disabled> Relative (Later)</label></fieldset></div><div class="vui-dialog-actions"><button class="vui-btn vui-btn-secondary" data-act="cancel">Cancel</button><button class="vui-btn vui-btn-accent" data-act="ok">OK</button></div></div>`;
+   overlay.innerHTML=`<div class="vui-dialog" role="dialog" aria-label="Corners"><div class="vui-dialog-header"><span class="vui-dialog-title">Corners</span></div><div class="vui-dialog-body"><div class="vui-field"><span>Corner</span><div class="corner-types"></div></div><label class="vui-field">Radius <input type="text" inputmode="decimal" aria-label="Radius" value="${convertFromPixels(g.r*scale,unit())}"> ${unit()}</label><fieldset><legend>Rounding</legend><label><input type="radio" name="rounding" checked> Absolute</label> <label title="Later"><input type="radio" name="rounding" disabled> Relative (Later)</label></fieldset></div><div class="vui-dialog-actions"><button class="vui-btn vui-btn-secondary" data-act="cancel">Cancel</button><button class="vui-btn vui-btn-accent" data-act="ok">OK</button></div></div>`;
    let type=g.type;
    for(const [value,label,d]of [['round','Round','M3 21V13C3 7 7 3 13 3H21'],['inverted','Inverted Round','M3 21V13C9 13 13 9 13 3H21'],['chamfer','Chamfer','M3 21V13L13 3H21']]){
      const button=document.createElement('button');button.type='button';button.className='vui-btn';button.setAttribute('aria-label',label);button.title=label;button.dataset.type=value;button.setAttribute('aria-pressed',String(type===value));button.innerHTML=`<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="${d}"/></svg>`;
@@ -123,7 +126,7 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    }
    document.body.append(overlay);const input=overlay.querySelector('[aria-label=Radius]');bindNumericField(input,{unit});input.focus();input.select();
    const close=()=>overlay.remove();
-   const ok=()=>{const radius=readNumericField(input,unit());if(radius===null||radius<0){input.value=String(convertFromPixels(g.r,unit()));return;}preview(g,convertToPixels(radius,unit()),type);commit(g);close();};
+   const ok=()=>{const radius=readNumericField(input,unit());if(radius===null||radius<0){input.value=String(convertFromPixels(g.r*scale,unit()));return;}preview(g,convertToPixels(radius,unit())/scale,type);commit(g);close();};
    overlay.querySelector('[data-act=ok]').addEventListener('click',ok);overlay.querySelector('[data-act=cancel]').addEventListener('click',close);
    overlay.addEventListener('keydown',e=>{if(e.key==='Escape'){stop(e);close();}else if(e.key==='Enter'){stop(e);ok();}});
  }

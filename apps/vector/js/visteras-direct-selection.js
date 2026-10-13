@@ -1,5 +1,5 @@
-import { parseCornerData, cornerDataIsCurrent } from './visteras-live-corners.js';
-import { mountCornerWidgets } from './visteras-corner-widgets.js';
+import { parseCornerData, cornerDataIsCurrent, sameCornerGeometry } from './visteras-live-corners.js';
+import { mountCornerWidgets } from './visteras-corner-widgets.js?v=live-corners-2';
 import { anchorGuideSnap } from './visteras-anchor-snap.js';
 import { cutAnchors } from './visteras-pen-geometry.js';
 import { artboardSnapTarget } from './visteras-artboard-snap.js';
@@ -111,7 +111,13 @@ export function mountDirectSelection(editor) {
   function readGeometry(el, d) {
     if(d===undefined&&el.hasAttribute('data-visteras-corners')){
       const data=parseCornerData(el.getAttribute('data-visteras-corners'));
-      if(!cornerDataIsCurrent(data,el.getAttribute('d')))el.removeAttribute('data-visteras-corners');
+      if(!cornerDataIsCurrent(data,el.getAttribute('d'))){
+        // SVG-Edit serializes paths at its configured precision. Accept only the
+        // same normalized geometry; actual edits still invalidate the base.
+        if(data&&sameCornerGeometry(readGeometry(el,data.gen),readGeometry(el,el.getAttribute('d')))){
+          data.gen=el.getAttribute('d');el.setAttribute('data-visteras-corners',JSON.stringify(data));
+        }else el.removeAttribute('data-visteras-corners');
+      }
     }
     const path = document.createElementNS(svgNS, 'path');
     path.setAttribute('d', d ?? sc.getPathDataForElement(el) ?? '');
@@ -136,13 +142,15 @@ export function mountDirectSelection(editor) {
       rec.el = path;
     }
     rec.el.setAttribute('d', serializeSegments(segments));
+    const data=parseCornerData(rec.el.getAttribute('data-visteras-corners'));
+    if(data&&!cornerDataIsCurrent(data,rec.el.getAttribute('d')))rec.el.removeAttribute('data-visteras-corners');
   }
   function activate(elements, selectAll = true) {
     const targets = leaves(elements);
     // Finish native point editing before taking ownership of its canvas events.
     switching = true;
-    sc.setMode('pathedit');
     sc.clearSelection();
+    sc.setMode('pathedit');
     switching = false;
     active = true;
     document.body.setAttribute('data-direct-multi', '');
@@ -185,7 +193,7 @@ export function mountDirectSelection(editor) {
       count += rec.selected.size;
       if (rec.selected.size) paths++;
       const m = matrix(rec.el), displayMatrix = new DOMMatrix().scale(zoom).multiply(m);
-      create('path', { d: serializeSegments(rec.segments), transform: displayMatrix.toString(), fill: 'none', stroke: '#3f8ff7', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none' });
+      create('path', { d: serializeSegments(rec.segments), transform: displayMatrix.toString(), fill: 'none', stroke: rec.el.hasAttribute('data-corner-limit')?'red':'#3f8ff7', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none' });
       for (const anchor of list) {
         const s = rec.segments[anchor.index], p = point(s.x, s.y, m), selected = rec.selected.has(anchor.index);
         if (selected) {
@@ -248,20 +256,20 @@ export function mountDirectSelection(editor) {
     return best;
   }
   function snapshot() {
-    return records.filter(r => r.el.isConnected).map(rec => ({ rec, d: rec.el.getAttribute('d'), segments: readGeometry(rec.el), inverse: matrix(rec.el).inverse() }));
+    return records.filter(r => r.el.isConnected).map(rec => ({ rec, d: rec.el.getAttribute('d'), cornerData:rec.el.getAttribute('data-visteras-corners'), segments: readGeometry(rec.el), inverse: matrix(rec.el).inverse() }));
   }
   function commit(before, title) {
     const { BatchCommand, ChangeElementCommand, RemoveElementCommand, InsertElementCommand } = sc.history;
     const command = new BatchCommand(title), changed = [];
     for (const item of before) {
-      const { rec, d, conversion, removed } = item;
+      const { rec, d, cornerData, conversion, removed } = item;
       if (removed) {
         command.addSubCommand(new RemoveElementCommand(rec.el, removed.next, removed.parent));
       } else if (conversion) {
         command.addSubCommand(new RemoveElementCommand(conversion.original, conversion.next, conversion.parent));
         command.addSubCommand(new InsertElementCommand(conversion.path));
       } else if (rec.el.getAttribute('d') !== d) {
-        command.addSubCommand(new ChangeElementCommand(rec.el, { d }));
+        command.addSubCommand(new ChangeElementCommand(rec.el, { d, 'data-visteras-corners':cornerData }));
       } else continue;
       changed.push(rec.el);
     }
@@ -285,7 +293,7 @@ export function mountDirectSelection(editor) {
     if (cancel) {
       if (g.before) for (const item of g.before) {
         if (item.conversion) { item.conversion.path.replaceWith(item.conversion.original); item.rec.el = item.conversion.original; }
-        else if (item.d !== null) item.rec.el.setAttribute('d', item.d);
+        else if (item.d !== null) {item.rec.el.setAttribute('d', item.d);if(item.cornerData===null)item.rec.el.removeAttribute('data-visteras-corners');else item.rec.el.setAttribute('data-visteras-corners',item.cornerData);}
       }
       if (g.selection) records.forEach((r,i) => { r.selected = new Set(g.selection[i] || []); });
     } else if (g.type === 'marquee') {
@@ -320,8 +328,8 @@ export function mountDirectSelection(editor) {
   sc.setMode = function (mode) {
     // Keep DS anchor chrome while Scissors is active so cuttable nodes stay visible
     // (DS mouse handlers already no-op unless mode === pathedit).
-    if (!active || switching || mode === 'pathedit' || mode === 'ext-panning' || mode === 'scissors') {
-      if (active && mode === 'scissors') finish(true);
+    if (!active || switching || mode === 'pathedit' || mode === 'ext-panning' || mode === 'scissors' || mode === 'visteras-lasso') {
+      if (active && ['scissors','visteras-lasso'].includes(mode)) finish(true);
       return setMode.call(this, mode);
     }
     finish(true);
@@ -465,6 +473,21 @@ export function mountDirectSelection(editor) {
     get active() { return active; },
     getSelectedElements: () => selectedElements(),
     findSnapTarget,
+    getAnchorSelection:()=>new Map(records.map(r=>[r.el,new Set(r.selected)])),
+    getAnchorCandidates(){
+      return leaves([...sc.getSvgContent().querySelectorAll(SHAPES)]).filter(el=>{
+        for(let parent=el;parent&&parent!==sc.getSvgContent();parent=parent.parentElement){
+          if(parent.getAttribute('data-visteras-locked')==='1'||getComputedStyle(parent).display==='none'||getComputedStyle(parent).visibility==='hidden')return false;
+        }
+        return !el.closest('#visteras_ruler_guides,#visteras_smart_guides,#canvasBackground');
+      }).flatMap(el=>{const segs=readGeometry(el),m=el.getScreenCTM();return m?anchors(segs).map(a=>{const p=new DOMPoint(segs[a.index].x,segs[a.index].y).matrixTransform(m);return {el,index:a.index,x:p.x,y:p.y};}):[];});
+    },
+    selectAnchors(map){
+      finish(true);sc.clearSelection();
+      if(map.size)showAnchors([...map.keys()],false);else{records=[];active=true;document.body.setAttribute('data-direct-multi','');}
+      for(const rec of records)rec.selected=new Set(map.get(rec.el)||[]);
+      schedule();
+    },
     get snapMarker() { return snapMarker; },
     get isSnapPointEnabled() { return isSnapPointEnabled; },
     // Paint targets: prefer elems with selected anchors; if none, all paths in the
@@ -736,7 +759,7 @@ export function mountDirectSelection(editor) {
   document.addEventListener('mouseup', e => { if (gesture) { stop(e); finish(); } }, true);
   document.addEventListener('keydown', e => {
     if (e.isComposing || window.__visterasIsTypingDirectly || e.composedPath().some(el => el?.isContentEditable || ['INPUT','TEXTAREA','SELECT'].includes(el?.nodeName))) return;
-    if (sc.getMode() !== 'pathedit') return;
+    if (!['pathedit','visteras-lasso'].includes(sc.getMode())) return;
     const key = e.key.toLowerCase(), command = e.metaKey || e.ctrlKey;
     if (command && key === 'a') {
       stop(e);
