@@ -222,3 +222,24 @@ test('render_adjustment pipeline: Levels adjustment modifies canvas pixels', () 
 	assert.equal(imgDataAfter.data[2], 71);
 	assert.equal(imgDataAfter.data[3], 255);
 });
+
+test('tonal histogram worker excludes transparent pixels and uses luminance', () => {
+	const vm = require('node:vm');
+	let result;
+	const self = { postMessage: data => { result = data; } };
+	vm.runInNewContext(fs.readFileSync(require.resolve('../src/js/workers/histogram-worker.js'), 'utf8'), { self });
+	self.onmessage({ data: { tonal: true, pixels: new Uint8ClampedArray([255, 0, 0, 255, 255, 255, 255, 0]).buffer } });
+	assert.equal(result.histogram[0][76], 1);
+	assert.equal(result.histogram[0][255], 0);
+	assert.equal(result.histogram[1][255], 1);
+});
+
+test('Levels histogram uses a fresh below-layer composite and is not recomputed on preview refresh', () => {
+	const src = fs.readFileSync(require.resolve('../src/js/core/gui/gui-properties.js'), 'utf8');
+	const compute = src.slice(src.indexOf('\tcompute_levels_histogram_data('), src.indexOf('\tdraw_levels_histogram('));
+	assert.match(compute, /l.order < layer.order/);
+	assert.doesNotMatch(compute, /adj_scratch_canvas/);
+	assert.match(compute, /new Worker/);
+	const refresh = src.slice(src.indexOf('if (sameLayer && !bind_events)', src.indexOf('\trender_levels_properties(')), src.indexOf("let html = '<div class=\"properties_controls levels_properties_controls"));
+	assert.doesNotMatch(refresh, /update_levels_histogram/);
+});

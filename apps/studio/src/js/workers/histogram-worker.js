@@ -5,10 +5,11 @@ self.onmessage = function (event) {
 	var sum = 0;
 
 	for (var index = 0; index < pixels.length; index += 4) {
+		if (event.data.tonal && pixels[index + 3] === 0) continue;
 		var red = pixels[index];
 		var green = pixels[index + 1];
 		var blue = pixels[index + 2];
-		histogram[0][Math.round((red + green + blue) / 3)]++;
+		histogram[0][Math.round(event.data.tonal ? (0.299 * red + 0.587 * green + 0.114 * blue) : (red + green + blue) / 3)]++;
 		histogram[1][red]++;
 		histogram[2][green]++;
 		histogram[3][blue]++;

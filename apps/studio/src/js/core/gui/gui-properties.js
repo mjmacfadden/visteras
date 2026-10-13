@@ -419,7 +419,6 @@ class GUI_properties_class {
 			&& target.dataset.adjType === 'levels';
 
 		if (sameLayer && !bind_events) {
-			this.update_levels_histogram(target, layer);
 			this.sync_levels_control_values(target, layer);
 			return;
 		}
@@ -501,73 +500,41 @@ class GUI_properties_class {
 	}
 
 	compute_levels_histogram_data(layer) {
-		const W = config.WIDTH || 800;
-		const H = config.HEIGHT || 600;
-		if (W === 0 || H === 0) return null;
-
-		let scratchCanvas = null;
-		if (this.Base_layers.adj_scratch_canvas && this.Base_layers.adj_scratch_canvas.width === W && this.Base_layers.adj_scratch_canvas.height === H) {
-			scratchCanvas = this.Base_layers.adj_scratch_canvas;
-		} else if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-			scratchCanvas = document.createElement('canvas');
-			scratchCanvas.width = W;
-			scratchCanvas.height = H;
-			const sCtx = scratchCanvas.getContext('2d');
-			if (sCtx) {
-				const sorted = this.Base_layers.get_sorted_layers ? this.Base_layers.get_sorted_layers() : (config.layers || []);
-				const below = sorted.filter(l => l.order < layer.order && l.visible !== false && l.type != null);
-				const temp = document.createElement('canvas');
-				temp.width = W;
-				temp.height = H;
-				if (typeof this.Base_layers.render_objects === 'function') {
-					this.Base_layers.render_objects(sCtx, temp, below, () => sCtx.save());
-				}
-			}
-		}
-
-		if (!scratchCanvas || typeof scratchCanvas.getContext !== 'function') return null;
-		const ctx = scratchCanvas.getContext('2d');
-		if (!ctx || typeof ctx.getImageData !== 'function') return null;
-		let imgData = null;
-		try {
-			imgData = ctx.getImageData(0, 0, W, H);
-		} catch (e) {
-			return null;
-		}
-		const data = imgData ? imgData.data : null;
-		if (!data) return null;
-
-		const rHist = new Uint32Array(256);
-		const gHist = new Uint32Array(256);
-		const bHist = new Uint32Array(256);
-		const rgbHist = new Uint32Array(256);
-
-		const step = data.length > 2000000 ? Math.ceil(data.length / 2000000) * 4 : 4;
-		for (let i = 0; i < data.length; i += step) {
-			if (data[i + 3] === 0) continue;
-			const r = data[i];
-			const g = data[i + 1];
-			const b = data[i + 2];
-			rHist[r]++;
-			gHist[g]++;
-			bHist[b]++;
-			const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-			rgbHist[lum]++;
-		}
-
-		return { rgb: rgbHist, red: rHist, green: gHist, blue: bHist };
+		// Render a fresh composite below this layer; shared render scratch canvases
+		// may belong to another adjustment higher in the stack.
+		const W = config.WIDTH, H = config.HEIGHT;
+		const canvas = document.createElement('canvas');
+		canvas.width = W; canvas.height = H;
+		const ctx = canvas.getContext('2d');
+		const temp = document.createElement('canvas');
+		temp.width = W; temp.height = H;
+		const below = this.Base_layers.get_sorted_layers().filter(l => l.order < layer.order);
+		this.Base_layers.render_objects(ctx, temp, below, () => ctx.save());
+		return ctx.getImageData(0, 0, W, H).data;
 	}
 
 	update_levels_histogram(target, layer) {
 		const canvas = target.querySelector('.levels_histogram_canvas');
 		if (!canvas) return;
-		const params = layer.params || default_levels_params();
-		const ch = params.channel || 'rgb';
-		const histData = this.compute_levels_histogram_data(layer);
-		this.last_levels_hist_data = histData;
-		if (histData) {
-			this.draw_levels_histogram(canvas, histData, ch);
-		}
+		const channel = layer.params.channel || 'rgb';
+		const request = (this.tonal_histogram_request || 0) + 1;
+		this.tonal_histogram_request = request;
+		this.last_levels_hist_data = null;
+		if (this.tonal_histogram_worker) this.tonal_histogram_worker.terminate();
+		const worker = new Worker(new URL('./../../workers/histogram-worker.js', import.meta.url));
+		this.tonal_histogram_worker = worker;
+		worker.onmessage = ({ data }) => {
+			worker.terminate();
+			if (request !== this.tonal_histogram_request || this.bound_layer_id !== layer.id
+				|| !target.contains(canvas)) return;
+			const [rgb, red, green, blue] = data.histogram;
+			this.last_levels_hist_data = { rgb, red, green, blue };
+			this.draw_levels_histogram(canvas, this.last_levels_hist_data, channel);
+			if (layer.adjustment_type === 'curves') this.draw_curves_graph(target, layer);
+		};
+		worker.onerror = () => worker.terminate();
+		const pixels = this.compute_levels_histogram_data(layer);
+		worker.postMessage({ pixels: pixels.buffer, tonal: true }, [pixels.buffer]);
 	}
 
 	draw_levels_histogram(canvas, histData, channel) {
@@ -780,7 +747,11 @@ class GUI_properties_class {
 				const c = layer.params[ch];
 				if (!c) return;
 
-				if (isFloat) {
+				if (handle === 'inBlack') {
+					c.inBlack = Math.max(0, Math.min(c.inWhite - 2, Math.round(raw)));
+				} else if (handle === 'inWhite') {
+					c.inWhite = Math.max(c.inBlack + 2, Math.min(255, Math.round(raw)));
+				} else if (isFloat) {
 					c[handle] = Math.max(min, Math.min(max, parseFloat(raw.toFixed(2))));
 				} else {
 					c[handle] = Math.max(min, Math.min(max, Math.round(raw)));
@@ -857,12 +828,11 @@ class GUI_properties_class {
 				const layer = this.Base_layers.get_layer(layer_id, true);
 				if (!layer) return;
 				this.snapshot_params(layer_id);
-				const histData = this.last_levels_hist_data || this.compute_levels_histogram_data(layer);
+				const histData = this.last_levels_hist_data;
 				if (histData) {
 					const newParams = auto_levels(histData);
 					newParams.channel = layer.params ? (layer.params.channel || 'rgb') : 'rgb';
 					layer.params = newParams;
-					this.update_levels_histogram(target, layer);
 					this.sync_levels_control_values(target, layer);
 					this.apply_live_levels(layer_id);
 					this.commit_params(layer_id);
@@ -879,7 +849,6 @@ class GUI_properties_class {
 				const ch = layer.params ? (layer.params.channel || 'rgb') : 'rgb';
 				layer.params = default_levels_params();
 				layer.params.channel = ch;
-				this.update_levels_histogram(target, layer);
 				this.sync_levels_control_values(target, layer);
 				this.apply_live_levels(layer_id);
 				this.commit_params(layer_id);
