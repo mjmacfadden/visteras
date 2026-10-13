@@ -310,6 +310,10 @@ export function mountGrid(editor) {
           <label class="vgrid_check"><input type="checkbox" data-key="inBack"${prefs.inBack ? ' checked' : ''}> Grid in Back</label>
           <label class="vgrid_check"><input type="checkbox" data-key="show"${prefs.show ? ' checked' : ''}> Show Grid</label>
           <label class="vgrid_check"><input type="checkbox" data-key="snap"${prefs.snap ? ' checked' : ''}> Snap to Grid</label>
+          <fieldset><legend>Smart Guides</legend>
+            <label class="vgrid_check"><input type="checkbox" data-key="measurementLabels"${window.__visterasGuideManager?.measurementLabels !== false ? ' checked' : ''}> Measurement Labels</label>
+            <label class="vgrid_check"><input type="checkbox" data-key="spacingGuides"${window.__visterasGuideManager?.spacingGuides !== false ? ' checked' : ''}> Spacing Guides</label>
+          </fieldset>
         </div>
         <div class="vui-dialog-actions">
           <button type="button" class="vui-btn vui-btn-secondary" data-act="cancel">Cancel</button>
@@ -334,7 +338,7 @@ export function mountGrid(editor) {
     overlay.addEventListener('click', (e) => {
       const act = e.target.closest?.('[data-act]')?.dataset?.act;
       if (act === 'cancel' || e.target === overlay) close();
-      if (act === 'ok') { setPrefs(read()); close(); }
+      if (act === 'ok') { setPrefs(read()); window.__visterasGuideManager?.setOptions({measurementLabels: overlay.querySelector('[data-key=measurementLabels]').checked, spacingGuides: overlay.querySelector('[data-key=spacingGuides]').checked}); close(); }
     });
     // Live preview while editing
     overlay.addEventListener('input', () => setPrefs(read(), { persist: false }));

@@ -40985,6 +40985,8 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 					x: e.altKey ? q.getStartX() - n : i,
 					y: e.altKey ? q.getStartY() - r : a
 				}, 1e3);
+				// Visteras: transient drawing dimensions; no document state.
+				window.__visterasOnDrawSize?.(Number(_.getAttribute("width")), Number(_.getAttribute("height")), y, x);
 				break;
 			}
 			case "circle":
@@ -41001,6 +41003,7 @@ var Zm, Qm, $m, eh, th, nh, rh, G, ih, ah, oh, sh, ch, lh, uh, dh, fh, ph, mh, h
 				const rx = Math.abs(dx) / (e.altKey ? 1 : 2), ry = Math.abs(dy) / (e.altKey ? 1 : 2);
 				kg(_, { cx: e.altKey ? sx : sx + dx / 2, cy: e.altKey ? sy : sy + dy / 2,
 					...(circle ? { r: rx } : { rx, ry }) }, 1e3);
+				window.__visterasOnDrawSize?.(rx * 2, ry * 2, y, x);
 				break;
 			}
 			case "fhellipse":

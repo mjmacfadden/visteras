@@ -179,6 +179,7 @@ export function mountSelectionTools(editor) {
         }
       } catch { /* ignore */ }
     }
+    let measurementAngle = null;
     let transform = new DOMMatrix();
     if (dir === 'move') {
       transform = transform.translate(p.x-start.x, p.y-start.y);
@@ -186,6 +187,7 @@ export function mountSelectionTools(editor) {
       const {x:cx,y:cy} = point(b.x+b.width/2,b.y+b.height/2,basis);
       let angle = (Math.atan2(p.y-cy, p.x-cx) - Math.atan2(start.y-cy, start.x-cx)) * 180 / Math.PI;
       if (e.shiftKey) angle = Math.round(angle / 45) * 45;
+      measurementAngle = angle;
       transform = transform.translate(cx, cy).rotate(angle).translate(-cx, -cy);
     } else {
       start = point(start.x,start.y,basis.inverse());
@@ -231,6 +233,12 @@ export function mountSelectionTools(editor) {
     } catch { /* ignore */ }
     drag.moved = true;
     drag.visualFrame = {b,m:transform.multiply(basis)};
+    const gm = window.__visterasGuideManager;
+    if (measurementAngle !== null) gm?.showMeasurement(measurementAngle,0,p.x,p.y,['Angle','']);
+    if (dir !== 'move' && measurementAngle === null) {
+      const live = gm?._getCombinedBBox(drag.items.map(i=>i.el));
+      if (live) {const cursor=position(e);gm.showMeasurement(live.width, live.height, cursor.x, cursor.y);}
+    }
     schedule();
   }, true);
   function finish(cancel = false) {

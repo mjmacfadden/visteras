@@ -16,10 +16,15 @@
  *    - Automatically clears when drag finishes.
  */
 
+import { convertFromPixels } from './visteras-document-presets.js';
+import { findEqualSpacing } from './visteras-spacing-guides.js';
+
 const NS = 'http://www.w3.org/2000/svg';
 const STORAGE_KEY_SMART_GUIDES = 'visteras_smart_guides_enabled';
 const STORAGE_KEY_SHOW_GUIDES = 'visteras_show_ruler_guides';
 const STORAGE_KEY_LOCK_GUIDES = 'visteras_lock_ruler_guides';
+const STORAGE_KEY_MEASUREMENT_LABELS = 'visteras_smart_measurement_labels';
+const STORAGE_KEY_SPACING_GUIDES = 'visteras_smart_spacing_guides';
 
 export class GuideManager {
   constructor(editor) {
@@ -29,6 +34,8 @@ export class GuideManager {
     this.showGuides = true;
     this.lockGuides = false;
     this.smartGuidesEnabled = true;
+    this.measurementLabels = true;
+    this.spacingGuides = true;
 
     this.rulerGuidesLayer = null;
     this.smartGuidesLayer = null;
@@ -45,6 +52,8 @@ export class GuideManager {
       const storedShow = localStorage.getItem(STORAGE_KEY_SHOW_GUIDES);
       if (storedShow !== null) this.showGuides = storedShow !== '0';
 
+      this.measurementLabels = localStorage.getItem(STORAGE_KEY_MEASUREMENT_LABELS) !== '0';
+      this.spacingGuides = localStorage.getItem(STORAGE_KEY_SPACING_GUIDES) !== '0';
       const storedLock = localStorage.getItem(STORAGE_KEY_LOCK_GUIDES);
       if (storedLock !== null) this.lockGuides = storedLock === '1';
     } catch (_) {}
@@ -54,8 +63,40 @@ export class GuideManager {
     try {
       localStorage.setItem(STORAGE_KEY_SMART_GUIDES, this.smartGuidesEnabled ? '1' : '0');
       localStorage.setItem(STORAGE_KEY_SHOW_GUIDES, this.showGuides ? '1' : '0');
+      localStorage.setItem(STORAGE_KEY_MEASUREMENT_LABELS, this.measurementLabels ? '1' : '0');
+      localStorage.setItem(STORAGE_KEY_SPACING_GUIDES, this.spacingGuides ? '1' : '0');
       localStorage.setItem(STORAGE_KEY_LOCK_GUIDES, this.lockGuides ? '1' : '0');
     } catch (_) {}
+  }
+
+  setOptions({measurementLabels = this.measurementLabels, spacingGuides = this.spacingGuides}) {
+    this.measurementLabels = measurementLabels;
+    this.spacingGuides = spacingGuides;
+    this._saveSettings();
+    this.clearSmartGuides();
+  }
+
+  formatMeasurement(value) {
+    const unit = (typeof window !== 'undefined' ? window.__visterasDocumentShell?.getBaseUnit?.() : null) || this.editor?.configObj?.curConfig?.baseUnit || 'px';
+    return `${Number((unit === 'px' ? value : convertFromPixels(value, unit)).toFixed(2))} ${unit}`;
+  }
+
+  showMeasurement(w, h, x, y, labels = ['W', 'H']) {
+    if (!this.smartGuidesEnabled || !this.measurementLabels) return;
+    this._ensureLayers();
+    this.smartGuidesLayer?.querySelector?.('.visteras-smart-badge')?.remove();
+    const badge = this._createDeltaBadge(x + 14, y + 14, w, h, labels);
+    if (badge) this.smartGuidesLayer?.append(badge);
+  }
+
+  _drawSpacing(match) {
+    for (const segment of match.segments) {
+      const {start,end,at} = segment;
+      this.drawSmartGuideLine(match.axis === 'x' ? 'h' : 'v', at, start, end);
+      for (const v of [start,end]) this.drawSmartGuideLine(match.axis === 'x' ? 'v' : 'h', v, at-4, at+4);
+      const label = this._createLabel(match.axis === 'x' ? (start+end)/2 : at, match.axis === 'x' ? at : (start+end)/2, this.formatMeasurement(match.gap));
+      if (label) this.smartGuidesLayer?.append(label);
+    }
   }
 
   init() {
@@ -551,20 +592,19 @@ export class GuideManager {
     return txt;
   }
 
-  _createDeltaBadge(x, y, dx, dy) {
+  _createDeltaBadge(x, y, dx, dy, labels = ['dX', 'dY']) {
     if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') return null;
     const g = document.createElementNS(NS, 'g');
     g.setAttribute('class', 'visteras-smart-badge');
 
-    const formatDelta = (val) => `${Math.abs(val) < 0.005 ? '0' : Number(val.toFixed(2))} px`;
-    const line1Text = `dX: ${formatDelta(dx)}`;
-    const line2Text = `dY: ${formatDelta(dy)}`;
+    const line1Text = labels[0] === 'Angle' ? `Angle: ${Number(dx.toFixed(2))}°` : `${labels[0]}: ${this.formatMeasurement(dx)}`;
+    const line2Text = labels[1] ? `${labels[1]}: ${this.formatMeasurement(dy)}` : '';
 
     const rect = document.createElementNS(NS, 'rect');
     rect.setAttribute('x', String(Math.round(x)));
     rect.setAttribute('y', String(Math.round(y)));
-    rect.setAttribute('width', '88');
-    rect.setAttribute('height', '36');
+    rect.setAttribute('width', String(Math.max(88, Math.max(line1Text.length,line2Text.length)*6+16)));
+    rect.setAttribute('height', labels[1] ? '36' : '22');
     rect.setAttribute('rx', '4');
     rect.setAttribute('ry', '4');
     rect.setAttribute('fill', '#cccccc');
@@ -892,6 +932,7 @@ export class GuideManager {
     }
 
     // 3. Other elements on canvas (across all layers and groups)
+    const spacingBoxes = [];
     const svgContent = this.sc?.getSvgContent?.() || (typeof document !== 'undefined' && typeof document.getElementById === 'function' ? document.getElementById('svgcontent') : null);
     if (svgContent) {
       const targets = svgContent.querySelectorAll ? svgContent.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text, image, g:not(.layer):not(.vclip-group)') : (svgContent.children || []);
@@ -910,6 +951,7 @@ export class GuideManager {
 
         const b = this._getElementSceneBBox(sib);
         if (b && (b.width > 0 || b.height > 0)) {
+          spacingBoxes.push(b);
           const minSpanX = Math.min(movingBBox.x, b.x) - 30;
           const maxSpanX = Math.max(movingBBox.x + movingBBox.width, b.x + b.width) + 30;
           const minSpanY = Math.min(movingBBox.y, b.y) - 30;
@@ -1037,20 +1079,12 @@ export class GuideManager {
     this._lastSnappedTargetX = bestMatchX ? bestMatchX.targetVal : null;
     this._lastSnappedTargetY = bestMatchY ? bestMatchY.targetVal : null;
 
-    // Display ONLY when objects are actively in a snappable position
-    if (!bestMatchX && !bestMatchY) {
-      this.clearSmartGuides();
-      return {
-        activeMatchesX: [],
-        activeMatchesY: [],
-        snapDx: 0,
-        snapDy: 0,
-        delta
-      };
-    }
-
-    const snapDx = bestMatchX ? (bestMatchX.targetVal - bestMatchX.movingPoint.val) : 0;
-    const snapDy = bestMatchY ? (bestMatchY.targetVal - bestMatchY.movingPoint.val) : 0;
+    const spacing = this.spacingGuides ? findEqualSpacing(movingBBox, spacingBoxes, baseSnapThreshold) : [];
+    const spaceX = spacing.find(m=>m.axis === 'x'), spaceY = spacing.find(m=>m.axis === 'y');
+    if (spaceX) bestMatchX = null;
+    if (spaceY) bestMatchY = null;
+    const snapDx = spaceX?.delta ?? (bestMatchX ? bestMatchX.targetVal-bestMatchX.movingPoint.val : 0);
+    const snapDy = spaceY?.delta ?? (bestMatchY ? bestMatchY.targetVal-bestMatchY.movingPoint.val : 0);
 
     // Apply snap displacement directly to moving elements unless caller specifies otherwise
     if (options.applyDirectSnap !== false && (snapDx !== 0 || snapDy !== 0)) {
@@ -1192,8 +1226,10 @@ export class GuideManager {
       }
     }
 
+    for (const match of spacing) this._drawSpacing(match);
+
     // Render displacement delta badge (dX, dY)
-    if (delta && this.smartGuidesLayer) {
+    if (delta && this.measurementLabels && this.smartGuidesLayer) {
       const badgeW = 92;
       const badgeH = 36;
       const badgeX = (movingBBox.x + movingBBox.width + 16 + badgeW > abW)
@@ -1483,6 +1519,7 @@ export function mountGuides(editor) {
   manager.init();
   if (typeof window !== 'undefined') {
     window.__visterasGuideManager = manager;
+    window.__visterasOnDrawSize = (w,h,x,y) => { manager.clearSmartGuides(); manager.showMeasurement(w,h,x,y); };
   }
   return manager;
 }

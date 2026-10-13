@@ -395,7 +395,7 @@ test('HTML: index.html contains Smart Guides and Ruler Guide menu items and moun
   assert.match(html, /mountGuides\(svgEditor\);/, 'Must call mountGuides');
 });
 
-test('Guides: Smart Guides only display when objects are in a snappable position', () => {
+test('Guides: Measurement badge remains visible away from snap targets', () => {
   const mockCanvas = {
     getZoom() { return 1; },
     getResolution() { return { w: 800, h: 600 }; },
@@ -419,7 +419,8 @@ test('Guides: Smart Guides only display when objects are in a snappable position
   assert.equal(res.activeMatchesY.length, 0, 'No active matches in Y');
   assert.equal(res.snapDx, 0, 'No snap displacement in X');
   assert.equal(res.snapDy, 0, 'No snap displacement in Y');
-  assert.equal(smartLayer.children.length, 0, 'Must NOT render any guides, markers, or badges when not in a snappable position');
+  assert.equal(smartLayer.children.length, 1, 'Free movement still displays the measurement badge');
+  assert.equal(smartLayer.children[0].getAttribute('class'), 'visteras-smart-badge');
 });
 
 test('Guides: Smart Guides layer renders above selectorParentGroup in DOM stacking order', () => {
@@ -542,3 +543,43 @@ test('Guides: ⌘; toggle keybind operates silently without any toasts', () => {
 });
 
 
+
+const {findEqualSpacing} = await import('../js/visteras-spacing-guides.js');
+test('Spacing: equal gaps on both sides snap to their midpoint', () => {
+  const [m]=findEqualSpacing({x:53,y:0,width:20,height:20},[{x:0,y:0,width:20,height:20},{x:100,y:0,width:20,height:20}],8);
+  assert.equal(m.delta,-3); assert.equal(m.gap,30); assert.equal(m.segments.length,2);
+});
+test('Spacing: matches an existing gap beside two neighbors', () => {
+  const [m]=findEqualSpacing({x:83,y:0,width:20,height:20},[{x:0,y:0,width:20,height:20},{x:40,y:0,width:20,height:20}],8);
+  assert.equal(m.delta,-3); assert.equal(m.gap,20);
+});
+test('Spacing: ignores other rows and respects tolerance', () => {
+  assert.deepEqual(findEqualSpacing({x:70,y:0,width:20,height:20},[{x:0,y:40,width:20,height:20},{x:100,y:40,width:20,height:20}],8),[]);
+  assert.deepEqual(findEqualSpacing({x:70,y:0,width:20,height:20},[{x:0,y:0,width:20,height:20},{x:100,y:0,width:20,height:20}],8),[]);
+});
+test('Spacing: column gaps use height and keep input boxes intact', () => {
+  const box={x:0,y:54,width:20,height:20};
+  const [m]=findEqualSpacing(box,[{x:0,y:0,width:20,height:20},{x:0,y:100,width:20,height:20}],8);
+  assert.equal(m.axis,'y'); assert.equal(m.delta,-4); assert.equal(box.y,54);
+});
+test('Measurement preferences are allowlisted and wired to the dialog', () => {
+  const source=fs.readFileSync(guidesJsPath,'utf8');
+  const allow=fs.readFileSync(path.resolve(vectorRoot,'../../scripts/check-no-doc-localstorage.mjs'),'utf8');
+  const grid=fs.readFileSync(path.resolve(vectorRoot,'js/visteras-grid.js'),'utf8');
+  for(const key of ['STORAGE_KEY_MEASUREMENT_LABELS','STORAGE_KEY_SPACING_GUIDES']) assert.ok(allow.includes(key)&&source.includes(key));
+  assert.ok(grid.includes('Measurement Labels')&&grid.includes('Spacing Guides'));
+  assert.ok(!source.includes('} px`'));
+  const manager=new GuidesModule.GuideManager({configObj:{curConfig:{baseUnit:'pt'}}});
+  assert.equal(manager.formatMeasurement(16),'12 pt');
+});
+
+test('Spacing: GuideManager gathers scene boxes and applies equal-gap snap', () => {
+  const content=createMockElement('g');
+  for(const b of [{x:100,y:100,width:80,height:80},{x:470,y:100,width:90,height:120}]){const el=createMockElement('rect');el.getBBox=()=>b;content.append(el);}
+  const moving=createMockElement('rect');moving._bbox={x:272,y:100,width:100,height:100};moving.getBBox=()=>moving._bbox;
+  const manager=new GuidesModule.GuideManager({svgCanvas:{getSvgContent:()=>content,getZoom:()=>1,getResolution:()=>({w:902,h:623})}});
+  manager.smartGuidesLayer=createMockElement('g');
+  const res=manager.evaluateSmartSnap([moving],{dx:12,dy:0});
+  assert.equal(res.snapDx,3);assert.equal(moving._bbox.x,275);
+  assert.equal(manager.smartGuidesLayer.children.filter(el=>el.textContent==='95 px').length,2);
+});

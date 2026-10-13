@@ -61,6 +61,8 @@ export const ALLOWLIST = [
   { file: 'apps/vector/js/visteras-document-shell.js', key: 'LAST_PRESET_KEY', reason: 'last New Document preset' },
   { file: 'apps/vector/js/visteras-guides.js', key: 'STORAGE_KEY_SMART_GUIDES', reason: 'smart guides on/off preference' },
   { file: 'apps/vector/js/visteras-guides.js', key: 'STORAGE_KEY_SHOW_GUIDES', reason: 'ruler guides visibility preference' },
+  { file: 'apps/vector/js/visteras-guides.js', key: 'STORAGE_KEY_MEASUREMENT_LABELS', reason: 'measurement labels visibility preference' },
+  { file: 'apps/vector/js/visteras-guides.js', key: 'STORAGE_KEY_SPACING_GUIDES', reason: 'spacing guides visibility preference' },
   { file: 'apps/vector/js/visteras-guides.js', key: 'STORAGE_KEY_LOCK_GUIDES', reason: 'ruler guides lock preference' },
   { file: 'apps/vector/js/visteras-eraser.js', key: "'visteras_eraser_radius'", reason: 'eraser size' },
   { file: 'apps/vector/js/visteras-eyedropper.js', key: "'visteras_eyedropper_options'", reason: 'eyedropper options' },
