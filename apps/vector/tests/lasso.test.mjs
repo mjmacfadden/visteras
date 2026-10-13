@@ -35,11 +35,11 @@ test('Lasso tool wiring preserves editable Direct Selection anchors and intercep
  assert.ok(ui.includes("window.addEventListener('pointerdown'")&&ui.includes("window.addEventListener('mousedown'"));
  assert.ok(ui.includes('stopImmediatePropagation()')&&ui.includes('typing(e)'));
 });
-test('Shared and toolbar lasso icons exactly reuse Studio geometry',()=>{
+test('Shared lasso icons exactly reuse Studio geometry',()=>{
  const read=p=>fs.readFileSync(new URL(p,import.meta.url),'utf8');
  const geometry=svg=>[...svg.matchAll(/<(path|circle)\s+([^>]+)\/?\s*>/g)].map(m=>[m[1],Object.fromEntries([...m[2].matchAll(/(d|cx|cy|r)="([^"]*)"/g)].map(a=>[a[1],a[2]]))]);
  const studio=read('../../studio/images/icons/lasso.svg');
- for(const p of ['../../../packages/icons/tools/lasso.svg','../images/lasso.svg','../images/tools/lasso.svg','../../studio/images/tools/lasso.svg'])assert.deepEqual(geometry(read(p)),geometry(studio));
+ for(const p of ['../../../packages/icons/tools/lasso.svg','../images/tools/lasso.svg','../../studio/images/tools/lasso.svg'])assert.deepEqual(geometry(read(p)),geometry(studio));
 });
 test('Lasso pointer gestures replace/add/subtract and Esc cancels without moving artwork',()=>{
  const oldDocument=global.document,oldWindow=global.window;

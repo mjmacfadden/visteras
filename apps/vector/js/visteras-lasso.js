@@ -26,7 +26,7 @@ const MODE='visteras-lasso';
 const typing=e=>e.isComposing||window.__visterasIsTypingDirectly||e.composedPath().some(el=>el?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(el?.nodeName));
 export function mountLasso(editor){
  const sc=editor.svgCanvas,btn=document.createElement('se-button');
- btn.id='tool_lasso';btn.setAttribute('title',`Lasso Tool (${formatShortcut({key:'Q'})})`);btn.setAttribute('src','lasso.svg');
+ btn.id='tool_lasso';btn.setAttribute('title',`Lasso Tool (${formatShortcut({key:'Q'})})`);btn.setAttribute('src','lasso.svg?v=illustrator-1');
  document.getElementById('tool_direct_select')?.after(btn);
  const activate=()=>{const selected=(sc.getSelectedElements?.()||[]).filter(Boolean);if(!sc.directSelection.active&&selected.length){sc.directSelection.showAnchors(selected,true);sc.clearSelection();}sc.setMode(MODE);editor.leftPanel?.updateLeftPanel?.('tool_lasso');btn.setAttribute('pressed','true');};
  btn.addEventListener('click',activate);
