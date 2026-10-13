@@ -7,6 +7,8 @@ import config from './../config.js';
 import zoomView from './../libs/zoomView.js';
 import app from './../app.js';
 import Mask_class from './../modules/mask/mask.js';
+import { ref_point, skew_from_drag, snap_angle, scale_about } from './../libs/free-transform.js';
+
 
 var instance = null;
 var settings_all = [];
@@ -73,6 +75,7 @@ class Base_selection_class {
 		this.current_angle = null;
 		// state captured when a rotate drag starts (for relative rotation)
 		this.rotate_drag = null;
+		this.is_skew_drag = false;
 		// marching ants animation state
 		this.ant_offset = 0;
 		this.ant_keep_rendering = false;
@@ -304,6 +307,11 @@ class Base_selection_class {
 		//shifts the bounding box off the layer's pixel edges, introducing
 		//padding/misalignment when zooming.
 
+		const transform=app.GUI?.modules?.['edit/transform'];
+		if ((transform?.is_active() || data.transform_quad) && overlay_ctx && settings.enable_controls) {
+			this.draw_transform_controls(overlay_ctx,data,transform?.session?.ref,screen_handle);
+			return;
+		}
 		var block_size = block_size_default;
 
 		this.ctx.save();
@@ -320,12 +328,22 @@ class Base_selection_class {
 			this.ctx.setTransform(mm[0], mm[1], mm[2], mm[3], mm[4] + config.TRANSFORM_MARGIN, mm[5] + config.TRANSFORM_MARGIN);
 		}
 
-		let isRotated = false;
-		if (data.rotate != null && data.rotate != 0) {
-			//rotate
-			isRotated = true;
+		this.ctx.save();
+
+		let isTransformed = false;
+		const hasRotate = data.rotate != null && data.rotate != 0;
+		const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
+		if (hasRotate || hasSkew) {
+			isTransformed = true;
 			this.ctx.translate(data.x + data.width / 2, data.y + data.height / 2);
-			this.ctx.rotate(data.rotate * Math.PI / 180);
+			if (hasRotate) {
+				this.ctx.rotate(data.rotate * Math.PI / 180);
+			}
+			if (hasSkew) {
+				const sxRad = ((data.skew_x || 0) * Math.PI) / 180;
+				const syRad = ((data.skew_y || 0) * Math.PI) / 180;
+				this.ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+			}
 			x = -data.width / 2;
 			y = -data.height / 2;
 		}
@@ -476,7 +494,44 @@ class Base_selection_class {
 				corner(x, y + h / 2, DRAG_TYPE_LEFT, 'ew-resize');
 				corner(x + w, y + h / 2, DRAG_TYPE_RIGHT, 'ew-resize');
 			}
+
+			this.ctx.restore();
+
+			const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+			if (transform_module && transform_module.is_active()) {
+				const session = transform_module.session;
+				const ref = session.ref || { x: data.x + data.width / 2, y: data.y + data.height / 2 };
+				const r = 5 / config.ZOOM;
+
+				const refPath = new Path2D();
+				refPath.arc(ref.x, ref.y, r, 0, 2 * Math.PI);
+
+				this.ctx.save();
+				this.ctx.beginPath();
+				this.ctx.arc(ref.x, ref.y, r, 0, 2 * Math.PI);
+				this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+				this.ctx.strokeStyle = '#000000';
+				this.ctx.lineWidth = 1 / config.ZOOM;
+				this.ctx.fill();
+				this.ctx.stroke();
+
+				this.ctx.beginPath();
+				this.ctx.moveTo(ref.x - r * 1.6, ref.y);
+				this.ctx.lineTo(ref.x + r * 1.6, ref.y);
+				this.ctx.moveTo(ref.x, ref.y - r * 1.6);
+				this.ctx.lineTo(ref.x, ref.y + r * 1.6);
+				this.ctx.stroke();
+				this.ctx.restore();
+
+				this.selected_obj_positions['ref_point'] = {
+					cursor: 'move',
+					path: refPath,
+				};
+			}
+		} else {
+			this.ctx.restore();
 		}
+
 
 		// Optional tool overlay (e.g. crop straighten reference line) in doc space
 		if (typeof settings.after_draw === 'function') {
@@ -490,6 +545,25 @@ class Base_selection_class {
 			//reset the overlay transform so next frame's clear spans the whole canvas
 			overlay_ctx.setTransform(1, 0, 0, 1, 0, 0);
 		}
+	}
+
+	/** Draw controls in screen space so layer shear never distorts the squares. */
+	draw_transform_controls(ctx,box,reference,size=8) {
+		this.selected_obj_positions={};
+		const m=zoomView.matrix,margin=config.TRANSFORM_MARGIN||0;
+		const screen=p=>({x:m[0]*p.x+m[2]*p.y+m[4]+margin,y:m[1]*p.x+m[3]*p.y+m[5]+margin});
+		ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
+		ctx.strokeStyle='#3f8ff7';ctx.fillStyle='#fff';ctx.lineWidth=1;
+		const corners=['tl','tr','br','bl'].map(loc=>screen(ref_point(box,loc)));
+		ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();
+		for(const loc of ['tl','tc','tr','ml','mr','bl','bc','br']) {
+			const p=screen(ref_point(box,loc)),x=Math.round(p.x-size/2)+.5,y=Math.round(p.y-size/2)+.5;
+			ctx.fillRect(x,y,size,size);ctx.strokeRect(x,y,size,size);
+		}
+		const p=screen(reference||ref_point(box)),r=5;
+		ctx.strokeStyle='#222';ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.stroke();
+		ctx.beginPath();ctx.moveTo(p.x-r*1.6,p.y);ctx.lineTo(p.x+r*1.6,p.y);ctx.moveTo(p.x,p.y-r*1.6);ctx.lineTo(p.x,p.y+r*1.6);ctx.stroke();
+		ctx.restore();
 	}
 
 	/**
@@ -1766,6 +1840,10 @@ class Base_selection_class {
 	}
 
 	selected_object_actions(e) {
+		// Free Transform owns pointer geometry and hit testing. These document
+		// listeners also receive the tool's events; running both mutates the
+		// session box before its preview can transform the actual layer.
+		if (app.GUI?.modules?.['edit/transform']?.is_active() || (config.TOOL?.name==='select' && config.layer?.transform_quad)) return;
 		var settings = this.find_settings();
 		if (!settings || !settings.data) {
 			return;
@@ -1776,6 +1854,9 @@ class Base_selection_class {
 		if (data.locked === true) {
 			return;
 		}
+
+		const hasRotate = data.rotate != null && data.rotate != 0;
+		const hasSkew = (data.skew_x != null && data.skew_x != 0) || (data.skew_y != null && data.skew_y != 0);
 
 		var x = settings.data.x;
 		var y = settings.data.y;
@@ -1840,6 +1921,9 @@ class Base_selection_class {
 				y: settings.data.y,
 				width: settings.data.width,
 				height: settings.data.height,
+				rotate: settings.data.rotate || 0,
+				skew_x: settings.data.skew_x || 0,
+				skew_y: settings.data.skew_y || 0,
 				mask: settings.data.mask ? {
 					x: settings.data.mask.x,
 					y: settings.data.mask.y,
@@ -1880,8 +1964,13 @@ class Base_selection_class {
 				//rotate relatively to where the drag started - no jump
 				const start = this.rotate_drag;
 				if (start) {
-					const cx = start.cx;
-					const cy = start.cy;
+					const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+					let cx = start.cx;
+					let cy = start.cy;
+					if (transform_module && transform_module.is_active() && transform_module.session.ref) {
+						cx = transform_module.session.ref.x;
+						cy = transform_module.session.ref.y;
+					}
 					const start_angle = Math.atan2(start.start_y - cy, start.start_x - cx) / Math.PI * 180;
 					const cur_angle = Math.atan2(mouse.y - cy, mouse.x - cx) / Math.PI * 180;
 					//wrap the delta to [-180, 180) so crossing the ±180° boundary is smooth
@@ -1898,13 +1987,93 @@ class Base_selection_class {
 					//with the object during the drag (find_settings() will not
 					//refresh data while mouse_lock === 'selected_object_actions')
 					settings.data.rotate = angle;
+					if (transform_module && transform_module.is_active()) {
+						transform_module.session.box.rotate = angle;
+						transform_module.sync_options_bar();
+					}
 					app.Layers.render_interactive_layer(settings.data.id);
 				}
 			}
 			else if (e.buttons == 1 || typeof e.buttons == "undefined") {
+				const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+				const is_transform_active = !!(transform_module && transform_module.is_active());
+
+				if (drag_type === 'ref_point' && is_transform_active) {
+					const curDocX = mouse.x;
+					const curDocY = mouse.y;
+					const locators = ['tl', 'tc', 'tr', 'ml', 'c', 'mr', 'bl', 'bc', 'br'];
+					let closestLoc = null;
+					let closestDist = Infinity;
+					const snapDist = 12 / config.ZOOM;
+					for (const loc of locators) {
+						const pt = ref_point(transform_module.session.box, loc);
+						const d = Math.hypot(curDocX - pt.x, curDocY - pt.y);
+						if (d < snapDist && d < closestDist) {
+							closestDist = d;
+							closestLoc = loc;
+						}
+					}
+					if (closestLoc) {
+						transform_module.session.locator = closestLoc;
+						transform_module.session.ref = ref_point(transform_module.session.box, closestLoc);
+					} else {
+						transform_module.session.locator = null;
+						transform_module.session.ref = { x: curDocX, y: curDocY };
+					}
+					transform_module.sync_options_bar();
+					this.draw_selection();
+					return;
+				}
+
 				const is_corner = (is_drag_type_left || is_drag_type_right) && (is_drag_type_top || is_drag_type_bottom);
 				const is_side_horizontal = (is_drag_type_left || is_drag_type_right) && !is_drag_type_top && !is_drag_type_bottom;
 				const is_side_vertical = (is_drag_type_top || is_drag_type_bottom) && !is_drag_type_left && !is_drag_type_right;
+
+				const is_skew = is_transform_active && (is_side_horizontal || is_side_vertical)
+					&& (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey || this.is_skew_drag);
+
+				if (is_skew) {
+					let side = 'top';
+					if (is_drag_type_top) side = 'top';
+					else if (is_drag_type_bottom) side = 'bottom';
+					else if (is_drag_type_left) side = 'left';
+					else if (is_drag_type_right) side = 'right';
+
+					mainWrapper.style.cursor = (side === 'top' || side === 'bottom') ? 'ew-resize' : 'ns-resize';
+
+					var dx = Math.round(mouse.x - mouse.click_x);
+					var dy = Math.round(mouse.y - mouse.click_y);
+					const rotRad = ((data.rotate || 0) * Math.PI) / 180;
+					const cosA = Math.cos(rotRad);
+					const sinA = Math.sin(rotRad);
+					const local_dx = dx * cosA + dy * sinA;
+					const local_dy = -dx * sinA + dy * cosA;
+
+					const { skew_x, skew_y } = skew_from_drag(side, local_dx, local_dy, this.click_details);
+					let sx = skew_x;
+					let sy = skew_y;
+					if (e.shiftKey) {
+						if (side === 'top' || side === 'bottom') sx = snap_angle(sx, 5);
+						if (side === 'left' || side === 'right') sy = snap_angle(sy, 5);
+					}
+					settings.data.skew_x = sx;
+					settings.data.skew_y = sy;
+					transform_module.session.box.skew_x = sx;
+					transform_module.session.box.skew_y = sy;
+					if (transform_module.session.snapshot && transform_module.session.snapshot.layers) {
+						for (const s of transform_module.session.snapshot.layers) {
+							const l = app.Layers.get_layer(s.id, true);
+							if (l) {
+								l.skew_x = sx;
+								l.skew_y = sy;
+							}
+						}
+					}
+					transform_module.sync_options_bar();
+					app.Layers.render();
+					return;
+				}
+
 
 				const is_shift = (e.shiftKey === true) || (app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.is_shift_down);
 				// Tool-specific keep_ratio (e.g. crop aspect presets) wins over select's global aspect_lock
@@ -1974,7 +2143,16 @@ class Base_selection_class {
 					}
 				}
 
-				if (is_alt) {
+				if (is_transform_active && is_alt && transform_module.session.ref) {
+					const refPt = transform_module.session.ref;
+					const sx = width / orig_w;
+					const sy = height / orig_h;
+					const scaled = scale_about(this.click_details, refPt, sx, sy);
+					settings.data.width = width;
+					settings.data.height = height;
+					settings.data.x = Math.round(scaled.x);
+					settings.data.y = Math.round(scaled.y);
+				} else if (is_alt) {
 					var cx = this.click_details.x + this.click_details.width / 2;
 					var cy = this.click_details.y + this.click_details.height / 2;
 
@@ -2076,6 +2254,21 @@ class Base_selection_class {
 					}
 				}
 				new Mask_class().preview_linked_mask_transform(settings.data, this.click_details, settings.data);
+				if (is_transform_active) {
+					const snap = transform_module.session.snapshot.box;
+					const curW = settings.data.width;
+					const curH = settings.data.height;
+					transform_module.session.w_pct = (curW / snap.width) * 100;
+					transform_module.session.h_pct = (curH / snap.height) * 100;
+					transform_module.session.box.width = curW;
+					transform_module.session.box.height = curH;
+					transform_module.session.box.x = settings.data.x;
+					transform_module.session.box.y = settings.data.y;
+					if (transform_module.session.locator) {
+						transform_module.session.ref = ref_point(transform_module.session.box, transform_module.session.locator);
+					}
+					transform_module.sync_options_bar();
+				}
 				app.Layers.render_interactive_layer(settings.data.id);
 			}
 			return;
@@ -2084,6 +2277,7 @@ class Base_selection_class {
 			//reset
 			this.mouse_lock = null;
 			this.rotate_drag = null;
+			this.is_skew_drag = false;
 		}
 
 		if (!this.mouse_lock) {
@@ -2094,18 +2288,37 @@ class Base_selection_class {
 			//leftover transform on the context.
 			let testX = mouse.x;
 			let testY = mouse.y;
-			if (data.rotate != null && data.rotate != 0) {
-				const rot_rad = data.rotate * Math.PI / 180;
-				const cosA = Math.cos(-rot_rad);
-				const sinA = Math.sin(-rot_rad);
+			if (hasRotate || hasSkew) {
 				const rx = mouse.x - (x + w / 2);
 				const ry = mouse.y - (y + h / 2);
-				testX = rx * cosA - ry * sinA;
-				testY = rx * sinA + ry * cosA;
+				let ux = rx;
+				let uy = ry;
+				if (hasRotate) {
+					const rot_rad = (data.rotate || 0) * Math.PI / 180;
+					const cosA = Math.cos(-rot_rad);
+					const sinA = Math.sin(-rot_rad);
+					ux = rx * cosA - ry * sinA;
+					uy = rx * sinA + ry * cosA;
+				}
+				if (hasSkew) {
+					const sx = Math.tan(((data.skew_x || 0) * Math.PI) / 180);
+					const sy = Math.tan(((data.skew_y || 0) * Math.PI) / 180);
+					const det = 1 - sx * sy;
+					if (Math.abs(det) > 0.0001) {
+						testX = (ux - sx * uy) / det;
+						testY = (-sy * ux + uy) / det;
+					} else {
+						testX = ux;
+						testY = uy;
+					}
+				} else {
+					testX = ux;
+					testY = uy;
+				}
 			}
 
 			//set mouse move cursor if hovering inside body of layer
-			const inBody = (data.rotate != null && data.rotate != 0)
+			const inBody = (hasRotate || hasSkew)
 				? (testX > -w / 2 && testX < w / 2 && testY > -h / 2 && testY < h / 2)
 				: (mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h);
 
@@ -2122,19 +2335,56 @@ class Base_selection_class {
 			}
 
 			let handleMatched = false;
-			for (let current_drag_type in this.selected_obj_positions) {
-				const position = this.selected_obj_positions[current_drag_type];
-				if (position.path && this.ctx && this.ctx.isPointInPath(position.path, testX, testY)) {
-					// match
+			const transform_module = (app.GUI && app.GUI.modules) ? app.GUI.modules['edit/transform'] : null;
+			const is_transform_active = !!(transform_module && transform_module.is_active());
+
+			if (is_transform_active && this.selected_obj_positions['ref_point']) {
+				const session = transform_module.session;
+				const ref = session.ref || { x: data.x + data.width / 2, y: data.y + data.height / 2 };
+				const refDist = Math.hypot(mouse.x - ref.x, mouse.y - ref.y);
+				if (refDist <= 8 / config.ZOOM) {
 					handleMatched = true;
 					if (event_type == 'mousedown') {
 						if (e.buttons == 1 || typeof e.buttons == "undefined") {
 							this.mouse_lock = 'selected_object_actions';
-							this.selected_object_drag_type = current_drag_type;
+							this.selected_object_drag_type = 'ref_point';
 						}
 					}
 					if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
-						mainWrapper.style.cursor = position.cursor;
+						mainWrapper.style.cursor = 'move';
+					}
+				}
+			}
+
+			if (!handleMatched) {
+				for (let current_drag_type in this.selected_obj_positions) {
+					if (current_drag_type === 'ref_point') continue;
+					const position = this.selected_obj_positions[current_drag_type];
+					if (position.path && this.ctx && this.ctx.isPointInPath(position.path, testX, testY)) {
+						handleMatched = true;
+						if (event_type == 'mousedown') {
+							if (e.buttons == 1 || typeof e.buttons == "undefined") {
+								this.mouse_lock = 'selected_object_actions';
+								this.selected_object_drag_type = current_drag_type;
+								const dt = parseInt(current_drag_type, 10);
+								const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
+								this.is_skew_drag = is_transform_active && is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey);
+							}
+						}
+						if (event_type == 'mousemove' || event_type == 'keydown' || event_type == 'keyup') {
+							if (is_transform_active) {
+								const dt = parseInt(current_drag_type, 10);
+								const is_side = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM || dt === DRAG_TYPE_LEFT || dt === DRAG_TYPE_RIGHT);
+								if (is_side && (transform_module.is_skew_mode() || e.ctrlKey || e.metaKey)) {
+									mainWrapper.style.cursor = (dt === DRAG_TYPE_TOP || dt === DRAG_TYPE_BOTTOM) ? 'ew-resize' : 'ns-resize';
+								} else {
+									mainWrapper.style.cursor = position.cursor;
+								}
+							} else {
+								mainWrapper.style.cursor = position.cursor;
+							}
+						}
+						break;
 					}
 				}
 			}

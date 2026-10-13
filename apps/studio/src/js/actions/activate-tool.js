@@ -28,6 +28,11 @@ export class Activate_tool_action extends Base_action {
 		this.old_key = app.GUI.GUI_tools.active_tool;
 
 		if (this.key !== this.old_key || this.ignore_same_tool) {
+			const transform_module = app.GUI?.modules?.['edit/transform'];
+			if (transform_module && transform_module.is_active()) {
+				await transform_module.commit();
+			}
+
 			if (key !== 'pick_color' && app.GUI && app.GUI.GUI_shortcuts && app.GUI.GUI_shortcuts.alt_eyedropper_tool && app.GUI.GUI_shortcuts.alt_eyedropper_tool !== key) {
 				app.GUI.GUI_shortcuts.alt_eyedropper_tool = null;
 				app.GUI.GUI_shortcuts._restore_eyedropper_pending = false;
@@ -135,6 +140,8 @@ export class Activate_tool_action extends Base_action {
 			}
 			// Toggle pan tool class on body (grab/grabbing cursor)
 			document.body.classList.toggle('tool-pan', config.TOOL && config.TOOL.name === 'pan');
+			document.body.classList.toggle('tool-zoom', config.TOOL?.name === 'zoom');
+			document.body.classList.toggle('zoom-out', config.TOOL?.name === 'zoom' && app.GUI.GUI_shortcuts?.is_alt_down);
 
 			// Type tool: seed Size from baked span/params BEFORE mounting the options bar.
 			// Prior fixes synced after show_action_attributes(); the Size widget was created
@@ -331,6 +338,8 @@ export class Activate_tool_action extends Base_action {
 		}
 		// Toggle pan tool class on body (grab/grabbing cursor)
 		document.body.classList.toggle('tool-pan', config.TOOL && config.TOOL.name === 'pan');
+		document.body.classList.toggle('tool-zoom', config.TOOL?.name === 'zoom');
+		document.body.classList.toggle('zoom-out', config.TOOL?.name === 'zoom' && app.GUI.GUI_shortcuts?.is_alt_down);
 
 		// Show brush cursor immediately if switching to a brush tool
 		if (brushTools.includes(config.TOOL.name)) {

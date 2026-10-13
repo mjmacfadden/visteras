@@ -71,6 +71,7 @@ class GUI_shortcuts_class {
 			'u': 'rectangle',
 			'j': 'spot_heal',
 			'h': 'pan',
+			'z': 'zoom',
 			'o': 'bulge_pinch',
 			'a': 'direct_select',
 		};
@@ -114,13 +115,14 @@ class GUI_shortcuts_class {
 			}
 			if (key === 'Alt' || key === 'AltGraph' || code === 'AltLeft' || code === 'AltRight' || event.keyCode === 18) {
 				this.is_alt_down = isDown;
+				document.body.classList.toggle('zoom-out', isDown && config.TOOL?.name === 'zoom');
 				if (config.TOOL && config.TOOL.name === 'clone' && app.GUI && app.GUI.GUI_tools) {
 					const cloneTool = app.GUI.GUI_tools.tools_modules['clone']?.object;
 					if (cloneTool && typeof cloneTool.update_cursor === 'function') {
 						cloneTool.update_cursor(isDown);
 					}
 				}
-				this.handle_alt_eyedropper(isDown, event);
+				if (!app.GUI?.modules?.['edit/transform']?.is_active()) this.handle_alt_eyedropper(isDown, event);
 			}
 			if (key === 'Shift' || code === 'ShiftLeft' || code === 'ShiftRight' || event.keyCode === 16) {
 				this.is_shift_down = isDown;
@@ -128,6 +130,8 @@ class GUI_shortcuts_class {
 					app.GUI.GUI_tools.update_aspect_lock_ui(isDown);
 				}
 			}
+			const transform = app.GUI?.modules?.['edit/transform'];
+			if (transform?.is_active()) transform.update_cursor({ metaKey: this.is_meta_down, ctrlKey: this.is_ctrl_down, shiftKey: this.is_shift_down });
 		};
 		window.addEventListener('keydown', (event) => updateModifierState(event, true), { capture: true, passive: true });
 		window.addEventListener('keyup', (event) => updateModifierState(event, false), { capture: true, passive: true });
@@ -145,6 +149,7 @@ class GUI_shortcuts_class {
 			this.is_meta_down = false;
 			this.is_ctrl_down = false;
 			this.is_alt_down = false;
+			document.body.classList.remove('zoom-out');
 			this.is_shift_down = false;
 			if (app.GUI && app.GUI.GUI_tools && typeof app.GUI.GUI_tools.update_aspect_lock_ui === 'function') {
 				app.GUI.GUI_tools.update_aspect_lock_ui(false);
@@ -245,6 +250,34 @@ class GUI_shortcuts_class {
 			// Prevent browser Alt/Option key from stealing focus / hiding cursor
 			if (event.key === 'Alt' || event.key === 'AltGraph' || event.code === 'AltLeft' || event.code === 'AltRight' || event.keyCode === 18) {
 				event.preventDefault();
+				return;
+			}
+
+			// Free Transform session keyboard handling
+			const transformMod = app.GUI && app.GUI.modules && app.GUI.modules['edit/transform'];
+			if (transformMod && transformMod.is_active()) {
+				if (event.key === 'Enter') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					transformMod.commit();
+					return;
+				}
+				if (event.key === 'Escape') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					transformMod.cancel();
+					return;
+				}
+				if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+					event.preventDefault();
+					event.stopImmediatePropagation();
+					const step = event.shiftKey ? 10 : 1;
+					const dx = event.key === 'ArrowLeft' ? -step : (event.key === 'ArrowRight' ? step : 0);
+					const dy = event.key === 'ArrowUp' ? -step : (event.key === 'ArrowDown' ? step : 0);
+					transformMod.nudge(dx, dy);
+					return;
+				}
+				event.stopImmediatePropagation();
 				return;
 			}
 
@@ -544,6 +577,17 @@ class GUI_shortcuts_class {
 				event.stopImmediatePropagation();
 				if (app.GUI && app.GUI.modules && app.GUI.modules['layer/adjustment']) {
 					app.GUI.modules['layer/adjustment'].create_or_edit('levels');
+				}
+				return;
+			}
+
+			// Free Transform: Photoshop ⌘T / Ctrl+T → browser-safe ⌃⌘T on Mac / Ctrl+Alt+T on Win
+			const isMacOSTransform = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesChord(event, { meta: true, key: 'T' }, isMacOSTransform)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/transform']) {
+					app.GUI.modules['edit/transform'].free_transform();
 				}
 				return;
 			}

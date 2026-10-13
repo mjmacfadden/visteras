@@ -1019,6 +1019,10 @@ class Base_documents_class {
 	async activate_document(id) {
 		await app.State?._action_queue;
 		if (id === this.active_id) return;
+		const transform_module = app.GUI?.modules?.['edit/transform'];
+		if (transform_module && transform_module.is_active()) {
+			await transform_module.commit();
+		}
 		const targetDoc = this.documents.find(d => d.id === id);
 		if (!targetDoc) return;
 
@@ -1031,6 +1035,10 @@ class Base_documents_class {
 
 	async close_document(id) {
 		await app.State?._action_queue;
+		const transform_module = app.GUI?.modules?.['edit/transform'];
+		if (transform_module && transform_module.is_active()) {
+			await transform_module.commit();
+		}
 		if (id == null) id = this.active_id;
 		const idx = this.documents.findIndex(d => d.id === id);
 		if (idx === -1) return;

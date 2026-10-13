@@ -1,3 +1,5 @@
+import { draw_quad } from './../libs/quad-transform.js';
+import { ref_point } from './../libs/free-transform.js';
 import { resampleRaster } from '../libs/raster-resample.js';
 import { composite_group_layers } from '../libs/group-composite.js';
 import { renderSmart, isContentEffect } from '../libs/smart-effects.js';
@@ -832,13 +834,29 @@ class Base_layers_class {
 	 * Draw layer pixels/content only (no filters). Used for Fill Opacity punch-out.
 	 */
 	_draw_layer_content(ctx, object, is_preview) {
+		if (object.transform_quad) {
+			const source=document.createElement('canvas');
+			source.width=Math.max(1,Math.ceil(object.width));source.height=Math.max(1,Math.ceil(object.height));
+			const scratch=source.getContext('2d');scratch.translate(-object.x,-object.y);
+			this._draw_layer_content(scratch,{...object,transform_quad:undefined,rotate:0,skew_x:0,skew_y:0},is_preview);
+			draw_quad(ctx,source,['tl','tr','br','bl'].map(loc=>ref_point(object,loc)),()=>document.createElement('canvas'));
+			return;
+		}
 		const hasRotate = object.type !== 'text' && object.rotate != null && object.rotate !== 0;
-		if (hasRotate) {
+		const hasSkew = object.type !== 'text' && ((object.skew_x != null && object.skew_x !== 0) || (object.skew_y != null && object.skew_y !== 0));
+		if (hasRotate || hasSkew) {
 			ctx.save();
 			const cx = (object.x || 0) + (object.width || 0) / 2;
 			const cy = (object.y || 0) + (object.height || 0) / 2;
 			ctx.translate(cx, cy);
-			ctx.rotate((object.rotate * Math.PI) / 180);
+			if (hasRotate) {
+				ctx.rotate((object.rotate * Math.PI) / 180);
+			}
+			if (hasSkew) {
+				const sxRad = ((object.skew_x || 0) * Math.PI) / 180;
+				const syRad = ((object.skew_y || 0) * Math.PI) / 180;
+				ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+			}
 			ctx.translate(-cx, -cy);
 		}
 
@@ -894,7 +912,7 @@ class Base_layers_class {
 			}
 		}
 
-		if (hasRotate) {
+		if (hasRotate || hasSkew) {
 			ctx.restore();
 		}
 	}
@@ -1697,12 +1715,17 @@ class Base_layers_class {
 		var scratch = document.createElement('canvas');
 		scratch.width = W;
 		scratch.height = H;
-		var sctx = scratch.getContext('2d', { willReadFrequently: true });
-		sctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0);
+		var skew_x = layer.skew_x || 0;
+		var skew_y = layer.skew_y || 0;
+		var hasTransform = (rad !== 0 || skew_x !== 0 || skew_y !== 0) && mask.linked !== false;
+		sctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0 || skew_x !== 0 || skew_y !== 0);
 
-		if (rad !== 0 && mask.linked !== false) {
+		if (hasTransform) {
 			sctx.translate(lx + lw / 2, ly + lh / 2);
-			sctx.rotate(rad);
+			if (rad !== 0) sctx.rotate(rad);
+			if (skew_x !== 0 || skew_y !== 0) {
+				sctx.transform(1, Math.tan(skew_y * Math.PI / 180), Math.tan(skew_x * Math.PI / 180), 1, 0, 0);
+			}
 			sctx.translate(-lw / 2, -lh / 2);
 			sctx.drawImage(alpha, 0, 0, sw, sh, mx - lx, my - ly, mw, mh);
 		}

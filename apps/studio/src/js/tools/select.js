@@ -12,6 +12,7 @@ import { is_group, get_descendant_ids, get_ancestors } from './../libs/layer-tre
 import { get_layer_content_bounds, get_selection_content_bounds } from './../libs/layer-bounds.js';
 import { Subpath } from './../core/vector/vector-model.js';
 
+
 const hydrate_vector_paths = (paths) => (paths || []).map((path) =>
 	path && typeof path.getBounds === 'function' ? path : Subpath.fromJSON(path)
 );
@@ -51,6 +52,10 @@ class Select_tool_class extends Base_tools_class {
 			enable_rotation: true,
 			enable_move: true,
 			data_function: () => {
+				const transform = app.GUI?.modules?.['edit/transform'];
+				if (transform?.is_active()) return { ...config.layer, ...transform.session.box };
+				if(config.layer?.transform_quad) return {...config.layer,...get_layer_content_bounds(config.layer)};
+
 				const isParagraphText = is_box_text(config.layer);
 				sel_config.border_style = isParagraphText ? 'dashed_black' : null;
 				sel_config.handle_style = isParagraphText ? 'bw_square' : null;
@@ -296,6 +301,12 @@ class Select_tool_class extends Base_tools_class {
 
 	async mousedown(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if(config.layer?.transform_quad && transform && !transform.is_active() && mouse.click_valid) await transform.free_transform();
+		if (transform?.is_active()) {
+			if (mouse.click_valid && config.mouse_lock !== true) transform.pointer_down(mouse, e);
+			return;
+		}
 		if (mouse.click_valid == false || config.mouse_lock === true) {
 			return;
 		}
@@ -483,6 +494,11 @@ class Select_tool_class extends Base_tools_class {
 
 	mousemove(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) {
+			transform.pointer_move(mouse, e);
+			return;
+		}
 		if (mouse.is_drag == false || mouse.click_valid == false || config.mouse_lock === true) {
 			return;
 		}
@@ -682,6 +698,8 @@ class Select_tool_class extends Base_tools_class {
 
 	async mouseup(e) {
 		var mouse = this.get_mouse_info(e);
+		const transform = app.GUI?.modules?.['edit/transform'];
+		if (transform?.is_active()) { transform.pointer_up(); return; }
 		if (this.marquee) {
 			const box = this.marquee;
 			this.marquee = null;
@@ -1478,7 +1496,7 @@ class Select_tool_class extends Base_tools_class {
 	check_hit_region(e, ctx, layer) {
 		var mouse = this.get_mouse_info(e);
 
-		if(layer.type == 'image' && Math.abs(layer.width * layer.height / 1000000) > 5){
+		if(layer.type == 'image' && !layer.rotate && !layer.skew_x && !layer.skew_y && !layer.transform_quad && Math.abs(layer.width * layer.height / 1000000) > 5){
 			//too big to check using getImageData - use simple way
 			if (mouse.x > layer.x && mouse.x < layer.x + layer.width &&
 				mouse.y > layer.y && mouse.y < layer.y + layer.height) {

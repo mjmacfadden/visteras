@@ -146,7 +146,11 @@ class Image_size_class {
 			for (var j in config.layers) {
 				var lyr = config.layers[j];
 				if (lyr.type === 'adjustment') {
-					actions.push(new app.Actions.Update_layer_action(lyr.id, { x: 0, y: 0, width: parseInt(width), height: parseInt(height) }));
+					var adjPatch = { x: 0, y: 0, width: parseInt(width), height: parseInt(height) };
+					if (lyr.mask && typeof lyr.mask === 'object' && (shift.dx || shift.dy)) {
+						adjPatch.mask = Object.assign({}, lyr.mask, { x: (lyr.mask.x || 0) + shift.dx, y: (lyr.mask.y || 0) + shift.dy });
+					}
+					actions.push(new app.Actions.Update_layer_action(lyr.id, adjPatch));
 					continue;
 				}
 				if (!shift.dx && !shift.dy) continue;

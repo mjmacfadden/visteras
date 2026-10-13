@@ -1,3 +1,5 @@
+import { ref_point } from './free-transform.js';
+import { quad_matrix, map_point } from './quad-transform.js';
 import app from './../app.js';
 import config from './../config.js';
 import { is_group, get_descendant_ids } from './layer-tree.js';
@@ -9,6 +11,7 @@ import { is_group, get_descendant_ids } from './layer-tree.js';
  */
 function get_bounds_aabb(b) {
 	if (!b) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+	if(b.transform_quad) { const q=['tl','tr','br','bl'].map(loc=>ref_point(b,loc));return {minX:Math.min(...q.map(p=>p.x)),minY:Math.min(...q.map(p=>p.y)),maxX:Math.max(...q.map(p=>p.x)),maxY:Math.max(...q.map(p=>p.y))}; }
 	const rot = b.rotate || 0;
 	if (rot === 0) {
 		return {
@@ -53,6 +56,13 @@ function get_bounds_aabb(b) {
  */
 export function get_layer_content_bounds(layer) {
 	if (!layer || layer.visible === false) return null;
+	if(layer.transform_quad) {
+		const bounds=get_layer_content_bounds({...layer,transform_quad:undefined,rotate:0,skew_x:0,skew_y:0});
+		if(!bounds) return null;
+		const matrix=quad_matrix(['tl','tr','br','bl'].map(loc=>ref_point(layer,loc)));
+		const points=[[bounds.x,bounds.y],[bounds.x+bounds.width,bounds.y],[bounds.x+bounds.width,bounds.y+bounds.height],[bounds.x,bounds.y+bounds.height]].map(([x,y])=>map_point(matrix,{x:(x-layer.x)/layer.width,y:(y-layer.y)/layer.height}));
+		return {...bounds,rotate:0,skew_x:0,skew_y:0,transform_quad:points.map(p=>({x:(p.x-bounds.x)/bounds.width,y:(p.y-bounds.y)/bounds.height}))};
+	}
 
 	// Vector layer bounds from true Bézier paths
 	if (layer.type === 'vector') {
