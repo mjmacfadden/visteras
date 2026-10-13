@@ -18,6 +18,8 @@
 
 import { convertFromPixels } from './visteras-document-presets.js';
 import { findEqualSpacing } from './visteras-spacing-guides.js';
+import { readSegments } from './visteras-anchor-model.js';
+import { segmentAnchors, transformAnchors, nearestGuideAnchor } from './visteras-guide-anchor-snap.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const STORAGE_KEY_SMART_GUIDES = 'visteras_smart_guides_enabled';
@@ -361,8 +363,49 @@ export class GuideManager {
     }
   }
 
+  _guideAnchorTargets() {
+    const content=this.sc?.getSvgContent?.();
+    if (!content?.getScreenCTM?.()) return [];
+    const root=content.getScreenCTM();
+    if (!root) return [];
+    const rootMatrix=new DOMMatrix([root.a,root.b,root.c,root.d,root.e,root.f]).inverse();
+    const targets=[];
+    for(const el of content.querySelectorAll('path,rect,circle,ellipse,line,polygon,polyline')) {
+      if(el.closest('defs,#canvasBackground,#visteras_ruler_guides,#visteras_smart_guides'))continue;
+      let hidden=false;
+      for(let parent=el;parent&&parent!==content;parent=parent.parentElement){
+        const style=getComputedStyle(parent);
+        if(style.display==='none'||style.visibility==='hidden'){hidden=true;break;}
+      }
+      if(hidden)continue;
+      try {
+        const path=document.createElementNS(NS,'path');
+        path.setAttribute('d',this.sc.getPathDataForElement(el)||'');
+        const ctm=el.getScreenCTM();
+        if(!ctm)continue;
+        const matrix=rootMatrix.multiply(new DOMMatrix([ctm.a,ctm.b,ctm.c,ctm.d,ctm.e,ctm.f]));
+        targets.push(...transformAnchors(segmentAnchors(readSegments(path)),matrix));
+      } catch (_) { /* An unsupported shape must not prevent guide dragging. */ }
+    }
+    return targets;
+  }
+
+  _guideDragPosition(type,event,targets) {
+    const pt=this.clientToSvg(event.clientX,event.clientY),axis=type==='h'?'y':'x';
+    const match=this.smartGuidesEnabled&&!event.shiftKey
+      ? nearestGuideAnchor(pt,type,targets,8/(this.sc?.getZoom?.()||1)) : null;
+    this.clearSmartGuides();
+    if(match){
+      const marker=this._createCrosshair(match.x,match.y);
+      if(marker)this.smartGuidesLayer?.append(marker);
+      return match[axis];
+    }
+    return event.shiftKey?Math.round(pt[axis]/10)*10:Math.round(pt[axis]);
+  }
+
   _startNewGuideDrag(type, startEvent) {
     const isHorizontal = type === 'h';
+    const anchorTargets = this._guideAnchorTargets();
     document.body.style.cursor = isHorizontal ? 'row-resize' : 'col-resize';
 
     // Temporary live drag guide line
@@ -376,9 +419,7 @@ export class GuideManager {
     this.rulerGuidesLayer?.append(liveLine);
 
     const onMouseMove = (e) => {
-      const pt = this.clientToSvg(e.clientX, e.clientY);
-      const val = isHorizontal ? pt.y : pt.x;
-      const rounded = e.shiftKey ? Math.round(val / 10) * 10 : Math.round(val);
+      const rounded = this._guideDragPosition(isHorizontal ? 'h' : 'v', e, anchorTargets);
 
       if (isHorizontal) {
         liveLine.setAttribute('x1', '-100000');
@@ -398,6 +439,7 @@ export class GuideManager {
       window.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = '';
       liveLine.remove();
+      this.clearSmartGuides();
 
       // Check if dropped back on ruler (cancel)
       const rulerX = document.getElementById('ruler_x');
@@ -410,10 +452,9 @@ export class GuideManager {
         (!isHorizontal && ryRect && e.clientX <= ryRect.right);
 
       if (!droppedOnRuler) {
-        const pt = this.clientToSvg(e.clientX, e.clientY);
-        const val = isHorizontal ? pt.y : pt.x;
-        const rounded = e.shiftKey ? Math.round(val / 10) * 10 : Math.round(val);
+        const rounded = this._guideDragPosition(isHorizontal ? 'h' : 'v', e, anchorTargets);
         this.addGuide(type, rounded);
+        this.clearSmartGuides();
       }
     };
 
@@ -423,6 +464,7 @@ export class GuideManager {
 
   _startExistingGuideDrag(guide, startEvent) {
     const isHorizontal = guide.type === 'h';
+    const anchorTargets = this._guideAnchorTargets();
     document.body.style.cursor = isHorizontal ? 'row-resize' : 'col-resize';
 
     // Remove the original guide element during drag
@@ -435,9 +477,7 @@ export class GuideManager {
     this.rulerGuidesLayer?.append(liveLine);
 
     const onMouseMove = (e) => {
-      const pt = this.clientToSvg(e.clientX, e.clientY);
-      const val = isHorizontal ? pt.y : pt.x;
-      const rounded = e.shiftKey ? Math.round(val / 10) * 10 : Math.round(val);
+      const rounded = this._guideDragPosition(isHorizontal ? 'h' : 'v', e, anchorTargets);
 
       if (isHorizontal) {
         liveLine.setAttribute('x1', '-100000');
@@ -457,6 +497,7 @@ export class GuideManager {
       window.removeEventListener('mouseup', onMouseUp);
       document.body.style.cursor = '';
       liveLine.remove();
+      this.clearSmartGuides();
 
       // If dragged back to ruler, it's deleted!
       const rulerX = document.getElementById('ruler_x');
@@ -469,10 +510,9 @@ export class GuideManager {
         (!isHorizontal && ryRect && e.clientX <= ryRect.right);
 
       if (!droppedOnRuler) {
-        const pt = this.clientToSvg(e.clientX, e.clientY);
-        const val = isHorizontal ? pt.y : pt.x;
-        const rounded = e.shiftKey ? Math.round(val / 10) * 10 : Math.round(val);
+        const rounded = this._guideDragPosition(isHorizontal ? 'h' : 'v', e, anchorTargets);
         this.addGuide(guide.type, rounded);
+        this.clearSmartGuides();
       }
     };
 
