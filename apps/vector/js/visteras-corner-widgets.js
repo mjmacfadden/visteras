@@ -41,7 +41,7 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
        const r=data.corners.find(v=>v.index===c.index)?.r||0;
        const m=matrix(rec.el),p=point(c.p.x,c.p.y,m),b=point(c.p.x+c.basis.bisector.x,c.p.y+c.basis.bisector.y,m),length=Math.hypot(b.x-p.x,b.y-p.y)||1;
        const offset=Math.max(14/zoom,r/c.basis.sinHalf*length+8/zoom);
-       create('circle',{cx:(p.x+(b.x-p.x)/length*offset)*zoom,cy:(p.y+(b.y-p.y)/length*offset)*zoom,r:4.5,fill:'var(--visteras-panel-bg, #333)',stroke:'var(--visteras-accent)','stroke-width':1.5,'data-corner-record':i,'data-corner-index':c.index,'vector-effect':'non-scaling-stroke',style:'cursor:crosshair'});
+       create('circle',{cx:(p.x+(b.x-p.x)/length*offset)*zoom,cy:(p.y+(b.y-p.y)/length*offset)*zoom,r:4.5,fill:'var(--visteras-panel-bg, #333)',stroke:'#3f8ff7','stroke-width':1.5,'data-corner-record':i,'data-corner-index':c.index,'vector-effect':'non-scaling-stroke',style:'cursor:crosshair'});
      }
    }
  }
@@ -134,6 +134,6 @@ export function mountCornerWidgets(editor,{getRecords,readGeometry,write,schedul
    if(sc.getMode()!=='pathedit')return;const records=getRecords();if(records.length!==1||records[0].el.localName!=='rect')return;
    stop(e);const rec=records[0],g=begin(rec,0);if(!g)return;g.all=true;g.targets=eligibleCorners(g.data.segments);preview(g,Number(e.target.value)||0,'round');commit(g);
  },true);
- const style=document.createElement('style');style.textContent=`[data-corner-limit]{stroke:red!important} .corner-types{display:flex;gap:8px;margin:8px 0}.corner-types [aria-pressed=true]{color:var(--visteras-accent);border-color:var(--visteras-accent)}.vui-dialog[aria-label=Corners]{width:340px}.vui-dialog[aria-label=Corners] input{accent-color:var(--visteras-accent)}`;document.head.append(style);
+ const style=document.createElement('style');style.textContent=`[data-corner-limit]{stroke:red!important} .corner-types{display:flex;gap:8px;margin:8px 0}.corner-types [aria-pressed=true]{color:#3f8ff7;border-color:#3f8ff7}.vui-dialog[aria-label=Corners]{width:340px}.vui-dialog[aria-label=Corners] input{accent-color:#3f8ff7}`;document.head.append(style);
  return {render};
 }
