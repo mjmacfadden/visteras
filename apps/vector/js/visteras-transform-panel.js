@@ -107,6 +107,7 @@ export function mountTransformPanel(editor) {
     sc.addCommandToHistory(batch);sc.call('changed',elements);sync();
   }
   window.addEventListener('visteras:artboard-properties',sync);
+  window.addEventListener('visteras:unit-changed',sync);
   const call=sc.call;sc.call=function(event,...args){const result=call.call(this,event,...args);if(event==='selected'||event==='changed'||event==='sourcechanged')sync();return result;};
   new MutationObserver(records=>{if(records.some(r=>sc.getSvgContent().contains(r.target))&&!pending)pending=requestAnimationFrame(sync);}).observe(sc.getSvgRoot(),{subtree:true,attributes:true,childList:true});sync();
   return { panel, fields, sync, change };

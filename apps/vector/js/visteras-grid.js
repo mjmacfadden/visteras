@@ -285,6 +285,7 @@ export function mountGrid(editor) {
   }
 
   function openPrefs() {
+    document.querySelectorAll('.menu_entry.open').forEach(entry=>entry.classList.remove('open'));
     if (prefsDlg?.isConnected) { prefsDlg.querySelector('[data-act="cancel"]')?.focus(); return; }
     const u = unit();
     const overlay = document.createElement('div');
@@ -412,6 +413,7 @@ export function mountGrid(editor) {
       .vgrid_field input[type="number"], .vgrid_field select { flex: 1; min-width: 0; }
       .vgrid_field em { color: #888; font-style: normal; min-width: 24px; }
       .vgrid_check { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; }
+      .vgrid_dialog fieldset input { accent-color: var(--visteras-accent); }
       .vgrid_note { color: #999; font-size: 11px; margin: 0 0 10px; line-height: 1.35; }
       #visteras_document_grid { pointer-events: none !important; }
     `;

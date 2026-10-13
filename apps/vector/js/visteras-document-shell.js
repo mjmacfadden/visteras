@@ -143,6 +143,7 @@ export function mountVisterasDocumentShell({ svgEditor }) {
     if (prefs?.setAttribute) prefs.setAttribute('baseunit', u);
     updateRulers();
     updateStatusBar();
+    window.dispatchEvent(new CustomEvent('visteras:unit-changed', {detail:{unit:u}}));
     return u;
   }
 

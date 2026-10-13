@@ -100,6 +100,8 @@
                 <div class="menu_dropdown_item" role="menuitem" id="action_adjust_color_balance" data-fx-type="colorAdjust">Adjust Color Balance…</div>
               </div>
             </div>
+            <div class="menu_dropdown_separator"></div>
+            <div class="menu_dropdown_item" id="action_prefs">Preferences...</div>
           </div>
         </div>
 
@@ -223,7 +225,7 @@
           <div class="menu_dropdown_list">
             <div class="menu_dropdown_item" id="action_about">About Visteras Vector...</div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_prefs">Preferences...</div>
+
           </div>
         </div>
 
@@ -298,7 +300,7 @@
 
   <!-- SVG-Edit Initialization & Studio Integration -->
   <script type="module">
-    import Editor from './Editor.js?v=smart-guides-3';
+    import Editor from './Editor.js?v=align-key-1';
     import { mountOutlineImages } from './js/visteras-outline-images.js';
     import { mountVectorWorkspace } from './js/visteras-workspace.js?v=layers-parity-6';
     import { mountPenTools } from './js/visteras-pen-tools.js?v=merge-icons-1';
@@ -307,7 +309,8 @@
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-6';
     import { mountOffsetPath } from './js/visteras-offset-path.js?v=smart-fields-1';
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
-    import { mountTransformPanel } from './js/visteras-transform-panel.js';
+    import { mountTransformPanel } from './js/visteras-transform-panel.js?v=smart-fields-2';
+    import { mountAlignKey } from './js/visteras-align-key-ui.js?v=align-key-1';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
     import { mountTransparency } from './js/visteras-transparency.js?v=transparency-1';
@@ -319,7 +322,7 @@
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=smart-fields-1';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
     import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
-    import { mountGrid } from './js/visteras-grid.js?v=smart-guides-3';
+    import { mountGrid } from './js/visteras-grid.js?v=smart-guides-4';
     import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-3';
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
@@ -344,7 +347,7 @@
     window.openFilePicker = openFilePicker;
     import { mountVisterasImageTrace } from './js/visteras-image-trace.js?v=trace-dialog-2';
     import { installVisterasClipboardBridge } from './js/visteras-clipboard-bridge.js?v=clipboard-bridge-6';
-    import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=guides-3';
+    import { mountVisterasDocumentShell } from './js/visteras-document-shell.js?v=align-key-1';
     import { captureDocumentSnapshot, serializeDocumentSnapshot, createDocumentSaveQueue } from './js/visteras-document-save.js';
     import { clearLegacySvgEditStorage } from './js/visteras-legacy-storage.js';
     import { showToast } from './lib/visteras-ui/toast.js';
@@ -2221,7 +2224,7 @@
           const rel = sel.length < 2
             ? 'page'
             : (document.getElementById('tool_align_relative')?.value || 'selected');
-          svgEditor.svgCanvas.alignSelectedElements(dir, rel);
+          if (rel !== 'key' || !window.__visterasAlignKey?.align(dir)) svgEditor.svgCanvas.alignSelectedElements(dir, rel === 'key' ? 'selected' : rel);
           window.__updatePropertiesVisibility?.();
         }, true);
       });
@@ -2588,6 +2591,7 @@
     mountTextEditing(svgEditor);
     mountVisterasTypeOnPath({ svgEditor });
     mountTransformPanel(svgEditor);
+    mountAlignKey(svgEditor);
     // Shape library picker in the options bar (shape flyout's last tool)
     mountShapePicker({ svgEditor });
 
