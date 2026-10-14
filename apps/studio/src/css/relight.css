@@ -29,3 +29,8 @@
 .relight-pattern-frame{position:absolute;border:1px dashed var(--visteras-accent);pointer-events:none;box-sizing:border-box}
 .relight-handles .relight-pattern-handle{border-radius:3px;width:24px;height:24px;z-index:1;background:var(--area-background-color);color:var(--text-color)}
 .relight-handles[hidden]{display:none}
+
+.relight-handles .relight-light-handle{width:42px;height:42px;padding:0;border:0;background:transparent;border-radius:50%;box-shadow:none;filter:drop-shadow(0 1px 3px #0008)}
+.relight-light-handle svg{display:block;width:100%;height:100%;pointer-events:none}
+.relight-handles .relight-light-handle[aria-pressed=true]{background:transparent;filter:drop-shadow(0 0 5px #ffffff70) drop-shadow(0 1px 3px #0008)}
+.relight-light-handle:focus-visible{outline:2px solid var(--visteras-accent);outline-offset:3px}

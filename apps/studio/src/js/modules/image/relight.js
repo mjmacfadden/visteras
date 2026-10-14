@@ -160,7 +160,7 @@ export default class Image_relight_class {
    gizmos=`<div class="relight-pattern-frame" style="left:${x}%;top:${y}%;width:${r*2}%;height:${r*2}%;transform:translate(-50%,-50%) rotate(${light.patternRotation}deg)"></div>`;
    for(const [kind,label,px,py] of [['move','Move pattern',x-r,y-r],['scale','Scale pattern',x+r,y+r],['rotate','Rotate pattern',x,y-r-5]])gizmos+=`<button type="button" class="relight-pattern-handle" data-light="${light.id}" data-gizmo="${kind}" aria-label="${label}" style="left:${px}%;top:${py}%">${kind==='move'?'✥':kind==='scale'?'↗':'↻'}</button>`;
   }
-  host.innerHTML=this.lights.filter(l=>l.enabled).map(l=>`<button type="button" data-light="${l.id}" aria-label="Move Light ${l.id}" aria-pressed="${l.id===this.selected}" style="left:${l.x*100}%;top:${l.y*100}%">${l.id}</button>`).join('')+gizmos;
+  host.innerHTML=this.lights.filter(l=>l.enabled).map(l=>`<button type="button" class="relight-light-handle" data-light="${l.id}" aria-label="Move Light ${l.id}" title="Light ${l.id} — drag to move" aria-pressed="${l.id===this.selected}" style="left:${l.x*100}%;top:${l.y*100}%"><svg aria-hidden="true" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#f5f5f5" stroke="#333" stroke-width="1.4"/><circle cx="24" cy="24" r="18.2" fill="#263034" fill-opacity=".7" stroke="#333" stroke-width="1.4"/><circle cx="24" cy="24" r="16" fill="none" stroke="#fff" stroke-width="3.2"/><circle cx="24" cy="24" r="6.5" fill="#fff" stroke="#333" stroke-width="1.2"/></svg></button>`).join('')+gizmos;
  }
  syncPosition(light){for(const key of ['x','y','patternX','patternY','patternScale','patternRotation'])this.root.querySelectorAll(`[data-param="${key}"]`).forEach(input=>input.value=light[key]?.toFixed(2));}
  definePattern(source,id){
