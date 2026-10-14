@@ -2,7 +2,7 @@
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function default_light(index = 0) {
- return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.7, intensity:.5, diffusion:.5, color:'#ffffff', enabled:true};
+ return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.3, intensity:.8, diffusion:.3, color:'#ffffff', enabled:true};
 }
 export function normalize_light(light = {}) {
  const d = default_light();

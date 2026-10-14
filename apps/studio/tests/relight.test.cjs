@@ -8,7 +8,7 @@ async function flat(w=5,h=5){const m=await load(),depth=new Float32Array(w*h).fi
 test('Relight defaults are independent and controls normalize invalid values',async()=>{
  const m=await load();assert.notEqual(m.default_light(),m.default_light());
  const l=m.normalize_light({x:-5,y:5,intensity:Infinity,diffusion:-2,distance:0,color:'not-a-color',type:'bad'});
- assert.equal(l.x,0);assert.equal(l.y,1);assert.equal(l.intensity,.5);assert.equal(l.diffusion,0);assert.equal(l.distance,.1);assert.equal(l.color,'#ffffff');assert.equal(l.type,'bulb');
+ assert.equal(l.x,0);assert.equal(l.y,1);assert.equal(l.intensity,.8);assert.equal(l.diffusion,0);assert.equal(l.distance,.1);assert.equal(l.color,'#ffffff');assert.equal(l.type,'bulb');
 });
 test('Depth normalization handles constant, nonfinite and varied maps',async()=>{
  const m=await load();assert.deepEqual([...m.normalize_depth([4,6,8])],[0,.5,1]);assert.deepEqual([...m.normalize_depth([NaN,2,2])],[.5,.5,.5]);
@@ -69,7 +69,7 @@ test('Light drag uses a stable captured host and updates normalized position unt
  const {default_light}=await load(),events={},host={addEventListener:(name,fn)=>events[name]=fn,setPointerCapture:id=>{host.pointer=id;},innerHTML:''};
  const canvas={width:100,height:50,getContext:()=>({putImageData(){}}),getBoundingClientRect:()=>({left:20,top:30,width:200,height:100})};
  const nodes={canvas,'.relight-handles':host,'.relight-stage':{getBoundingClientRect:()=>({width:500,height:300})},'.relight-image':{style:{}}};
- const root={querySelector:s=>nodes[s],addEventListener(){}};
+ const root={querySelector:s=>nodes[s],querySelectorAll:()=>[],addEventListener(){}};
  const ui=loadUI();ui.POP={el:{querySelector:s=>s==='.studio-relight'?root:{}}};ui.preview={width:100,height:50};ui.lights=[default_light()];ui.selected=1;
  let renders=0,redraws=0;ui.controls=()=>{};ui.handles=()=>redraws++;ui.schedule=()=>renders++;ui.startDepth=()=>{};
  ui.mount();events.pointerdown({target:{closest:()=>({dataset:{light:'1'}})},pointerId:4,preventDefault(){}});assert.equal(host.pointer,4);
@@ -87,4 +87,12 @@ test('Apply commits one image action and a closed or changed document commits no
  const canceled=loadUI({config,app,document,ImageData:class{},Uint8ClampedArray});let finish;const runtime={render:()=>new Promise(resolve=>finish=resolve),close(){}};
  Object.assign(canceled,{root,ready:true,layer,documentId:1,source:{width:1,height:1},original:{},lights:[],originalStrength:1,runtime});canceled.status=()=>{};
  const pending=canceled.apply();canceled.close();finish({pixels:new ArrayBuffer(4)});assert.equal(await pending,false);assert.equal(actions,1);
+});
+
+test('Default lighting visibly follows the source across the image',async()=>{
+ const {geometry,render_relight,default_light}=await flat(21,21),src=pixels(21,21);
+ const left=render_relight(src,21,21,geometry,{original:.75,lights:[{...default_light(),x:.1,y:.5}]}),right=render_relight(src,21,21,geometry,{original:.75,lights:[{...default_light(),x:.9,y:.5}]});
+ const a=(10*21+2)*4,b=(10*21+18)*4;
+ assert.ok(left[a]-left[b]>=20,'near-side lighting must be clearly stronger');
+ assert.ok(right[b]-right[a]>=20,'the lighting emphasis must move to the opposite side');
 });

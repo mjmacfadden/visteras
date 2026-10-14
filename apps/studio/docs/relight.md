@@ -4,10 +4,10 @@ Image ▸ Relight… edits the selected, unlocked raster image layer. It uses th
 
 ## Controls
 
-- Drag the numbered light handle on the image to move its source. Arrow keys nudge a focused handle (Shift makes a larger step).
+- Drag the numbered light handle on the image to move its source. Arrow keys nudge a focused handle (Shift makes a larger step). Horizontal/vertical position sliders and fields also move the source; dragging updates those controls.
 - Add up to eight lights, switch between Bulb and Sun, change their color, intensity, diffusion and distance, disable or remove them.
 - Bulb lights attenuate over distance. Sun lights have a constant direction over the surface.
-- Original lighting controls how much existing illumination remains. Show original compares with untouched pixels. Reset restores the initial configuration.
+- Original lighting controls how much existing illumination remains. Show original compares with untouched pixels. Reset restores the initial configuration: original lighting 75%, closer distance 0.3, intensity 0.8 and diffusion 0.3, making source movement easier to see.
 - Apply computes the full-resolution result. Cancel terminates the workers without changing pixels. A failed download offers Retry; GPU initialization failure retries in a fresh CPU worker.
 
 ## Independent implementation and sources
@@ -33,7 +33,7 @@ Relight operates on the whole raster layer, not a selection-only region. Its nor
 
 ## Validation
 
-- `node --test apps/studio/tests/*.test.cjs`: 281 pass, one existing local-PSD-fixture skip (17 new Relight tests).
+- `node --test apps/studio/tests/*.test.cjs`: 282 pass, one existing local-PSD-fixture skip (18 new Relight tests).
 - `npm test`: all seven gates pass.
 - `npm run check:storage`: zero violations; only the existing non-Vector document-store warnings.
 - `npm run build:studio`: production compilation succeeds; two bundle-size warnings.

@@ -27,7 +27,7 @@ export default class Image_relight_class {
   this.preview.width=Math.max(1,Math.round(this.source.width*scale));this.preview.height=Math.max(1,Math.round(this.source.height*scale));
   this.preview.getContext('2d').drawImage(this.source,0,0,this.preview.width,this.preview.height);
   this.previewOriginal=this.preview.getContext('2d').getImageData(0,0,this.preview.width,this.preview.height);
-  this.lights=[default_light()];this.selected=1;this.nextId=2;this.originalStrength=1;
+  this.lights=[default_light()];this.selected=1;this.nextId=2;this.originalStrength=.75;
   this.ready=false;this.applying=false;this.rendering=false;this.dirty=false;this.comparing=false;this.result=null;
   this.POP.show({title:'Relight',className:'raw_develop_popup relight-popup',params:[{html:this.html()}],
    on_load:()=>this.mount(),on_cancel:()=>this.close(),on_finish:()=>this.apply()});
@@ -38,7 +38,7 @@ export default class Image_relight_class {
   <aside class="raw-develop__sidebar"><p class="relight-hint">Drag a light on the photo. Processing stays on your device.</p>
   <div class="relight-toolbar"><button type="button" data-action="add">Add Light</button></div>
   <div class="relight-list" role="list" aria-label="Lights"></div><div class="relight-controls"></div>
-  <label class="relight-global">Original lighting <input type="range" aria-label="Original lighting" min="0" max="100" value="100"><output>100%</output></label>
+  <label class="relight-global">Original lighting <input type="range" aria-label="Original lighting" min="0" max="100" value="75"><output>75%</output></label>
   <label><input type="checkbox" data-role="compare"> Show original</label>
   <p class="relight-hint">Apply changes the selected layer in one undo step.</p>
   </aside></div><p class="relight-status" role="status" aria-live="polite">Preparing local depth estimation…</p><button type="button" data-action="retry" hidden>Retry depth estimation</button></div>`;}
@@ -53,7 +53,7 @@ export default class Image_relight_class {
    if(action==='apply'){this.POP.save();return;}
    if(action==='add' && this.lights.length<8){const light=default_light(this.nextId-1);light.x=.5;light.y=.5;this.nextId++;this.lights.push(light);this.selected=light.id;}
    if(action==='remove'){this.lights=this.lights.filter(l=>l.id!==this.selected);this.selected=this.lights[0]?.id;}
-   if(action==='reset'){this.lights=[default_light()];this.selected=1;this.nextId=2;this.originalStrength=1;this.root.querySelector('[aria-label="Original lighting"]').value=100;this.root.querySelector('output').textContent='100%';}
+   if(action==='reset'){this.lights=[default_light()];this.selected=1;this.nextId=2;this.originalStrength=.75;this.root.querySelector('[aria-label="Original lighting"]').value=75;this.root.querySelector('output').textContent='75%';}
    if(action==='retry'){this.startDepth();return;}
    const choice=e.target.closest('[data-light]');if(choice)this.selected=Number(choice.dataset.light);
    if(action || choice){this.controls();this.schedule();}
@@ -79,6 +79,8 @@ export default class Image_relight_class {
    if(this.drag!==e.pointerId)return;
    const box=this.canvas.getBoundingClientRect(),light=this.lights.find(l=>l.id===this.selected);
    light.x=Math.max(0,Math.min(1,(e.clientX-box.left)/box.width));light.y=Math.max(0,Math.min(1,(e.clientY-box.top)/box.height));
+   this.root.querySelectorAll('[data-param="x"]').forEach(input=>input.value=light.x.toFixed(2));
+   this.root.querySelectorAll('[data-param="y"]').forEach(input=>input.value=light.y.toFixed(2));
    this.handles();this.schedule();
   });
   const end=()=>{this.drag=null;};handleHost.addEventListener('pointerup',end);handleHost.addEventListener('pointercancel',end);
@@ -101,7 +103,7 @@ export default class Image_relight_class {
   this.root.querySelector('[data-action="add"]').disabled=this.lights.length>=8;
   this.root.querySelector('.relight-controls').innerHTML=light?`<label>Type <select aria-label="Light type" data-param="type"><option value="bulb" ${light.type==='bulb'?'selected':''}>Bulb</option><option value="sun" ${light.type==='sun'?'selected':''}>Sun</option></select></label>
    <label>Color <input type="color" aria-label="Light color" data-param="color" value="${light.color}"></label>
-   ${[['intensity','Intensity',0,3,.01],['diffusion','Diffusion',0,1,.01],['distance','Distance',.1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<span class="relight-slider"><input type="range" aria-label="${label}" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"><input type="number" aria-label="${label} value" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"></span></label>`).join('')}
+   ${[['x','Horizontal position',0,1,.01],['y','Vertical position',0,1,.01],['intensity','Intensity',0,3,.01],['diffusion','Diffusion',0,1,.01],['distance','Distance',.1,3,.01]].map(([key,label,min,max,step])=>`<label>${label}<span class="relight-slider"><input type="range" aria-label="${label}" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"><input type="number" aria-label="${label} value" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"></span></label>`).join('')}
    <label><input type="checkbox" data-param="enabled" ${light.enabled?'checked':''}> Light enabled</label><button type="button" data-action="remove">Remove Light</button>`:'<p>No lights. Add a light or adjust original lighting.</p>';
   this.handles();
  }
