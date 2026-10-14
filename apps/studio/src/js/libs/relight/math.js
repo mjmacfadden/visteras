@@ -1,8 +1,9 @@
+import {PATTERNS,pattern_mask} from './patterns.js';
 /** Independent depth-guided relighting. No ImageFlow source or assets used. */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function default_light(index = 0) {
- return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.3, intensity:.8, diffusion:.3, color:'#ffffff', enabled:true};
+ return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.3, intensity:.8, diffusion:.3, color:'#ffffff', enabled:true, temperature:5500, softness:.5, pattern:'none', patternScale:1, patternRotation:0, patternX:.5, patternY:.5, patternInvert:false};
 }
 export function normalize_light(light = {}) {
  const d = default_light();
@@ -10,6 +11,9 @@ export function normalize_light(light = {}) {
   x:clamp(finite(light.x,d.x),0,1), y:clamp(finite(light.y,d.y),0,1),
   distance:clamp(finite(light.distance,d.distance),.1,3), intensity:clamp(finite(light.intensity,d.intensity),0,3),
   diffusion:clamp(finite(light.diffusion,d.diffusion),0,1),
+  softness:clamp(finite(light.softness,.5),0,1),pattern:PATTERNS.includes(light.pattern)?light.pattern:'none',
+  patternScale:clamp(finite(light.patternScale,1),.1,4),patternRotation:finite(light.patternRotation,0),
+  patternX:clamp(finite(light.patternX,.5),-1,2),patternY:clamp(finite(light.patternY,.5),-1,2),
   color:/^#[0-9a-f]{6}$/i.test(light.color) ? light.color : d.color};
 }
 export function normalize_depth(data) {
@@ -57,10 +61,13 @@ export function render_relight(rgba,width,height,geometry,settings={}) {
   for(const light of lights) {
    const dx=(light.x-u)*aspect,dy=(light.y-v)*aspectY,dz=light.distance+.35-z;
    const sx=light.type==='sun'?(light.x-.5)*2:dx,sy=light.type==='sun'?(light.y-.5)*2:dy;
-   const len=Math.hypot(sx,sy,dz),cos=Math.max(0,(nx*sx+ny*sy+nz*dz)/(len*nl));
-   const diffuse=cos*(1-light.diffusion*.6)+light.diffusion*.6;
+   const lz=light.type==='sun'?.65:dz;
+   const len=Math.hypot(sx,sy,lz),cos=Math.max(0,(nx*sx+ny*sy+nz*lz)/(len*nl));
+   const softened=light.type==='sun'?Math.pow(cos,1-light.softness*.65):cos;
+   const diffuse=softened*(1-light.diffusion*.6)+light.diffusion*.6;
    const attenuation=light.type==='sun'?1:light.distance*light.distance/(len*len);
-   const energy=light.intensity*diffuse*attenuation*2;
+   const projection=light.type==='sun'?pattern_mask(u,v,z,light,settings.patterns?.[light.customPatternId],width/height):1;
+   const energy=light.intensity*diffuse*attenuation*projection*2;
    for(let c=0;c<3;c++) lightRGB[c]+=light.rgb[c]*energy;
   }
   for(let c=0;c<3;c++) out[i+c]=Math.round(clamp(to_srgb(to_linear(rgba[i+c]/255)*lightRGB[c]),0,1)*255);

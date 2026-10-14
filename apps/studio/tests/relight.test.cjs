@@ -68,14 +68,19 @@ function loadUI(globals={}) {
 test('Light drag uses a stable captured host and updates normalized position until release',async()=>{
  const {default_light}=await load(),events={},host={addEventListener:(name,fn)=>events[name]=fn,setPointerCapture:id=>{host.pointer=id;},innerHTML:''};
  const canvas={width:100,height:50,getContext:()=>({putImageData(){}}),getBoundingClientRect:()=>({left:20,top:30,width:200,height:100})};
- const nodes={canvas,'.relight-handles':host,'.relight-stage':{getBoundingClientRect:()=>({width:500,height:300})},'.relight-image':{style:{}}};
+ const nodes={canvas,'.relight-handles':host,'.relight-stage':{getBoundingClientRect:()=>({width:500,height:300})},'.relight-image':{style:{}},'[data-role="pattern-file"]':{addEventListener(){}}};
  const root={querySelector:s=>nodes[s],querySelectorAll:()=>[],addEventListener(){}};
  const ui=loadUI();ui.POP={el:{querySelector:s=>s==='.studio-relight'?root:{}}};ui.preview={width:100,height:50};ui.lights=[default_light()];ui.selected=1;
- let renders=0,redraws=0;ui.controls=()=>{};ui.handles=()=>redraws++;ui.schedule=()=>renders++;ui.startDepth=()=>{};
+ let renders=0,redraws=0;ui.controls=()=>{};ui.handles=()=>redraws++;ui.schedule=()=>renders++;ui.startDepth=()=>{};ui.layoutView=()=>{};ui.bindViewport=()=>{};
  ui.mount();events.pointerdown({target:{closest:()=>({dataset:{light:'1'}})},pointerId:4,preventDefault(){}});assert.equal(host.pointer,4);
  events.pointermove({pointerId:4,clientX:170,clientY:80});assert.equal(ui.lights[0].x,.75);assert.equal(ui.lights[0].y,.5);assert.equal(renders,1);assert.equal(redraws,1);
  events.pointermove({pointerId:4,clientX:500,clientY:0});assert.equal(ui.lights[0].x,1);assert.equal(ui.lights[0].y,0);
  events.pointerup();events.pointermove({pointerId:4,clientX:20,clientY:30});assert.equal(ui.lights[0].x,1,'released pointer does not move light');
+ const start=(kind,x,y)=>events.pointerdown({target:{closest:()=>({dataset:{light:'1',gizmo:kind}})},pointerId:4,clientX:x,clientY:y,preventDefault(){}});
+ start('move',20,30);events.pointermove({pointerId:4,clientX:70,clientY:55});events.pointerup();assert.equal(ui.lights[0].patternX,.75);assert.equal(ui.lights[0].patternY,.75);assert.equal(ui.lights[0].x,1);
+ start('scale',190,125);events.pointermove({pointerId:4,clientX:210,clientY:145});events.pointerup();assert.ok(Math.abs(ui.lights[0].patternScale-2)<1e-6);
+ start('rotate',170,85);events.pointermove({pointerId:4,clientX:190,clientY:105});events.pointerup();assert.equal(ui.lights[0].patternRotation,90);
+
 });
 test('Apply commits one image action and a closed or changed document commits none',async()=>{
  let actions=0;const layer={id:2},config={layers:[layer]},app={Documents:{active_id:1},Actions:{Update_layer_image_action:class{constructor(canvas,id){assert.equal(id,2);}}},State:{do_action:async()=>{actions++;}}};
@@ -95,4 +100,62 @@ test('Default lighting visibly follows the source across the image',async()=>{
  const a=(10*21+2)*4,b=(10*21+18)*4;
  assert.ok(left[a]-left[b]>=20,'near-side lighting must be clearly stronger');
  assert.ok(right[b]-right[a]>=20,'the lighting emphasis must move to the opposite side');
+});
+const patterns=()=>import('../src/js/libs/relight/patterns.js');
+test('Every procedural mask is deterministic, bounded and invertible',async()=>{
+ const m=await patterns(),{default_light}=await load();
+ for(const name of m.PATTERNS.filter(n=>n!=='none'&&n!=='custom'))for(const [x,y] of [[.12,.26],[.5,.5],[.9,.77]]){
+  const light={...default_light(),type:'sun',pattern:name},a=m.pattern_mask(x,y,.15,light);
+  assert.ok(Number.isFinite(a)&&a>=0&&a<=1,name);assert.equal(a,m.pattern_mask(x,y,.15,light));
+  assert.ok(Math.abs(a+m.pattern_mask(x,y,.15,{...light,patternInvert:true})-1)<1e-6,name);
+ }
+});
+test('Sun projection warps mask coordinates with depth and direction',async()=>{
+ const m=await patterns(),{default_light}=await load(),light={...default_light(),x:.9,y:.1};
+ const near=m.pattern_coordinates(.5,.5,.3,light),far=m.pattern_coordinates(.5,.5,0,light);
+ assert.ok(near.x<far.x);assert.ok(near.y>far.y);
+});
+test('Pattern translation, scale and rotation transform coordinates independently',async()=>{
+ const m=await patterns(),{default_light}=await load(),l={...default_light(),x:.5,y:.5};
+ assert.deepEqual(m.pattern_coordinates(.7,.5,0,l),{x:.7-.5,y:0});
+ assert.ok(Math.abs(m.pattern_coordinates(.7,.5,0,{...l,patternScale:2}).x-.1)<1e-6);
+ const r=m.pattern_coordinates(.7,.5,0,{...l,patternRotation:90});assert.ok(Math.abs(r.x)<1e-6);assert.ok(Math.abs(r.y+.2)<1e-6);
+ assert.ok(Math.abs(m.pattern_coordinates(.7,.5,0,{...l,patternX:.7}).x)<1e-6);
+});
+test('Window and blinds produce spatial lighting variation on a flat image',async()=>{
+ const {render_relight,default_light,geometry}=await flat(21,21),src=pixels(21,21);
+ for(const pattern of ['window','blinds']){const result=render_relight(src,21,21,geometry,{original:.75,lights:[{...default_light(),type:'sun',pattern}]});const values=new Set();for(let i=0;i<result.length;i+=4)values.add(result[i]);assert.ok(values.size>2,pattern);}
+});
+test('Custom grayscale masks interpolate and remain bounded outside their footprint',async()=>{
+ const m=await patterns(),{default_light}=await load(),l={...default_light(),pattern:'custom',x:.5,y:.5},custom={width:2,height:1,data:new Uint8Array([0,255])};
+ assert.equal(m.pattern_mask(.5,.5,0,l,custom),.5);assert.equal(m.pattern_mask(1.2,.5,0,l,custom),0);assert.equal(m.pattern_mask(1.2,.5,0,{...l,patternInvert:true},custom),1);
+});
+test('Sun softness changes surface response independently of diffusion',async()=>{
+ const {render_relight,default_light,geometry}=await flat(),src=pixels(5,5),l={...default_light(),type:'sun',x:0,y:0,diffusion:0};
+ const hard=render_relight(src,5,5,geometry,{lights:[{...l,softness:0}]}),soft=render_relight(src,5,5,geometry,{lights:[{...l,softness:1}]});assert.ok(soft[0]>hard[0]);
+});
+test('Temperature presets include neutral and distinct warm/cool gels',async()=>{
+ const m=await patterns();assert.equal(m.temperature_color(5500),'#ffffff');assert.notEqual(m.temperature_color(1000),m.temperature_color(10000));assert.equal(m.TEMPERATURES.length,9);
+});
+test('Zoom keeps the point under the cursor fixed and fit uses image dimensions',async()=>{
+ const m=await import('../src/js/libs/relight/view.js');assert.equal(m.fit_zoom(432,232,800,400),.5);
+ const before={scale:.5,x:20,y:-10},after=m.zoom_view(before,1,100,50);
+ assert.equal((100-after.x)/after.scale,(100-before.x)/before.scale);assert.equal((50-after.y)/after.scale,(50-before.y)/before.scale);
+ assert.equal(m.zoom_view(before,100).scale,4);
+});
+test('Pattern rotation accounts for non-square image pixels',async()=>{
+ const m=await patterns(),{default_light}=await load(),l={...default_light(),x:.5,y:.5,patternRotation:90};
+ const p=m.pattern_coordinates(.6,.5,0,l,2);assert.ok(Math.abs(p.x)<1e-6);assert.ok(Math.abs(p.y+.2)<1e-6);
+});
+test('Viewport pans only while held, wheel zoom anchors at the cursor and comparison releases',()=>{
+ const stageEvents={},compareEvents={},rootEvents={};
+ const stage={addEventListener:(n,f)=>stageEvents[n]=f,setPointerCapture(){},getBoundingClientRect:()=>({left:10,top:20,width:200,height:100})};
+ const compare={addEventListener:(n,f)=>compareEvents[n]=f,setPointerCapture(){}};
+ const ui=loadUI();ui.root={querySelector:s=>s==='.relight-stage'?stage:compare,addEventListener:(n,f)=>rootEvents[n]=f};ui.view={scale:.5,x:0,y:0};ui.layoutView=()=>{};
+ const paints=[];ui.paint=()=>paints.push(Boolean(ui.holdingCompare));let zoom;ui.changeZoom=(...args)=>zoom=args;
+ ui.bindViewport();rootEvents.keydown({code:'Space',target:{closest:()=>null},preventDefault(){}});
+ stageEvents.pointerdown({button:0,pointerId:2,clientX:20,clientY:30,preventDefault(){}});stageEvents.pointermove({pointerId:2,clientX:70,clientY:60});assert.equal(ui.view.x,50);assert.equal(ui.view.y,30);
+ stageEvents.pointerup();stageEvents.pointermove({pointerId:2,clientX:80,clientY:90});assert.equal(ui.view.x,50);
+ stageEvents.wheel({ctrlKey:true,deltaY:-100,clientX:160,clientY:80,preventDefault(){}});assert.ok(zoom[0]>.5);assert.equal(zoom[1],50);assert.equal(zoom[2],10);
+ compareEvents.pointerdown({pointerId:3});compareEvents.pointerup();assert.deepEqual(paints,[true,false]);
 });

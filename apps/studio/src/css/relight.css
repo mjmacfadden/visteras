@@ -22,3 +22,10 @@
 .studio-relight .raw-develop__sidebar{padding:12px}
 .studio-relight .relight-status{padding:8px 12px;background:var(--header-background-color);flex:none}
 .studio-relight .raw-develop__btn--primary{background:var(--visteras-accent);border-color:var(--visteras-accent)}
+.studio-relight .relight-image{max-width:none}
+.relight-view-tools{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--header-background-color);flex:none;flex-wrap:wrap}
+.relight-view-tools input{width:56px}
+.relight-view-tools .relight-hint{margin:0 0 0 12px}
+.relight-pattern-frame{position:absolute;border:1px dashed var(--visteras-accent);pointer-events:none;box-sizing:border-box}
+.relight-handles .relight-pattern-handle{border-radius:3px;width:24px;height:24px;z-index:1;background:var(--area-background-color);color:var(--text-color)}
+.relight-handles[hidden]{display:none}
