@@ -3,7 +3,7 @@ import {PATTERNS,pattern_mask} from './patterns.js';
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function default_light(index = 0) {
- return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.3, intensity:.8, diffusion:.3, color:'#ffffff', enabled:true, temperature:5500, softness:.5, pattern:'none', patternScale:1, patternRotation:0, patternX:.5, patternY:.5, patternInvert:false};
+ return {id:index + 1, type:'bulb', x:.35, y:.3, distance:.3, intensity:.8, diffusion:.3, color:'#ffffff', customColor:'#ffffff', enabled:true, temperature:5500, softness:.5, pattern:'none', patternScale:1, patternRotation:0, patternX:.5, patternY:.5, patternInvert:false};
 }
 export function normalize_light(light = {}) {
  const d = default_light();

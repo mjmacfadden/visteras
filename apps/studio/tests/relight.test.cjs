@@ -159,3 +159,23 @@ test('Viewport pans only while held, wheel zoom anchors at the cursor and compar
  stageEvents.wheel({ctrlKey:true,deltaY:-100,clientX:160,clientY:80,preventDefault(){}});assert.ok(zoom[0]>.5);assert.equal(zoom[1],50);assert.equal(zoom[2],10);
  compareEvents.pointerdown({pointerId:3});compareEvents.pointerup();assert.deepEqual(paints,[true,false]);
 });
+test('Temperature dropdown includes swatches, selection marker and retained custom color',async()=>{
+ const {temperature_markup}=await import('../src/js/libs/relight/temperature-menu.js');
+ const html=temperature_markup({temperature:5500,color:'#ffffff',customColor:'#cc3388'});
+ assert.equal((html.match(/role="option"/g)||[]).length,10);assert.match(html,/background:#cc3388/);assert.match(html,/5500K: Neutral/);assert.match(html,/data-temperature="5500"/);assert.equal((html.match(/aria-selected="true"/g)||[]).length,1);
+});
+test('Temperature dropdown keyboard chooses a preset, Escape closes only the open menu and listeners clean up',async()=>{
+ const {mount_temperature_menu}=await import('../src/js/libs/relight/temperature-menu.js');
+ function node(){return {events:{},style:{},attrs:{},addEventListener(n,fn){this.events[n]=fn;},removeEventListener(n){delete this.events[n];},setAttribute(n,v){this.attrs[n]=v;},getAttribute(n){return this.attrs[n];},focus(){this.focused=true;}};}
+ const trigger=node(),menu=node(),control=node(),host=node();host.innerWidth=800;host.innerHeight=600;menu.hidden=true;menu.scrollTop=0;menu.clientHeight=340;
+ const options=[0,1000,2000,3200,4300,5500,6500,7500,9000,10000].map((k,i)=>Object.assign(node(),{dataset:{temperature:String(k)},offsetTop:i*31,offsetHeight:31,attrs:{'aria-selected':String(k===5500)}}));
+ trigger.getBoundingClientRect=()=>({left:500,top:200,bottom:232,width:248});menu.querySelectorAll=()=>options;control.querySelector=s=>s.includes('combobox')?trigger:menu;control.contains=target=>target===trigger||target===menu||options.includes(target);
+ let value=null,stops=0;const binding=mount_temperature_menu(control,k=>value=k,host);
+ const key=k=>control.events.keydown({key:k,preventDefault(){},stopImmediatePropagation(){stops++;}});
+ key('ArrowDown');assert.equal(menu.hidden,false);assert.equal(trigger.attrs['aria-expanded'],'true');assert.equal(options[5].focused,true);
+ key('ArrowDown');key('Enter');assert.equal(value,6500);assert.equal(menu.hidden,true);
+ const oldStops=stops;key('Escape');assert.equal(stops,oldStops,'closed Escape passes through to the dialog');
+ trigger.events.click();key('Escape');assert.equal(menu.hidden,true);assert.equal(trigger.focused,true);
+ trigger.events.click();host.events.pointerdown({target:{}});assert.equal(menu.hidden,true);
+ binding.destroy();assert.deepEqual(Object.keys(host.events),[]);assert.deepEqual(Object.keys(control.events),[]);
+});

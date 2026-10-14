@@ -4,8 +4,9 @@ import Base_layers_class from '../../core/base-layers.js';
 import Dialog_class from '../../libs/popup.js';
 import alertify from '../../../../node_modules/alertifyjs/build/alertify.min.js';
 import {default_light,normalize_light} from '../../libs/relight/math.js';
-import {PATTERNS,TEMPERATURES,temperature_color} from '../../libs/relight/patterns.js';
+import {PATTERNS,temperature_color} from '../../libs/relight/patterns.js';
 import {fit_zoom,zoom_view} from '../../libs/relight/view.js';
+import {temperature_markup,mount_temperature_menu} from '../../libs/relight/temperature-menu.js';
 import {RelightRuntime} from '../../libs/relight/runtime.js';
 import '../../../css/relight.css';
 
@@ -80,9 +81,10 @@ export default class Image_relight_class {
    const value=['enabled','patternInvert'].includes(key)?e.target.checked:['color','type','pattern'].includes(key)?e.target.value:Number(e.target.value);
    const update={[key]:value};
    if(key==='temperature')update.color=temperature_color(value);
-   if(key==='color')update.temperature=0;
+   if(key==='color'){update.temperature=0;update.customColor=value;}
    Object.assign(light,normalize_light({...light,...update}));
-   if(['type','pattern','temperature','color'].includes(key))this.controls();
+   if(['type','pattern','temperature'].includes(key))this.controls();
+   if(key==='color')this.root.querySelectorAll('.relight-temperature-trigger .relight-temperature-swatch,[data-temperature="0"] .relight-temperature-swatch').forEach(swatch=>swatch.style.background=light.color);
    this.root.querySelectorAll(`[data-param="${key}"]`).forEach(input=>{if(input!==e.target)input.value=light[key];});
    this.handles();this.schedule();
   });
@@ -137,18 +139,24 @@ export default class Image_relight_class {
  }
  controls(){
   if(!this.root)return;
+  this.colorMenu?.destroy();
   this.root.querySelector('.relight-list').innerHTML=this.lights.map(l=>`<button type="button" role="listitem" data-light="${l.id}" aria-pressed="${l.id===this.selected}">Light ${l.id}</button>`).join('');
   const light=this.lights.find(l=>l.id===this.selected);
   this.root.querySelector('[data-action="add"]').disabled=this.lights.length>=8;
   const field=([key,label,min,max,step])=>`<label>${label}<span class="relight-slider"><input type="range" aria-label="${label}" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"><input type="number" aria-label="${label} value" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${Number(light[key].toFixed(2))}"></span></label>`;
   const names={none:'None',blinds:'Blinds',window:'Window',strip:'Light Strip',foliage:'Foliage',palm:'Palm',branches:'Branches',checker:'Checkerboard',dots:'Polka Dots','lines-h':'Horizontal Lines','lines-d':'Diagonal Lines',grid:'Grid',weave:'Weave',noise:'Noise',crosshatch:'Crosshatch',custom:'Custom Pattern'};
   this.root.querySelector('.relight-controls').innerHTML=light?`<label>Type <select aria-label="Light type" data-param="type"><option value="bulb" ${light.type==='bulb'?'selected':''}>Bulb</option><option value="sun" ${light.type==='sun'?'selected':''}>Sun</option></select></label>
-   <label>Color temperature <select aria-label="Color temperature" data-param="temperature"><option value="0">Custom color</option>${TEMPERATURES.map(k=>`<option value="${k}" ${light.temperature===k?'selected':''}>${k}K${k===5500?' · Neutral':''}</option>`).join('')}</select></label>
-   <label>Color <input type="color" aria-label="Light color" data-param="color" value="${light.color}"></label>
+   ${temperature_markup(light)}
    ${[['intensity','Intensity',0,3,.01],...(light.type==='sun'?[['softness','Softness',0,1,.01]]:[]),['diffusion','Diffusion',0,1,.01],...(light.type==='bulb'?[['distance','Distance',.1,3,.01]]:[])].map(field).join('')}
    ${light.type==='sun'?`<label>Pattern <select aria-label="Light pattern" data-param="pattern">${PATTERNS.map(p=>`<option value="${p}" ${light.pattern===p?'selected':''}>${names[p]}</option>`).join('')}</select></label><div class="relight-toolbar"><button type="button" data-action="pattern-file">Load Pattern…</button><button type="button" data-action="pattern-layer">Define from Layer</button></div>
     ${light.pattern!=='none'?[['patternScale','Pattern scale',.1,4,.01],['patternRotation','Pattern rotation',0,360,1],['patternX','Pattern horizontal position',-1,2,.01],['patternY','Pattern vertical position',-1,2,.01]].map(field).join('')+`<label><input type="checkbox" data-param="patternInvert" ${light.patternInvert?'checked':''}> Invert pattern</label>`:''}`:''}
    <label><input type="checkbox" data-param="enabled" ${light.enabled?'checked':''}> Light enabled</label><div class="relight-toolbar"><button type="button" data-action="reset-light">Reset Light</button><button type="button" data-action="remove">Remove Light</button></div>`:'<p>No lights. Add a light or adjust original lighting.</p>';
+  if(light)this.colorMenu=mount_temperature_menu(this.root.querySelector('.relight-temperature-control'),value=>{
+   if(this.applying)return;
+   Object.assign(light,normalize_light({...light,temperature:value,color:value?temperature_color(value):(light.customColor||light.color)}));
+   this.controls();this.schedule();
+   if(value)this.colorMenu.trigger.focus();else {const input=this.root.querySelector('[data-param="color"]');input.focus();input.click();}
+  });
   this.handles();
  }
  handles(){
@@ -236,5 +244,5 @@ export default class Image_relight_class {
   }catch(e){if(this.root){this.status(e.message);this.root.querySelector('[data-action="apply"]').disabled=false;this.root.querySelectorAll('aside input,aside select,aside button,.relight-handles button').forEach(el=>el.disabled=false);this.controls();}return false;}
   finally{this.applying=false;}
  }
- close(){this.resizeObserver?.disconnect();this.resizeObserver=null;this.runtime?.close();this.runtime=null;this.root=null;this.patterns=null;this.canvas=null;this.source=null;this.original=null;this.previewOriginal=null;this.preview=null;this.result=null;}
+ close(){this.colorMenu?.destroy();this.colorMenu=null;this.resizeObserver?.disconnect();this.resizeObserver=null;this.runtime?.close();this.runtime=null;this.root=null;this.patterns=null;this.canvas=null;this.source=null;this.original=null;this.previewOriginal=null;this.preview=null;this.result=null;}
 }

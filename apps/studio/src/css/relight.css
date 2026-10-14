@@ -34,3 +34,14 @@
 .relight-light-handle svg{display:block;width:100%;height:100%;pointer-events:none}
 .relight-handles .relight-light-handle[aria-pressed=true]{background:transparent;filter:drop-shadow(0 0 5px #ffffff70) drop-shadow(0 1px 3px #0008)}
 .relight-light-handle:focus-visible{outline:2px solid var(--visteras-accent);outline-offset:3px}
+.relight-color-control{margin:8px 0}
+.relight-temperature-control{margin-top:6px}
+.relight-temperature-trigger{display:flex;align-items:center;gap:9px;width:100%;min-height:32px;background:var(--input-background-color);color:var(--text-color);border:1px solid var(--input-border-color);border-radius:3px;padding:4px 7px;text-align:left}
+.relight-temperature-trigger:focus-visible,.relight-temperature-trigger[aria-expanded=true]{outline:2px solid var(--visteras-accent);outline-offset:1px}
+.relight-temperature-swatch{display:inline-block;width:22px;height:22px;flex:0 0 22px;border:1px solid #eee;border-radius:2px;box-shadow:inset 0 0 0 1px #555}
+.relight-temperature-chevron,.relight-temperature-check{margin-left:auto}
+.relight-temperature-options{position:fixed;z-index:100000;overflow-y:auto;background:var(--block-background-color);border:1px solid #111;border-radius:3px;box-shadow:0 12px 28px #0008;padding:5px;box-sizing:border-box}
+.relight-temperature-options[hidden],.relight-custom-color[hidden]{display:none}
+.relight-temperature-options [role=option]{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;color:var(--text-color);padding:4px 7px;min-height:31px;text-align:left}
+.relight-temperature-options [role=option]:hover,.relight-temperature-options [role=option]:focus-visible{background:var(--button-background-color-hover);outline:none}
+.relight-temperature-check{width:15px;text-align:center}

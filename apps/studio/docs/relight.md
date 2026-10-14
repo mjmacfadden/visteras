@@ -9,7 +9,7 @@ Image ▸ Relight… edits the selected, unlocked raster image layer. It uses th
 - Bulb lights attenuate over distance. Sun lights have a constant direction over the surface and independent Softness and Diffusion.
 - Sun patterns: Blinds, Window, Light Strip, Foliage, Palm, Branches, Checkerboard, Polka Dots, horizontal/diagonal lines, Grid, Weave, Noise and Crosshatch. These are independently generated procedural masks, warped by estimated depth. Pattern coordinates account for image aspect ratio when rotating.
 - Move, scale and rotate a pattern using the on-image square handles or the sidebar fields. Invert swaps its light/dark areas. Load Pattern reads a local image as a grayscale/alpha mask; Define from Layer uses the captured raster source. Custom masks live only in dialog memory.
-- Nine color-temperature presets cover 1000–10000K, plus a custom color picker. These are approximate photographic gel colors, not a calibrated blackbody simulation.
+- The color dropdown shows swatches for nine temperature presets (1000–10000K), a checkmark for the selected entry, and a custom color picker. Arrow keys navigate the menu; Escape closes it without canceling the dialog. Custom color is retained when switching to presets and back. These are approximate photographic gel colors, not a calibrated blackbody simulation.
 - Fit, 1:1, zoom buttons and a percentage field control the preview. Space-drag or middle-drag pans; Ctrl/Cmd/Alt-wheel zooms around the cursor. Hold to compare and Show original reveal source pixels. Hide light guides removes all handles without changing the rendered lighting. Reset Light resets only the selected source.
 - Original lighting controls how much existing illumination remains. Show original compares with untouched pixels. Reset restores the initial configuration: original lighting 75%, closer distance 0.3, intensity 0.8 and diffusion 0.3, making source movement easier to see.
 - Apply computes the full-resolution result. Cancel terminates the workers without changing pixels. A failed download offers Retry; GPU initialization failure retries in a fresh CPU worker.
@@ -37,7 +37,7 @@ Relight operates on the whole raster layer, not a selection-only region. Its nor
 
 ## Validation
 
-- `node --test apps/studio/tests/*.test.cjs`: 292 pass, one existing local-PSD-fixture skip (28 new Relight tests).
+- `node --test apps/studio/tests/*.test.cjs`: 294 pass, one existing local-PSD-fixture skip (30 new Relight tests).
 - `npm test`: all seven gates pass.
 - `npm run check:storage`: zero violations; only the existing non-Vector document-store warnings.
 - `npm run build:studio`: production compilation succeeds; two bundle-size warnings.
