@@ -1,8 +1,8 @@
 .studio-relight{color:var(--text-color)}
 .relight-workspace{gap:0}
-.relight-stage{display:flex;align-items:center;justify-content:center;min-height:0;background:var(--area-background-color);padding:16px;overflow:hidden}
+.relight-stage{display:flex;align-items:center;justify-content:center;min-height:0;padding:16px;overflow:hidden}
 .relight-image{position:relative;max-width:100%;line-height:0;flex:none}
-.relight-image canvas{max-width:100%;max-height:100%;width:100%;height:100%;background:repeating-conic-gradient(#444 0% 25%,#555 0% 50%) 0/16px 16px}
+.relight-image canvas{max-width:100%;max-height:100%;width:100%;height:100%}
 .relight-handles{position:absolute;inset:0;z-index:3;pointer-events:none;touch-action:none}
 .relight-handles button{pointer-events:auto;position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border:2px solid var(--visteras-accent);border-radius:50%;background:var(--area-background-color);color:var(--text-color);cursor:move;line-height:1;box-shadow:0 0 0 1px #fff}
 .relight-handles button[aria-pressed=true]{background:var(--visteras-accent);color:var(--visteras-on-accent)}
