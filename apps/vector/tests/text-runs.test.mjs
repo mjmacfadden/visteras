@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {normalizeRuns,applyStyleToRange,styleAtRange,insertText,deleteText,runsToSpans,parseRuns,serializeRuns,updateRunsForText} from '../js/visteras-text-runs.js';
+const initial=[{start:0,end:11,style:{fontWeight:'400'}}];
+test('range styling splits and equal restyling merges',()=>{const bold=applyStyleToRange(initial,6,11,{fontWeight:'700'},11);assert.equal(bold.length,2);assert.deepEqual(applyStyleToRange(bold,6,11,{fontWeight:'400'},11),initial);});
+test('mixed fields are undefined and absent keys inherit',()=>{const r=applyStyleToRange([],6,11,{fontSize:48},11);assert.equal(styleAtRange(r,0,11,{fontSize:24}).fontSize,undefined);assert.equal(styleAtRange(r,6,11,{fontSize:24}).fontSize,48);assert.equal(styleAtRange(r,0,6,{fontSize:24}).fontSize,24);});
+for(const at of [3,6,11])test(`insertion at ${at} inherits left character`,()=>{const r=insertText(initial,at,2);assert.equal(styleAtRange(r,at,at+2).fontWeight,'400');assert.equal(r.at(-1).end,13);});
+test('insertion at start inherits base, not right',()=>assert.deepEqual(insertText(initial,0,2)[0],{start:0,end:2,style:{}}));
+test('deleting across runs merges equal neighbours',()=>{const r=applyStyleToRange(initial,3,7,{fontWeight:'700'},11);assert.deepEqual(deleteText(r,3,7),[{start:0,end:7,style:{fontWeight:'400'}}]);});
+test('normalization clamps sorts drops empty and merges',()=>assert.deepEqual(normalizeRuns([{start:5,end:99,style:{fill:'red'}},{start:-3,end:5,style:{fill:'red'}},{start:2,end:2,style:{}}],10),[{start:0,end:10,style:{fill:'red'}}]));
+test('malformed metadata is ignored',()=>assert.deepEqual(parseRuns('{bad'),[]));
+test('metadata round trips',()=>assert.deepEqual(parseRuns(serializeRuns(initial)),initial));
+test('point spans include inherited gaps',()=>assert.deepEqual(runsToSpans('Hello World',[{start:6,end:11,style:{fill:'red'}}]).map(s=>s.text),['Hello ','World']));
+test('wrapped spans are line by run slices',()=>{const s=runsToSpans('Hello World',initial,[{start:0,end:8},{start:8,end:11}]);assert.deepEqual(s.map(x=>[x.text,x.start,x.line]),[['Hello Wo',0,0],['rld',8,1]]);});
+test('null patch clears a whole object override',()=>assert.deepEqual(applyStyleToRange(initial,0,11,{fontWeight:null},11),[{start:0,end:11,style:{}}]));
+test('replacement preserves surrounding runs',()=>{const r=applyStyleToRange(initial,6,11,{fill:'red'},11);const next=updateRunsForText(r,'Hello World','Hello Word');assert.equal(styleAtRange(next,6,10).fill,'red');assert.equal(next.at(-1).end,10);});
+test('emoji indices follow UTF-16 textarea offsets',()=>{const r=applyStyleToRange([],2,3,{fill:'red'},3);assert.equal(runsToSpans('😀x',r)[1].text,'x');});
