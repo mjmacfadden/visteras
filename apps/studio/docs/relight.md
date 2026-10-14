@@ -4,7 +4,7 @@ Image ▸ Relight… edits the selected, unlocked raster image layer. It uses th
 
 ## Controls
 
-- Drag the numbered light handle on the image to move its source. Arrow keys nudge a focused handle (Shift makes a larger step). Horizontal/vertical position sliders and fields also move the source; dragging updates those controls.
+- Drag the numbered light handle on the image to move its source. Arrow keys nudge a focused handle (Shift makes a larger step).
 - Add up to eight lights, switch between Bulb and Sun, change their color, intensity, diffusion and distance, disable or remove them.
 - Bulb lights attenuate over distance. Sun lights have a constant direction over the surface and independent Softness and Diffusion.
 - Sun patterns: Blinds, Window, Light Strip, Foliage, Palm, Branches, Checkerboard, Polka Dots, horizontal/diagonal lines, Grid, Weave, Noise and Crosshatch. These are independently generated procedural masks, warped by estimated depth. Pattern coordinates account for image aspect ratio when rotating.
