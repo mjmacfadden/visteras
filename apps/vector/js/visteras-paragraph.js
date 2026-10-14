@@ -1,3 +1,4 @@
+import {parseRuns,serializeRuns} from './visteras-text-runs.js';
 /**
  * Visteras Vector — Illustrator-style Character (Leading, Tracking) and Paragraph
  * (Align incl. Justify, Space Before/After) controls for text.
@@ -124,11 +125,23 @@ export function writeParagraph(el, patch) {
 
 /** Apply to many text elements as one undo step. */
 export function applyParagraph(sc, elements, patch, label = 'Paragraph') {
+  const win=typeof window!=='undefined'?window:undefined;
+  if('tracking' in patch && win?.__visterasTextEditing?.hasRange()) {
+    const style=win.__visterasTextEditing.rangeStyle();
+    win.__visterasTextEditing.apply({letterSpacing:trackingToLetterSpacing(patch.tracking,style.fontSize||24)});
+    return elements;
+  }
   const { BatchCommand, ChangeElementCommand } = sc?.history || {};
   const batch = BatchCommand ? new BatchCommand(label) : null;
   const changed = [];
   for (const el of (elements || []).filter(isText)) {
-    const before = writeParagraph(el, patch);
+    const oldRuns=el.getAttribute('data-text-runs');
+    let before = writeParagraph(el, patch);
+    if('tracking' in patch && oldRuns){
+      const cleared=parseRuns(oldRuns,(el.getAttribute('data-text-content')??el.textContent).length).map(r=>{const style={...r.style};delete style.letterSpacing;return {...r,style};});
+      el.setAttribute('data-text-runs',serializeRuns(cleared));
+      if(el.getAttribute('data-text-runs')!==oldRuns){before ||= {};before['data-text-runs']=oldRuns;}
+    }
     if (!before) continue;
     if (batch && ChangeElementCommand) batch.addSubCommand(new ChangeElementCommand(el, before));
     changed.push(el);
@@ -247,6 +260,7 @@ export function mountParagraph(editor) {
     for (const [k, input] of Object.entries(inputs)) {
       if (document.activeElement === input) continue;
       if (k === 'leading') { input.value = v.leading ?? ''; input.placeholder = `Auto (${v.autoLeading})`; }
+      else if(k==='tracking'&&window.__visterasTextEditing?.hasRange()){const style=window.__visterasTextEditing.rangeStyle();input.value=style.letterSpacing==null||style.fontSize==null?'':letterSpacingToTracking(style.letterSpacing,style.fontSize);}
       else input.value = v[k];
     }
     for (const k of ['leading', 'spaceBefore', 'spaceAfter', 'indentLeft', 'indentRight', 'indentFirst']) {
@@ -260,10 +274,13 @@ export function mountParagraph(editor) {
   const schedule = () => { if (!queued) { queued = true; setTimeout(() => { queued = false; render(); }, 0); } };
 
   for (const [k, input] of Object.entries(inputs)) {
+    let pending;
+    input.addEventListener('input',()=>{pending=input.value;});
     input.addEventListener('change', () => {
       const label = { leading: 'Leading', tracking: 'Tracking', spaceBefore: 'Space Before', spaceAfter: 'Space After', indentLeft: 'Left Indent', indentRight: 'Right Indent', indentFirst: 'First-Line Indent' }[k];
       const els = k === 'tracking' ? texts() : texts().filter(isAreaText);
-      applyParagraph(sc, els, { [k]: input.value }, label);
+      const value=pending??input.value;pending=undefined;
+      applyParagraph(sc, els, { [k]: value }, label);
       render();
     });
     input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') input.blur(); });

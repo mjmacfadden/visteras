@@ -143,3 +143,23 @@ test('Lasso Q is plain Q on Mac and Windows; command chords are never captured',
    assert.equal(formatBrowserSafeShortcut({key:'Q',mac}),'Q');
  }
 });
+
+for (const [key,code,shifted] of [['.','Period','>'],[',','Comma','<']]) {
+ for (const mac of [true,false]) test(`type size ${code} physical chord on ${mac?'Mac':'Windows'}`,()=>{
+  const spec={key,shift:true,meta:true,mac};
+  assert.equal(eventMatchesChord({key:shifted,code,metaKey:mac,ctrlKey:!mac,shiftKey:true,altKey:false},spec),true);
+  assert.equal(eventMatchesChord({key,code,metaKey:mac,ctrlKey:!mac,shiftKey:false},spec),false);
+  assert.equal(isBrowserReservedChord(spec),false);
+  assert.equal(eventMatchesChord({key:shifted,code,metaKey:mac,ctrlKey:!mac,shiftKey:true,altKey:true},{...spec,alt:true}),true);
+  assert.equal(formatBrowserSafeShortcut(spec),mac?`⇧⌘${key}`:`Shift+Ctrl+${key}`);
+ });
+}
+
+for(const mac of [true,false])test(`typing tracking and baseline chords on ${mac?'Mac':'Windows'}`,()=>{
+ for(const key of ['ArrowLeft','ArrowRight'])for(const primary of [false,true]){
+  const spec={key,mac,alt:true,meta:primary&&mac,ctrl:primary&&!mac};
+  assert.equal(eventMatchesChord({key,code:key,altKey:true,metaKey:primary&&mac,ctrlKey:primary&&!mac},spec),true);
+  assert.equal(isBrowserReservedChord(spec),false);
+ }
+ for(const key of ['ArrowUp','ArrowDown'])assert.equal(eventMatchesChord({key,code:key,altKey:true,shiftKey:true},{key,alt:true,shift:true,mac}),true);
+});

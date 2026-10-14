@@ -1810,6 +1810,8 @@ const VCS_TAB_STORAGE = 'visteras-vector-color-tab';
 function readCanvasPaint(svgEditor, which) {
   const sc = svgEditor?.svgCanvas;
   const fallbackHex = which === 'fill' ? '#cccccc' : '#000000';
+  const range=typeof window!=='undefined'&&which==='fill'?window.__visterasTextEditing?.rangeStyle?.():null;
+  if(range){if(range.fill==null)return {none:false,hex:fallbackHex,mixed:true,fromSelection:true};const paint=parseCssPaint(range.fill);if(paint)return {...paint,fromSelection:true};}
 
   try {
     const targets = flattenPaintTargets(resolvePaintTargets(sc), { attr: which });
@@ -2858,8 +2860,10 @@ function mountPickerModal(ctrl) {
       hex: st.workingHex,
       none: st.workingNone,
       target: st.activeTarget,
+      restoreRange: !edit && st.activeTarget==='fill' ? window.__visterasTextEditing?.captureRange?.() : null,
     };
-    draftHex = edit?.color || st.workingHex;
+    const rangeFill=!edit&&st.activeTarget==='fill'?window.__visterasTextEditing?.rangeStyle()?.fill:null;
+    draftHex = edit?.color || normalizeHex(rangeFill) || st.workingHex;
     draftNone = edit ? false : st.workingNone;
     modal.querySelector('#vcs_picker_none').hidden = !!edit;
     refreshDraft();
@@ -2876,6 +2880,7 @@ function mountPickerModal(ctrl) {
       ctrl.setActiveTarget(openSnapshot.target, { syncColor: false });
       if (openSnapshot.none) ctrl.setWorkingColor('none', { recordRecent: false });
       else ctrl.setWorkingColor(openSnapshot.hex, { recordRecent: false });
+      openSnapshot.restoreRange?.();
     } catch (err) {
       console.warn('[visteras-color-system] cancel restore failed', err);
     } finally {

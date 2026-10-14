@@ -1,6 +1,6 @@
 import { bindNumericField } from './visteras-numeric-field.js';
 import {convertToPixels,convertFromPixels} from './visteras-document-presets.js';
-import {layoutParagraph} from './visteras-text-editing.js';
+import {layoutParagraph} from './visteras-text-editing.js?v=character-styling-1';
 export function referencePosition(bounds, reference) {
   return {x:bounds.x+bounds.width*reference.x,y:bounds.y+bounds.height*reference.y};
 }

@@ -71,7 +71,7 @@ test('Paragraph: text layout reads the attributes; wiring and observers', () => 
   assert.match(src, /new MutationObserver\(bind\)\.observe\(root,\{childList:true\}\)/, 'reflow after open (svgcontent replaced)');
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /mountParagraph\(svgEditor\);/);
-  assert.match(html, /import \{ mountTextEditing \} from '\.\/js\/visteras-text-editing\.js';/, 'single module instance (type-on-path imports it too)');
+  assert.match(html, /import \{ mountTextEditing \} from '\.\/js\/visteras-text-editing\.js\?v=character-styling-1';/, 'single module instance (type-on-path imports it too)');
 });
 
 test('Paragraph: newlines in data-text-content are encoded for save', () => {

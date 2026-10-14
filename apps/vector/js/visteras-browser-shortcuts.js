@@ -115,7 +115,8 @@ export function eventMatchesChord(e, spec = {}) {
   const key = String(want.key);
   const codeDigit = isDigitKey(key) ? `Digit${key}` : null;
   const codeNumpad = isDigitKey(key) ? `Numpad${key}` : null;
-  const keyOk = /^[a-z]$/i.test(key)
+  const punctuationCode={'.':'Period',',':'Comma'}[key];
+  const keyOk = punctuationCode ? (e.code?e.code===punctuationCode:e.key===key) : /^[a-z]$/i.test(key)
     ? (e.code ? e.code === `Key${key.toUpperCase()}` : String(e.key).toUpperCase() === key.toUpperCase())
     : e.key === key || e.key === key.toUpperCase() || (codeDigit && e.code === codeDigit) || (codeNumpad && e.code === codeNumpad);
   if (!keyOk) return false;
@@ -125,8 +126,8 @@ export function eventMatchesChord(e, spec = {}) {
     if (!!want.ctrl !== !!e.ctrlKey) return false;
   } else {
     // Windows: require Ctrl; ignore meta
-    if (want.ctrl && !e.ctrlKey) return false;
-    if (!want.ctrl && e.ctrlKey) return false;
+    const primary=want.ctrl||want.meta;
+    if (!!primary !== !!e.ctrlKey) return false;
   }
   if (!!want.alt !== !!e.altKey) return false;
   if (!!want.shift !== !!e.shiftKey) return false;

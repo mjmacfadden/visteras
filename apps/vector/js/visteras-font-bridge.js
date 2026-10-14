@@ -1490,7 +1490,7 @@ export function mountVisterasFontPicker({ svgEditor } = {}) {
 			if (typeof sc.setFontWeight === 'function') {
 				sc.setFontWeight(cssWeight);
 			}
-			if (applyToSelected) {
+			if (applyToSelected && !window.__visterasTextEditing?.hasRange()) {
 				const sel = sc.getSelectedElements ? sc.getSelectedElements().filter(Boolean) : [];
 				for (const el of sel) {
 					const targetText = el.tagName === 'text' ? el : (el.querySelector ? el.querySelector('text') : null);
@@ -1558,38 +1558,40 @@ export function mountVisterasFontPicker({ svgEditor } = {}) {
 			}
 
 			if (textEl) {
+				const range = window.__visterasTextEditing?.rangeStyle();
 				// 1. Family
-				const ff = textEl.getAttribute('font-family');
+				const ff = range?range.fontFamily:textEl.getAttribute('font-family');
+				if(range&&!ff)setFamilyLabel('');
 				if (ff) {
 					const clean = ff.split(',')[0].replace(/['"]/g, '').trim();
-					if (clean && clean !== currentFamily) {
+					if (clean) {
 						currentFamily = clean;
 						setFamilyLabel(clean);
 					}
 				}
 
 				// 2. Weight
-				const fw = textEl.getAttribute('font-weight') || '400';
+				const fw = range?range.fontWeight:textEl.getAttribute('font-weight') || '400';
 				const weights = getFontWeightList(currentFamily);
 				const matched = weights.find(w => styleNameToCssWeight(w) === styleNameToCssWeight(fw))
 					|| formatWeightLabel(fw)
 					|| 'Regular (400)';
-				setWeightLabel(matched);
+				setWeightLabel(range&&fw==null?'':matched);
 				const boldBtn = document.getElementById('tool_bold');
 				if (boldBtn) boldBtn.pressed = (fw === 'bold' || parseInt(fw, 10) >= 700);
 
 				// 3. Size
-				const fs = textEl.getAttribute('font-size');
+				const fs = range?range.fontSize:textEl.getAttribute('font-size');
 				const sizeInput = document.getElementById('font_size');
-				if (sizeInput && fs) {
-					sizeInput.value = Math.round(parseFloat(fs) || 24);
+				if (sizeInput && document.activeElement!==sizeInput) {
+					sizeInput.value = range&&fs==null?'':Math.round(parseFloat(fs)||24);
 				}
 
 				// 4. Letter Spacing (Kerning)
-				const ls = textEl.getAttribute('letter-spacing');
+				const ls = range?range.letterSpacing:textEl.getAttribute('letter-spacing');
 				const lsInput = document.getElementById('tool_letter_spacing');
 				if (lsInput) {
-					lsInput.value = (ls != null && ls !== '') ? (parseFloat(ls) || 0) : 0;
+					lsInput.value = range&&ls==null?'':(ls != null && ls !== '') ? (parseFloat(ls) || 0) : 0;
 				}
 
 				// 5. Word Spacing
@@ -1600,7 +1602,9 @@ export function mountVisterasFontPicker({ svgEditor } = {}) {
 				}
 
 				// 6. Style (Italic)
-				const fstyle = textEl.getAttribute('font-style');
+				const baselineInput=document.getElementById('character_baseline_shift');
+				if(baselineInput)baselineInput.value=range?(range.baselineShift??''):(Number(textEl.getAttribute('data-baseline-shift'))||0);
+				const fstyle = range?range.fontStyle:textEl.getAttribute('font-style');
 				const italicBtn = document.getElementById('tool_italic');
 				if (italicBtn) italicBtn.pressed = (fstyle === 'italic');
 
