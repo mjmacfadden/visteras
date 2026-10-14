@@ -319,6 +319,11 @@ const menuDefinition = [
 				target: 'image/raw_develop.raw_develop'
 			},
 			{
+				name: 'Relight',
+				ellipsis: true,
+				target: 'image/relight.relight'
+			},
+			{
 				name: 'Color Corrections',
 				ellipsis: true,
 				target: 'image/color_corrections.color_corrections'

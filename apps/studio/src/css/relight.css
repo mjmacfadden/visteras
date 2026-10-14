@@ -1,0 +1,24 @@
+.studio-relight{color:var(--text-color)}
+.relight-workspace{gap:0}
+.relight-stage{display:flex;align-items:center;justify-content:center;min-height:0;background:var(--area-background-color);padding:16px;overflow:hidden}
+.relight-image{position:relative;max-width:100%;line-height:0;flex:none}
+.relight-image canvas{max-width:100%;max-height:100%;width:100%;height:100%;background:repeating-conic-gradient(#444 0% 25%,#555 0% 50%) 0/16px 16px}
+.relight-handles{position:absolute;inset:0;z-index:3;pointer-events:none;touch-action:none}
+.relight-handles button{pointer-events:auto;position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border:2px solid var(--visteras-accent);border-radius:50%;background:var(--area-background-color);color:var(--text-color);cursor:move;line-height:1;box-shadow:0 0 0 1px #fff}
+.relight-handles button[aria-pressed=true]{background:var(--visteras-accent);color:var(--visteras-on-accent)}
+.relight-toolbar,.relight-list{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.relight-list button[aria-pressed=true]{border-color:var(--visteras-accent);background:var(--visteras-accent);color:var(--visteras-on-accent)}
+.relight-controls label,.relight-global{display:block;margin:8px 0}
+.relight-controls select{width:100%;margin-top:6px}
+.relight-slider{display:flex;gap:8px;margin-top:6px;align-items:center}
+.relight-slider input[type=range]{min-width:0;flex:1}
+.relight-slider input[type=number]{width:60px;max-width:60px}
+.studio-relight input{accent-color:var(--visteras-accent)}
+.relight-global input{display:block;width:100%}
+.relight-hint{font-size:12px;color:var(--text-color-muted);line-height:1.5}
+.relight-status{font-size:12px;min-height:20px;margin-bottom:0}
+
+
+.studio-relight .raw-develop__sidebar{padding:12px}
+.studio-relight .relight-status{padding:8px 12px;background:var(--header-background-color);flex:none}
+.studio-relight .raw-develop__btn--primary{background:var(--visteras-accent);border-color:var(--visteras-accent)}
