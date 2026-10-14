@@ -64,3 +64,11 @@ test('Failed writes release the lock for retry without changing document state',
  await assert.rejects(queue.run(doc,()=>{throw new Error('Disk unavailable');}),/Disk unavailable/);
  assert.deepEqual(doc,before);assert.equal(await queue.run(doc,()=>true),true);
 });
+
+test('VVD snapshot retains canonical content, run metadata and rendered spans',()=>{
+ const svg='<svg xmlns="http://www.w3.org/2000/svg"><text data-text-content="Hello World" data-text-runs="[{&quot;start&quot;:6,&quot;end&quot;:11,&quot;style&quot;:{&quot;fill&quot;:&quot;red&quot;}}]"><tspan>Hello </tspan><tspan fill="red" font-size="40">World</tspan></text></svg>';
+ const saved=captureDocumentSnapshot(document('mixed'),{svg,width:200,height:100,unit:'px'});
+ const reopened=JSON.parse(serializeDocumentSnapshot(saved,'Mixed text',null));
+ assert.equal(reopened.svg,svg);
+ assert.equal(reopened.version,1);
+});

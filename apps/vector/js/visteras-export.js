@@ -1,3 +1,5 @@
+import {outlineStyledTextForPdf} from './visteras-text-pdf.js';
+import {convertTextToOutlines} from './visteras-text-outlines.js?v=character-styling-1';
 import { clipExportToRect, stripExportGuides } from './visteras-export-clip.js';
 import { buildArtboardPdf, pdfPageSpecs } from './visteras-export-pdf.js?v=pdf-1';
 import {artboardsForExport,artboardUnion} from './visteras-artboard-model.js';
@@ -176,7 +178,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
    * Standalone SVG for a scope. background = CSS colour or null. Returns
    * { svg, rect, w, h, warnings, fonts }.
    */
-  async function buildExportSvg({ board, scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false, symbols = 'keep' } = {}) {
+  async function buildExportSvg({ board, scope = 'artboard', padding = 0, background = null, scale = 1, fonts = true, images = true, dropImages = false, forSvgFile = false, symbols = 'keep', outlineStyledText = false } = {}) {
     const warnings = [];
     const rect = scopeRect(scope, padding, board);
     if (!rect) throw new Error(scope === 'selection' ? 'Nothing is selected' : 'There is nothing to export');
@@ -185,6 +187,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const clone = window.__visterasSymbolEdit?.cloneCommitted?.() || sc.getSvgContent().cloneNode(true);
     for(const path of clone.querySelectorAll('[data-visteras-corners]'))path.removeAttribute('data-visteras-corners');
     stripExportGuides(clone);
+    if(outlineStyledText)await outlineStyledTextForPdf(clone,sc.getSvgContent(),convertTextToOutlines);
     // Symbols: always drop unused panel symbols; Expand turns instances into groups
     // (PDF always expands so svg2pdf never depends on <use>/overflow handling).
     if (symbols === 'expand') expandInstancesInClone(clone); else pruneUnusedPanelSymbols(clone);
@@ -291,7 +294,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
       // Single-artboard path (multi-page uses renderPdfDocument).
       const board = job.board || artboard();
       const bg = artboardColor(board);
-      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true, symbols: 'expand' });
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, outlineStyledText: true, forSvgFile: true, symbols: 'expand' });
       warnings.push(...built.warnings);
       const out = await buildArtboardPdf({
         title: title(),
@@ -363,7 +366,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const pages = [];
     for (const board of list) {
       const bg = artboardColor(board);
-      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, forSvgFile: true, symbols: 'expand' });
+      const built = await buildExportSvg({ board, scope: 'artboard', background: bg, fonts: true, images: true, outlineStyledText: true, forSvgFile: true, symbols: 'expand' });
       warnings.push(...built.warnings);
       pages.push({ svg: built.svg, width: board.width, height: board.height, name: board.name });
     }
