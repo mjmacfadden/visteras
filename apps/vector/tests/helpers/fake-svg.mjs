@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 export const loadModule = async (rel) => {
   const source = fs.readFileSync(new URL(`../../js/${rel}`, import.meta.url), 'utf8');
-  return import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+  return import(new URL(`../../js/${rel}`, import.meta.url));
 };
 export function fakeEl(tag = 'rect', attrs = {}) {
   const el = {

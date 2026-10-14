@@ -1,5 +1,5 @@
 import { installPathTextBounds } from './visteras-path-text-bounds.js';
-import { beginTextEdit } from './visteras-text-editing.js';
+import { beginTextEdit } from './visteras-text-editing.js?v=character-styling-1';
 /**
  * Visteras Vector — Type on Path (Illustrator-style textPath).
  * Client-side: binds editable <text>/<textPath> to a selected path or shape.

@@ -456,7 +456,7 @@ test('HTML: index.html wires ⇧⌘O shortcut, menu item, and mounts mountTextOu
   assert.match(html, /window\.__visterasTextOutlines\?\.createOutlines\(\);/, '⇧⌘O executes createOutlines()');
 
   // 2. Module import and mount
-  assert.match(html, /import\s+\{\s*mountTextOutlines\s*\}\s+from\s+'\.\/js\/visteras-text-outlines\.js\?v=outlines-1';/);
+  assert.match(html, /import\s+\{\s*mountTextOutlines\s*\}\s+from\s+'\.\/js\/visteras-text-outlines\.js\?v=character-styling-1';/);
   assert.match(html, /mountTextOutlines\(svgEditor\);/);
 
   // 3. OpenType library in head
@@ -628,3 +628,36 @@ test('Create Outlines: system font bridge is used when available', async () => {
   assert.ok(font, 'Local system font should be parsed and loaded');
 });
 
+
+test('Create Outlines: character runs keep different sizes, fills and continuous advances',async()=>{
+ const {newScope}=await import('./helpers/paper-node.mjs');
+ const paper=newScope();
+ const text=createMockElement('text',{'font-size':'10','font-family':'Roboto',x:'10',y:'70','data-text-runs':'[]'});
+ text.style.fontSize='20px';
+ text.append(createMockElement('tspan',{'data-text-start':'0',textContent:'H',fill:'#000000'}),createMockElement('tspan',{'data-text-start':'1',textContent:'H','font-size':'40',fill:'#ff0000',dy:'-2'}));
+ const group=await T.convertTextToOutlines(text,{createElementNS:(_,tag)=>createMockElement(tag)});
+ assert.equal(group.children.length,2);
+ const paths=group.children.map(el=>new paper.CompoundPath(el.getAttribute('d')));
+ assert.ok(Math.abs(paths[1].bounds.height/paths[0].bounds.height-2)<.02);
+ assert.ok(paths[1].bounds.left>paths[0].bounds.right);
+ assert.equal(group.children[1].getAttribute('fill'),'#ff0000');
+ paths.forEach(p=>p.remove());paper.project.clear();
+});
+test('Create Outlines: run-specific font weights produce their own glyph paths',async()=>{
+ const text=createMockElement('text',{'font-size':'30','font-family':'Roboto',x:'0',y:'60','data-text-runs':'[]'});
+ text.append(createMockElement('tspan',{textContent:'H','font-weight':'400'}),createMockElement('tspan',{textContent:'H','font-weight':'700'}));
+ const group=await T.convertTextToOutlines(text,{createElementNS:(_,tag)=>createMockElement(tag)});
+ assert.equal(group.children.length,2);
+ assert.notEqual(group.children[0].getAttribute('d'),group.children[1].getAttribute('d'));
+});
+
+test('PDF outlines only the styled export clone using live glyph metrics',async()=>{
+ const {outlineStyledTextForPdf}=await import('../js/visteras-text-pdf.js');
+ const live={id:'mixed'},path={id:'path'},outlined={tagName:'g'};
+ let replacement,converted;
+ const mixed={id:'mixed',querySelector:()=>null,replaceWith:node=>{replacement=node;}};
+ const pathText={id:'path',querySelector:()=>({}),replaceWith:()=>assert.fail('textPath must stay unchanged')};
+ const clone={ownerDocument:{},querySelectorAll:()=>[mixed,pathText]};
+ const count=await outlineStyledTextForPdf(clone,{querySelectorAll:()=>[live,path]},async(source,doc)=>{converted=source;assert.equal(doc,clone.ownerDocument);return outlined;});
+ assert.equal(count,1);assert.equal(converted,live);assert.equal(replacement,outlined);assert.deepEqual(live,{id:'mixed'});
+});

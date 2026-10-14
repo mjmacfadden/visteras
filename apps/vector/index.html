@@ -23,7 +23,7 @@
   <link href="./css/visteras-theme.css?v=layers-parity-6" rel="stylesheet" media="all">
   <link href="./lib/visteras-ui/ui.css?v=ui-3" rel="stylesheet" media="all">
   <link href="./css/visteras-document-shell.css?v=guides-2" rel="stylesheet" media="all">
-  <link href="./css/visteras-color-system.css?v=paint-resolver-1" rel="stylesheet" media="all">
+  <link href="./css/visteras-color-system.css?v=character-picker-2" rel="stylesheet" media="all">
   <link href="./css/visteras-svgedit-hygiene.css?v=hygiene-1" rel="stylesheet" media="all">
   <link href="./css/visteras-image-trace.css?v=trace-dialog-2" rel="stylesheet" media="all">
   <link href="./css/visteras-panel-dock.css?v=dock-5" rel="stylesheet" media="all">
@@ -310,7 +310,7 @@
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-6';
     import { mountOffsetPath } from './js/visteras-offset-path.js?v=smart-fields-1';
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
-    import { mountTransformPanel } from './js/visteras-transform-panel.js?v=smart-fields-2';
+    import { mountTransformPanel } from './js/visteras-transform-panel.js?v=character-styling-1';
     import { mountAlignKey } from './js/visteras-align-key-ui.js?v=align-key-1';
     import { mountScaleStrokes } from './js/visteras-scale-strokes.js';
     import { mountBlendModes } from './js/visteras-blend-modes.js?v=gravit-1';
@@ -319,7 +319,7 @@
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-2';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-2';
-    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=layers-parity-6';
+    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=character-styling-1';
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=smart-fields-1';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
     import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
@@ -327,7 +327,7 @@
     import { mountContextMenu } from './js/visteras-context-menu.js?v=cmenu-3';
     import { mountShortcutLabels } from './js/visteras-shortcut-labels-apply.js?v=2';
     import { mountMenus } from './js/visteras-menus.js?v=effect-menu-1';
-    import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=gravit-5';
+    import { mountParagraph, mountParagraphPanel } from './js/visteras-paragraph.js?v=character-styling-1';
     import { mountWindowMenu } from './js/visteras-window-menu.js?v=gravit-5';
     import { mountIconButtons } from './js/visteras-icon-buttons.js?v=gravit-5';
     import { mountTypeCursor } from './js/visteras-type-cursor.js?v=gravit-5';
@@ -340,9 +340,9 @@
     import { mountGradient } from './js/visteras-gradient.js?v=gradient-2';
     import { mountSelectionTools } from './js/visteras-selection.js?v=lasso-4';
     import { normalizeEditablePath } from './js/visteras-path-geometry.js';
-    import { mountVisterasFontPicker } from './js/visteras-font-bridge.js';
-    import { mountTextEditing } from './js/visteras-text-editing.js';
-    import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js?v=path-text-transforms-1';
+    import { mountVisterasFontPicker } from './js/visteras-font-bridge.js?v=character-styling-1';
+    import { mountTextEditing } from './js/visteras-text-editing.js?v=character-styling-1';
+    import { mountVisterasTypeOnPath } from './js/visteras-type-on-path.js?v=character-styling-1';
     import { mountVisterasReferenceImages, placeReferenceImage, openFilePicker } from './js/visteras-reference-images.js?v=merge-trace-1';
     window.placeReferenceImage = placeReferenceImage;
     window.openFilePicker = openFilePicker;
@@ -354,12 +354,12 @@
     import { showToast } from './lib/visteras-ui/toast.js';
     import { initLogoEasterEgg } from './lib/visteras-ui/easter-egg.js';
     import { openFile, saveFile, safeFileName, fileBaseFromName, findBySameHandle, downloadBlob } from './lib/visteras-ui/file.js?v=open-1';
-    import { mountExport } from './js/visteras-export.js?v=live-corners-1';
-    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=gradient-2';
+    import { mountExport } from './js/visteras-export.js?v=character-styling-1';
+    import { mountVisterasColorSystem } from './js/visteras-color-system.js?v=character-styling-1';
     import { mountShapePicker } from './js/visteras-shape-picker.js?v=tool-flyouts-2';
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-5';
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-3';
-    import { mountTextOutlines } from './js/visteras-text-outlines.js?v=outlines-1';
+    import { mountTextOutlines } from './js/visteras-text-outlines.js?v=character-styling-1';
     import { mountExpand } from './js/visteras-expand.js?v=expand-1';
     import { mountGuides } from './js/visteras-guides.js?v=guide-anchors-1';
 
@@ -1764,6 +1764,8 @@
                 <div class="prop_row">
                   <div id="slot_letter_spacing" style="flex:1;"></div>
                   <div id="slot_word_spacing" style="flex:1;"></div>
+                </div>
+                <div class="prop_row"><label for="character_baseline_shift">Baseline Shift</label><input id="character_baseline_shift" type="number" step="2" value="0" aria-label="Baseline Shift" style="width:70px;">
                 </div>
               </div>
             </div>

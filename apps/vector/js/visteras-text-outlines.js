@@ -547,8 +547,10 @@ export async function convertTextToOutlines(textElem, doc = document) {
   const family = (rawFamily || 'Roboto').replace(/['"]/g, '').split(',')[0].trim();
   const weight = getElementFontWeight(textElem);
   const style = getElementFontStyle(textElem);
-  const fontSize = parseFloat(textElem.getAttribute('font-size')) || 24;
-  const letterSpacing = parseFloat(textElem.getAttribute('letter-spacing')) || 0;
+  let computed;
+  try { computed = getComputedStyle(textElem); } catch { /* Node / detached SVG */ }
+  const fontSize = parseFloat(textElem.style?.fontSize || textElem.getAttribute('font-size') || computed?.fontSize) || 24;
+  const letterSpacing = parseFloat(textElem.style?.letterSpacing || textElem.getAttribute('letter-spacing') || computed?.letterSpacing) || 0;
   const defaultAnchor = textElem.getAttribute('text-anchor') || 'start';
 
   const font = await loadFont(family, weight, style);
@@ -582,6 +584,56 @@ export async function convertTextToOutlines(textElem, doc = document) {
       } catch (_) {
         // Fallback to normal layout if character metrics fail
       }
+    }
+  }
+
+  if (!textPathElem && textElem.hasAttribute('data-text-runs')) {
+    // The live SVG metrics include kerning, tracking, wrapping, and dy baseline
+    // compensation. Detached documents use the same per-span OpenType fallback.
+    const spans=[...(textElem.querySelectorAll?.('tspan')||[])];
+    const prepared=[];
+    for(const span of spans) {
+      const spanFamily=(span.getAttribute('font-family')||family).replace(/['"]/g,'').split(',')[0].trim();
+      const spanWeight=span.getAttribute('font-weight')||weight;
+      const spanStyle=span.getAttribute('font-style')||style;
+      const spanFont=await loadFont(spanFamily,spanWeight,spanStyle);
+      if(!spanFont)return null;
+      const size=parseFloat(span.getAttribute('font-size'))||fontSize;
+      const spacing=parseFloat(span.getAttribute('letter-spacing')??letterSpacing)||0;
+      const wordSpacing=parseFloat(span.getAttribute('word-spacing')||textElem.getAttribute('word-spacing'))||0;
+      const value=span.textContent||'';
+      const advance=spanFont.getAdvanceWidth(value,size)+value.length*spacing+(value.match(/ /g)||[]).length*wordSpacing;
+      prepared.push({span,font:spanFont,size,spacing,wordSpacing,value,advance,fill:span.getAttribute('fill')||textElem.getAttribute('fill')||textElem.style?.fill||'#000000'});
+    }
+    let cursorX=parseFloat(textElem.getAttribute('x'))||0;
+    let cursorY=parseFloat(textElem.getAttribute('y'))||0, index=0;
+    if(!textElem.hasAttribute('data-text-width')) {
+      const width=prepared.reduce((n,p)=>n+p.advance,0);
+      if(defaultAnchor==='middle')cursorX-=width/2;
+      else if(defaultAnchor==='end')cursorX-=width;
+    }
+    for(const part of prepared) {
+      if(part.span.hasAttribute('x'))cursorX=parseFloat(part.span.getAttribute('x'))||0;
+      if(part.span.hasAttribute('y'))cursorY=parseFloat(part.span.getAttribute('y'))||0;
+      cursorY+=parseFloat(part.span.getAttribute('dy'))||0;
+      let localX=cursorX,localIndex=0;
+      for(const char of part.value) {
+        const glyph=part.font.charToGlyph(char);
+        if(!/\s|\u200b/.test(char)) {
+          let x=localX,y=cursorY,angle=0;
+          if(textElem.isConnected && typeof textElem.getStartPositionOfChar==='function') {
+            try{const pt=textElem.getStartPositionOfChar(index);x=pt.x;y=pt.y;angle=(textElem.getRotationOfChar?.(index)||0)*Math.PI/180;}catch{/* detached SVG: OpenType advance */}
+          }
+          const path=glyph.getPath(0,0,part.size);
+          allGlyphs.push({char,d:transformCommands(path.commands,Math.cos(angle),Math.sin(angle),x,y),x,y,fill:part.fill});
+        }
+        const next=part.font.charToGlyph(part.value.slice(localIndex+char.length)[0]||'');
+        localX+=glyph.advanceWidth/part.font.unitsPerEm*part.size+part.spacing+(char===' '?part.wordSpacing:0);
+        // Browser metrics are authoritative; fallback keeps pair kerning too.
+        if(next)localX+=part.font.getKerningValue(glyph,next)/part.font.unitsPerEm*part.size;
+        index+=char.length;localIndex+=char.length;
+      }
+      cursorX+=part.advance;
     }
   }
 
@@ -675,7 +727,7 @@ export async function convertTextToOutlines(textElem, doc = document) {
   const fillAttr = textElem.getAttribute('fill') || textElem.style?.fill || group.getAttribute('fill') || '';
   const hasGradient = fillAttr.includes('url(') || textElem.hasAttribute('data-gradient') || group.hasAttribute('data-gradient');
 
-  if (hasGradient) {
+  if (hasGradient && !allGlyphs.some(g=>g.fill && g.fill!==fillAttr)) {
     // When text has a gradient, all glyphs must be in a single compound path
     // so gradientUnits="objectBoundingBox" spans across the ENTIRE text continuously.
     const compoundPath = doc.createElementNS(NS, 'path');
@@ -693,6 +745,7 @@ export async function convertTextToOutlines(textElem, doc = document) {
       path.setAttribute('d', cleanD);
       path.setAttribute('class', 'visteras-glyph');
       path.setAttribute('data-char', item.char);
+      if(item.fill)path.setAttribute('fill',item.fill);
       if (origId) {
         path.setAttribute('id', `${origId}_${glyphIdx++}`);
       }

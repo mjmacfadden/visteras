@@ -1,3 +1,6 @@
+import {parseRuns,serializeRuns,applyStyleToRange,styleAtRange,runsToSpans,updateRunsForText} from './visteras-text-runs.js';
+import {eventMatchesChord} from './visteras-browser-shortcuts.js';
+import {detectMac} from './visteras-shortcut-label.js';
 const NS = 'http://www.w3.org/2000/svg';
 let editing = null;
 let selectionId = 0;
@@ -225,6 +228,64 @@ export function drawOversetMarker(parent, point) {
   return g;
 }
 
+const RUN_ATTRS = {fontFamily:'font-family',fontWeight:'font-weight',fontStyle:'font-style',fontSize:'font-size',fill:'fill',letterSpacing:'letter-spacing',baselineShift:'data-baseline-shift'};
+export function baseCharacterStyle(text) {
+  const css = getComputedStyle(text);
+  return {fontFamily:css.fontFamily,fontWeight:css.fontWeight,fontStyle:css.fontStyle,fontSize:parseFloat(css.fontSize)||24,fill:css.fill,letterSpacing:parseFloat(css.letterSpacing)||0,baselineShift:Number(text.getAttribute('data-baseline-shift'))||0};
+}
+function applySpanStyle(span,style) {
+  for(const [key,attr] of Object.entries(RUN_ATTRS))if(key!=='baselineShift' && style[key]!=null)span.setAttribute(attr,style[key]);
+}
+export function renderPointText(text,value,runs=parseRuns(text.getAttribute('data-text-runs'),value.length)) {
+  if(text.querySelector('textPath'))return;
+  if(text.getAttribute('data-text-content')!==value)text.setAttribute('data-text-content',value);
+  if(!runs.length&&!Number(text.getAttribute('data-baseline-shift'))){if(text.textContent!==value || text.children.length)text.replaceChildren(document.createTextNode(value));return;}
+  const fragment=document.createDocumentFragment();let previous=0;
+  for(const part of runsToSpans(value,runs)) {
+    const span=document.createElementNS(NS,'tspan');applySpanStyle(span,part.style);
+    span.setAttribute('data-text-start',part.start);
+    const shift=Number(part.style.baselineShift??text.getAttribute('data-baseline-shift'))||0;
+    if(shift!==previous)span.setAttribute('dy',previous-shift);
+    previous=shift;span.textContent=part.text;fragment.append(span);
+  }
+  if(text.innerHTML!==[...fragment.childNodes].map(n=>n.outerHTML).join(''))text.replaceChildren(fragment);
+}
+/** Styled area layout retains paragraph alignment/indents and measures at UTF-16 offsets. */
+export function computeStyledParagraphLayout(opts,runs,base,measure) {
+  const value=opts.value||'', out=[];let cursor=0,baseline=0,previousSize=0;
+  const para={...opts};
+  while(cursor<value.length) {
+    const paragraphEnd=value.indexOf('\n',cursor), end=paragraphEnd<0?value.length:paragraphEnd;
+    const start=cursor,firstLine=start===0||value[start-1]==='\n';
+    const inset=(Number(opts.indentLeft)||0)+(firstLine?Math.max(0,Number(opts.indentFirst)||0):Math.max(0,-Number(opts.indentFirst)||0));
+    const width=Math.max(8,opts.width-inset-(Number(opts.indentRight)||0));
+    let stop=start,widthUsed=0,lastSpace=-1;
+    while(stop<end) {
+      const point=value.codePointAt(stop),count=point>65535?2:1;
+      const style=styleAtRange(runs,stop,stop+count,base);
+      const advance=measure(value.slice(stop,stop+count),style)+(Number(style.letterSpacing)||0);
+      if(stop>start&&widthUsed+advance>width)break;
+      widthUsed+=advance;stop+=count;if(/\s/.test(value[stop-1]))lastSpace=stop;
+    }
+    if(stop<end&&lastSpace>start)stop=lastSpace;
+    const parts=runsToSpans(value,runs,[{start,end:stop}]);
+    const size=Math.max(parts.length?0:base.fontSize,...parts.map(p=>Number(p.style.fontSize??base.fontSize)||24));
+    baseline=out.length?baseline+(Number(opts.leading)>0?Number(opts.leading):Math.max(size,previousSize)*AUTO_LEADING)+(firstLine?(Number(opts.spaceBefore)||0)+(Number(opts.spaceAfter)||0):0):size;
+    previousSize=size;
+    if(baseline+size*.2>opts.height){out.overset=true;break;}
+    const lineText=value.slice(start,stop);
+    const measured=parts.reduce((n,p)=>n+measure(p.text,{...base,...p.style})+p.text.length*(Number(p.style.letterSpacing??base.letterSpacing)||0),0);
+    const last=stop===end,justify=opts.align in JUSTIFY_LAST&&(!last||opts.align==='justify-all');
+    const align=justify?'left':JUSTIFY_LAST[opts.align]||opts.align||'left';
+    const spaces=(lineText.trimEnd().match(/ /g)||[]).length;
+    const wordSpacing=justify&&spaces?Math.max(0,(width-measured)/spaces):null;
+    const lineX=(opts.x||0)+inset+(align==='center'?(width-measured)/2:align==='right'?width-measured:0);
+    out.push({text:lineText,start,x:lineX,y:(opts.y||0)+baseline,wordSpacing,size});
+    cursor=stop===end?end+1:stop;
+  }
+  out.overset=!!out.overset;return out;
+}
+
 export function layoutParagraph(text) {
   const width = Number(text.getAttribute('data-text-width'));
   if (!width) return;
@@ -238,21 +299,31 @@ export function layoutParagraph(text) {
   const spacing = parseFloat(style.letterSpacing) || 0;
   const measure = s => ctx.measureText(s).width + Math.max(0,s.length-1)*spacing;
   const para = readParagraphAttrs(text);
-  const lines = computeParagraphLayout({
+  const runs=parseRuns(text.getAttribute('data-text-runs'),value.length);
+  const options={
     value, width, height: Number(text.getAttribute('data-text-height')), size,
     x: Number(text.getAttribute('x')) || 0, y: Number(text.getAttribute('y')) || 0, ...para,
-  }, measure);
+  };
+  const base=baseCharacterStyle(text);
+  const measureRun=(str,p)=>{ctx.font=`${p.fontStyle} ${p.fontWeight} ${p.fontSize}px ${p.fontFamily}`;return ctx.measureText(str).width;};
+  const lines=runs.length?computeStyledParagraphLayout(options,runs,base,measureRun):computeParagraphLayout(options,measure);
   if (lines.overset) oversetTexts.add(text); else oversetTexts.delete(text);
   const fragment = document.createDocumentFragment();
   for (const line of lines) {
-    const span = document.createElementNS(NS, 'tspan');
-    span.setAttribute('x', line.x);
-    span.setAttribute('y', line.y);
-    span.setAttribute('data-text-start', line.start);
-    if (line.wordSpacing != null) span.setAttribute('word-spacing', line.wordSpacing);
-    if (line.anchor) span.setAttribute('text-anchor', line.anchor);
-    span.textContent = line.text || '\u200b';
-    fragment.append(span);
+    const parts=runs.length?runsToSpans(value,runs,[{start:line.start,end:line.start+line.text.length}]):[{start:line.start,text:line.text,style:{}}];
+    if(!parts.length)parts.push({start:line.start,text:'',style:{}});
+    let advance=0;
+    for(const part of parts){
+      const span = document.createElementNS(NS, 'tspan');
+      applySpanStyle(span,part.style);
+      span.setAttribute('x', line.x+advance);
+      span.setAttribute('y', line.y-(Number(part.style.baselineShift??base.baselineShift)||0));
+      span.setAttribute('data-text-start', part.start);
+      if (line.wordSpacing != null) span.setAttribute('word-spacing', line.wordSpacing);
+      if (line.anchor) span.setAttribute('text-anchor', line.anchor);
+      span.textContent = part.text || '\u200b';fragment.append(span);
+      if(runs.length)advance+=measureRun(part.text,{...base,...part.style})+part.text.length*(Number(part.style.letterSpacing??base.letterSpacing)||0)+(line.wordSpacing||0)*(part.text.match(/ /g)||[]).length;
+    }
   }
   if (text.innerHTML !== [...fragment.childNodes].map(n => n.outerHTML).join('')) text.replaceChildren(fragment);
   // Re-assert fixed frame (guards against any SVG-Edit / observer side effect).
@@ -266,7 +337,10 @@ export function beginTextEdit(editor, text) {
   const sc = editor.svgCanvas, tp = text.querySelector('textPath');
   const paragraph = text.hasAttribute('data-text-width');
   const target = tp || text;
-  const original = paragraph ? text.getAttribute('data-text-content') || '' : target.textContent;
+  const original = tp?target.textContent:text.getAttribute('data-text-content') ?? text.textContent;
+  const snapshot=text.cloneNode(true);
+  let previousValue=original;
+  let runs=tp?[]:parseRuns(text.getAttribute('data-text-runs'),original.length);
   // Native text editing must not rewrite a textPath into ordinary point text.
   sc.setMode('select');
   sc.clearSelection(); sc.addToSelection([text], true);
@@ -285,8 +359,16 @@ export function beginTextEdit(editor, text) {
   document.body.setAttribute('data-vector-editing-text','');
   const render = () => {
     if (done || !text.isConnected) return;
-    if (paragraph) { text.setAttribute('data-text-content', input.value); layoutParagraph(text); }
-    else target.textContent = input.value;
+    if(!tp){
+      if(previousValue!==input.value)runs=updateRunsForText(runs,previousValue,input.value);
+      previousValue=input.value;
+      if(runs.length||text.hasAttribute('data-text-runs'))text.setAttribute('data-text-runs',serializeRuns(runs,input.value.length));
+      if (paragraph) { text.setAttribute('data-text-content', input.value); layoutParagraph(text); }
+      else renderPointText(text,input.value,runs);
+    }else target.textContent=input.value;
+    window.__visterasSyncTypography?.(text);
+    window.__visterasParagraph?.render();
+    if(document.activeElement===input)window.__visterasColorSystem?.refresh();
     overlay.replaceChildren(); chars.length = 0;
     const matrix = text.getScreenCTM();
     if (!matrix) return;
@@ -302,7 +384,7 @@ export function beginTextEdit(editor, text) {
         drawOversetMarker(overlay, p);
       }
     }
-    const sourceIndices = paragraph ? [...text.children].flatMap(span => [...span.textContent].map((_,i)=>Number(span.getAttribute('data-text-start'))+i)) : [...input.value].map((_,i)=>i);
+    const sourceIndices = !tp && text.children.length ? [...text.children].flatMap(span => span.textContent.split('').map((_,i)=>Number(span.getAttribute('data-text-start'))+i)) : input.value.split('').map((_,i)=>i);
     const start = input.selectionStart, end = input.selectionEnd;
     const count = text.getNumberOfChars();
     const selectedQuads = [];
@@ -317,7 +399,10 @@ export function beginTextEdit(editor, text) {
         const a = text.getStartPositionOfChar(i), b = text.getEndPositionOfChar(i);
         chars.push({index:sourceIndices[i],a:new DOMPoint(a.x,a.y).matrixTransform(matrix), b:new DOMPoint(b.x,b.y).matrixTransform(matrix)});
         if (sourceIndices[i] >= start && sourceIndices[i] < end) {
-          selectedQuads.push(selectionQuad(a, b, text.getRotationOfChar(i), ascent, descent));
+          const character=tp?baseCharacterStyle(text):styleAtRange(runs,sourceIndices[i],sourceIndices[i]+1,baseCharacterStyle(text));
+          measure.font=`${character.fontStyle} ${character.fontWeight} ${character.fontSize}px ${character.fontFamily}`;
+          const m=measure.measureText('Hg');
+          selectedQuads.push(selectionQuad(a,b,text.getRotationOfChar(i),m.fontBoundingBoxAscent||character.fontSize*.8,m.fontBoundingBoxDescent||character.fontSize*.2));
         }
         if (start === end && (sourceIndices[i] === start || start === input.value.length && i === count-1)) {
           const pos = start === input.value.length ? b : a;
@@ -381,9 +466,15 @@ export function beginTextEdit(editor, text) {
       sc.clearSelection(); sc.addToSelection([text],true); sc.deleteSelectedElements();
       return;
     }
-    if (final !== original) {
-      const attrs = paragraph ? {'data-text-content':original} : {'#text':original};
-      sc.addCommandToHistory(new sc.history.ChangeElementCommand(target, attrs, 'Edit text'));
+    if (text.outerHTML!==snapshot.outerHTML) {
+      const after=text.cloneNode(true);
+      const restore=node=>{for(const a of [...text.attributes])text.removeAttribute(a.name);for(const a of [...node.attributes])text.setAttribute(a.name,a.value);text.replaceChildren(...[...node.childNodes].map(n=>n.cloneNode(true)));};
+      class TextEditCommand extends sc.history.ChangeElementCommand {
+        type(){return 'TextEditCommand';}
+        apply(handler){super.apply(handler);restore(after);}
+        unapply(handler){super.unapply(handler);restore(snapshot);}
+      }
+      sc.addCommandToHistory(new TextEditCommand(text,{},'Edit text'));
     }
     sc.call('changed',[text]);
     sc.selectorManager?.requestSelector(text)?.showGrips(true);
@@ -399,9 +490,11 @@ export function beginTextEdit(editor, text) {
     return index;
   };
   const down = e => {
+    if(e.target.closest?.('#properties_panel, .dock-panel, .visteras-dock, #vdock, #vdock_flyout, #vcs_colors_block, #tools_left_swatches, #visteras_font_picker, #visteras_font_weight_picker, [role=dialog], dialog, .visteras-dialog, #color_picker, #vcs_picker_modal, #vcs_picker_overlay, .visteras-panel, .visteras-dock-panel'))return;
     if (!text.contains(e.target) && e.target !== text) { commit(); return; }
     e.preventDefault(); e.stopImmediatePropagation();
     dragStart = nearest(e);
+    if(e.detail===2){let start=dragStart,end=dragStart;while(start>0&&!/\s/.test(input.value[start-1]))start--;while(end<input.value.length&&!/\s/.test(input.value[end]))end++;input.focus({preventScroll:true});input.setSelectionRange(start,end);dragStart=null;render();return;}
     input.focus({preventScroll:true}); input.setSelectionRange(dragStart,dragStart); render();
   };
   const move = e => {
@@ -410,7 +503,29 @@ export function beginTextEdit(editor, text) {
     const end=nearest(e); input.setSelectionRange(Math.min(dragStart,end),Math.max(dragStart,end)); render();
   };
   const up = () => {dragStart=null;};
+  const rangeStyle=()=>styleAtRange(runs,input.selectionStart,input.selectionEnd,baseCharacterStyle(text));
+  const apply=patch=>{
+    if(tp || input.selectionStart===input.selectionEnd)return false;
+    if(typeof patch==='function'){
+      const spans=runsToSpans(input.value,runs,[{start:input.selectionStart,end:input.selectionEnd}]);
+      const base=baseCharacterStyle(text);
+      for(const span of spans)runs=applyStyleToRange(runs,span.start,span.end,patch({...base,...span.style}),input.value.length);
+    }else runs=applyStyleToRange(runs,input.selectionStart,input.selectionEnd,patch,input.value.length);
+    text.setAttribute('data-text-runs',serializeRuns(runs,input.value.length));render();sc.call('changed',[text]);
+    input.focus({preventScroll:true});return true;
+  };
   const key = e => {
+    if(e.target!==input)return;
+    const mac=detectMac();
+    const match=spec=>eventMatchesChord(e,{...spec,mac,meta:!!spec.meta&&mac,ctrl:!!spec.meta&&!mac});
+    let patch;
+    for(const [code,keyName,direction] of [['Period','.',1],['Comma',',',-1]]) {
+      if(e.code===code&&(match({meta:true,shift:true,key:keyName})||match({meta:true,alt:true,shift:true,key:keyName})))patch=style=>({fontSize:Math.max(1,Number(style.fontSize)+direction*(e.altKey?10:2))});
+    }
+    for(const [keyName,direction] of [['ArrowLeft',-1],['ArrowRight',1]])if(match({alt:true,key:keyName})||match({meta:true,alt:true,key:keyName}))patch=style=>({letterSpacing:(Number(style.letterSpacing)||0)+direction*.02*(Number(style.fontSize)||24)*(e.metaKey||e.ctrlKey?5:1)});
+    for(const [keyName,direction] of [['ArrowUp',1],['ArrowDown',-1]])if(match({alt:true,shift:true,key:keyName}))patch=style=>({baselineShift:(Number(style.baselineShift)||0)+direction*2});
+    if(patch){e.preventDefault();e.stopImmediatePropagation();if(!apply(patch)){const value=patch(baseCharacterStyle(text));if(value.fontSize)sc.setFontSize(value.fontSize);}return;}
+
     if(e.key==='Escape' || (e.key==='Enter' && (!paragraph || e.metaKey || e.ctrlKey))) {
       e.preventDefault(); e.stopImmediatePropagation(); commit(); return;
     }
@@ -422,12 +537,48 @@ export function beginTextEdit(editor, text) {
   window.addEventListener('keydown',key,true); window.addEventListener('resize',render); window.addEventListener('blur',commit);
   document.addEventListener('selectionchange',render);
   window.__visterasIsTypingDirectly=true;
-  editing={text,commit};
+  editing={text,commit,input,apply,rangeStyle,render,restoreRuns:()=>{runs=parseRuns(text.getAttribute('data-text-runs'),input.value.length);render();sc.call('changed',[text]);input.focus({preventScroll:true});},hasRange:()=>!tp&&input.selectionStart!==input.selectionEnd};
   input.focus({preventScroll:true}); input.select(); render();
+}
+
+/** One shared route for range paint/attributes and whole-object override clearing. */
+function mountCharacterAttributes(sc) {
+  const route=(attr,value,elements,noUndo,original)=>{
+    const key=Object.keys(RUN_ATTRS).find(k=>RUN_ATTRS[k]===attr);
+    if(!key)return original(attr,value,elements);
+    if(editing?.hasRange()&&editing.apply({[key]:value}))return;
+    const selected=(elements||sc.getSelectedElements()).filter(Boolean);
+    const texts=selected.filter(el=>el.tagName==='text'&&!el.querySelector('textPath'));
+    const batch=new sc.history.BatchCommand('Character attributes');
+    for(const text of texts){
+      const old={[attr]:text.getAttribute(attr),style:text.getAttribute('style'),'data-text-runs':text.getAttribute('data-text-runs')};
+      const content=text.getAttribute('data-text-content')??text.textContent;
+      const runs=parseRuns(old['data-text-runs'],content.length).map(r=>{const style={...r.style};delete style[key];return {...r,style};});
+      if(old['data-text-runs'])text.setAttribute('data-text-runs',serializeRuns(runs,content.length));
+      if(value==null||value==='')text.removeAttribute(attr);else text.setAttribute(attr,value);text.style.removeProperty(attr);
+      if(text.hasAttribute('data-text-width'))layoutParagraph(text);else renderPointText(text,content,runs);
+      if(!noUndo && editing?.text!==text)batch.addSubCommand(new sc.history.ChangeElementCommand(text,old,'Character attributes'));
+    }
+    if(!batch.isEmpty())sc.addCommandToHistory(batch);
+    const rest=selected.filter(el=>!texts.includes(el));if(rest.length)original(attr,value,rest);
+    if(editing){editing.render();editing.input.focus({preventScroll:true});}
+    sc.call('changed',selected);
+  };
+  for(const name of ['changeSelectedAttribute','changeSelectedAttributeNoUndo']){
+    const original=sc[name].bind(sc);sc[name]=(attr,value,elements)=>route(attr,value,elements,name.endsWith('NoUndo'),original);
+  }
+  // Core setters filter against the object's base value; a range may differ even
+  // when that base already matches. They also clear child font weight eagerly.
+  for(const [name,key,convert] of [['setFontFamily','fontFamily',v=>v],['setFontWeight','fontWeight',v=>v],['setFontSize','fontSize',Number],['setLetterSpacing','letterSpacing',Number],['setBold','fontWeight',v=>v?'700':'400'],['setItalic','fontStyle',v=>v?'italic':'normal']]){
+    const original=sc[name]?.bind(sc);if(!original)continue;
+    sc[name]=value=>{if(editing?.hasRange())return editing.apply({[key]:convert(value)});if(!sc.getSelectedElements().some(el=>el?.tagName==='text'&&!el.querySelector('textPath')))return original(value);sc.setCurText?.({fontFamily:'font_family',fontWeight:'font_weight',fontSize:'font_size',letterSpacing:'letter_spacing'}[key]||key,convert(value));return sc.changeSelectedAttribute(RUN_ATTRS[key],convert(value));};
+  }
+  document.addEventListener('change',e=>{if(e.target.id==='character_baseline_shift')sc.changeSelectedAttribute('data-baseline-shift',Number(e.target.value)||0);});
 }
 
 export function mountTextEditing(editor) {
   const sc=editor.svgCanvas;
+  mountCharacterAttributes(sc);
   let gesture;
   const css=document.createElement('style');
   css.textContent='body[data-vector-editing-text] #selectorParentGroup {visibility:hidden}';
@@ -503,9 +654,9 @@ export function mountTextEditing(editor) {
   const call2=sc.call;
   sc.call=function(event,...args){const result=call2.call(this,event,...args);if(event==='selected'||event==='changed'||event==='zoomed')queueOverset();return result;};
   document.getElementById('workarea')?.addEventListener('scroll',queueOverset,{passive:true});
-  const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);queueOverset();};
+  const relayout=()=>{for(const text of sc.getSvgContent().querySelectorAll('text[data-text-width]'))layoutParagraph(text);for(const text of sc.getSvgContent().querySelectorAll('text[data-text-runs]:not([data-text-width])'))if(!text.querySelector('textPath'))renderPointText(text,text.getAttribute('data-text-content')??text.textContent);queueOverset();};
   window.__visterasLayoutParagraph = layoutParagraph;
-  window.__visterasTextEditing = { layoutParagraph, computeParagraphLayout, isOverset, oversetPort };
+  window.__visterasTextEditing = { layoutParagraph, computeParagraphLayout, isOverset, oversetPort, rangeStyle:()=>editing?.hasRange()?editing.rangeStyle():null, apply:patch=>editing?.apply(patch)||false, hasRange:()=>!!editing?.hasRange(), captureRange:()=>{if(!editing?.hasRange())return null;const session=editing,raw=session.text.getAttribute('data-text-runs');return ()=>{if(editing!==session)return;session.text.setAttribute('data-text-runs',raw||'[]');session.restoreRuns();};} };
   const observer=new MutationObserver(relayout);
   // Opening a file (setSvgString) replaces #svgcontent: re-attach and reflow.
   let bound=null;
