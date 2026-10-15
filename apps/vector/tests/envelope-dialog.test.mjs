@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas, serialize } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-8';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-8';
-import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts } from '../js/visteras-envelope-dialogs.js?v=envelope-8';
-import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-8';
-import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-8';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-8';
+import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-9';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-9';
+import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-9';
+import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-9';
+import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-9';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-9';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -84,7 +84,7 @@ test('dialog wiring: title, controls, Preview default off, undo blocked, rAF pre
   assert.match(env, /id="sec_envelope"|sec\.id = 'sec_envelope'/);
   assert.match(env, /label: 'Envelope Warp'/);
   const html = read('../index.html');
-  assert.match(html, /visteras-envelope\.js\?v=envelope-8/);
+  assert.match(html, /visteras-envelope\.js\?v=envelope-9/);
 });
 
 test('AT14 image envelope: Clipping Mask → clipPath, Transparency → alpha (injected fake canvas)', async () => {
@@ -124,4 +124,30 @@ test('AT14 image envelope: Clipping Mask → clipPath, Transparency → alpha (i
   drawMesh(ctx, {}, buildMesh(10, 10, [1, 0, 0, 1, 0, 0], [0, 0, 10, 10], { style: 'arc', dir: 'h', bend: 50, dh: 0, dv: 0 }, 2), 1, { antiAlias: false });
   assert.equal(calls.filter((c) => c[0] === 'clip').length, calls.filter((c) => c[0] === 'drawImage').length);
   assert.ok(!calls.some((c) => c[0] === 'fillRect'));
+});
+
+test('fix 2: Warp Options opens beside the selection, never over it, and stays inside the window', () => {
+  const view = { width: 1400, height: 900 }, box = { w: 380, h: 330 };
+  const overlaps = (r, p) => p.x < r.x + r.width && p.x + box.w > r.x && p.y < r.y + r.height && p.y + box.h > r.y;
+  const inView = (p) => p.x >= 0 && p.y >= 0 && p.x + box.w <= view.width && p.y + box.h <= view.height;
+  for (const r of [{ x: 300, y: 300, width: 400, height: 200 }, { x: 900, y: 100, width: 450, height: 200 }, { x: 100, y: 50, width: 1200, height: 300 }, { x: 0, y: 0, width: 300, height: 850 }]) {
+    const p = placeBeside(r, box, view);
+    assert.ok(!overlaps(r, p), `covers ${JSON.stringify(r)} at ${JSON.stringify(p)}`); assert.ok(inView(p));
+  }
+  const right = placeBeside({ x: 300, y: 300, width: 400, height: 200 }, box, view);
+  assert.ok(right.x >= 724, 'prefers the right-hand side like Illustrator');
+  assert.ok(inView(placeBeside(null, box, view)));
+  // Whole window covered: falls back to a corner, still inside the window.
+  assert.ok(inView(placeBeside({ x: 0, y: 0, width: 1400, height: 900 }, box, view)));
+});
+
+test('fix 2: the modal layer is transparent (canvas never dimmed) and the title bar is the drag handle', () => {
+  const src = fs.readFileSync(new URL('../js/visteras-envelope-dialogs.js', import.meta.url), 'utf8');
+  assert.match(src, /\.venv_modal\.visteras_modal_overlay\{[^}]*background:transparent/);
+  assert.doesNotMatch(src, /rgba\(0,0,0,\.45\)/);
+  assert.match(src, /visteras_modal_header\{cursor:move/);
+  assert.equal((src.match(/  mountMovable\(overlay, sc, /g) || []).length, 2, 'both envelope dialogs are movable');
+  assert.match(src, /range\.oninput = /, 'slider previews on input, not just change');
+  assert.match(src, /num\.oninput = /, 'typed numbers preview while typing');
+  assert.match(src, /const schedule = \(\) => \{ if \(closed \|\| !preview\.checked\) return;/, 'a late change after Cancel cannot re-create the preview');
 });

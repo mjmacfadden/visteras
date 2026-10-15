@@ -1,10 +1,10 @@
-import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-8';
-import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-8';
-import { openWarpOptions, openEnvelopeOptions, clampPercent } from './visteras-envelope-dialogs.js?v=envelope-8';
-import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-8';
-import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-8';
-import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-8';
-import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-8';
+import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-9';
+import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-9';
+import { openWarpOptions, openEnvelopeOptions, clampPercent } from './visteras-envelope-dialogs.js?v=envelope-9';
+import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-9';
+import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-9';
+import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-9';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-9';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });

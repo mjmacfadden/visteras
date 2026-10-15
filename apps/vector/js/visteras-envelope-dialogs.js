@@ -3,9 +3,9 @@
  * Session memory only: last-used values live in this module (no storage of any kind).
  * Pure helpers (clamp, icons, session) are DOM-free so they can be unit-tested.
  */
-import { normalizeParams, normalizeOpts, readEnvelope } from './visteras-envelope-core.js?v=envelope-8';
-import { STYLE_LABELS, warpPoint } from './visteras-envelope-warp.js?v=envelope-8';
-import { makeEnvelope, revertPreviewEnvelope, updateEnvelope, restoreEnvelopeAttrs } from './visteras-envelope-model.js?v=envelope-8';
+import { normalizeParams, normalizeOpts, readEnvelope } from './visteras-envelope-core.js?v=envelope-9';
+import { STYLE_LABELS, warpPoint } from './visteras-envelope-warp.js?v=envelope-9';
+import { makeEnvelope, revertPreviewEnvelope, updateEnvelope, restoreEnvelopeAttrs } from './visteras-envelope-model.js?v=envelope-9';
 
 export const DEFAULT_WARP = Object.freeze({ style: 'arc', dir: 'h', bend: 50, dh: 0, dv: 0 });
 export const DEFAULT_OPTS = Object.freeze(normalizeOpts({}));
@@ -36,7 +36,10 @@ export function styleIcon(style, size = 22) {
 }
 
 const STYLE_CSS = `
-.venv_modal.visteras_modal_overlay{position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+.venv_modal.visteras_modal_overlay{position:fixed;inset:0;z-index:5000;background:transparent}
+.venv_modal .visteras_modal{position:absolute;margin:0}
+.venv_modal .visteras_modal_header{cursor:move;user-select:none;touch-action:none}
+.venv_modal .visteras_modal_header button{cursor:pointer}
 .venv_modal .visteras_modal{background:#2a2a2a;border:1px solid #444;border-radius:6px;color:#ddd;box-shadow:0 12px 40px rgba(0,0,0,.5)}
 .venv_modal .visteras_modal_header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #3a3a3a;font-size:13px}
 .venv_modal .vui-btn{background:#3a3a3a;border:1px solid #555;color:#ddd;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px}
@@ -72,6 +75,61 @@ const pctRow = (id, label, value) => `
  *  - envelope: an existing envelope (Reset with Warp; prefilled with its params).
  * Preview changes are never recorded in history; OK commits one undo step; Cancel restores verbatim.
  */
+/**
+ * Illustrator-style placement: a transparent modal layer (the canvas stays fully visible and
+ * Preview is seen live), the box opened beside the selection rather than over it, and moved
+ * by dragging its title bar. Positions are clamped so the title bar can never leave the window.
+ */
+export function placeBeside(rect, box, view, gap = 24) {
+  const { w, h } = box, W = view.width, H = view.height, m = 8;
+  const clampY = (y) => Math.min(Math.max(m, y), Math.max(m, H - h - m));
+  const clampX = (x) => Math.min(Math.max(m, x), Math.max(m, W - w - m));
+  if (!rect) return { x: clampX(W - w - 40), y: clampY(80) };
+  const cy = clampY(rect.y + rect.height / 2 - h / 2), cx = clampX(rect.x + rect.width / 2 - w / 2);
+  const tries = [
+    [rect.x + rect.width + gap, cy, rect.x + rect.width + gap + w <= W - m],
+    [rect.x - gap - w, cy, rect.x - gap - w >= m],
+    [cx, rect.y + rect.height + gap, rect.y + rect.height + gap + h <= H - m],
+    [cx, rect.y - gap - h, rect.y - gap - h >= m],
+  ];
+  const hit = tries.find((t) => t[2]);
+  // No free side: pick the window corner farthest from the selection's centre.
+  if (!hit) { const left = rect.x + rect.width / 2 > W / 2; return { x: left ? m : clampX(W - w - m), y: clampY(m + 40) }; }
+  return { x: clampX(hit[0]), y: clampY(hit[1]) };
+}
+
+function selectionScreenRect(sc, targets, envelope) {
+  const els = (envelope ? [envelope] : (targets || sc.getSelectedElems?.() || [])).filter(Boolean);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const el of els) {
+    let r; try { r = el.getBoundingClientRect(); } catch { r = null; }
+    if (!r || (!r.width && !r.height)) continue;
+    x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom);
+  }
+  return Number.isFinite(x0) ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : null;
+}
+
+export function mountMovable(overlay, sc, { targets = null, envelope = null } = {}) {
+  const box = overlay.querySelector('.visteras_modal'), header = overlay.querySelector('.visteras_modal_header');
+  const view = () => ({ width: window.innerWidth, height: window.innerHeight });
+  const moveTo = (x, y) => {
+    const { width: W, height: H } = view(), w = box.offsetWidth, hh = header.offsetHeight || 32;
+    x = Math.min(Math.max(-(w - 60), x), W - 60); y = Math.min(Math.max(0, y), H - hh);
+    box.style.left = `${Math.round(x)}px`; box.style.top = `${Math.round(y)}px`;
+  };
+  const p = placeBeside(selectionScreenRect(sc, targets, envelope), { w: box.offsetWidth, h: box.offsetHeight }, view());
+  moveTo(p.x, p.y);
+  header.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    e.preventDefault();
+    const sx = e.clientX - box.offsetLeft, sy = e.clientY - box.offsetTop;
+    try { header.setPointerCapture(e.pointerId); } catch { /* synthetic */ }
+    const move = (ev) => moveTo(ev.clientX - sx, ev.clientY - sy);
+    const up = () => { header.removeEventListener('pointermove', move); header.removeEventListener('pointerup', up); header.removeEventListener('pointercancel', up); };
+    header.addEventListener('pointermove', move); header.addEventListener('pointerup', up); header.addEventListener('pointercancel', up);
+  });
+}
+
 export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   if (document.getElementById('visteras_warp_dialog')) return null;
   ensureStyle();
@@ -118,7 +176,8 @@ export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   };
 
   // Preview plumbing (Simplify pattern: originals captured once, restored verbatim).
-  let previewGroup = null, snapshot = null, frame = 0;
+  // `closed`: removing a focused number field fires a late 'change' — it must not re-create a preview.
+  let previewGroup = null, snapshot = null, frame = 0, closed = false;
   const revert = () => {
     cancelAnimationFrame(frame); frame = 0;
     if (previewGroup) { revertPreviewEnvelope(previewGroup); previewGroup = null; sc.clearSelection?.(); sc.addToSelection?.(targets, true); }
@@ -126,14 +185,14 @@ export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   };
   const renderPreview = () => {
     frame = 0;
-    if (!preview.checked) return;
+    if (closed || !preview.checked) return;
     if (reset) {
       const snap = updateEnvelope(sc, envelope, { params: state }, { history: false });
       if (!snapshot) snapshot = snap;
     } else if (previewGroup) updateEnvelope(sc, previewGroup, { params: state }, { history: false });
     else previewGroup = makeEnvelope(sc, targets, state, getSessionOpts(), { history: false });
   };
-  const schedule = () => { if (!preview.checked) return; if (!frame) frame = requestAnimationFrame(renderPreview); };
+  const schedule = () => { if (closed || !preview.checked) return; if (!frame) frame = requestAnimationFrame(renderPreview); };
   const set = (patch) => { state = normalizeParams({ ...state, ...patch }); syncFields(); schedule(); };
 
   // Style dropdown (button + listbox, keyboard: arrows / Enter / Escape).
@@ -155,6 +214,8 @@ export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   preview.onchange = () => { if (preview.checked) { document.body.style.cursor = 'progress'; renderPreview(); requestAnimationFrame(() => { document.body.style.cursor = ''; }); } else revert(); };
 
   const close = (commit) => {
+    if (closed) return null;
+    closed = true;
     revert();
     window.removeEventListener('keydown', onKey, true);
     overlay.remove();
@@ -189,6 +250,7 @@ export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   window.addEventListener('keydown', onKey, true);
   document.body.appendChild(overlay);
   syncFields();
+  mountMovable(overlay, sc, { targets, envelope });
   styleBtn.focus();
   return { overlay, close, get state() { return { ...state }; } };
 }
@@ -266,6 +328,7 @@ export function openEnvelopeOptions(sc, { envelope = null } = {}) {
   $('#venvo_close').onclick = () => close(false);
   window.addEventListener('keydown', onKey, true);
   document.body.appendChild(overlay);
+  mountMovable(overlay, sc, { envelope: envelope || null, targets: envelope ? null : (sc.getSelectedElems?.() || []) });
   sync();
   $('#venvo_aa').focus();
   return { overlay, close, get state() { return { ...state }; } };
