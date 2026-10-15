@@ -1,4 +1,4 @@
-import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-3';
+import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-5';
 /**
  * Visteras Vector — Select ▸ Inverse / Select ▸ Same ▸ …
  *

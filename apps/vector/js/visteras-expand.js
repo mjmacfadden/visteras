@@ -11,6 +11,9 @@
 
 import { convertTextToOutlines, isTextElement } from './visteras-text-outlines.js';
 import { executeOutlineStroke } from './visteras-offset-path.js';
+import { isEnvelope } from './visteras-envelope-core.js?v=envelope-5';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-5';
+import { expandEnvelope } from './visteras-envelope-actions.js?v=envelope-5';
 
 const SHAPE_TAGS = new Set(['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 
@@ -45,6 +48,7 @@ export function canExpand(elements) {
   if (!elements || !elements.length) return false;
   for (const el of elements) {
     if (!el || el.nodeType !== 1) continue;
+    if (isEnvelope(el)) return true; // Envelope Distort ▸ Expand, same result
     if (isTextElement(el) || el.querySelector?.('text')) return true;
     if (hasVisibleStroke(el) || el.querySelector?.('[stroke]:not([stroke="none"])')) return true;
     if (isPrimitiveShape(el) || el.querySelector?.('rect, circle, ellipse, line, polyline, polygon')) return true;
@@ -63,7 +67,7 @@ export async function expandSelection(editor, targetElements = null) {
   const sc = editor?.svgCanvas;
   if (!sc) return null;
 
-  const elements = (targetElements || (sc.getSelectedElements ? sc.getSelectedElements() : [])).filter(Boolean);
+  let elements = (targetElements || (sc.getSelectedElements ? sc.getSelectedElements() : [])).filter(Boolean);
   if (!elements.length) {
     if (typeof window !== 'undefined' && window.showToast) {
       window.showToast('Please select one or more objects to expand.', 'info');
@@ -77,6 +81,15 @@ export async function expandSelection(editor, targetElements = null) {
 
   const finalExpanded = [];
   const handled = new Set();
+
+  // 0. Envelopes expand to their rendered output (same as Envelope Distort ▸ Expand), joining this batch.
+  for (const env of elements.filter(isEnvelope)) {
+    await ensureEnvelopeRendered(sc, env);
+    if (!env.isConnected) continue;
+    const g = expandEnvelope(sc, env, { batch });
+    if (g) finalExpanded.push(g);
+  }
+  elements = elements.filter((el) => !isEnvelope(el));
 
   // 1. First Pass: Expand all live <text> elements into vector paths
   const textElements = [];
@@ -152,7 +165,7 @@ export async function expandSelection(editor, targetElements = null) {
   }
 
   // If batch had sub-commands, commit it
-  if (batch && batch.sub_commands && batch.sub_commands.length > 0) {
+  if (batch && ((batch.sub_commands?.length || 0) + (batch.stack?.length || 0) > 0 || (typeof batch.isEmpty === 'function' && !batch.isEmpty()))) {
     sc.addCommandToHistory(batch);
   }
 

@@ -1,6 +1,6 @@
-import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-3';
-import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-3';
-import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-3';
+import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-5';
+import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-5';
+import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-5';
 const NS='http://www.w3.org/2000/svg';
 export const WRAP=`${ENV}-wrap`;
 let deps={};
@@ -29,6 +29,12 @@ const pending=new WeakMap();
  * a render whose source/params changed meanwhile is discarded. Output is derived data, so the swap is
  * not an undo step (the step that changed params/source is).
  */
+/** Resolve once `-out` is the full (async) render for the current hash. */
+export function ensureEnvelopeRendered(sc, el) {
+  const hash=envelopeHash(el);
+  if(typeof sc.getSvgContent!=='function' || el.getAttribute(`${ENV}-rendered`)===hash) return Promise.resolve(false);
+  return renderEnvelope(sc,el,{force:true});
+}
 export function renderEnvelope(sc, el, {force=false}={}) {
   const data=readEnvelope(el); if(!data?.src) return Promise.resolve(false);
   const hash=envelopeHash(el);
@@ -66,7 +72,7 @@ export function refreshEnvelope(sc, el) {
 
 const ctmTo=(node)=>{ try { const m=node.getScreenCTM?.(); return m?[m.a,m.b,m.c,m.d,m.e,m.f]:null; } catch { return null; } };
 /** Geometric bounds of elements in `parent`'s user space (document axis). */
-function boundsIn(sc, parent, elements) {
+export function boundsIn(sc, parent, elements) {
   const pm=ctmTo(parent), pinv=pm&&invert(pm);
   let box=null;
   if(pinv) {

@@ -32,6 +32,11 @@ export function canvas(elements) {
   apply(){this.newParent.insertBefore(this.el,this.newNext);}
   unapply(){this.parent.insertBefore(this.el,this.next);}
  };
+ sc.history.RemoveElementCommand=class {
+  constructor(el,next,parent){Object.assign(this,{el,next,parent});}
+  apply(){this.el.remove();}
+  unapply(){this.parent.insertBefore(this.el,this.next && this.next.parentNode===this.parent?this.next:null);}
+ };
  return sc;
 }
 export const serialize=node=>JSON.stringify([node.localName,node.attrs,node.children.map(serialize)]);

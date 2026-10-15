@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-3';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-5';
 import {
   warpPoint, parsePathData, shapeToPathData, warpTolerance, warpSegments, segmentsToPathData,
   segmentsBounds, countNodes, parseTransform, multiply, applyMatrix, invert, transformSegments,
-} from '../js/visteras-envelope-warp.js?v=envelope-3';
-import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-3';
-import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-3';
+} from '../js/visteras-envelope-warp.js?v=envelope-5';
+import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-5';
+import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-5';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-3';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-3';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-5';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-5';
 
 const BOX = [100, 50, 200, 100];
 const GRID = [];

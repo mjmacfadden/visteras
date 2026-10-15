@@ -2,7 +2,7 @@
  * Envelope raster (image) mesh warp. Pure maths; the canvas is injected so the
  * module never touches the DOM at import time.
  */
-import { warpPoint, applyMatrix } from './visteras-envelope-warp.js?v=envelope-3';
+import { warpPoint, applyMatrix } from './visteras-envelope-warp.js?v=envelope-5';
 
 /** Mesh resolution from Fidelity: 8 … 64 cells per side. */
 export const meshSize = (fidelity) => Math.round(8 + 56 * Math.max(0, Math.min(100, Number(fidelity) || 0)) / 100);

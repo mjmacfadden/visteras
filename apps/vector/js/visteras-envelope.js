@@ -1,8 +1,10 @@
-import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-3';
-import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-4';
-import { openWarpOptions, clampPercent, ensureStyle } from './visteras-envelope-dialogs.js?v=envelope-4';
-import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-3';
-import { readEnvelope } from './visteras-envelope-core.js?v=envelope-3';
+import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-5';
+import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-5';
+import { openWarpOptions, clampPercent, ensureStyle } from './visteras-envelope-dialogs.js?v=envelope-5';
+import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-5';
+import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-5';
+import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-5';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-5';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });
@@ -54,7 +56,7 @@ export function envelopeBlockReason(sel) {
  * Control-bar controls for a selected envelope (Properties panel section "Envelope").
  * Every change is one undo step ('Envelope Warp').
  */
-export function mountEnvelopePanel(sc, { openOptions, editContents } = {}) {
+export function mountEnvelopePanel(sc, { openOptions, editContents, getCurrent } = {}) {
   const host = document.getElementById('properties_content');
   if (!host || document.getElementById('sec_envelope')) return null;
   const sec = document.createElement('div');
@@ -71,7 +73,7 @@ export function mountEnvelopePanel(sc, { openOptions, editContents } = {}) {
   const anchor = document.getElementById('sec_appearance');
   if (anchor) anchor.before(sec); else host.appendChild(sec);
   const $ = (id) => sec.querySelector(id);
-  const current = () => { const sel = selected(sc); return sel.length === 1 && envelope(sel[0]) ? sel[0] : null; };
+  const current = getCurrent || (() => { const sel = selected(sc); return sel.length === 1 && envelope(sel[0]) ? sel[0] : null; });
   const commit = (patch) => { const el = current(); if (el) updateEnvelope(sc, el, { params: patch }, { label: 'Envelope Warp' }); };
   $('#venv_style').onchange = (e) => commit({ style: e.target.value });
   for (const r of sec.querySelectorAll('input[name="venv_dir"]')) r.onchange = () => commit({ dir: r.value });
@@ -122,15 +124,31 @@ export function mountEnvelope(editor) {
       if (item.classList.contains('disabled')) return;
       if (id === 'make') openWarp();
       if (id === 'options') stubDialog('Envelope Options');
+      const el = currentEnvelope();
+      if (!el) return;
+      if (id === 'release') releaseEnvelope(sc, el);
+      if (id === 'expand') ensureEnvelopeRendered(sc, el).finally(() => { if (el.isConnected) expandEnvelope(sc, el); });
+      if (id === 'edit') (el.hasAttribute(EDITING) ? editEnvelope : editContents)(sc, el);
     });
     list.appendChild(item);
   }
   document.getElementById('action_scale_strokes')?.after(menu);
+  let editingEl = null;
+  /** The selected envelope, or the envelope whose contents are being edited. */
+  function currentEnvelope() {
+    const sel = selected(sc);
+    if (sel.length === 1 && envelope(sel[0])) return sel[0];
+    if (editingEl?.isConnected && editingEl.hasAttribute(EDITING)) return editingEl;
+    return sc.getSvgContent?.()?.querySelector?.(`g[${EDITING}]`) || null;
+  }
   function sync() {
     const sel = selected(sc), isEnvelope = sel.length === 1 && envelope(sel[0]);
+    const cur = currentEnvelope(), editing = !!cur?.hasAttribute(EDITING);
+    editingEl = editing ? cur : null;
     for (const [id] of ENVELOPE_COMMANDS) {
       const item = document.getElementById(`action_envelope_${id}`);
-      const enabled = id === 'options' || (id === 'make' ? isEnvelope || canMakeEnvelope(sel) : ['release', 'expand', 'edit'].includes(id) && isEnvelope);
+      const enabled = id === 'options' || (id === 'make' ? isEnvelope || canMakeEnvelope(sel) : ['release', 'expand', 'edit'].includes(id) && (isEnvelope || editing));
+      if (id === 'edit') item.querySelector('.envelope-command-label').textContent = editing ? 'Edit Envelope' : 'Edit Contents';
       item.classList.toggle('disabled', !enabled); item.setAttribute('aria-disabled', String(!enabled));
       if (id === 'make' || id === 'mesh') item.querySelector('.envelope-command-label').textContent = `${isEnvelope ? 'Reset' : 'Make'} with ${id === 'make' ? 'Warp' : 'Mesh'}…`;
     }
@@ -148,7 +166,7 @@ export function mountEnvelope(editor) {
   let panelApi = null;
   const panel = { sync() {
     panelApi ||= mountEnvelopePanel(sc, { openOptions: () => document.getElementById('action_envelope_options')?.click(),
-      editContents: () => document.getElementById('action_envelope_edit')?.click() });
+      editContents: () => document.getElementById('action_envelope_edit')?.click(), getCurrent: () => currentEnvelope() });
     panelApi?.sync();
   } };
   window.addEventListener('keydown', e => {
@@ -157,13 +175,36 @@ export function mountEnvelope(editor) {
     if (!eventMatchesChord(e, WARP_CHORD)) return;
     e.preventDefault(); e.stopImmediatePropagation(); openWarp();
   }, true);
+  if (!document.getElementById('visteras_envelope_edit_css')) {
+    // Edit Contents: stylesheet rules beat the presentation attributes, so one flag swaps src/out.
+    const css = document.createElement('style'); css.id = 'visteras_envelope_edit_css';
+    css.textContent = `g[${EDITING}] > g[data-visteras-envelope-src]{display:inline!important}
+g[${EDITING}] > g[data-visteras-envelope-out]{display:none!important}`;
+    document.head.appendChild(css);
+  }
   const original = sc.call;
   sc.call = function(event, ...args) {
     const result = original.call(this, event, ...args);
-    if (event === 'sourcechanged') for (const el of sc.getSvgContent().querySelectorAll('[data-visteras-envelope="warp"]')) refreshEnvelope(sc,el);
+    if (event === 'sourcechanged') for (const el of sc.getSvgContent().querySelectorAll('[data-visteras-envelope="warp"]')) {
+      if (el !== editingEl) clearEditingFlag(el); // a reopened file never starts inside Edit Contents
+      refreshEnvelope(sc,el);
+    }
+    // Undo/redo and contents edits report 'changed': re-render any envelope whose hash moved.
+    if (event === 'changed' && Array.isArray(args[0])) {
+      const seen = new Set();
+      for (const node of args[0]) {
+        let env = null;
+        for (let n = node; n && n.nodeType === 1; n = n.parentNode) if (envelope(n)) { env = n; break; }
+        if (env && !seen.has(env)) { seen.add(env); refreshEnvelope(sc, env); }
+      }
+    }
+    // Leaving the isolation (double-click outside / Esc) returns to the envelope, like Illustrator.
+    if (event === 'contextset' && !args[0] && editingEl?.isConnected && editingEl.hasAttribute(EDITING)) {
+      const el = editingEl; editingEl = null; queueMicrotask(() => { if (el.hasAttribute(EDITING)) editEnvelope(sc, el); });
+    }
     if (['selected', 'changed', 'sourcechanged'].includes(event)) { sync(); panel.sync(); }
     return result;
   };
   sync();
-  return { openWarp, sync };
+  return { openWarp, sync, currentEnvelope };
 }

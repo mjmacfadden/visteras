@@ -12,8 +12,10 @@ export function normalizeOpts(o = {}) {
     appearance:o.appearance !== false, linGrad:false, pattern:false};
 }
 export const isEnvelope = el => el?.getAttribute?.(ENV) === 'warp';
+export const EDITING = `${ENV}-editing`;
+/** True for anything inside `-src`, except while that envelope is in Edit Contents (isolation). */
 export function isEnvelopeSource(node) {
-  for (let n = node; n; n = n.parentNode) if (n.hasAttribute?.(SRC)) return true;
+  for (let n = node; n; n = n.parentNode) if (n.hasAttribute?.(SRC)) return !n.parentNode?.hasAttribute?.(EDITING);
   return false;
 }
 export const envelopePart = (el, attr) => [...(el?.children || [])].find(n => n.hasAttribute(attr));
@@ -48,7 +50,10 @@ export function envelopeHash(el) {
     attrs.sort((a,b)=>a[0].localeCompare(b[0]));
     return [node.localName,attrs,[...node.childNodes].map(canonical).filter(x=>x!==null)];
   };
-  const value=JSON.stringify([data.params,data.opts,data.bbox,data.src ? canonical(data.src) : null]);
+  // The src root's own display/marker attributes are structural (Edit Contents toggles them), not content.
+  const root = data.src ? canonical(data.src) : null;
+  if (root) root[1] = root[1].filter(([name]) => name !== 'display' && name !== SRC);
+  const value=JSON.stringify([data.params,data.opts,data.bbox,root]);
   let hash=2166136261; for(let i=0;i<value.length;i++) hash=Math.imul(hash ^ value.charCodeAt(i),16777619);
   return (hash>>>0).toString(16);
 }
