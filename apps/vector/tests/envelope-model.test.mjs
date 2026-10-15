@@ -29,7 +29,7 @@ test('H2 hidden source is display none inside atomic envelope; native bounds rem
  assert.equal(src.parentNode,group);assert.equal(src.getAttribute('display'),'none');assert.equal(root.children.length,1);
  // Browser regression fixture has disjoint source/result. Native getBBox and UI verified against it.
  const model=fs.readFileSync(new URL('../js/visteras-envelope-model.js',import.meta.url),'utf8');
- assert.match(model,/sc.getStrokedBBox\(sorted\)/);assert.doesNotMatch(model,/sc\.(getBBox|getStrokedBBox)\s*=/);
+ assert.match(model,/sc\.getStrokedBBox\(elements\)/);assert.match(model,/getScreenCTM/);assert.doesNotMatch(model,/sc\.(getBBox|getStrokedBBox)\s*=/);
 });
 test('Generated output remaps internal references without changing original references',()=>{
  const grad=tree('linearGradient',{id:'paint'}),rect=tree('rect',{id:'rect',fill:'url(#paint)'}),a=tree('g',{id:'art'},[tree('defs',{},[grad]),rect]);

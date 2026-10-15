@@ -1,6 +1,6 @@
 import { eventMatchesChord, formatBrowserSafeShortcut, browserSafeChord } from './visteras-browser-shortcuts.js';
-import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js?v=envelope-2';
-import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js?v=envelope-2';
+import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js?v=envelope-3';
+import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js?v=envelope-3';
 import { ensureHost, documentMatrix, localMatrix } from './visteras-object-transform.js';
 /** Shared viewport gestures and object rows for the Vector workspace. */
 export function mountVectorWorkspace(editor) {

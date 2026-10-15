@@ -1,5 +1,5 @@
-import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-2';
-import { makeEnvelope, refreshEnvelope } from './visteras-envelope-model.js?v=envelope-2';
+import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-3';
+import { makeEnvelope, refreshEnvelope, setEnvelopeDeps } from './visteras-envelope-model.js?v=envelope-3';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });
@@ -39,6 +39,8 @@ function stubDialog(title, accept = null) {
 }
 
 export function mountEnvelope(editor) {
+  // Same URL as index.html so the shared font cache is reused; loaded lazily (keeps tests DOM-free).
+  setEnvelopeDeps({ loadTextOutlines: () => import('./visteras-text-outlines.js?v=character-styling-1').then(m => m.convertTextToOutlines) });
   const sc = editor?.svgCanvas;
   if (!sc || document.getElementById('menu_envelope_distort')) return null;
   const menu = document.createElement('div');

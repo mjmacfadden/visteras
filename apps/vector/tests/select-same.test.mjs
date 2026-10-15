@@ -49,9 +49,9 @@ test('Select menu includes All, All on Active Artboard, Deselect, Reselect, Inve
   assert.match(src, /eventMatchesChord\(e, \{ meta: true, key: '6' \}/);
 });
 
-test('index mounts select-same with cache-bust envelope-2; menu bar uses live delegation', () => {
+test('index mounts select-same with cache-bust envelope-3; menu bar uses live delegation', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-select-same\.js\?v=envelope-2/);
+  assert.match(html, /visteras-select-same\.js\?v=envelope-3/);
   assert.match(html, /mountSelectSame/);
   assert.match(html, /Live queries \+ delegation/);
   assert.match(html, /const menuEntries = \(\) => Array\.from\(menuBar\.querySelectorAll\('\.menu_entry'\)\)/);
