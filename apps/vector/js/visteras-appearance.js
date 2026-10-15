@@ -21,6 +21,8 @@ const EYE = (on) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"
 
 export { ILLUSTRATOR_STROKE_WEIGHT_PRESETS, stepStrokeWeight, formatStrokeWeight };
 
+const ENVELOPE_STYLE_NAMES = { arc: 'Arc', arcLower: 'Arc Lower', arcUpper: 'Arc Upper', arch: 'Arch', bulge: 'Bulge', shellLower: 'Shell Lower', shellUpper: 'Shell Upper', flag: 'Flag', wave: 'Wave', fish: 'Fish', rise: 'Rise', fisheye: 'Fisheye', inflate: 'Inflate', squeeze: 'Squeeze', twist: 'Twist' };
+
 /** Build the Appearance rows for a selection (pure; no DOM writes). */
 export function appearanceRows(elements) {
   const els = (elements || []).filter((el) => el?.getAttribute);
@@ -37,6 +39,19 @@ export function appearanceRows(elements) {
   const stroke = strokes.size === 1 ? [...strokes][0] : 'mixed';
   const weight = weights.size === 1 ? [...weights][0] : 'mixed';
   const opacity = selectionOpacity(els);
+  // Envelope (Illustrator): "Envelope" and a "Contents" link instead of the object's Stroke/Fill.
+  if (els.length === 1 && els[0].getAttribute('data-visteras-envelope') === 'warp') {
+    let style = 'arc';
+    try { style = JSON.parse(els[0].getAttribute('data-visteras-envelope-params') || '{}').style || 'arc'; } catch { /* default */ }
+    const rows = [
+      { kind: 'envelope', label: 'Envelope', summary: ENVELOPE_STYLE_NAMES[style] || 'Arc', visible: true },
+      { kind: 'contents', label: 'Contents', visible: true },
+    ];
+    const efx = parseFx(els[0].getAttribute(FX_ATTR));
+    for (const type of FX_ORDER) if (efx[type]) rows.push({ kind: 'effect', type, label: FX_LABELS[type] || type, summary: summarizeEffect(type, efx[type]), visible: !!efx[type].enabled });
+    rows.push({ kind: 'opacity', label: 'Opacity', value: opacity === '' ? 'Mixed' : `${opacity}%`, visible: true });
+    return { empty: false, rows, count: 1, envelope: true };
+  }
   const fx = els.length === 1 ? parseFx(els[0].getAttribute(FX_ATTR)) : {};
   // Illustrator lists Stroke above Fill (front → back), then object effects, then Opacity.
   const rows = [
@@ -267,6 +282,19 @@ export function mountAppearance(editor) {
               <span class="vapp_summary">${r.summary || ''}</span>
             </div>`;
           }
+          if (r.kind === 'envelope') {
+            return `<div class="vapp_row" role="listitem" data-kind="envelope">
+              <span class="vapp_eye_spacer" aria-hidden="true"></span>
+              <button type="button" class="vapp_label" title="Reset with Warp…">Envelope</button>
+              <span class="vapp_summary">${r.summary}</span>
+            </div>`;
+          }
+          if (r.kind === 'contents') {
+            return `<div class="vapp_row" role="listitem" data-kind="contents">
+              <span class="vapp_eye_spacer" aria-hidden="true"></span>
+              <button type="button" class="vapp_label vapp_label_link" data-act="edit-contents" title="Edit Contents">Contents</button>
+            </div>`;
+          }
           if (r.kind === 'opacity') {
             return `<div class="vapp_row" role="listitem" data-kind="opacity">
               <span class="vapp_eye_spacer" aria-hidden="true"></span>
@@ -343,6 +371,8 @@ export function mountAppearance(editor) {
       window.__visterasEffects?.edit?.(row.dataset.type);
       return;
     }
+    if (kind === 'contents') { document.getElementById('action_envelope_edit')?.click(); return; }
+    if (kind === 'envelope') { document.getElementById('action_envelope_make')?.click(); return; }
     if (kind === 'opacity') {
       window.__visterasDock?.open?.('transparency');
     }

@@ -16,9 +16,10 @@ Baseline: Vector 765/765, 0 skipped; storage 0 violations (70 writes, 66 allowed
   `visteras-envelope-actions.js`. Edit Contents sets `data-visteras-envelope-editing` (a stylesheet rule swaps `-src`/`-out`, beating the presentation attributes) and isolates `-src` with SVG-Edit's `setContext` (same as symbol editing); H1–H3 are lifted only for that envelope (`isEnvelopeSource` honours the flag). Edit Envelope (menu, Properties button, or leaving the isolation) refits the bbox to the edited contents and re-renders; each toggle is one undo step. Reset with Warp = stage-4 dialog prefilled. Release: contents back at the envelope's z-order, wrapper/envelope transforms folded into each child, plus one grey (#cccccc, decision) warped-shape path; wrappers vanish. Expand (Envelope Distort and Object ▸ Expand, which now delegates and joins its batch): fresh-id copy of the rendered `-out` in a `<g>` named "Envelope", no envelope attributes, unused clipPaths swept. Undo/redo now re-render stale envelopes via the 'changed' event. Object ▸ Expand's commit check also accepts BatchCommand `stack`/`isEmpty()` (it only looked at `sub_commands`). Chrome verified: text warp → Edit Contents (src shown, out hidden, isolated, click hits the live text, label Edit Envelope) → change string → Edit Envelope (outlines re-rendered, bbox refit) → Reset Bulge → undo re-renders Arc → Release (text + grey path, no hidden leftovers, 1 step) → undo → Expand (only paths, named Envelope) → undo → Object ▸ Expand (1 step).
 - [x] 6. Envelope Options — commit: this stage commit (resolve with `git log --grep='stage 6'`) — gates: test:vector 826/826, storage 0, build:vector OK, npm test PASS.
   Envelope Options dialog (Rasters: Anti-Alias, Preserve Shape Using Clipping Mask / Transparency; Fidelity 0–100; Distort Appearance; Distort Linear Gradients and Distort Pattern Fills shown disabled "Coming later"). Envelope selected (or being edited): OK = one undo step 'Envelope Options' and re-render; nothing selected: OK sets the in-memory defaults for the next Make (no history, no storage). Distort Appearance on (default): strokes are outlined with the same Paper.js outline as Outline Stroke (loaded lazily) and warped as filled shapes grouped with the fill; off: the warped path keeps a uniform stroke. Deferred: expanding `data-visteras-fx` effects before warping — effects are SVG filters and still apply on top of the warped result in both modes (rasterising them would be needed; follow-up). Chrome verified: thick-stroked circle + Inflate → outlined stroke group; Options Fidelity 100 + Appearance off → 1 step, 8→24 curve nodes, uniform 24px stroke; defaults with nothing selected → next Make gets Fidelity 20.
-- [ ] 7. Appearance, Layers, export and Studio paste
+- [x] 7. Appearance, Layers, export and Studio paste — commit: this stage commit (resolve with `git log --grep='stage 7'`) — gates: test:vector 830/830, storage 0, build:vector OK, npm test PASS.
+  Appearance shows **Envelope** (style name; click = Reset with Warp…) and a **Contents** link (runs Edit Contents), then effects and Opacity; Layers shows `<Envelope>` with the Contents row. `visteras-envelope-export.js` `envelopeOutputOnly()` strips `-src` and every `data-visteras-envelope*` attribute; called in `buildExportSvg` (SVG/PNG/JPG/PDF, before text outlining and the selection prune), in the SVG-Edit-serializer artboard path, and on each clone in `serializeSelectedToSvg` (Studio clipboard). Export/clipboard bounds already come from the envelope's bbox, which is `-out` (H2). Chrome verified with Flag 100 (source 200,200 300×80 vs output 200,160 300×160): selection SVG viewBox = output bounds, no source ids/text/attributes; artboard SVG clean; PNG 300×160 with no source pixels; PDF valid with no leak; Studio clipboard SVG = 5 warped paths, viewBox 300×160; Appearance rows Envelope/Contents/Opacity, Contents link enters Edit Contents; Vector→Vector ⌘C/⌘V keeps a full editable envelope (SVG-Edit's internal clipboard).
 
-Next: Stage 7 (Appearance, Layers, export, Studio paste).
+Next: Mike's smoke test (see the PR body). Nothing merges before that.
 
 Acceptance tests:
 - [x] AT1 menu/chord scaffolding (Chrome Mac runtime verified)
@@ -32,15 +33,15 @@ Acceptance tests:
 - [x] AT9 live contents
 - [x] AT10 fidelity
 - [x] AT11 persistence
-- [ ] AT12 export
-- [ ] AT13 clipboard
+- [x] AT12 export
+- [x] AT13 clipboard
 - [x] AT14 rasters
-- [ ] AT15 Appearance/Layers
+- [x] AT15 Appearance/Layers
 - [x] H1 hit-testing
 - [x] H2 bounds
 - [x] H3 Select All
-- [ ] H4 export
-- [ ] H5 Studio paste
-- [ ] H6 cleanup
+- [x] H4 export
+- [x] H5 Studio paste
+- [x] H6 cleanup
 
 Decisions: the spec calls for eight menu items but explicitly lists seven commands. Implement the seven named commands in the prescribed order; Reset replaces Make rather than adding an invented eighth command.

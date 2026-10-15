@@ -22,6 +22,7 @@ import {
 	referencedDefsMarkup, renderImagePng, renderSvgTextPng,
 	selectionVisualBounds, normalizedSvgMarkup, newClipStamp, stampClipSvg, sortByDocumentOrder,
 } from './visteras-clipboard-payload.js?v=clipboard-bridge-5';
+import { envelopeOutputOnly } from './visteras-envelope-export.js?v=envelope-7';
 
 const SVG_MIME = 'image/svg+xml';
 const VISTERAS_MIME = 'web application/x-visteras-vector+json';
@@ -55,6 +56,8 @@ export function serializeSelectedToSvg(svgCanvas, customSelected = null) {
 	for (const el of selected) {
 		try {
 			const clone = el.cloneNode(true);
+			// Envelopes travel as their warped output (Studio sees vectors, never the hidden source).
+			envelopeOutputOnly(clone);
 			// Drop SVG-Edit selection helpers if present
 			clone.classList && clone.classList.remove('selected');
 			if (clone.querySelectorAll) {

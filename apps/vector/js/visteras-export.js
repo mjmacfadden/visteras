@@ -1,4 +1,5 @@
 import {outlineStyledTextForPdf} from './visteras-text-pdf.js';
+import { envelopeOutputOnly } from './visteras-envelope-export.js?v=envelope-7';
 import {convertTextToOutlines} from './visteras-text-outlines.js?v=character-styling-1';
 import { clipExportToRect, stripExportGuides } from './visteras-export-clip.js';
 import { buildArtboardPdf, pdfPageSpecs } from './visteras-export-pdf.js?v=pdf-1';
@@ -185,6 +186,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     const { w, h } = forSvgFile ? { w: X.pixelSize(rect, 1).w, h: X.pixelSize(rect, 1).h } : X.pixelSize(rect, scale);
     // While in Symbol Editing Mode, export the committed symbol (not the edit group).
     const clone = window.__visterasSymbolEdit?.cloneCommitted?.() || sc.getSvgContent().cloneNode(true);
+    envelopeOutputOnly(clone); // envelopes export their warped output only (never the hidden source)
     for(const path of clone.querySelectorAll('[data-visteras-corners]'))path.removeAttribute('data-visteras-corners');
     stripExportGuides(clone);
     if(outlineStyledText)await outlineStyledTextForPdf(clone,sc.getSvgContent(),convertTextToOutlines);
@@ -260,6 +262,7 @@ export function mountExport({ editor, saveFile, downloadBlob, toast = (m, t) => 
     if (!rect) return str;
     const doc = new DOMParser().parseFromString(str, 'image/svg+xml');
     const root = doc.documentElement;
+    envelopeOutputOnly(root);
     stripExportGuides(root);
     root.setAttribute('viewBox', `${rect.x} ${rect.y} ${rect.width} ${rect.height}`);
     root.setAttribute('width', rect.width); root.setAttribute('height', rect.height);
