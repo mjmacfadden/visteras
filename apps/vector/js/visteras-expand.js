@@ -11,9 +11,9 @@
 
 import { convertTextToOutlines, isTextElement } from './visteras-text-outlines.js';
 import { executeOutlineStroke } from './visteras-offset-path.js';
-import { isEnvelope } from './visteras-envelope-core.js?v=envelope-10';
-import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-10';
-import { expandEnvelope } from './visteras-envelope-actions.js?v=envelope-10';
+import { isEnvelope } from './visteras-envelope-core.js?v=envelope-11';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-11';
+import { expandEnvelope } from './visteras-envelope-actions.js?v=envelope-11';
 
 const SHAPE_TAGS = new Set(['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 

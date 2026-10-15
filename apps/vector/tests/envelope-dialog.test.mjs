@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas, serialize } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-10';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-10';
-import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-10';
-import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-10';
-import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-10';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-10';
+import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-11';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-11';
+import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-11';
+import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-11';
+import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-11';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-11';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -66,14 +66,16 @@ test('every style has an inline icon drawn from the warp (no fixed colours)', ()
   assert.notEqual(styleIcon('arc'), styleIcon('flag'));
 });
 
-test('dialog wiring: title, controls, Preview default off, undo blocked, rAF preview, one-step commit', () => {
+test('dialog wiring: title, controls, Preview on at every open (not remembered), undo blocked, rAF preview, one-step commit', () => {
   const src = read('../js/visteras-envelope-dialogs.js');
   assert.match(src, /Warp Options/);
   for (const id of ['vwarp_style', 'vwarp_preview', 'vwarp_ok', 'vwarp_cancel']) assert.match(src, new RegExp(`id="${id}"`));
   assert.match(src, /pctRow\('vwarp_bend', 'Bend', state\.bend\)/); assert.match(src, /pctRow\('vwarp_dh', 'Horizontal'/); assert.match(src, /pctRow\('vwarp_dv', 'Vertical'/);
   assert.match(src, /min="-100" max="100"/);
   assert.match(src, /name="vwarp_dir" value="h"> Horizontal/); assert.match(src, /name="vwarp_dir" value="v"> Vertical/);
-  assert.doesNotMatch(src, /id="vwarp_preview" checked/);
+  assert.match(src, /preview\.checked = true; renderPreview\(\);/, 'Preview is ticked and rendered on open');
+  assert.doesNotMatch(src, /preview[^\n]*(localStorage|sessionStorage|setSession)/i, 'Preview state is never stored');
+  assert.doesNotMatch(src, /preview:\s*preview\.checked/, 'Preview is not part of session memory');
   assert.match(src, /requestAnimationFrame\(renderPreview\)/);
   assert.match(src, /\/\^\[zy\]\$\/i\.test\(e\.key\)/);
   assert.match(src, /history: false/);
@@ -84,7 +86,7 @@ test('dialog wiring: title, controls, Preview default off, undo blocked, rAF pre
   assert.match(env, /id="sec_envelope"|sec\.id = 'sec_envelope'/);
   assert.match(env, /label: 'Envelope Warp'/);
   const html = read('../index.html');
-  assert.match(html, /visteras-envelope\.js\?v=envelope-10/);
+  assert.match(html, /visteras-envelope\.js\?v=envelope-11/);
 });
 
 test('AT14 image envelope: Clipping Mask → clipPath, Transparency → alpha (injected fake canvas)', async () => {

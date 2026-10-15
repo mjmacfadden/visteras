@@ -1,6 +1,6 @@
-import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-10';
-import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-10';
-import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-10';
+import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-11';
+import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-11';
+import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-11';
 const NS='http://www.w3.org/2000/svg';
 export const WRAP=`${ENV}-wrap`;
 let deps={};
