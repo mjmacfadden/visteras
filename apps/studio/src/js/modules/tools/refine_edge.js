@@ -15,6 +15,7 @@ import config from './../../config.js';
 import Dialog_class from './../../libs/popup.js';
 import Base_layers_class from './../../core/base-layers.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { fit_preview_scale } from './../../libs/preview-fit.js';
 import {
 	refineStrokeMatting,
 	applyFeather,
@@ -321,7 +322,7 @@ class Tools_refineEdge_class {
 					<!-- Center Viewport -->
 					<div class="refine-edge__viewport" id="refine_viewport">
 						<div class="refine-edge__canvas-container" id="refine_canvas_container">
-							<canvas class="refine-edge__canvas" id="refine_display_canvas" width="${this._width}" height="${this._height}"></canvas>
+							<canvas class="refine-edge__canvas studio-preview-surface" id="refine_display_canvas" width="${this._width}" height="${this._height}"></canvas>
 						</div>
 						<div class="refine-edge__cursor-ring" id="refine_cursor_ring"></div>
 						
@@ -677,13 +678,11 @@ class Tools_refineEdge_class {
 
 	_fit_to_screen() {
 		if (!this._viewport || !this._canvasContainer) return;
-		const vw = this._viewport.clientWidth - 40;
-		const vh = this._viewport.clientHeight - 40;
+		const vw = this._viewport.clientWidth;
+		const vh = this._viewport.clientHeight;
 		if (vw <= 0 || vh <= 0) return;
 
-		const scaleX = vw / this._width;
-		const scaleY = vh / this._height;
-		this._zoom = Math.min(1.5, Math.max(0.05, Math.min(scaleX, scaleY)));
+		this._zoom = Math.min(32, Math.max(0.05, fit_preview_scale(vw, vh, this._width, this._height)));
 		this._panX = 0;
 		this._panY = 0;
 		this._apply_transform();

@@ -17,6 +17,7 @@ import Dialog_class from './../../libs/popup.js';
 import ImageFilters_class from './../../libs/imagefilters.js';
 import Raw_source_registry from './../../libs/raw-source.js';
 import alertify from './../../../../node_modules/alertifyjs/build/alertify.min.js';
+import { fit_preview_scale, PREVIEW_FIT_MARGIN } from './../../libs/preview-fit.js';
 
 var DEFAULTS = {
 	exposure: 0,
@@ -253,7 +254,7 @@ class Image_rawDevelop_class {
 			'    </div>' +
 			'  </div>' +
 			'  <div class="raw-develop__body">' +
-			'    <div class="raw-develop__viewer"><canvas id="raw_develop_canvas"></canvas></div>' +
+			'    <div class="raw-develop__viewer"><canvas id="raw_develop_canvas" class="studio-preview-surface"></canvas></div>' +
 			'    <aside class="raw-develop__sidebar">' +
 			'      <p class="raw-develop__hint">Double-click a slider to reset. Camera RAW decode (LibRaw) can plug in later.</p>' +
 			panels +
@@ -641,19 +642,18 @@ class Image_rawDevelop_class {
 
 		// Prefer the viewer box; if the popup height chain is still settling /
 		// collapsed, fall back to the visible viewport so the preview is usable.
-		var maxW = (viewer.clientWidth || 0) - 24;
-		var maxH = (viewer.clientHeight || 0) - 24;
-		if (maxW < 120 || maxH < 120) {
-			var fallbackW = Math.floor((window.innerWidth || 1200) - 280 - 48);
-			var fallbackH = Math.floor((window.innerHeight || 800) - 72);
-			if (maxW < 120) maxW = fallbackW;
-			if (maxH < 120) maxH = fallbackH;
-		}
-		maxW = Math.max(64, maxW);
-		maxH = Math.max(64, maxH);
-		var scale = Math.min(1, maxW / this._source.width, maxH / this._source.height);
+		var viewW = viewer.clientWidth || 0;
+		var viewH = viewer.clientHeight || 0;
+		if (viewW < 120 + PREVIEW_FIT_MARGIN * 2) viewW = Math.floor((window.innerWidth || 1200) - 280 - 24);
+		if (viewH < 120 + PREVIEW_FIT_MARGIN * 2) viewH = Math.floor((window.innerHeight || 800) - 48);
+		// Display size fits the viewer like the main canvas Fit on Screen; the
+		// bitmap never exceeds source resolution (small images are CSS-upscaled).
+		var fit = fit_preview_scale(viewW, viewH, this._source.width, this._source.height);
+		var scale = Math.min(1, fit);
 		var pw = Math.max(1, Math.round(this._source.width * scale));
 		var ph = Math.max(1, Math.round(this._source.height * scale));
+		this._previewCanvas.style.width = Math.max(1, Math.round(this._source.width * fit)) + 'px';
+		this._previewCanvas.style.height = Math.max(1, Math.round(this._source.height * fit)) + 'px';
 		var sizeKey = pw + 'x' + ph;
 
 		if (this._previewSizeKey !== sizeKey) {
