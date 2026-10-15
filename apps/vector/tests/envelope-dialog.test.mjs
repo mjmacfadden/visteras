@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas, serialize } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-9';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-9';
-import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-9';
-import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-9';
-import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-9';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-9';
+import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-10';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-10';
+import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-10';
+import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-10';
+import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-10';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-10';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -84,7 +84,7 @@ test('dialog wiring: title, controls, Preview default off, undo blocked, rAF pre
   assert.match(env, /id="sec_envelope"|sec\.id = 'sec_envelope'/);
   assert.match(env, /label: 'Envelope Warp'/);
   const html = read('../index.html');
-  assert.match(html, /visteras-envelope\.js\?v=envelope-9/);
+  assert.match(html, /visteras-envelope\.js\?v=envelope-10/);
 });
 
 test('AT14 image envelope: Clipping Mask → clipPath, Transparency → alpha (injected fake canvas)', async () => {

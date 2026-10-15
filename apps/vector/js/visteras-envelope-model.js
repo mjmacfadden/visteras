@@ -1,6 +1,6 @@
-import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-9';
-import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-9';
-import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-9';
+import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-10';
+import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-10';
+import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-10';
 const NS='http://www.w3.org/2000/svg';
 export const WRAP=`${ENV}-wrap`;
 let deps={};
@@ -71,22 +71,66 @@ export function refreshEnvelope(sc, el) {
 }
 
 const ctmTo=(node)=>{ try { const m=node.getScreenCTM?.(); return m?[m.a,m.b,m.c,m.d,m.e,m.f]:null; } catch { return null; } };
-/** Geometric bounds of elements in `parent`'s user space (document axis). */
+const SKIP=new Set(['defs','title','desc','metadata','clipPath','mask','linearGradient','radialGradient','pattern','symbol','marker','filter','style','script']);
+const CONTAINER=new Set(['g','a','switch']);
+let glyphCtx=null;
+/** Ink extents of one glyph from the browser's own font (canvas TextMetrics), baseline-relative. */
+function canvasMeasure(ch, el) {
+  if(typeof document==='undefined') return null;
+  glyphCtx ||= document.createElement('canvas').getContext('2d');
+  const cs=getComputedStyle(el);
+  glyphCtx.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+  glyphCtx.textBaseline='alphabetic'; glyphCtx.textAlign='left';
+  const m=glyphCtx.measureText(ch);
+  return { left:m.actualBoundingBoxLeft, right:m.actualBoundingBoxRight, ascent:m.actualBoundingBoxAscent, descent:m.actualBoundingBoxDescent };
+}
+/**
+ * Visual bounds of live text in its own user space: the union of each glyph's ink box at the
+ * browser's own glyph position. getBBox() on text is the line box (ascent + descent + advances,
+ * trailing tracking), which is taller and wider than the letters — Illustrator warps the letters.
+ * Returns null (caller falls back to getBBox) when the character map can't be trusted.
+ */
+export function textInkBox(text, measure=deps.measureGlyph||canvasMeasure) {
+  const n=text.getNumberOfChars?.(); if(!n || typeof text.getStartPositionOfChar!=='function') return null;
+  const chars=[];
+  const walk=(node)=>{ for(const c of node.childNodes||[]) { if(c.nodeType===3) for(const u of c.nodeValue||'') { chars.push([u,c.parentNode]); if(u.length===2) chars.push(null); } else if(c.nodeType===1 && !SKIP.has(c.localName)) walk(c); } };
+  walk(text);
+  if(chars.length!==n) return null;
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  chars.forEach((entry,i)=>{
+    if(!entry || /\s|\u200b/.test(entry[0])) return;
+    const g=measure(entry[0],entry[1]); if(!g) return;
+    const p=text.getStartPositionOfChar(i), a=(text.getRotationOfChar?.(i)||0)*Math.PI/180, c=Math.cos(a), s=Math.sin(a);
+    for(const [dx,dy] of [[-g.left,-g.ascent],[g.right,-g.ascent],[-g.left,g.descent],[g.right,g.descent]]) {
+      const x=p.x+dx*c-dy*s, y=p.y+dx*s+dy*c;
+      x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);
+    }
+  });
+  return [x0,y0,x1,y1].every(Number.isFinite) && x1>x0 && y1>y0 ? {x:x0,y:y0,width:x1-x0,height:y1-y0} : null;
+}
+const hasText=(el)=>el.localName==='text' || !!el.querySelector?.('text');
+/** Visual bounds of elements in `parent`'s user space (document axis); text counts by its glyphs. */
 export function boundsIn(sc, parent, elements) {
   const pm=ctmTo(parent), pinv=pm&&invert(pm);
   let box=null;
   if(pinv) {
-    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
-    for(const el of elements) {
-      let b; try { b=el.getBBox(); } catch { b=null; }
-      const em=ctmTo(el); if(!b||!em) { x0=NaN; break; }
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity,bad=false;
+    const add=(el)=>{
+      if(bad || SKIP.has(el.localName)) return;
+      if(CONTAINER.has(el.localName) && hasText(el)) { for(const k of [...(el.children||[])]) add(k); return; }
+      let b=null;
+      if(el.localName==='text') { try { b=textInkBox(el); } catch { b=null; } }
+      if(!b) { try { b=el.getBBox(); } catch { b=null; } }
+      const em=ctmTo(el); if(!b||!em) { bad=true; return; }
+      if(!b.width && !b.height && el.localName==='text') return; // empty text adds nothing
       const m=multiply(pinv,em);
       for(const [x,y] of [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]]) {
         const px=m[0]*x+m[2]*y+m[4], py=m[1]*x+m[3]*y+m[5];
         x0=Math.min(x0,px);y0=Math.min(y0,py);x1=Math.max(x1,px);y1=Math.max(y1,py);
       }
-    }
-    if([x0,y0,x1,y1].every(Number.isFinite)) box={x:x0,y:y0,width:x1-x0,height:y1-y0};
+    };
+    for(const el of elements) add(el);
+    if(!bad && [x0,y0,x1,y1].every(Number.isFinite)) box={x:x0,y:y0,width:x1-x0,height:y1-y0};
   }
   return box || sc.getStrokedBBox(elements);
 }

@@ -5,7 +5,7 @@
  * formulas [unverified], designed so bend 0 + distortion 0 is the identity and
  * a negative bend mirrors the effect.
  */
-import { normalizeParams, normalizeOpts } from './visteras-envelope-core.js?v=envelope-9';
+import { normalizeParams, normalizeOpts } from './visteras-envelope-core.js?v=envelope-10';
 
 export const STYLE_LABELS = Object.freeze([
   ['arc', 'Arc'], ['arcLower', 'Arc Lower'], ['arcUpper', 'Arc Upper'], ['arch', 'Arch'], ['bulge', 'Bulge'],

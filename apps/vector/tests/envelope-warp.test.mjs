@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-9';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-10';
 import {
   warpPoint, parsePathData, shapeToPathData, warpTolerance, warpSegments, segmentsToPathData,
   segmentsBounds, countNodes, parseTransform, multiply, applyMatrix, invert, transformSegments,
-} from '../js/visteras-envelope-warp.js?v=envelope-9';
-import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-9';
-import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-9';
+} from '../js/visteras-envelope-warp.js?v=envelope-10';
+import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-10';
+import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-10';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-9';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-9';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-10';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-10';
 
 const BOX = [100, 50, 200, 100];
 const GRID = [];
@@ -171,4 +171,28 @@ test('fix 1: rect + resized text warp through ONE grid — glyphs keep their pla
     assert.ok(Math.abs((tb.x0 + tb.x1) / 2 - (rb.x0 + rb.x1) / 2) < 1, `${style}: text stays horizontally centred`);
     assert.ok((tb.x1 - tb.x0) < (rb.x1 - rb.x0) * 0.9, `${style}: text keeps its proportion of the rect width`);
   }
+});
+
+test('fix 3: live text alone — envelope bounds are the glyph ink box, not the line box (getBBox)', async () => {
+  const { boundsIn, textInkBox, setEnvelopeDeps } = await import('../js/visteras-envelope-model.js?v=envelope-10');
+  const I = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  // "A B" at x=100,150,200 on baseline y=300; each glyph ink 40 wide, 70 tall above the baseline, 2 below.
+  const text = { localName: 'text', getScreenCTM: () => I, getBBox: () => ({ x: 100, y: 211, width: 160, height: 112 }), // line box: ascent+descent+advances
+    getNumberOfChars: () => 3, getStartPositionOfChar: (i) => ({ x: 100 + 50 * i, y: 300 }), getRotationOfChar: () => 0, childNodes: [] };
+  text.childNodes.push({ nodeType: 3, nodeValue: 'A B', parentNode: text });
+  setEnvelopeDeps({ measureGlyph: () => ({ left: -3, right: 43, ascent: 70, descent: 2 }) });
+  try {
+    assert.deepEqual(textInkBox(text), { x: 103, y: 230, width: 140, height: 72 });
+    const parent = { getScreenCTM: () => I };
+    const b = boundsIn({ getStrokedBBox: () => ({ x: 100, y: 211, width: 160, height: 112 }) }, parent, [text]);
+    assert.deepEqual(b, { x: 103, y: 230, width: 140, height: 72 }, 'no growth from the line-height/advance box');
+    // Inside a scaled group the ink box follows the group's matrix.
+    const g = { localName: 'g', children: [text], querySelector: () => text, getScreenCTM: () => ({ a: 2, b: 0, c: 0, d: 2, e: 10, f: 0 }) };
+    text.getScreenCTM = () => ({ a: 2, b: 0, c: 0, d: 2, e: 10, f: 0 });
+    assert.deepEqual(boundsIn({ getStrokedBBox: () => null }, parent, [g]), { x: 216, y: 460, width: 280, height: 144 });
+    // A character map that doesn't line up (collapsed whitespace) falls back to getBBox.
+    text.getNumberOfChars = () => 2; text.getScreenCTM = () => I;
+    assert.equal(textInkBox(text), null);
+    assert.deepEqual(boundsIn({ getStrokedBBox: () => null }, parent, [text]), { x: 100, y: 211, width: 160, height: 112 });
+  } finally { setEnvelopeDeps({ measureGlyph: undefined }); }
 });

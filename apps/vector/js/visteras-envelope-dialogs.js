@@ -3,9 +3,9 @@
  * Session memory only: last-used values live in this module (no storage of any kind).
  * Pure helpers (clamp, icons, session) are DOM-free so they can be unit-tested.
  */
-import { normalizeParams, normalizeOpts, readEnvelope } from './visteras-envelope-core.js?v=envelope-9';
-import { STYLE_LABELS, warpPoint } from './visteras-envelope-warp.js?v=envelope-9';
-import { makeEnvelope, revertPreviewEnvelope, updateEnvelope, restoreEnvelopeAttrs } from './visteras-envelope-model.js?v=envelope-9';
+import { normalizeParams, normalizeOpts, readEnvelope } from './visteras-envelope-core.js?v=envelope-10';
+import { STYLE_LABELS, warpPoint } from './visteras-envelope-warp.js?v=envelope-10';
+import { makeEnvelope, revertPreviewEnvelope, updateEnvelope, restoreEnvelopeAttrs } from './visteras-envelope-model.js?v=envelope-10';
 
 export const DEFAULT_WARP = Object.freeze({ style: 'arc', dir: 'h', bend: 50, dh: 0, dv: 0 });
 export const DEFAULT_OPTS = Object.freeze(normalizeOpts({}));

@@ -49,4 +49,4 @@ Decisions: the spec calls for eight menu items but explicitly lists seven comman
 ## Post-smoke fixes (Mike, c676bfba)
 - [x] F1 multi-object warp: one grid over the combined bounds. Root cause: the text's own transform was applied twice (the render matrix already had it, and Create Outlines copies it onto the outline group), so resized text grew and ran outside the grid.
 - [x] F2 Warp Options: draggable title bar, opens clear of the artwork, no overlay hiding the canvas, live Preview on slider input and typed numbers. Root cause: the dialog sat centred on a 45% black full-screen overlay and had no drag handle. Also fixed: Esc right after typing a number left the preview behind, because the removed field's late 'change' re-created the preview.
-- [ ] F3 text alone: the envelope uses the glyphs' visual (ink) bounds, not the line-height/advance box
+- [x] F3 text alone: the envelope uses the glyphs' visual (ink) bounds, not the line-height/advance box. Root cause: boundsIn used text getBBox(), which is the line box (font ascent+descent, plus advances and trailing tracking). The warp grid now spans the letters only; Edit Envelope refits the same way.

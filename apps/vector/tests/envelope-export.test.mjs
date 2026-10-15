@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-9';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-10';
 import { envelopeOutputOnly } from '../js/visteras-envelope-export.js?v=envelope-7';
 import { appearanceRows } from '../js/visteras-appearance.js';
 import { defaultObjectName } from '../js/visteras-layer-names.js';
