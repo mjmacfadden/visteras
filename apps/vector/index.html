@@ -319,7 +319,7 @@
     import { mountEffects } from './js/visteras-effects.js?v=export-1';
     import { mountAppearance } from './js/visteras-appearance.js?v=appearance-stroke-2';
     import { mountObjectLock } from './js/visteras-object-lock.js?v=lock-2';
-    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=character-styling-1';
+    import { eventMatchesChord, mappedLabel, browserSafeChord } from './js/visteras-browser-shortcuts.js?v=envelope-1';
     import { mountObjectTransform } from './js/visteras-object-transform.js?v=smart-fields-1';
     import { mountCompoundPath } from './js/visteras-compound-path.js?v=compound-2';
     import { mountSelectSame } from './js/visteras-select-same.js?v=select-3';
@@ -361,6 +361,7 @@
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-3';
     import { mountTextOutlines } from './js/visteras-text-outlines.js?v=character-styling-1';
     import { mountExpand } from './js/visteras-expand.js?v=expand-1';
+    import { mountEnvelope } from './js/visteras-envelope.js?v=envelope-1';
     import { mountGuides } from './js/visteras-guides.js?v=guide-anchors-1';
 
     // Studio-style toasts (replace browser alert() modals) — shared @visteras/ui kit.
@@ -421,6 +422,7 @@
     mountLasso(svgEditor);
     mountScaleStrokes(svgEditor);
     mountExpand(svgEditor);
+    mountEnvelope(svgEditor);
     mountGuides(svgEditor);
 
     if (svgEditor.rulers && typeof svgEditor.rulers.updateRulers === 'function') {

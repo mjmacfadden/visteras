@@ -44,7 +44,7 @@ test('Windows: Ctrl+digit 1–9 → Ctrl+Alt+digit; already-Alt → Ctrl+Alt+Shi
   assert.deepEqual(browserSafeChord({ meta: true, alt: true, key: '2', mac: false }), {
     meta: false, ctrl: true, alt: true, shift: true, key: '2', mac: false,
   });
-  assert.equal(formatBrowserSafeShortcut({ meta: true, alt: true, key: '2', mac: false }), 'Shift+Alt+Ctrl+2');
+  assert.equal(formatBrowserSafeShortcut({ meta: true, alt: true, key: '2', mac: false }), 'Ctrl+Alt+Shift+2');
 });
 
 test('non-digit chords pass through unchanged', () => {
@@ -115,7 +115,7 @@ test('New Layer reserved L maps to Ctrl+Cmd on Mac and Alt+Ctrl on Windows', () 
   assert.equal(formatBrowserSafeShortcut({ meta:true, key:'L', mac:true }), '⌃⌘L');
   assert.equal(formatBrowserSafeShortcut({ meta:true, key:'L', mac:false }), 'Alt+Ctrl+L');
   assert.equal(formatBrowserSafeShortcut({ meta:true, alt:true, key:'L', mac:true }), '⌃⌥⌘L');
-  assert.equal(formatBrowserSafeShortcut({ meta:true, alt:true, key:'L', mac:false }), 'Shift+Alt+Ctrl+L');
+  assert.equal(formatBrowserSafeShortcut({ meta:true, alt:true, key:'L', mac:false }), 'Ctrl+Alt+Shift+L');
 });
 test('New Layer matches physical L even when Option changes its key, and rejects bare browser chords', () => {
   for (const mac of [true, false]) {

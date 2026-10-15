@@ -19,7 +19,7 @@
 /** Canonical spec { meta: true, key: 'L' } means Illustrator's Cmd/Ctrl+L. */
 export const RESERVED_LETTERS = new Set(['L']);
 
-import { formatShortcut, detectMac } from './visteras-shortcut-label.js';
+import { formatShortcut, detectMac } from './visteras-shortcut-label.js?v=envelope-1';
 
 /** True if `key` is a digit 0–9 (Illustrator tab/zoom style bindings). */
 export function isDigitKey(key) {
