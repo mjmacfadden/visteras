@@ -51,3 +51,21 @@ Decisions: the spec calls for eight menu items but explicitly lists seven comman
 - [x] F2 Warp Options: draggable title bar, opens clear of the artwork, no overlay hiding the canvas, live Preview on slider input and typed numbers. Root cause: the dialog sat centred on a 45% black full-screen overlay and had no drag handle. Also fixed: Esc right after typing a number left the preview behind, because the removed field's late 'change' re-created the preview.
 - [x] F3 text alone: the envelope uses the glyphs' visual (ink) bounds, not the line-height/advance box. Root cause: boundsIn used text getBBox(), which is the line box (font ascent+descent, plus advances and trailing tracking). The warp grid now spans the letters only; Edit Envelope refits the same way.
 - [x] F4 Preview opens ticked in Warp Options every time, so the warp shows straight away. It is not stored anywhere; the other values are still remembered for the session. Esc/Cancel straight after opening leaves the file byte-identical with nothing to undo. Envelope Options has no Preview, so it is unchanged.
+
+## Object ▸ Expand… (Illustrator)
+- [x] E1 Audit and reuse:
+  - Envelope Distort ▸ Expand (`expandEnvelope`, joined into the same batch).
+  - Create Outlines (`convertTextToOutlines`).
+  - Outline Stroke. It already existed (`executeOutlineStroke` in `visteras-offset-path.js`, Paper.js). Its core is now `outlineStrokeLeaves(sc, leaves, batch)`, shared by Outline Stroke and Expand.
+  - Break Link (`breakLinkToSymbol`).
+  - Shape-to-path (`shapeToPathData`). svgedit's `convertToPath` records its own undo step, so Expand doesn't use it any more.
+  - Expand Appearance didn't exist anywhere.
+- [x] E2 Menu: Object ▸ Expand… with Expand Appearance directly below it, no shortcuts. Expand… is greyed out when nothing expandable is selected, and refreshes when the menu opens. Expand Appearance is shown greyed out ("Coming later"), because Vector has nothing to expand there yet: effects are SVG filters, and envelopes use Expand.
+- [x] E3 Dialog: Object / Fill / Stroke, OK / Cancel. Same movable box as Warp Options, transparent modal layer. Checkboxes that don't apply are disabled; envelope-only gives Object only.
+- [x] E4 Behaviour, all one undo step ('Expand') with no hidden originals left:
+  - Envelope: same as Envelope Distort ▸ Expand.
+  - Text: outlines.
+  - Symbol: Object breaks the link; Fill/Stroke then also apply to its artwork.
+  - Stroke: filled outline paths.
+  - Fill: primitives become paths with the same paint.
+- [x] Also fixed: the old Expand recorded two or three undo steps (convertToPath and Outline Stroke each added their own).

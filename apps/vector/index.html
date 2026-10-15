@@ -136,7 +136,8 @@
             <div class="menu_dropdown_item" id="action_type_on_path_object" title="Place editable text along a path">Type on Path…</div>
             <div class="menu_dropdown_item disabled" id="action_image_trace" title="Trace the selected raster image into vector paths">Image Trace…</div>
             <div class="menu_dropdown_separator"></div>
-            <div class="menu_dropdown_item" id="action_expand" title="Expand objects, fills, and strokes into editable vector paths">Expand</div>
+            <div class="menu_dropdown_item disabled" id="action_expand" aria-disabled="true" title="Expand objects, fills, and strokes into editable vector paths">Expand…</div>
+            <div class="menu_dropdown_item disabled" id="action_expand_appearance" aria-disabled="true" title="Coming later">Expand Appearance</div>
             <div class="menu_dropdown_item" id="action_offset_path">Offset Path… <span class="menu_dropdown_shortcut">⌥⌘O</span></div>
             <div class="menu_dropdown_item" id="action_outline_stroke">Outline Stroke</div>
             <div class="menu_dropdown_item" id="action_scale_strokes" role="menuitemcheckbox" aria-checked="true">Scale Strokes</div>
@@ -308,7 +309,7 @@
     import { mountScissorsTool } from './js/visteras-scissors.js?v=smoke-69-3';
     import { mountEraserTool } from './js/visteras-eraser.js?v=eraser-1';
     import { mountEyedropperTool } from './js/visteras-eyedropper.js?v=eyedropper-6';
-    import { mountOffsetPath } from './js/visteras-offset-path.js?v=smart-fields-1';
+    import { mountOffsetPath } from './js/visteras-offset-path.js?v=expand-1';
     import { mountShapeBuilderTool, partitionRegions } from './js/visteras-shape-builder.js?v=shape-builder-4';
     import { mountTransformPanel } from './js/visteras-transform-panel.js?v=character-styling-1';
     import { mountAlignKey } from './js/visteras-align-key-ui.js?v=align-key-1';
@@ -360,7 +361,7 @@
     import { mountVisterasPanelDock } from './js/visteras-panel-dock.js?v=dock-5';
     import { mountClippingMask } from './js/visteras-clipping-mask.js?v=clip-3';
     import { mountTextOutlines } from './js/visteras-text-outlines.js?v=character-styling-1';
-    import { mountExpand } from './js/visteras-expand.js?v=envelope-11';
+    import { mountExpand } from './js/visteras-expand.js?v=expand-1';
     import { mountEnvelope } from './js/visteras-envelope.js?v=envelope-11';
     import { mountGuides } from './js/visteras-guides.js?v=guide-anchors-1';
 

@@ -130,9 +130,9 @@ test('wiring: menu actions, Edit label toggles, isolation exit, CSS swap, Object
   assert.match(src, /event === 'contextset'/);
   assert.match(src, /display:none!important/);
   const expand = read('../js/visteras-expand.js');
-  assert.match(expand, /if \(isEnvelope\(el\)\) return true;/);
+  assert.match(expand, /object: t\.envelopes\.length > 0/);
   assert.match(expand, /expandEnvelope\(sc, env, \{ batch \}\)/);
-  assert.match(read('../index.html'), /visteras-expand\.js\?v=envelope-11/);
+  assert.match(read('../index.html'), /visteras-expand\.js\?v=expand-1/);
   assert.ok(stripEnvelopeAttrs(tree('g', { 'data-visteras-envelope-x': '1', id: 'k' })).attrs.id === 'k');
   assert.equal(sweepLocalClips(tree('g', {}, [tree('defs', {}, [tree('clipPath', { id: 'z' })])])).children.length, 0);
 });

@@ -78,7 +78,7 @@ export function mountEnvelope(editor) {
     // Distort Appearance: the same Paper.js outline as Object ▸ Path ▸ Outline Stroke (same module URLs as expand.js).
     loadStrokeOutliner: async () => {
       const [{ readStrokeSpec, pathItemFromElement }, { outlineItem }] = await Promise.all([
-        import('./visteras-offset-path.js'), import('./visteras-stroke-envelope.js?v=envelope-1')]);
+        import('./visteras-offset-path.js?v=expand-1'), import('./visteras-stroke-envelope.js?v=envelope-1')]);
       let scope = null;
       return (el) => {
         if (!window.paper) return null;
