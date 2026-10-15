@@ -151,10 +151,11 @@ export function imageMatrix(attrs, nw, nh, m) {
   return multiply(m, [sx, 0, 0, sy, tx, ty]);
 }
 
-async function rasterize(img, m, data, doc) {
+/** io: {loadImage(href), createCanvas()} — injectable for tests (AT14). */
+export async function rasterize(img, m, data, doc, io = {}) {
   const href = img.getAttribute('href') || img.getAttribute('xlink:href');
   if (!href) return null;
-  const image = await loadImage(href);
+  const image = await (io.loadImage || loadImage)(href);
   if (!image || !image.naturalWidth) return null;
   const nw = image.naturalWidth, nh = image.naturalHeight;
   const mi = imageMatrix(attrsOf(img), nw, nh, m);
@@ -163,7 +164,7 @@ async function rasterize(img, m, data, doc) {
   // Raster at the source's own pixel density (capped) so the warp doesn't blur or bloat the file.
   const density = Math.min(4, Math.max(0.25, Math.sqrt((nw * nh) / Math.max(1, Math.abs((mi[0] * mi[3] - mi[1] * mi[2])) * nw * nh)) || 1));
   const scale = Math.min(density, 4096 / Math.max(bw, bh, 1));
-  const canvas = doc.createElement('canvas');
+  const canvas = io.createCanvas ? io.createCanvas() : doc.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(bw * scale)); canvas.height = Math.max(1, Math.ceil(bh * scale));
   drawMesh(canvas.getContext('2d'), image, mesh, scale, { antiAlias: data.opts.aa });
   // Warped outline of the image rectangle (for Preserve Shape: Clipping Mask).
@@ -196,7 +197,7 @@ export async function prepareAndBuild(sc, el, cloneFn, deps = {}) {
   for (const img of data.src.querySelectorAll('image')) {
     // Image matrix excludes the image's own transform from matrixTo's parent chain, then adds it.
     const m = matrixTo(data.src, img);
-    try { const r = await rasterize(img, m, data, doc); if (r) rasters.set(img, r); } catch { /* keep unwarped */ }
+    try { const r = await rasterize(img, m, data, doc, deps); if (r) rasters.set(img, r); } catch { /* keep unwarped */ }
   }
   const svgRoot = sc.getSvgContent?.();
   return buildOutput(el, {

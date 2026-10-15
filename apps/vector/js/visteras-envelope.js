@@ -1,5 +1,8 @@
 import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-3';
-import { makeEnvelope, refreshEnvelope, setEnvelopeDeps } from './visteras-envelope-model.js?v=envelope-3';
+import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-4';
+import { openWarpOptions, clampPercent, ensureStyle } from './visteras-envelope-dialogs.js?v=envelope-4';
+import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-3';
+import { readEnvelope } from './visteras-envelope-core.js?v=envelope-3';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });
@@ -15,7 +18,8 @@ export const canMakeEnvelope = canEnvelope;
 function stubDialog(title, accept = null) {
   const previous = document.activeElement;
   const overlay = document.createElement('div');
-  overlay.className = 'visteras_modal_overlay';
+  ensureStyle();
+  overlay.className = 'visteras_modal_overlay venv_modal';
   overlay.id = 'visteras_envelope_dialog';
   overlay.innerHTML = `<div class="visteras_modal" role="dialog" aria-modal="true" aria-labelledby="venv_title" style="width:340px">
     <div class="visteras_modal_header"><span id="venv_title"></span></div>
@@ -36,6 +40,59 @@ function stubDialog(title, accept = null) {
   document.body.appendChild(overlay);
   overlay.querySelector('button').focus();
   return overlay;
+}
+
+/** Why Make with Warp can't run on this selection (toast text), or '' when nothing is selected. */
+export function envelopeBlockReason(sel) {
+  if (!sel.length) return '';
+  if (sel.some(el => el.localName === 'use' || el.querySelector?.('use'))) return 'Expand the symbol first';
+  if (sel.some(el => envelope(el))) return 'Select a single envelope to reset it';
+  return 'Envelope Distort needs unlocked, visible artwork';
+}
+
+/**
+ * Control-bar controls for a selected envelope (Properties panel section "Envelope").
+ * Every change is one undo step ('Envelope Warp').
+ */
+export function mountEnvelopePanel(sc, { openOptions, editContents } = {}) {
+  const host = document.getElementById('properties_content');
+  if (!host || document.getElementById('sec_envelope')) return null;
+  const sec = document.createElement('div');
+  sec.className = 'prop_section'; sec.id = 'sec_envelope'; sec.style.display = 'none';
+  sec.innerHTML = `<div class="prop_section_header" data-target="sec_envelope_body"><span class="prop_section_arrow"></span><span class="prop_section_title">Envelope</span></div>
+    <div class="prop_section_body" id="sec_envelope_body" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#ccc">
+      <label style="display:flex;gap:6px;align-items:center">Style <select id="venv_style" class="vui-input" style="flex:1">${STYLE_LABELS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
+      <div role="radiogroup" aria-label="Direction" style="display:flex;gap:10px"><label><input type="radio" name="venv_dir" value="h"> Horizontal</label><label><input type="radio" name="venv_dir" value="v"> Vertical</label></div>
+      <label style="display:flex;gap:6px;align-items:center">Bend <input id="venv_bend" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %</label>
+      <label style="display:flex;gap:6px;align-items:center">H <input id="venv_dh" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %
+        V <input id="venv_dv" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %</label>
+      <div style="display:flex;gap:6px"><button type="button" class="vui-btn" id="venv_edit">Edit Contents</button><button type="button" class="vui-btn" id="venv_options">Envelope Options…</button></div>
+    </div>`;
+  const anchor = document.getElementById('sec_appearance');
+  if (anchor) anchor.before(sec); else host.appendChild(sec);
+  const $ = (id) => sec.querySelector(id);
+  const current = () => { const sel = selected(sc); return sel.length === 1 && envelope(sel[0]) ? sel[0] : null; };
+  const commit = (patch) => { const el = current(); if (el) updateEnvelope(sc, el, { params: patch }, { label: 'Envelope Warp' }); };
+  $('#venv_style').onchange = (e) => commit({ style: e.target.value });
+  for (const r of sec.querySelectorAll('input[name="venv_dir"]')) r.onchange = () => commit({ dir: r.value });
+  for (const k of ['bend', 'dh', 'dv']) $(`#venv_${k}`).onchange = (e) => {
+    const el = current(); if (!el) return;
+    const v = clampPercent(e.target.value, -100, 100, readEnvelope(el).params[k]); e.target.value = v; commit({ [k]: v });
+  };
+  $('#venv_edit').onclick = () => editContents?.();
+  $('#venv_options').onclick = () => openOptions?.();
+  return {
+    sync() {
+      const el = current();
+      sec.style.display = el ? '' : 'none';
+      if (!el) return;
+      const p = readEnvelope(el).params, editing = el.hasAttribute('data-visteras-envelope-editing');
+      $('#venv_style').value = p.style;
+      for (const r of sec.querySelectorAll('input[name="venv_dir"]')) r.checked = r.value === p.dir;
+      for (const k of ['bend', 'dh', 'dv']) if (document.activeElement !== $(`#venv_${k}`)) $(`#venv_${k}`).value = p[k];
+      $('#venv_edit').textContent = editing ? 'Edit Envelope' : 'Edit Contents';
+    },
+  };
 }
 
 export function mountEnvelope(editor) {
@@ -79,10 +136,21 @@ export function mountEnvelope(editor) {
     }
   }
   function openWarp() {
-    if (document.getElementById('visteras_envelope_dialog')) return;
+    if (document.getElementById('visteras_envelope_dialog') || document.getElementById('visteras_warp_dialog')) return;
     const sel = selected(sc);
-    if (canMakeEnvelope(sel) || (sel.length === 1 && envelope(sel[0]))) stubDialog('Warp Options', () => makeEnvelope(sc, sel));
+    if (sel.length === 1 && envelope(sel[0])) return openWarpOptions(sc, { envelope: sel[0] });
+    if (canMakeEnvelope(sel)) return openWarpOptions(sc, { targets: sel });
+    const reason = envelopeBlockReason(sel);
+    if (reason) window.showStudioToast?.(reason, 'info');
+    return null;
   }
+  // The Properties panel is built after extensions mount: attach lazily on the first selection change.
+  let panelApi = null;
+  const panel = { sync() {
+    panelApi ||= mountEnvelopePanel(sc, { openOptions: () => document.getElementById('action_envelope_options')?.click(),
+      editContents: () => document.getElementById('action_envelope_edit')?.click() });
+    panelApi?.sync();
+  } };
   window.addEventListener('keydown', e => {
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase()) || document.activeElement?.isContentEditable) return;
     if (window.__visterasIsTypingDirectly) return;
@@ -93,7 +161,7 @@ export function mountEnvelope(editor) {
   sc.call = function(event, ...args) {
     const result = original.call(this, event, ...args);
     if (event === 'sourcechanged') for (const el of sc.getSvgContent().querySelectorAll('[data-visteras-envelope="warp"]')) refreshEnvelope(sc,el);
-    if (['selected', 'changed', 'sourcechanged'].includes(event)) sync();
+    if (['selected', 'changed', 'sourcechanged'].includes(event)) { sync(); panel.sync(); }
     return result;
   };
   sync();

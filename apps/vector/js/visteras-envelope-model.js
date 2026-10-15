@@ -1,5 +1,5 @@
 import { ENV, SRC, OUT, normalizeParams, normalizeOpts, readEnvelope, canEnvelope, envelopeHash } from './visteras-envelope-core.js?v=envelope-3';
-import { prepareAndBuild } from './visteras-envelope-render.js?v=envelope-3';
+import { prepareAndBuild, buildOutput } from './visteras-envelope-render.js?v=envelope-3';
 import { multiply, invert, IDENTITY } from './visteras-envelope-warp.js?v=envelope-3';
 const NS='http://www.w3.org/2000/svg';
 export const WRAP=`${ENV}-wrap`;
@@ -51,11 +51,16 @@ export function refreshEnvelope(sc, el) {
   const data=readEnvelope(el); if(!data?.src) return false;
   const hash=envelopeHash(el);
   if(data.out && el.getAttribute(`${ENV}-hash`)===hash) return false;
-  // Immediate identity output so nothing disappears while the warp renders.
-  const out=cloneEnvelopeOutput(data.src,sc);
-  if(data.out) data.out.replaceWith(out); else el.appendChild(out);
+  const live=typeof sc.getSvgContent==='function';
+  if(!live) { // DOM-free callers: identity output (tests, headless tooling)
+    const out=cloneEnvelopeOutput(data.src,sc);
+    if(data.out) data.out.replaceWith(out); else el.appendChild(out);
+  } else if(!data.out) { // shapes warp synchronously now; text/images follow in the async render
+    const out=buildOutput(el,{doc:el.ownerDocument,nextId:()=>sc.getNextId(),outlines:new Map(),rasters:new Map()},src=>cloneEnvelopeOutput(src,sc));
+    if(out) el.appendChild(out);
+  } // else keep the previous output on screen until the new render lands (no flicker while previewing)
   el.setAttribute(`${ENV}-hash`,hash); el.removeAttribute(`${ENV}-rendered`);
-  if(typeof sc.getSvgContent==='function') renderEnvelope(sc,el,{force:true});
+  if(live) renderEnvelope(sc,el,{force:true});
   return true;
 }
 
@@ -85,7 +90,7 @@ function boundsIn(sc, parent, elements) {
  * layers/groups: the envelope goes where the topmost object was, and objects from other
  * parents keep their look through a wrapper carrying the parent-to-parent matrix.
  */
-export function makeEnvelope(sc, elements, params={}, opts={}) {
+export function makeEnvelope(sc, elements, params={}, opts={}, {history=true}={}) {
   const chosen=[...new Set(elements)].filter(el=>!elements.some(other=>other!==el && other.contains(el)));
   if(!canEnvelope(chosen)) return null;
   let all=[...(sc.getSvgContent?.()?.querySelectorAll('*') || [])];
@@ -125,6 +130,47 @@ export function makeEnvelope(sc, elements, params={}, opts={}) {
     } else { src.appendChild(el); batch.addSubCommand(new MoveElementCommand(el,next,oldParent)); }
   }
   refreshEnvelope(sc,group);
+  if(!history) { // preview: caller reverts with group.__visterasRevert()
+    Object.defineProperty(group,'__visterasRevert',{configurable:true,value:()=>{ pending.delete(group); batch.unapply(null); }});
+    return group;
+  }
   sc.addCommandToHistory(batch); sc.clearSelection(); sc.addToSelection([group],true); sc.call('changed',[group]);
   return group;
+}
+
+/** Revert a preview made with makeEnvelope(..., {history:false}). */
+export function revertPreviewEnvelope(group) { group?.__visterasRevert?.(); }
+
+/**
+ * Change params/opts of an existing envelope. history:false is used by Preview (caller restores);
+ * otherwise one undo step labelled `label`.
+ */
+export function updateEnvelope(sc, el, {params, opts}={}, {history=true, label='Reset with Warp'}={}) {
+  const data=readEnvelope(el); if(!data) return false;
+  const next={};
+  if(params) next[`${ENV}-params`]=JSON.stringify(normalizeParams({...data.params,...params}));
+  if(opts) next[`${ENV}-opts`]=JSON.stringify(normalizeOpts({...data.opts,...opts}));
+  const before={};
+  for(const [k,v] of Object.entries(next)) before[k]=el.getAttribute(k);
+  const snapshot=history?null:{attrs:{...before,[`${ENV}-hash`]:el.getAttribute(`${ENV}-hash`),[`${ENV}-rendered`]:el.getAttribute(`${ENV}-rendered`)},out:data.out};
+  for(const [k,v] of Object.entries(next)) el.setAttribute(k,v);
+  if(history) {
+    const {BatchCommand,ChangeElementCommand}=sc.history;
+    const batch=new BatchCommand(label);
+    batch.addSubCommand(new ChangeElementCommand(el,before));
+    sc.addCommandToHistory(batch);
+  }
+  refreshEnvelope(sc,el);
+  sc.call?.('changed',[el]);
+  return snapshot||before;
+}
+
+/** Undo a preview made with updateEnvelope(..., {history:false}): the original output node and attributes come back verbatim. */
+export function restoreEnvelopeAttrs(sc, el, snapshot) {
+  if(!snapshot) return;
+  pending.delete(el);
+  for(const [k,v] of Object.entries(snapshot.attrs||{})) v==null?el.removeAttribute(k):el.setAttribute(k,v);
+  const current=readEnvelope(el)?.out;
+  if(snapshot.out && current!==snapshot.out) { if(current) current.replaceWith(snapshot.out); else el.appendChild(snapshot.out); }
+  sc.call?.('changed',[el]);
 }
