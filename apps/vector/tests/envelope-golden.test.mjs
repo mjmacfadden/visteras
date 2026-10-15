@@ -5,8 +5,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-5';
-import { parsePathData, shapeToPathData, warpSegments, segmentsToPathData } from '../js/visteras-envelope-warp.js?v=envelope-5';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-8';
+import { parsePathData, shapeToPathData, warpSegments, segmentsToPathData } from '../js/visteras-envelope-warp.js?v=envelope-8';
 
 const DIR = new URL('./fixtures/envelope/', import.meta.url);
 const BOX = [0, 0, 200, 100], TOL = 0.01;

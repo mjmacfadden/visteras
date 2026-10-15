@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope } from '../js/visteras-envelope-model.js?v=envelope-5';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-5';
-import { getSessionOpts, setSessionOpts, resetSession } from '../js/visteras-envelope-dialogs.js?v=envelope-5';
-import { buildOutput } from '../js/visteras-envelope-render.js?v=envelope-5';
-import { countNodes, parsePathData } from '../js/visteras-envelope-warp.js?v=envelope-5';
+import { makeEnvelope, updateEnvelope } from '../js/visteras-envelope-model.js?v=envelope-8';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-8';
+import { getSessionOpts, setSessionOpts, resetSession } from '../js/visteras-envelope-dialogs.js?v=envelope-8';
+import { buildOutput } from '../js/visteras-envelope-render.js?v=envelope-8';
+import { countNodes, parsePathData } from '../js/visteras-envelope-warp.js?v=envelope-8';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 const env = (extra = {}) => { let n = 0; return { doc: { createElementNS: (_n, t) => tree(t) }, nextId: () => `n${++n}`, outlines: new Map(), rasters: new Map(), ...extra }; };

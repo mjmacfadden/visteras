@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-5';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-8';
 import {
   warpPoint, parsePathData, shapeToPathData, warpTolerance, warpSegments, segmentsToPathData,
   segmentsBounds, countNodes, parseTransform, multiply, applyMatrix, invert, transformSegments,
-} from '../js/visteras-envelope-warp.js?v=envelope-5';
-import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-5';
-import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-5';
+} from '../js/visteras-envelope-warp.js?v=envelope-8';
+import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-8';
+import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-8';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-5';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-5';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-8';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-8';
 
 const BOX = [100, 50, 200, 100];
 const GRID = [];
@@ -148,4 +148,27 @@ test('stage 3 lifts the same-layer limit: Make across layers wraps foreign items
   assert.equal(sc.log.length, 1);
   sc.undo();
   assert.equal(a.parentNode, layer1); assert.equal(b.parentNode, grp);
+});
+
+test('fix 1: rect + resized text warp through ONE grid — glyphs keep their place inside the warped rect (no double text transform)', () => {
+  const ink = (d) => { const n = d.match(/-?\d+(\.\d+)?(e-?\d+)?/g).map(Number); const xs = n.filter((_, i) => i % 2 === 0), ys = n.filter((_, i) => i % 2 === 1); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; };
+  for (const style of ['arc', 'arch', 'bulge', 'flag', 'rise']) {
+    const r = tree('rect', { id: 'r1', x: '100', y: '100', width: '400', height: '100', fill: '#ccc' });
+    // Text resized with handles: local glyph box 70..230 × 70..90, scale(2) → 140..460 × 140..180 (centred in the rect).
+    const t = tree('text', { id: 't1', x: '70', y: '90', transform: 'matrix(2 0 0 2 0 0)', fill: '#000' });
+    tree('g', { class: 'layer' }, [r, t]); const sc = canvas([r, t]);
+    const env = makeEnvelope(sc, [r, t], { style, bend: 50 });
+    env.setAttribute('data-visteras-envelope-bbox', '100 100 400 100'); // combined visual bounds
+    const srcText = readEnvelope(env).src.querySelectorAll('*').find((n) => n.localName === 'text');
+    // Create Outlines copies the text's transform onto the outline group; glyphs are in local text space.
+    const outline = tree('g', { transform: 'matrix(2 0 0 2 0 0)', fill: '#000' }, [tree('path', { d: 'M70 70L230 70L230 90L70 90Z' })]);
+    const e = fakeEnv(); e.outlines.set(srcText, outline);
+    const out = buildOutput(env, e, (n) => n.cloneNode(true));
+    const paths = out.querySelectorAll('*').filter((n) => n.localName === 'path');
+    assert.equal(paths.length, 2, style);
+    const rb = ink(paths[0].getAttribute('d')), tb = ink(paths[1].getAttribute('d'));
+    assert.ok(tb.x0 >= rb.x0 - 0.5 && tb.x1 <= rb.x1 + 0.5 && tb.y0 >= rb.y0 - 0.5 && tb.y1 <= rb.y1 + 0.5, `${style}: text ${JSON.stringify(tb)} escapes rect ${JSON.stringify(rb)}`);
+    assert.ok(Math.abs((tb.x0 + tb.x1) / 2 - (rb.x0 + rb.x1) / 2) < 1, `${style}: text stays horizontally centred`);
+    assert.ok((tb.x1 - tb.x0) < (rb.x1 - rb.x0) * 0.9, `${style}: text keeps its proportion of the rect width`);
+  }
 });

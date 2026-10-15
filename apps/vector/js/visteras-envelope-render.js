@@ -4,12 +4,12 @@
  * unit-testable; text outlines and image rasters are prepared asynchronously
  * by renderEnvelope() and passed in.
  */
-import { ENV, SRC, OUT, readEnvelope, normalizeOpts } from './visteras-envelope-core.js?v=envelope-5';
+import { ENV, SRC, OUT, readEnvelope, normalizeOpts } from './visteras-envelope-core.js?v=envelope-8';
 import {
   shapeToPathData, parsePathData, transformSegments, warpSegments, segmentsToPathData, parseTransform,
   multiply, IDENTITY, applyMatrix, warpedBoxPathData,
-} from './visteras-envelope-warp.js?v=envelope-5';
-import { buildMesh, meshSize, drawMesh } from './visteras-envelope-raster.js?v=envelope-5';
+} from './visteras-envelope-warp.js?v=envelope-8';
+import { buildMesh, meshSize, drawMesh } from './visteras-envelope-raster.js?v=envelope-8';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
@@ -81,7 +81,10 @@ function textOutputs(orig, clone, m, data, env) {
   for (const [k, v] of Object.entries(attrsOf(outline))) if (k !== 'transform' && k !== 'id' && !k.startsWith('data-visteras-')) g.setAttribute(k, v);
   for (const [k, v] of Object.entries(attrsOf(clone))) if (!GEOMETRY_ATTRS.has(k) && !g.hasAttribute(k) && !/^(font|text-anchor|letter-spacing|xml:space|dominant-baseline)/.test(k)) g.setAttribute(k, v);
   g.setAttribute('id', clone.getAttribute('id') || env.nextId());
-  const mt = multiply(m, parseTransform(outline.getAttribute('transform')));
+  // `m` already includes the text's own transform; Create Outlines copies that same transform onto
+  // the outline group, so applying it again would scale/shift the glyphs twice (resized text ran
+  // off the envelope). Glyph coordinates are in the text's local space: use `m` alone.
+  const mt = m;
   for (const glyph of [...outline.children]) {
     if (glyph.localName !== 'path') continue;
     const p = warpShape(glyph, glyph, mt, data, env);

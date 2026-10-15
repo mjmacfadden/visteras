@@ -2,9 +2,9 @@
  * Visteras Vector — Envelope Distort actions: Edit Contents / Edit Envelope, Release, Expand.
  * Every action is one BatchCommand. DOM-free at import time (tests use the fake SVG tree).
  */
-import { ENV, SRC, OUT, EDITING, readEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-5';
-import { cloneEnvelopeOutput, refreshEnvelope, boundsIn, WRAP } from './visteras-envelope-model.js?v=envelope-5';
-import { parseTransform, multiply, IDENTITY, warpedBoxPathData } from './visteras-envelope-warp.js?v=envelope-5';
+import { ENV, SRC, OUT, EDITING, readEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-8';
+import { cloneEnvelopeOutput, refreshEnvelope, boundsIn, WRAP } from './visteras-envelope-model.js?v=envelope-8';
+import { parseTransform, multiply, IDENTITY, warpedBoxPathData } from './visteras-envelope-warp.js?v=envelope-8';
 
 const NS = 'http://www.w3.org/2000/svg';
 /** Release leaves the envelope shape as a grey object (Illustrator; exact grey [unverified] — decision). */

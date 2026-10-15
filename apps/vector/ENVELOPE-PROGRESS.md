@@ -45,3 +45,8 @@ Acceptance tests:
 - [x] H6 cleanup
 
 Decisions: the spec calls for eight menu items but explicitly lists seven commands. Implement the seven named commands in the prescribed order; Reset replaces Make rather than adding an invented eighth command.
+
+## Post-smoke fixes (Mike, c676bfba)
+- [x] F1 multi-object warp: one grid over the combined bounds. Root cause: the text's own transform was applied twice (the render matrix already had it, and Create Outlines copies it onto the outline group), so resized text grew and ran outside the grid.
+- [ ] F2 Warp Options: draggable title bar, opens clear of the artwork, no overlay hiding the canvas, live Preview on slider input and typed numbers
+- [ ] F3 text alone: the envelope uses the glyphs' visual (ink) bounds, not the line-height/advance box
