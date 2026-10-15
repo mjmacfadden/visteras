@@ -26,6 +26,26 @@ function warpShape(orig, clone, m, data, env) {
   for (const [k, v] of Object.entries(attrsOf(clone))) if (!GEOMETRY_ATTRS.has(k)) path.setAttribute(k, v);
   const segs = transformSegments(parsePathData(d || ''), m);
   path.setAttribute('d', segmentsToPathData(warpSegments(segs, data.bbox, data.params, data.opts).segments));
+  const so = env.strokeOutlines?.get(orig);
+  if (so) {
+    // Illustrator's outlined stroke: a group of the fill shape and the stroke as a filled path, both warped.
+    const g = env.doc.createElementNS(NS, 'g');
+    const id = path.getAttribute('id'); if (id) { g.setAttribute('id', id); path.setAttribute('id', env.nextId()); }
+    for (const k of ['opacity', 'filter', 'mask', 'clip-path', 'transform']) if (path.getAttribute(k)) { g.setAttribute(k, path.getAttribute(k)); path.removeAttribute(k); }
+    for (const k of [...Object.keys(attrsOf(path))]) if (k.startsWith('stroke')) path.removeAttribute(k);
+    const style = (path.getAttribute('style') || '').split(';').filter((x) => x.trim() && !/^\s*stroke/.test(x)).join(';');
+    if (style) path.setAttribute('style', style); else path.removeAttribute('style');
+    path.setAttribute('stroke', 'none');
+    const fill = path.getAttribute('fill');
+    if (fill !== 'none') g.appendChild(path);
+    const sp = env.doc.createElementNS(NS, 'path');
+    sp.setAttribute('id', env.nextId());
+    sp.setAttribute('d', segmentsToPathData(warpSegments(transformSegments(parsePathData(so.d), m), data.bbox, data.params, data.opts).segments));
+    sp.setAttribute('fill', so.color); sp.setAttribute('fill-rule', 'nonzero'); sp.setAttribute('stroke', 'none');
+    if (so.opacity < 1) sp.setAttribute('fill-opacity', String(so.opacity));
+    g.appendChild(sp);
+    return g;
+  }
   // Baking a scaled transform into the geometry would thin the stroke; keep its visual width uniform.
   const s = Math.sqrt(det(m));
   if (Math.abs(s - 1) > 1e-6) {
@@ -199,9 +219,21 @@ export async function prepareAndBuild(sc, el, cloneFn, deps = {}) {
     const m = matrixTo(data.src, img);
     try { const r = await rasterize(img, m, data, doc, deps); if (r) rasters.set(img, r); } catch { /* keep unwarped */ }
   }
+  // Distort Appearance: strokes become filled outlines before warping (so their width follows the warp).
+  const strokeOutlines = new Map();
+  if (data.opts.appearance && deps.loadStrokeOutliner) {
+    let outline = null;
+    try { outline = await deps.loadStrokeOutliner(); } catch { outline = null; }
+    if (outline) for (const leaf of data.src.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon')) {
+      if (leaf.closest?.('clipPath, mask, defs, symbol, pattern, marker')) continue;
+      const stroke = leaf.getAttribute('stroke') || leaf.style?.stroke;
+      if (!stroke || stroke === 'none') continue;
+      try { const o = outline(leaf); if (o) strokeOutlines.set(leaf, o); } catch { /* keep a uniform stroke */ }
+    }
+  }
   const svgRoot = sc.getSvgContent?.();
   return buildOutput(el, {
-    doc, nextId: () => sc.getNextId(), outlines, rasters,
+    doc, nextId: () => sc.getNextId(), outlines, rasters, strokeOutlines,
     findById: (id) => svgRoot?.querySelector?.(`[id="${String(id).replace(/"/g, '')}"]`) || doc.getElementById?.(id),
     strokeWidth: (node) => { try { return getComputedStyle(node).strokeWidth; } catch { return node.getAttribute('stroke-width'); } },
   }, cloneFn);

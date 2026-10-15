@@ -192,3 +192,81 @@ export function openWarpOptions(sc, { targets = null, envelope = null } = {}) {
   styleBtn.focus();
   return { overlay, close, get state() { return { ...state }; } };
 }
+
+/**
+ * Envelope Options. With an envelope: OK re-renders it as one undo step ('Envelope Options').
+ * Without one: OK sets the in-memory defaults used by the next Make with Warp.
+ */
+export function openEnvelopeOptions(sc, { envelope = null } = {}) {
+  if (document.getElementById('visteras_envopts_dialog')) return null;
+  ensureStyle();
+  let state = envelope ? normalizeOpts(readEnvelope(envelope).opts) : getSessionOpts();
+  const previous = document.activeElement;
+  const overlay = document.createElement('div');
+  overlay.className = 'visteras_modal_overlay venv_modal'; overlay.id = 'visteras_envopts_dialog';
+  const row = 'display:flex;align-items:center;gap:8px;color:#ccc;font-size:12px';
+  overlay.innerHTML = `
+  <div class="visteras_modal" role="dialog" aria-modal="true" aria-labelledby="venvo_title" style="width:360px">
+    <div class="visteras_modal_header"><span id="venvo_title">Envelope Options</span>
+      <button type="button" class="floating_panel_close" id="venvo_close" aria-label="Close">×</button></div>
+    <div class="visteras_modal_body" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+      <fieldset style="border:1px solid #3a3a3a;border-radius:4px;padding:8px 10px;display:flex;flex-direction:column;gap:6px">
+        <legend style="color:#aaa;font-size:12px;padding:0 4px">Rasters</legend>
+        <label style="${row}"><input type="checkbox" id="venvo_aa"> Anti-Alias</label>
+        <div style="color:#aaa;font-size:12px">Preserve Shape Using:</div>
+        <label style="${row}"><input type="radio" name="venvo_preserve" value="clip"> Clipping Mask</label>
+        <label style="${row}"><input type="radio" name="venvo_preserve" value="alpha"> Transparency</label>
+      </fieldset>
+      <label style="${row}"><span style="width:60px">Fidelity</span>
+        <input type="range" id="venvo_fidelity_range" min="0" max="100" step="1" style="flex:1" aria-label="Fidelity">
+        <input type="number" id="venvo_fidelity" class="vui-input" min="0" max="100" step="1" style="width:52px" aria-label="Fidelity value"></label>
+      <label style="${row}"><input type="checkbox" id="venvo_appearance"> Distort Appearance</label>
+      <label style="${row};opacity:.5" title="Coming later"><input type="checkbox" id="venvo_lingrad" disabled title="Coming later"> Distort Linear Gradients <span style="margin-left:auto">Coming later</span></label>
+      <label style="${row};opacity:.5" title="Coming later"><input type="checkbox" id="venvo_pattern" disabled title="Coming later"> Distort Pattern Fills <span style="margin-left:auto">Coming later</span></label>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+        <button type="button" id="venvo_cancel" class="vui-btn">Cancel</button>
+        <button type="button" id="venvo_ok" class="vui-btn vui-btn-primary">OK</button></div>
+    </div></div>`;
+  const $ = (sel) => overlay.querySelector(sel);
+  const sync = () => {
+    $('#venvo_aa').checked = !!state.aa;
+    for (const r of overlay.querySelectorAll('input[name="venvo_preserve"]')) r.checked = r.value === state.preserve;
+    $('#venvo_fidelity').value = state.fidelity; $('#venvo_fidelity_range').value = state.fidelity;
+    $('#venvo_appearance').checked = !!state.appearance;
+    $('#venvo_lingrad').checked = false; $('#venvo_pattern').checked = false;
+  };
+  const set = (patch) => { state = normalizeOpts({ ...state, ...patch }); sync(); };
+  $('#venvo_aa').onchange = (e) => set({ aa: e.target.checked });
+  for (const r of overlay.querySelectorAll('input[name="venvo_preserve"]')) r.onchange = () => set({ preserve: r.value });
+  $('#venvo_fidelity_range').oninput = (e) => set({ fidelity: Number(e.target.value) });
+  $('#venvo_fidelity').onchange = (e) => set({ fidelity: clampPercent(e.target.value, 0, 100, state.fidelity) });
+  $('#venvo_appearance').onchange = (e) => set({ appearance: e.target.checked });
+  const close = (commit) => {
+    window.removeEventListener('keydown', onKey, true);
+    overlay.remove();
+    if (commit) {
+      const opts = { aa: state.aa, preserve: state.preserve, fidelity: state.fidelity, appearance: state.appearance, linGrad: false, pattern: false };
+      if (envelope) updateEnvelope(sc, envelope, { opts }, { label: 'Envelope Options' });
+      else setSessionOpts(opts);
+    }
+    previous?.focus?.();
+  };
+  const onKey = (e) => {
+    if ((e.metaKey || e.ctrlKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(false); return; }
+    if (e.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); e.stopImmediatePropagation(); close(true); return; }
+    if (e.key === 'Tab') {
+      const f = [...overlay.querySelectorAll('button,input')].filter((n) => !n.disabled);
+      const i = f.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); f.at(-1).focus(); } else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+    }
+  };
+  $('#venvo_ok').onclick = () => close(true);
+  $('#venvo_cancel').onclick = () => close(false);
+  $('#venvo_close').onclick = () => close(false);
+  window.addEventListener('keydown', onKey, true);
+  document.body.appendChild(overlay);
+  sync();
+  $('#venvo_aa').focus();
+  return { overlay, close, get state() { return { ...state }; } };
+}

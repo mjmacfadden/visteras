@@ -1,6 +1,6 @@
 import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-5';
 import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-5';
-import { openWarpOptions, clampPercent, ensureStyle } from './visteras-envelope-dialogs.js?v=envelope-5';
+import { openWarpOptions, openEnvelopeOptions, clampPercent } from './visteras-envelope-dialogs.js?v=envelope-5';
 import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-5';
 import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-5';
 import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-5';
@@ -17,32 +17,6 @@ const selected = sc => (sc.getSelectedElements?.() || []).filter(Boolean);
 const envelope = isEnvelope;
 export const canMakeEnvelope = canEnvelope;
 
-function stubDialog(title, accept = null) {
-  const previous = document.activeElement;
-  const overlay = document.createElement('div');
-  ensureStyle();
-  overlay.className = 'visteras_modal_overlay venv_modal';
-  overlay.id = 'visteras_envelope_dialog';
-  overlay.innerHTML = `<div class="visteras_modal" role="dialog" aria-modal="true" aria-labelledby="venv_title" style="width:340px">
-    <div class="visteras_modal_header"><span id="venv_title"></span></div>
-    <div class="visteras_modal_body"><button type="button" class="vui-btn">Cancel</button></div></div>`;
-  overlay.querySelector('#venv_title').textContent = title;
-  const close = () => { overlay.remove(); window.removeEventListener('keydown', onKey, true); previous?.focus?.(); };
-  const onKey = e => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); }
-    if (e.key === 'Tab') { e.preventDefault(); overlay.querySelector('button').focus(); }
-  };
-  overlay.querySelector('button').onclick = close;
-  if (accept) {
-    const ok=document.createElement('button'); ok.type='button'; ok.className='vui-btn vui-btn-primary'; ok.textContent='OK';
-    ok.onclick=()=>{try {accept();close();} catch(error) {window.showStudioToast?.(error.message,'error');}};
-    overlay.querySelector('.visteras_modal_body').appendChild(ok);
-  }
-  window.addEventListener('keydown', onKey, true);
-  document.body.appendChild(overlay);
-  overlay.querySelector('button').focus();
-  return overlay;
-}
 
 /** Why Make with Warp can't run on this selection (toast text), or '' when nothing is selected. */
 export function envelopeBlockReason(sel) {
@@ -99,7 +73,25 @@ export function mountEnvelopePanel(sc, { openOptions, editContents, getCurrent }
 
 export function mountEnvelope(editor) {
   // Same URL as index.html so the shared font cache is reused; loaded lazily (keeps tests DOM-free).
-  setEnvelopeDeps({ loadTextOutlines: () => import('./visteras-text-outlines.js?v=character-styling-1').then(m => m.convertTextToOutlines) });
+  setEnvelopeDeps({
+    loadTextOutlines: () => import('./visteras-text-outlines.js?v=character-styling-1').then(m => m.convertTextToOutlines),
+    // Distort Appearance: the same Paper.js outline as Object ▸ Path ▸ Outline Stroke (same module URLs as expand.js).
+    loadStrokeOutliner: async () => {
+      const [{ readStrokeSpec, pathItemFromElement }, { outlineItem }] = await Promise.all([
+        import('./visteras-offset-path.js'), import('./visteras-stroke-envelope.js?v=envelope-1')]);
+      let scope = null;
+      return (el) => {
+        if (!window.paper) return null;
+        const spec = readStrokeSpec(el); if (!spec) return null;
+        if (!scope) { scope = new window.paper.PaperScope(); scope.setup(document.createElement('canvas')); }
+        const local = el.cloneNode(false); local.removeAttribute('transform');
+        const item = pathItemFromElement(scope, local);
+        const outline = item && outlineItem(scope, item, spec.width, spec);
+        const d = outline?.pathData || '';
+        return d.trim() ? { d, color: spec.color, opacity: Number.isFinite(spec.opacity) ? spec.opacity : 1 } : null;
+      };
+    },
+  });
   const sc = editor?.svgCanvas;
   if (!sc || document.getElementById('menu_envelope_distort')) return null;
   const menu = document.createElement('div');
@@ -123,7 +115,7 @@ export function mountEnvelope(editor) {
     item.addEventListener('click', () => {
       if (item.classList.contains('disabled')) return;
       if (id === 'make') openWarp();
-      if (id === 'options') stubDialog('Envelope Options');
+      if (id === 'options') { openEnvelopeOptions(sc, { envelope: currentEnvelope() }); return; }
       const el = currentEnvelope();
       if (!el) return;
       if (id === 'release') releaseEnvelope(sc, el);
