@@ -44,7 +44,7 @@ export default class Image_relight_class {
   <aside class="raw-develop__sidebar"><p class="relight-hint">Drag a light on the photo. Processing stays on your device.</p>
   <div class="relight-toolbar"><button type="button" data-action="add">Add Light</button></div>
   <div class="relight-list" role="list" aria-label="Lights"></div><div class="relight-controls"></div>
-  <label class="relight-global">Original lighting <input type="range" aria-label="Original lighting" min="0" max="100" value="75"><output>75%</output></label>
+  <label class="relight-global">Original lighting <input type="range" class="properties_range" aria-label="Original lighting" min="0" max="100" value="75"><output>75%</output></label>
   <label><input type="checkbox" data-role="compare"> Show original</label>
   <p class="relight-hint">Apply changes the selected layer in one undo step.</p>
   </aside></div><p class="relight-status" role="status" aria-live="polite">Preparing local depth estimation…</p><button type="button" data-action="retry" hidden>Retry depth estimation</button></div>`;}
@@ -143,7 +143,7 @@ export default class Image_relight_class {
   this.root.querySelector('.relight-list').innerHTML=this.lights.map(l=>`<button type="button" role="listitem" data-light="${l.id}" aria-pressed="${l.id===this.selected}">Light ${l.id}</button>`).join('');
   const light=this.lights.find(l=>l.id===this.selected);
   this.root.querySelector('[data-action="add"]').disabled=this.lights.length>=8;
-  const field=([key,label,min,max,step])=>`<label>${label}<span class="relight-slider"><input type="range" aria-label="${label}" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"><input type="number" aria-label="${label} value" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${Number(light[key].toFixed(2))}"></span></label>`;
+  const field=([key,label,min,max,step])=>`<label>${label}<span class="relight-slider"><input type="range" class="properties_range" aria-label="${label}" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${light[key]}"><input type="number" aria-label="${label} value" data-param="${key}" min="${min}" max="${max}" step="${step}" value="${Number(light[key].toFixed(2))}"></span></label>`;
   const names={none:'None',blinds:'Blinds',window:'Window',strip:'Light Strip',foliage:'Foliage',palm:'Palm',branches:'Branches',checker:'Checkerboard',dots:'Polka Dots','lines-h':'Horizontal Lines','lines-d':'Diagonal Lines',grid:'Grid',weave:'Weave',noise:'Noise',crosshatch:'Crosshatch',custom:'Custom Pattern'};
   this.root.querySelector('.relight-controls').innerHTML=light?`<label>Type <select aria-label="Light type" data-param="type"><option value="bulb" ${light.type==='bulb'?'selected':''}>Bulb</option><option value="sun" ${light.type==='sun'?'selected':''}>Sun</option></select></label>
    ${temperature_markup(light)}
