@@ -1,3 +1,4 @@
+import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-2';
 /** Layer hierarchy helpers, with DOM creation injected. */
 export const isSublayer = el => el?.localName === 'g' && el.getAttribute('data-visteras-sublayer') === '1';
 export const isLayerContainer = el => isSublayer(el) || /(?:^|\s)layer(?:\s|$)/.test(el?.getAttribute?.('class') || '');
@@ -26,6 +27,6 @@ export function topmostSelected(elements, root) {
 }
 /** Flatten sublayer boundaries for Select All / marquee; ordinary groups stay groups. */
 export function selectableArtwork(elements) {
-  return [...elements].flatMap(el => el?.getAttribute?.('display') === 'none' ? [] : isSublayer(el) ? selectableArtwork(el.children) :
+  return [...elements].flatMap(el => isEnvelopeSource(el) || el?.getAttribute?.('display') === 'none' ? [] : isSublayer(el) ? selectableArtwork(el.children) :
     el && !['title','desc','defs','metadata'].includes(el.localName) ? [el] : []);
 }

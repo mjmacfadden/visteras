@@ -27,10 +27,14 @@ test('Envelope module imports safely and mounts with versioned URL next to Expan
   assert.match(html,/mountExpand\(svgEditor\);\s*mountEnvelope\(svgEditor\)/);
 });
 test('Envelope Make excludes unsupported, hidden and existing envelopes', () => {
-  const element = (localName, attr=null, blocked=false) => ({localName,getAttribute:()=>attr,closest:()=>blocked?{}:null});
+  const element = (localName, attr=null, blocked=false) => ({localName,getAttribute:key=>key==='data-visteras-envelope'?attr:key==='display'&&blocked?'none':null});
   assert.equal(canMakeEnvelope([]),false);
   assert.equal(canMakeEnvelope([element('rect'),element('text')]),true);
   assert.equal(canMakeEnvelope([element('g','warp')]),false);
   assert.equal(canMakeEnvelope([element('rect',null,true)]),false);
   assert.equal(canMakeEnvelope([element('use')]),false);
+});
+test('H3 Edit ▸ Select All uses the canvas Select All (selectAllElements does not exist on SVG-Edit 7)', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /getElementById\('action_select_all'\)\?\.addEventListener\('click', \(\) => \{[\s\S]{0,260}sc\.selectAllInCurrentLayer\?\.\(\)/);
 });

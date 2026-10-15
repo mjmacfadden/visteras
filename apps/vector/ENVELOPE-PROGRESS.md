@@ -6,18 +6,19 @@ Baseline: Vector 765/765, 0 skipped; storage 0 violations (70 writes, 66 allowed
 
 - [x] 1. Menu and shortcut scaffolding — commit: this stage commit (resolve with `git log --grep='stage 1'`) — gates: test:vector 768/768, storage 0, build:vector OK, npm test PASS.
   Chrome on Mac: rectangle selected → ⌥⇧⌘W opens Warp Options with Cancel. Other browsers not verified. Triple-modifier Windows labels normalized to Ctrl+Alt+Shift by shared formatter; key matching unchanged.
-- [ ] 2. Envelope object model and storage
+- [x] 2. Envelope object model and storage — commit: this stage commit (resolve with `git log --grep='stage 2'`) — gates: test:vector 778/778, storage 0, build:vector OK, npm test PASS.
+  `visteras-envelope-core.js` (normalize/read/isEnvelope/isEnvelopeSource/canEnvelope/hash) and `visteras-envelope-model.js` (makeEnvelope as one BatchCommand 'Make with Warp', identity `-out` clone with remapped ids, refresh-on-load when stale). Layers shows `<Envelope>` with a collapsed Contents row; Select All / marquee / click skip `-src`. Hash ignores ids and pointer-events styles that SVG-Edit adds on load (otherwise every reopen looked stale). Fixed a master bug: Edit ▸ Select All called the non-existent `sc.selectAllElements` and did nothing. Chrome (Mac) verified with a displaced `-out`: click on hidden source selects nothing, click on output selects the envelope, marquee over source selects nothing, ⌘A and Edit ▸ Select All select the envelope once, getStrokedBBox/getBBox/handles equal `-out`, save→reopen keeps params and output, stale source rebuilds `-out`. Limitation: Make requires all objects in the same layer/group (toast otherwise) until stage 3 adds document-space normalisation.
 - [ ] 3. Warp math, subdivision and raster rendering
 - [ ] 4. Warp Options and live Preview
 - [ ] 5. Editing, Reset, Release and Expand
 - [ ] 6. Envelope Options
 - [ ] 7. Appearance, Layers, export and Studio paste
 
-Next: Stage 2. Stage 1 is scaffolding only; Warp Options has no OK yet and does not modify artwork.
+Next: Stage 3 (warp math). Stage 2's Warp Options stub has OK (identity envelope) and Cancel.
 
 Acceptance tests:
 - [x] AT1 menu/chord scaffolding (Chrome Mac runtime verified)
-- [ ] AT2 defaults and Make
+- [x] AT2 defaults and Make
 - [ ] AT3 identity math
 - [ ] AT4 golden styles
 - [ ] AT5 preview/cancel
@@ -26,14 +27,14 @@ Acceptance tests:
 - [ ] AT8 release
 - [ ] AT9 live contents
 - [ ] AT10 fidelity
-- [ ] AT11 persistence
+- [x] AT11 persistence
 - [ ] AT12 export
 - [ ] AT13 clipboard
 - [ ] AT14 rasters
 - [ ] AT15 Appearance/Layers
-- [ ] H1 hit-testing
-- [ ] H2 bounds
-- [ ] H3 Select All
+- [x] H1 hit-testing
+- [x] H2 bounds
+- [x] H3 Select All
 - [ ] H4 export
 - [ ] H5 Studio paste
 - [ ] H6 cleanup

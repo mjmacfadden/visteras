@@ -1,3 +1,5 @@
+import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-2';
+import { makeEnvelope, refreshEnvelope } from './visteras-envelope-model.js?v=envelope-2';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });
@@ -7,14 +9,10 @@ export const ENVELOPE_COMMANDS = Object.freeze([
   ['release', 'Release'], ['options', 'Envelope Options…'], ['expand', 'Expand'], ['edit', 'Edit Contents'],
 ]);
 const selected = sc => (sc.getSelectedElements?.() || []).filter(Boolean);
-const envelope = el => el?.getAttribute?.('data-visteras-envelope') === 'warp';
-export function canMakeEnvelope(elements) {
-  return elements.length > 0 && elements.every(el =>
-    /^(path|rect|circle|ellipse|line|polyline|polygon|g|text|image)$/.test(el.localName) &&
-    !envelope(el) && !el.closest?.('[display="none"], [data-visteras-locked="1"], [data-visteras-guide], [data-visteras-symbol-instance]'));
-}
+const envelope = isEnvelope;
+export const canMakeEnvelope = canEnvelope;
 
-function stubDialog(title) {
+function stubDialog(title, accept = null) {
   const previous = document.activeElement;
   const overlay = document.createElement('div');
   overlay.className = 'visteras_modal_overlay';
@@ -29,6 +27,11 @@ function stubDialog(title) {
     if (e.key === 'Tab') { e.preventDefault(); overlay.querySelector('button').focus(); }
   };
   overlay.querySelector('button').onclick = close;
+  if (accept) {
+    const ok=document.createElement('button'); ok.type='button'; ok.className='vui-btn vui-btn-primary'; ok.textContent='OK';
+    ok.onclick=()=>{try {accept();close();} catch(error) {window.showStudioToast?.(error.message,'error');}};
+    overlay.querySelector('.visteras_modal_body').appendChild(ok);
+  }
   window.addEventListener('keydown', onKey, true);
   document.body.appendChild(overlay);
   overlay.querySelector('button').focus();
@@ -76,7 +79,7 @@ export function mountEnvelope(editor) {
   function openWarp() {
     if (document.getElementById('visteras_envelope_dialog')) return;
     const sel = selected(sc);
-    if (canMakeEnvelope(sel) || (sel.length === 1 && envelope(sel[0]))) stubDialog('Warp Options');
+    if (canMakeEnvelope(sel) || (sel.length === 1 && envelope(sel[0]))) stubDialog('Warp Options', () => makeEnvelope(sc, sel));
   }
   window.addEventListener('keydown', e => {
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase()) || document.activeElement?.isContentEditable) return;
@@ -87,6 +90,7 @@ export function mountEnvelope(editor) {
   const original = sc.call;
   sc.call = function(event, ...args) {
     const result = original.call(this, event, ...args);
+    if (event === 'sourcechanged') for (const el of sc.getSvgContent().querySelectorAll('[data-visteras-envelope="warp"]')) refreshEnvelope(sc,el);
     if (['selected', 'changed', 'sourcechanged'].includes(event)) sync();
     return result;
   };
