@@ -138,7 +138,7 @@ test('Temperature presets include neutral and distinct warm/cool gels',async()=>
  const m=await patterns();assert.equal(m.temperature_color(5500),'#ffffff');assert.notEqual(m.temperature_color(1000),m.temperature_color(10000));assert.equal(m.TEMPERATURES.length,9);
 });
 test('Zoom keeps the point under the cursor fixed and fit uses image dimensions',async()=>{
- const m=await import('../src/js/libs/relight/view.js');assert.equal(m.fit_zoom(432,232,800,400),.5);
+ const m=await import('../src/js/libs/relight/view.js');assert.equal(m.fit_zoom(464,264,800,400),.5);
  const before={scale:.5,x:20,y:-10},after=m.zoom_view(before,1,100,50);
  assert.equal((100-after.x)/after.scale,(100-before.x)/before.scale);assert.equal((50-after.y)/after.scale,(50-before.y)/before.scale);
  assert.equal(m.zoom_view(before,100).scale,4);

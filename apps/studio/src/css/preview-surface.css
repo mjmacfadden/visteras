@@ -1,0 +1,10 @@
+/**
+ * Shared image surface for full-workspace preview dialogs
+ * (Relight, Raw Develop, Select and Mask).
+ * Apply only to the element whose box equals the image/layer bounds,
+ * never to a full-width stage or wrapper, so the shadow hugs the image.
+ */
+.studio-preview-surface {
+	display: block;
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 4px 24px rgba(0, 0, 0, 0.5);
+}
