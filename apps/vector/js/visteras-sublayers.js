@@ -1,4 +1,4 @@
-import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-11';
+import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-12';
 /** Layer hierarchy helpers, with DOM creation injected. */
 export const isSublayer = el => el?.localName === 'g' && el.getAttribute('data-visteras-sublayer') === '1';
 export const isLayerContainer = el => isSublayer(el) || /(?:^|\s)layer(?:\s|$)/.test(el?.getAttribute?.('class') || '');

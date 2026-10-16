@@ -14,10 +14,10 @@
 import { convertTextToOutlines, isTextElement } from './visteras-text-outlines.js?v=character-styling-1';
 import { outlineStrokeLeaves, collectLeaves } from './visteras-offset-path.js?v=expand-1';
 import { breakLinkToSymbol } from './visteras-symbols-model.js?v=gap5-1';
-import { isEnvelope } from './visteras-envelope-core.js?v=envelope-11';
-import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-11';
-import { expandEnvelope } from './visteras-envelope-actions.js?v=envelope-11';
-import { shapeToPathData } from './visteras-envelope-warp.js?v=envelope-11';
+import { isEnvelope } from './visteras-envelope-core.js?v=envelope-12';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-12';
+import { expandEnvelope } from './visteras-envelope-actions.js?v=envelope-12';
+import { shapeToPathData } from './visteras-envelope-warp.js?v=envelope-12';
 
 const SHAPE_TAGS = new Set(['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);
 const LEAF_TAGS = ['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon'];
@@ -193,7 +193,7 @@ export async function expandSelection(editor, targetElements = null, choice = nu
 
 /* ── Dialog ─────────────────────────────────────────────────────────── */
 let dialogs = null;
-const loadDialogs = () => (dialogs ||= import('./visteras-envelope-dialogs.js?v=envelope-11'));
+const loadDialogs = () => (dialogs ||= import('./visteras-envelope-dialogs.js?v=envelope-12'));
 
 /** Object ▸ Expand… dialog: Object / Fill / Stroke (inapplicable ones disabled), OK / Cancel. */
 export async function openExpandDialog(editor) {

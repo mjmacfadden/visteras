@@ -1,10 +1,9 @@
-import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-11';
-import { refreshEnvelope, setEnvelopeDeps, updateEnvelope } from './visteras-envelope-model.js?v=envelope-11';
-import { openWarpOptions, openEnvelopeOptions, clampPercent } from './visteras-envelope-dialogs.js?v=envelope-11';
-import { STYLE_LABELS } from './visteras-envelope-warp.js?v=envelope-11';
-import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-11';
-import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-11';
-import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-11';
+import { canEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-12';
+import { refreshEnvelope, setEnvelopeDeps } from './visteras-envelope-model.js?v=envelope-12';
+import { openWarpOptions, openEnvelopeOptions } from './visteras-envelope-dialogs.js?v=envelope-12';
+import { readEnvelope, EDITING } from './visteras-envelope-core.js?v=envelope-12';
+import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, clearEditingFlag } from './visteras-envelope-actions.js?v=envelope-12';
+import { ensureEnvelopeRendered } from './visteras-envelope-model.js?v=envelope-12';
 import { eventMatchesChord, formatBrowserSafeShortcut } from './visteras-browser-shortcuts.js';
 
 export const WARP_CHORD = Object.freeze({ meta: true, alt: true, shift: true, key: 'W' });
@@ -26,35 +25,33 @@ export function envelopeBlockReason(sel) {
   return 'Envelope Distort needs unlocked, visible artwork';
 }
 
+// 16px icons for the Envelope row (currentColor so the shared hover/active colours apply).
+const ICONS = {
+  warp: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M2 5c3-3 9-3 12 0M2 11c3-3 9-3 12 0M2 5v6M14 5v6M8 3.2v5.6"/></svg>',
+  edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1" stroke-dasharray="2 1.5"/><path d="M5.5 10.5l4.8-4.8 1.2 1.2-4.8 4.8H5.5z"/></svg>',
+  options: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><path d="M2 4h7M12 4h2M2 8h2M7 8h7M2 12h9M14 12h0"/><circle cx="10.5" cy="4" r="1.5"/><circle cx="5.5" cy="8" r="1.5"/><circle cx="12.5" cy="12" r="1.5"/></svg>',
+};
+
 /**
- * Control-bar controls for a selected envelope (Properties panel section "Envelope").
- * Every change is one undo step ('Envelope Warp').
+ * Properties ▸ Envelope: one compact, left-aligned row of the shared icon buttons
+ * (.vui-icon-group / .vui-icon-btn, as Align, Pathfinder and Actions use).
+ * Envelopes are edited in Warp Options (Illustrator's Reset with Warp), not inline.
  */
-export function mountEnvelopePanel(sc, { openOptions, editContents, getCurrent } = {}) {
+export function mountEnvelopePanel(sc, { openWarp, openOptions, editContents, getCurrent } = {}) {
   const host = document.getElementById('properties_content');
   if (!host || document.getElementById('sec_envelope')) return null;
   const sec = document.createElement('div');
   sec.className = 'prop_section'; sec.id = 'sec_envelope'; sec.style.display = 'none';
+  const btn = (id, icon, label) => `<button type="button" class="vui-icon-btn" id="${id}" title="${label}" aria-label="${label}">${ICONS[icon]}</button>`;
   sec.innerHTML = `<div class="prop_section_header" data-target="sec_envelope_body"><span class="prop_section_arrow"></span><span class="prop_section_title">Envelope</span></div>
-    <div class="prop_section_body" id="sec_envelope_body" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#ccc">
-      <label style="display:flex;gap:6px;align-items:center">Style <select id="venv_style" class="vui-input" style="flex:1">${STYLE_LABELS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
-      <div role="radiogroup" aria-label="Direction" style="display:flex;gap:10px"><label><input type="radio" name="venv_dir" value="h"> Horizontal</label><label><input type="radio" name="venv_dir" value="v"> Vertical</label></div>
-      <label style="display:flex;gap:6px;align-items:center">Bend <input id="venv_bend" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %</label>
-      <label style="display:flex;gap:6px;align-items:center">H <input id="venv_dh" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %
-        V <input id="venv_dv" type="number" class="vui-input" min="-100" max="100" step="1" style="width:56px"> %</label>
-      <div style="display:flex;gap:6px"><button type="button" class="vui-btn" id="venv_edit">Edit Contents</button><button type="button" class="vui-btn" id="venv_options">Envelope Options…</button></div>
+    <div class="prop_section_body" id="sec_envelope_body">
+      <div class="vui-icon-group" id="venv_actions" role="toolbar" aria-label="Envelope">${btn('venv_warp', 'warp', 'Warp Options…')}${btn('venv_edit', 'edit', 'Edit Contents')}${btn('venv_options', 'options', 'Envelope Options…')}</div>
     </div>`;
   const anchor = document.getElementById('sec_appearance');
   if (anchor) anchor.before(sec); else host.appendChild(sec);
   const $ = (id) => sec.querySelector(id);
   const current = getCurrent || (() => { const sel = selected(sc); return sel.length === 1 && envelope(sel[0]) ? sel[0] : null; });
-  const commit = (patch) => { const el = current(); if (el) updateEnvelope(sc, el, { params: patch }, { label: 'Envelope Warp' }); };
-  $('#venv_style').onchange = (e) => commit({ style: e.target.value });
-  for (const r of sec.querySelectorAll('input[name="venv_dir"]')) r.onchange = () => commit({ dir: r.value });
-  for (const k of ['bend', 'dh', 'dv']) $(`#venv_${k}`).onchange = (e) => {
-    const el = current(); if (!el) return;
-    const v = clampPercent(e.target.value, -100, 100, readEnvelope(el).params[k]); e.target.value = v; commit({ [k]: v });
-  };
+  $('#venv_warp').onclick = () => openWarp?.();
   $('#venv_edit').onclick = () => editContents?.();
   $('#venv_options').onclick = () => openOptions?.();
   return {
@@ -62,11 +59,12 @@ export function mountEnvelopePanel(sc, { openOptions, editContents, getCurrent }
       const el = current();
       sec.style.display = el ? '' : 'none';
       if (!el) return;
-      const p = readEnvelope(el).params, editing = el.hasAttribute('data-visteras-envelope-editing');
-      $('#venv_style').value = p.style;
-      for (const r of sec.querySelectorAll('input[name="venv_dir"]')) r.checked = r.value === p.dir;
-      for (const k of ['bend', 'dh', 'dv']) if (document.activeElement !== $(`#venv_${k}`)) $(`#venv_${k}`).value = p[k];
-      $('#venv_edit').textContent = editing ? 'Edit Envelope' : 'Edit Contents';
+      const editing = el.hasAttribute('data-visteras-envelope-editing');
+      const edit = $('#venv_edit'), label = editing ? 'Edit Envelope' : 'Edit Contents';
+      edit.title = label; edit.setAttribute('aria-label', label);
+      edit.setAttribute('aria-pressed', String(editing));
+      // Warp Options edits the envelope itself: not while its contents are open.
+      $('#venv_warp').disabled = editing;
     },
   };
 }
@@ -157,15 +155,31 @@ export function mountEnvelope(editor) {
   // The Properties panel is built after extensions mount: attach lazily on the first selection change.
   let panelApi = null;
   const panel = { sync() {
-    panelApi ||= mountEnvelopePanel(sc, { openOptions: () => document.getElementById('action_envelope_options')?.click(),
+    panelApi ||= mountEnvelopePanel(sc, { openWarp: () => openWarp(), openOptions: () => document.getElementById('action_envelope_options')?.click(),
       editContents: () => document.getElementById('action_envelope_edit')?.click(), getCurrent: () => currentEnvelope() });
     panelApi?.sync();
   } };
   window.addEventListener('keydown', e => {
     if (['input', 'textarea', 'select'].includes(document.activeElement?.tagName?.toLowerCase()) || document.activeElement?.isContentEditable) return;
     if (window.__visterasIsTypingDirectly) return;
+    // Esc leaves Edit Contents (Illustrator's Exit Isolation Mode) unless a dialog is open.
+    if (e.key === 'Escape' && !document.querySelector('.venv_modal, .visteras_modal_overlay')) {
+      const el = currentEnvelope();
+      if (el?.hasAttribute(EDITING)) { e.preventDefault(); e.stopImmediatePropagation(); editEnvelope(sc, el); return; }
+    }
     if (!eventMatchesChord(e, WARP_CHORD)) return;
     e.preventDefault(); e.stopImmediatePropagation(); openWarp();
+  }, true);
+  // Illustrator: double-clicking an envelope with the Selection tool enters isolation on its
+  // contents (Edit Contents) — it does not open Warp Options. Capture so svgedit's group
+  // double-click doesn't isolate the envelope wrapper itself.
+  document.addEventListener('dblclick', (e) => {
+    const content = sc.getSvgContent?.();
+    if (!content || !content.contains(e.target) || (sc.getMode?.() || 'select') !== 'select') return;
+    const el = e.target.closest?.('g[data-visteras-envelope="warp"]');
+    if (!el || el.hasAttribute(EDITING)) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    editContents(sc, el);
   }, true);
   if (!document.getElementById('visteras_envelope_edit_css')) {
     // Edit Contents: stylesheet rules beat the presentation attributes, so one flag swaps src/out.

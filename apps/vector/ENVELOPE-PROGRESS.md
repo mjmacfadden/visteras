@@ -69,3 +69,9 @@ Decisions: the spec calls for eight menu items but explicitly lists seven comman
   - Stroke: filled outline paths.
   - Fill: primitives become paths with the same paint.
 - [x] Also fixed: the old Expand recorded two or three undo steps (convertToPath and Outline Stroke each added their own).
+
+## Properties ▸ Envelope cleanup (Mike, 5d9aab32)
+- [x] U1 The inline Style / Horizontal-Vertical / Bend / H / V controls are removed from Properties, together with their wiring (`updateEnvelope` 'Envelope Warp') and tests. Envelopes are edited in Warp Options, which opens on an existing envelope from Properties ▸ Warp Options… or from Object ▸ Envelope Distort ▸ Reset with Warp… (also ⌥⇧⌘W). It shows the current settings with Preview on, in the movable non-dimming box. OK is one undo step; Esc/Cancel leaves the file byte-identical with nothing to undo.
+- [x] U2 The Envelope section is one left-aligned row of the shared `.vui-icon-group` / `.vui-icon-btn` buttons (28×24, 2px gap, same as Align/Pathfinder/Actions), with icons and tooltips: Warp Options…, Edit Contents (aria-pressed, "Edit Envelope" while editing), Envelope Options….
+- [x] U3 Double-click follows Illustrator: double-clicking an envelope with the Selection tool enters isolation on its contents (Edit Contents), not Warp Options. Esc exits back to the envelope. Edit Contents now selects the contents (as Illustrator does), so Properties stays visible with "Edit Envelope".
+- Expand Appearance stays greyed out.

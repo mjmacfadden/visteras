@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-11';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-12';
 import {
   warpPoint, parsePathData, shapeToPathData, warpTolerance, warpSegments, segmentsToPathData,
   segmentsBounds, countNodes, parseTransform, multiply, applyMatrix, invert, transformSegments,
-} from '../js/visteras-envelope-warp.js?v=envelope-11';
-import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-11';
-import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-11';
+} from '../js/visteras-envelope-warp.js?v=envelope-12';
+import { meshSize, buildMesh, triangleAffine, meshTriangles } from '../js/visteras-envelope-raster.js?v=envelope-12';
+import { buildOutput, imageMatrix } from '../js/visteras-envelope-render.js?v=envelope-12';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-11';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-11';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-12';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-12';
 
 const BOX = [100, 50, 200, 100];
 const GRID = [];
@@ -174,7 +174,7 @@ test('fix 1: rect + resized text warp through ONE grid — glyphs keep their pla
 });
 
 test('fix 3: live text alone — envelope bounds are the glyph ink box, not the line box (getBBox)', async () => {
-  const { boundsIn, textInkBox, setEnvelopeDeps } = await import('../js/visteras-envelope-model.js?v=envelope-11');
+  const { boundsIn, textInkBox, setEnvelopeDeps } = await import('../js/visteras-envelope-model.js?v=envelope-12');
   const I = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   // "A B" at x=100,150,200 on baseline y=300; each glyph ink 40 wide, 70 tall above the baseline, 2 below.
   const text = { localName: 'text', getScreenCTM: () => I, getBBox: () => ({ x: 100, y: 211, width: 160, height: 112 }), // line box: ascent+descent+advances

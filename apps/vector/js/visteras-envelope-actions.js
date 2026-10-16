@@ -2,9 +2,9 @@
  * Visteras Vector — Envelope Distort actions: Edit Contents / Edit Envelope, Release, Expand.
  * Every action is one BatchCommand. DOM-free at import time (tests use the fake SVG tree).
  */
-import { ENV, SRC, OUT, EDITING, readEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-11';
-import { cloneEnvelopeOutput, refreshEnvelope, boundsIn, WRAP } from './visteras-envelope-model.js?v=envelope-11';
-import { parseTransform, multiply, IDENTITY, warpedBoxPathData } from './visteras-envelope-warp.js?v=envelope-11';
+import { ENV, SRC, OUT, EDITING, readEnvelope, isEnvelope } from './visteras-envelope-core.js?v=envelope-12';
+import { cloneEnvelopeOutput, refreshEnvelope, boundsIn, WRAP } from './visteras-envelope-model.js?v=envelope-12';
+import { parseTransform, multiply, IDENTITY, warpedBoxPathData } from './visteras-envelope-warp.js?v=envelope-12';
 
 const NS = 'http://www.w3.org/2000/svg';
 /** Release leaves the envelope shape as a grey object (Illustrator; exact grey [unverified] — decision). */
@@ -26,6 +26,9 @@ export function editContents(sc, el) {
   const { src } = readEnvelope(el);
   sc.clearSelection?.();
   try { sc.setContext?.(src); } catch { /* isolation is best effort */ }
+  // Illustrator selects the contents, so the Control/Properties panel stays up with "Edit Envelope".
+  const kids = [...(src?.children || [])].filter((n) => n.nodeType === 1 && !['title', 'desc', 'defs'].includes(n.localName));
+  if (kids.length) { try { sc.addToSelection?.(kids); } catch { /* ignore */ } }
   sc.call?.('changed', [el]);
   return true;
 }

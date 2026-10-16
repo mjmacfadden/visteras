@@ -4,12 +4,12 @@
  * unit-testable; text outlines and image rasters are prepared asynchronously
  * by renderEnvelope() and passed in.
  */
-import { ENV, SRC, OUT, readEnvelope, normalizeOpts } from './visteras-envelope-core.js?v=envelope-11';
+import { ENV, SRC, OUT, readEnvelope, normalizeOpts } from './visteras-envelope-core.js?v=envelope-12';
 import {
   shapeToPathData, parsePathData, transformSegments, warpSegments, segmentsToPathData, parseTransform,
   multiply, IDENTITY, applyMatrix, warpedBoxPathData,
-} from './visteras-envelope-warp.js?v=envelope-11';
-import { buildMesh, meshSize, drawMesh } from './visteras-envelope-raster.js?v=envelope-11';
+} from './visteras-envelope-warp.js?v=envelope-12';
+import { buildMesh, meshSize, drawMesh } from './visteras-envelope-raster.js?v=envelope-12';
 
 const NS = 'http://www.w3.org/2000/svg';
 export const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon']);

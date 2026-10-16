@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas, serialize } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope } from '../js/visteras-envelope-model.js?v=envelope-11';
-import { readEnvelope, isEnvelopeSource, EDITING, envelopeHash } from '../js/visteras-envelope-core.js?v=envelope-11';
-import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, stripEnvelopeAttrs, sweepLocalClips, RELEASE_FILL, EXPAND_NAME } from '../js/visteras-envelope-actions.js?v=envelope-11';
+import { makeEnvelope, updateEnvelope } from '../js/visteras-envelope-model.js?v=envelope-12';
+import { readEnvelope, isEnvelopeSource, EDITING, envelopeHash } from '../js/visteras-envelope-core.js?v=envelope-12';
+import { editContents, editEnvelope, releaseEnvelope, expandEnvelope, stripEnvelopeAttrs, sweepLocalClips, RELEASE_FILL, EXPAND_NAME } from '../js/visteras-envelope-actions.js?v=envelope-12';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 const setup = () => {

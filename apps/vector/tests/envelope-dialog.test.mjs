@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas, serialize } from './helpers/envelope-dom.mjs';
-import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-11';
-import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-11';
-import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-11';
-import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-11';
-import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-11';
-import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-11';
+import { makeEnvelope, updateEnvelope, revertPreviewEnvelope, restoreEnvelopeAttrs } from '../js/visteras-envelope-model.js?v=envelope-12';
+import { readEnvelope } from '../js/visteras-envelope-core.js?v=envelope-12';
+import { DEFAULT_WARP, getSessionWarp, setSessionWarp, resetSession, clampPercent, styleIcon, getSessionOpts, placeBeside } from '../js/visteras-envelope-dialogs.js?v=envelope-12';
+import { buildOutput, rasterize } from '../js/visteras-envelope-render.js?v=envelope-12';
+import { drawMesh, buildMesh } from '../js/visteras-envelope-raster.js?v=envelope-12';
+import { STYLES } from '../js/visteras-envelope-core.js?v=envelope-12';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
 
@@ -84,9 +84,9 @@ test('dialog wiring: title, controls, Preview on at every open (not remembered),
   assert.match(env, /openWarpOptions\(sc, \{ envelope: sel\[0\] \}\)/);
   assert.match(env, /Expand the symbol first/);
   assert.match(env, /id="sec_envelope"|sec\.id = 'sec_envelope'/);
-  assert.match(env, /label: 'Envelope Warp'/);
+  assert.doesNotMatch(env, /label: 'Envelope Warp'/, 'no inline warp edits from Properties');
   const html = read('../index.html');
-  assert.match(html, /visteras-envelope\.js\?v=envelope-11/);
+  assert.match(html, /visteras-envelope\.js\?v=envelope-12/);
 });
 
 test('AT14 image envelope: Clipping Mask → clipPath, Transparency → alpha (injected fake canvas)', async () => {
@@ -152,4 +152,28 @@ test('fix 2: the modal layer is transparent (canvas never dimmed) and the title 
   assert.match(src, /range\.oninput = /, 'slider previews on input, not just change');
   assert.match(src, /num\.oninput = /, 'typed numbers preview while typing');
   assert.match(src, /const schedule = \(\) => \{ if \(closed \|\| !preview\.checked\) return;/, 'a late change after Cancel cannot re-create the preview');
+});
+
+test('Properties ▸ Envelope: no inline warp controls, one row of shared icon buttons (Warp Options… / Edit Contents / Envelope Options…)', () => {
+  const env = read('../js/visteras-envelope.js');
+  const panel = env.slice(env.indexOf('export function mountEnvelopePanel'), env.indexOf('export function mountEnvelope('));
+  for (const id of ['venv_style', 'venv_dir', 'venv_bend', 'venv_dh', 'venv_dv']) assert.doesNotMatch(panel, new RegExp(id), `${id} removed`);
+  assert.doesNotMatch(panel, /updateEnvelope|clampPercent|STYLE_LABELS|vui-btn"/, 'inline wiring removed');
+  assert.match(panel, /class="vui-icon-group" id="venv_actions"/, 'the shared @visteras/ui icon row');
+  const buttons = [...panel.matchAll(/btn\('(venv_\w+)', '(\w+)', '([^']+)'\)/g)].map((m) => [m[1], m[3]]);
+  assert.deepEqual(buttons, [['venv_warp', 'Warp Options…'], ['venv_edit', 'Edit Contents'], ['venv_options', 'Envelope Options…']]);
+  assert.match(panel, /class="vui-icon-btn" id="\$\{id\}" title="\$\{label\}" aria-label="\$\{label\}"/, 'icons with tooltips');
+  assert.match(panel, /editing \? 'Edit Envelope' : 'Edit Contents'/);
+  assert.match(panel, /setAttribute\('aria-pressed', String\(editing\)\)/, 'shared active state while editing contents');
+  assert.match(env, /openWarp: \(\) => openWarp\(\)/, 'Warp Options… opens the dialog on the envelope (Reset with Warp)');
+  const css = fs.readFileSync(new URL('../../../packages/ui/src/ui.css', import.meta.url), 'utf8');
+  assert.match(css, /\.vui-icon-group \{[^}]*justify-content: flex-start/);
+});
+
+test('Illustrator double-click: an envelope enters Edit Contents (isolation), not Warp Options; Esc exits; contents get selected', () => {
+  const env = read('../js/visteras-envelope.js');
+  assert.match(env, /addEventListener\('dblclick'[\s\S]{0,600}editContents\(sc, el\)/);
+  assert.doesNotMatch(env.slice(env.indexOf("addEventListener('dblclick'"), env.indexOf("addEventListener('dblclick'") + 600), /openWarp/);
+  assert.match(env, /e\.key === 'Escape'[\s\S]{0,250}editEnvelope\(sc, el\)/);
+  assert.match(read('../js/visteras-envelope-actions.js'), /sc\.addToSelection\?\.\(kids\)/);
 });

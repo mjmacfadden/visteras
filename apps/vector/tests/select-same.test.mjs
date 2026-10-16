@@ -51,7 +51,7 @@ test('Select menu includes All, All on Active Artboard, Deselect, Reselect, Inve
 
 test('index mounts select-same with cache-bust envelope-3; menu bar uses live delegation', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /visteras-select-same\.js\?v=envelope-11/);
+  assert.match(html, /visteras-select-same\.js\?v=envelope-12/);
   assert.match(html, /mountSelectSame/);
   assert.match(html, /Live queries \+ delegation/);
   assert.match(html, /const menuEntries = \(\) => Array\.from\(menuBar\.querySelectorAll\('\.menu_entry'\)\)/);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { tree, canvas } from './helpers/envelope-dom.mjs';
-import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-11';
+import { makeEnvelope } from '../js/visteras-envelope-model.js?v=envelope-12';
 import { expandOptions, canExpand, expandSelection, expandTargets } from '../js/visteras-expand.js?v=expand-1';
 
 const read = (rel) => fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
