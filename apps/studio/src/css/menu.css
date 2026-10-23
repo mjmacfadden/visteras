@@ -123,8 +123,9 @@
 	list-style: none;
 	padding: 4px 0;
 	margin: 0;
-	overflow-x: hidden;
-	overflow-y: auto;
+	/* As tall as the content; gui-menu.js adds max-height + overflow-y: auto only
+	   when the menu would run past the bottom of the viewport. */
+	overflow: visible;
 	min-width: 180px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 	background: #3c3c3c;
@@ -174,6 +175,12 @@
 	content: ">";
 	right: 9px;
 	width: 5px;
+	/* Keep the stretched glyph inside its row: an unanchored, scaled 26px line box
+	   used to stick out below the last item and give the Edit menu a scrollbar. */
+	top: 50%;
+	height: 12px;
+	line-height: 12px;
+	margin-top: -6px;
 	transform: scaleY(2);
 	color: #808080;
 }
