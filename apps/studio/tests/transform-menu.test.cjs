@@ -219,3 +219,10 @@ test('render paths honour flip and warp', () => {
 	assert.match(read('tools/text.js'), /hasFlip/);
 	assert.match(read('core/renderer/webgl-renderer.js'), /layer\.flip_x \|\| layer\.flip_y \|\| layer\.warp_mesh/);
 });
+
+test('Move-tool handle drags run through the transform session so they can flip', () => {
+	const src = read('tools/select.js');
+	assert.match(src, /Number\(this\.Base_selection\.selected_object_drag_type\)/, 'drag types are strings ("1".."10")');
+	assert.match(src, /transform\.session\.from_handles = true;\n\t+transform\.pointer_down\(mouse, e\);/);
+	assert.match(src, /if \(transform\.session\?\.from_handles\) await transform\.commit\('Transform'\);/);
+});
