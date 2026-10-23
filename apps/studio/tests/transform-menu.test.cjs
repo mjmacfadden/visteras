@@ -41,14 +41,25 @@ test('corner dragged past the opposite corner flips both axes', () => {
 	close(r.x, -50); close(r.y, -25); close(r.width, 50); close(r.height, 25);
 });
 
-test('Shift + middle handle reflects about the opposite edge, then keeps resizing', () => {
-	const start = api.resize_from_drag(box(), H.tc, { x: 50, y: 0 }, { x: 50, y: 0 }, true, null, true);
-	assert.equal(start.flip_y, true);
-	close(start.y, 50); close(start.height, 50); close(start.width, 100, 1e-6, 'reflection is single-axis');
-	const more = api.resize_from_drag(box(), H.tc, { x: 50, y: 0 }, { x: 50, y: -10 }, true, null, true);
-	close(more.height, 60); close(more.y, 50);
-	const side = api.resize_from_drag(box(), H.ml, { x: 0, y: 25 }, { x: 0, y: 25 }, true, null, true);
-	assert.equal(side.flip_x, true); close(side.x, 100); close(side.height, 50);
+test('Shift never reflects: a zero-length Shift drag on a middle handle is the identity', () => {
+	for (const [h, p] of [[H.tc, { x: 50, y: 0 }], [H.ml, { x: 0, y: 25 }], [H.bc, { x: 50, y: 50 }], [H.mr, { x: 100, y: 25 }]]) {
+		for (const proportional of [true, false]) {
+			const r = api.resize_from_drag(box(), h, p, p, proportional, null);
+			assert.equal(!!r.flip_x || !!r.flip_y, false, `handle ${h}`);
+			close(r.x, 0); close(r.y, 0); close(r.width, 100); close(r.height, 50);
+		}
+	}
+	assert.equal(api.resize_from_drag.length, 6, 'no reflect parameter any more');
+});
+
+test('Shift + drag that stays on the same side is a normal resize (Shift only toggles proportions)', () => {
+	// Aspect lock on + Shift => non-proportional: only the dragged axis changes.
+	const up = api.resize_from_drag(box(), H.tc, { x: 50, y: 0 }, { x: 50, y: -10 }, false, null);
+	assert.equal(!!up.flip_y, false); close(up.y, -10); close(up.height, 60); close(up.width, 100);
+	const inward = api.resize_from_drag(box(), H.tc, { x: 50, y: 0 }, { x: 50, y: 30 }, false, null);
+	assert.equal(!!inward.flip_y, false); close(inward.y, 30); close(inward.height, 20);
+	const side = api.resize_from_drag(box(), H.ml, { x: 0, y: 25 }, { x: 20, y: 25 }, false, null);
+	assert.equal(!!side.flip_x, false); close(side.x, 20); close(side.width, 80); close(side.height, 50);
 });
 
 test('flipping a flipped box un-flips it', () => {

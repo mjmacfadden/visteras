@@ -602,11 +602,9 @@ export default class Transform_edit_class {
 			const moved = ref_point(next, opposite);
 			next.x += fixed.x - moved.x; next.y += fixed.y - moved.y;
 		} else {
-			// Shift on a corner toggles the aspect lock; Shift on a middle handle reflects
-			// across that axis (about the opposite edge) and keeps resizing from there.
-			const middle = [1, 2, 4, 8].includes(handle);
-			const shift = !!event.shiftKey;
-			next = resize_from_drag(box, handle, start, mouse, this.session.aspect_locked !== (shift && !middle), event.altKey ? ref : null, shift && middle);
+			// Shift toggles the aspect lock on every handle, as in Photoshop. A flip comes
+			// only from dragging past the opposite edge.
+			next = resize_from_drag(box, handle, start, mouse, this.session.aspect_locked !== !!event.shiftKey, event.altKey ? ref : null);
 		}
 		this.preview_box(next);
 		this.update_cursor(event);

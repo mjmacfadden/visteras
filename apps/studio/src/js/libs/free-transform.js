@@ -266,7 +266,7 @@ export function local_point(box, point) {
 }
 
 /** Resize in the box's local axes, keeping the opposite handle or custom pivot fixed. */
-export function resize_from_drag(box, handle, start, point, proportional, pivot, reflect = false) {
+export function resize_from_drag(box, handle, start, point, proportional, pivot) {
 	const a = local_point(box, start), b = local_point(box, point);
 	const left = (handle & 4) !== 0, right = (handle & 8) !== 0;
 	const top = (handle & 1) !== 0, bottom = (handle & 2) !== 0;
@@ -277,17 +277,15 @@ export function resize_from_drag(box, handle, start, point, proportional, pivot,
 	const yDen = (top ? -box.height / 2 : box.height / 2) - localRef.y;
 	let sx = left || right ? 1 + (b.x - a.x) / xDen : 1;
 	let sy = top || bottom ? 1 + (b.y - a.y) / yDen : 1;
-	if (proportional && !(reflect && (!left && !right || !top && !bottom))) {
+	if (proportional) {
 		const scale = !left && !right ? sy : !top && !bottom ? sx : Math.abs(sx - 1) > Math.abs(sy - 1) ? sx : sy;
 		// A middle handle only flips its own axis; the other axis follows the size, not the sign.
 		sx = !left && !right ? Math.abs(scale) : scale;
 		sy = !top && !bottom ? Math.abs(scale) : scale;
 	}
-	// Dragging past the opposite edge (or Shift on a middle handle) is a
-	// negative scale: keep the sign, store it as a flip, and keep the box
-	// itself positive so handles and cursors stay meaningful.
-	if (reflect && !left && !right) sy = -sy;
-	if (reflect && !top && !bottom) sx = -sx;
+	// Only dragging past the opposite edge gives a negative scale: keep the
+	// sign, store it as a flip, and keep the box itself positive so handles
+	// and cursors stay meaningful.
 	const minX = 1 / box.width, minY = 1 / box.height;
 	if (Math.abs(sx) < minX) sx = sx < 0 ? -minX : minX;
 	if (Math.abs(sy) < minY) sy = sy < 0 ? -minY : minY;
