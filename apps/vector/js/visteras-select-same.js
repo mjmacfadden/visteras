@@ -1,3 +1,4 @@
+import { isEnvelopeSource } from './visteras-envelope-core.js?v=envelope-12';
 /**
  * Visteras Vector — Select ▸ Inverse / Select ▸ Same ▸ …
  *
@@ -21,7 +22,7 @@ function isHidden(el) {
 }
 
 export function isSelectableTarget(el) {
-  if (!el || !el.tagName) return false;
+  if (!el || !el.tagName || isEnvelopeSource(el)) return false;
   if (el.classList?.contains?.('layer')) return false;
   if (el.id === 'svgcontent' || el.tagName === 'defs' || el.tagName === 'clipPath') return false;
   if (el.closest?.('defs')) return false;

@@ -2,6 +2,8 @@
 export const cleanName = text => String(text || '').trim().replace(/\s+/g, ' ');
 const titleOf = el => [...(el?.children || [])].find(child => child.localName === 'title');
 export function defaultObjectName(el) {
+  if (el?.getAttribute?.('data-visteras-envelope') === 'warp') return '<Envelope>';
+  if (el?.hasAttribute?.('data-visteras-envelope-src')) return 'Contents';
   if (el?.getAttribute?.('data-visteras-compound')) return '<Compound Path>';
   if (el?.getAttribute?.('data-visteras-clip')) return '<Clip Group>';
   if (el?.localName === 'text') return cleanName(el.textContent).slice(0, 30) || '<Text>';

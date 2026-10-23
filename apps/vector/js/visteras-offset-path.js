@@ -518,17 +518,15 @@ export function readStrokeSpec(el, getCS = (e) => getComputedStyle(e)) {
   };
 }
 
-function executeOutlineStroke(editor) {
-  const sc = editor.svgCanvas;
-  if (!sc) return false;
-  const selElems = (sc.getSelectedElements ? sc.getSelectedElements() : []).filter(Boolean);
-  const leaves = collectLeaves(selElems);
-  if (!leaves.length) { alert('Please select one or more stroked paths to outline.'); return false; }
-  if (!window.paper) { alert('Outline Stroke requires Paper.js.'); return false; }
-
-  const { BatchCommand, InsertElementCommand, RemoveElementCommand } = sc.history;
-  const batchCmd = new BatchCommand('Outline Stroke');
+/**
+ * Outline the strokes of painted leaves into filled paths, recording every insert/remove in
+ * `batchCmd` (no history entry of its own). Shared by Outline Stroke and Object ▸ Expand….
+ * Returns the created nodes (a path, or a group of fill path + stroke path, as Illustrator).
+ */
+export function outlineStrokeLeaves(sc, leaves, batchCmd) {
+  const { InsertElementCommand, RemoveElementCommand } = sc.history;
   const created = [];
+  if (!window.paper) return created;
   const scope = newScope();
   try {
     for (const el of leaves) {
@@ -570,19 +568,33 @@ function executeOutlineStroke(editor) {
       batchCmd.addSubCommand(new RemoveElementCommand(anchor, next, parent));
       created.push(top);
     }
+    return created;
+  } finally {
+    scope.project?.clear();
+    scope.remove?.();
+  }
+}
+
+function executeOutlineStroke(editor) {
+  const sc = editor.svgCanvas;
+  if (!sc) return false;
+  const selElems = (sc.getSelectedElements ? sc.getSelectedElements() : []).filter(Boolean);
+  const leaves = collectLeaves(selElems);
+  if (!leaves.length) { alert('Please select one or more stroked paths to outline.'); return false; }
+  if (!window.paper) { alert('Outline Stroke requires Paper.js.'); return false; }
+  const batchCmd = new sc.history.BatchCommand('Outline Stroke');
+  try {
+    const created = outlineStrokeLeaves(sc, leaves, batchCmd);
     if (!created.length) {
       alert('No stroked paths found. Make sure selected objects have a visible stroke.');
       return false;
     }
     finishBatch(sc, batchCmd, selElems, created);
-    return true;
+    return created;
   } catch (err) {
     console.error('Outline Stroke error:', err);
     alert('Outline Stroke error: ' + (err.message || err));
     return false;
-  } finally {
-    scope.project?.clear();
-    scope.remove?.();
   }
 }
 

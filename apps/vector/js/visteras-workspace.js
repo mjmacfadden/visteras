@@ -1,6 +1,6 @@
 import { eventMatchesChord, formatBrowserSafeShortcut, browserSafeChord } from './visteras-browser-shortcuts.js';
-import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js';
-import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js';
+import { isSublayer, isLayerContainer, createSublayer, rowPath, topmostSelected, selectableArtwork } from './visteras-sublayers.js?v=envelope-12';
+import { displayName, cleanName, nextLayerName, layerNames, renameObject } from './visteras-layer-names.js?v=envelope-12';
 import { ensureHost, documentMatrix, localMatrix } from './visteras-object-transform.js';
 /** Shared viewport gestures and object rows for the Vector workspace. */
 export function mountVectorWorkspace(editor) {
@@ -484,7 +484,18 @@ export function mountVectorWorkspace(editor) {
             cell.append(disclosure);
           }
           cell.append(button); child.append(eyeCell, cell); previous.after(child); previous = child;
-          if (element.localName === 'g' && !collapsedLayers.has(element)) append(element, depth+1);
+          if (element.getAttribute('data-visteras-envelope') === 'warp') {
+            // Source is represented as a read-only Contents disclosure, never an artwork target.
+            const contents = document.createElement('tr'); contents.className='vector-object-row';
+            const contentCell=document.createElement('td'); contentCell.colSpan=2;
+            const details=document.createElement('details'); const summary=document.createElement('summary'); summary.textContent='Contents';
+            details.appendChild(summary);
+            const source=[...element.children].find(el=>el.hasAttribute('data-visteras-envelope-src'));
+            for(const original of source?.children || []) {
+              const label=document.createElement('div'); label.textContent=displayName(original); details.appendChild(label);
+            }
+            contentCell.appendChild(details); contents.appendChild(contentCell); previous.after(contents); previous=contents;
+          } else if (element.localName === 'g' && !collapsedLayers.has(element)) append(element, depth+1);
         }
       }
       append(layer,0);

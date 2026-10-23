@@ -50,6 +50,8 @@ export function formatShortcut(spec = {}) {
     return out + key;
   }
   // Windows/Linux Illustrator-style: Shift+Ctrl+G, Alt+Ctrl+2 (modifiers before Ctrl).
+  // Keep the full three-modifier chord in conventional Windows order.
+  if ((ctrl || meta) && alt && shift) return `Ctrl+Alt+Shift+${key}`;
   const parts = [];
   if (shift) parts.push('Shift');
   if (alt) parts.push('Alt');

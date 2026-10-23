@@ -85,6 +85,9 @@ function createMockElement(tag, attrs = {}) {
       }
     },
   };
+  Object.defineProperty(el, 'attributes', { get() { return Object.entries(el.attrs).filter(([k]) => k !== 'textContent').map(([name, value]) => ({ name, value })); } });
+  el.contains = (n) => { for (let c = n; c; c = c.parentNode) if (c === el) return true; return false; };
+  el.ownerDocument = { createElementNS: (_ns, t) => createMockElement(t) };
   Object.defineProperty(el, 'isConnected', {
     get() {
       let cur = this;
@@ -136,7 +139,9 @@ test('Expand: canExpand predicate returns true for text, stroked paths, and prim
   assert.equal(ExpandModule.canExpand([strokedPath]), true);
 
   const unstrokedPath = createMockElement('path', { d: 'M0 0 L10 10 Z', fill: '#000' });
-  assert.equal(ExpandModule.canExpand([unstrokedPath]), false);
+  assert.equal(ExpandModule.canExpand([unstrokedPath]), false, 'a filled path has nothing left to expand');
+  const hollowRect = createMockElement('rect', { width: '10', height: '10', fill: 'none' });
+  assert.equal(ExpandModule.canExpand([hollowRect]), false, 'no fill, no stroke: nothing to expand');
 });
 
 test('Expand: expandSelection converts text and primitive shapes in a single BatchCommand', async () => {
@@ -174,12 +179,7 @@ test('Expand: expandSelection converts text and primitive shapes in a single Bat
     addToSelection(els) { selection = [...selection, ...els]; },
     addCommandToHistory(cmd) { history.commands.push(cmd); },
     call(event, args) {},
-    convertToPath(el) {
-      const pathEl = createMockElement('path', { id: el.id, d: 'M10 10 H60 V60 H10 Z', fill: el.getAttribute('fill') });
-      el.parentNode.insertBefore(pathEl, el.nextSibling);
-      el.remove();
-      return pathEl;
-    },
+    convertToPath() { throw new Error('svgedit convertToPath records its own history step; Expand must not use it'); },
   };
 
   const mockEditor = { svgCanvas: mockCanvas };
@@ -194,6 +194,9 @@ test('Expand: expandSelection converts text and primitive shapes in a single Bat
   // Verify rect was converted to path
   const pathEl = results.find(el => el.tagName === 'PATH' && el.getAttribute('fill') === '#ff0000');
   assert.ok(pathEl, 'Rect primitive must be converted to path element');
+  assert.equal(pathEl.getAttribute('d'), 'M10 10H60V60H10Z');
+  assert.equal(pathEl.getAttribute('id'), 'rect_1');
+  assert.ok(!svg.children.some((c) => c.localName === 'rect' || c.localName === 'text'), 'no originals left behind');
 
   // Verify history batch was committed
   assert.equal(history.commands.length, 1);
