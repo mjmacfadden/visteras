@@ -248,13 +248,14 @@ export default class Transform_edit_class {
 				const r = (old.rotate || 0) * Math.PI / 180;
 				const localX = (bounds.local_min_x + bounds.local_width / 2) * old.width / (old.link_canvas?.width || old.link?.naturalWidth || old.width);
 				const localY = (bounds.local_min_y + bounds.local_height / 2) * old.height / (old.link_canvas?.height || old.link?.naturalHeight || old.height);
-				const dx = Number.isFinite(localX) ? localX - old.width / 2 : bounds.x + bounds.width / 2 - old.x - old.width / 2;
-				const dy = Number.isFinite(localY) ? localY - old.height / 2 : bounds.y + bounds.height / 2 - old.y - old.height / 2;
+				// local_* are measured on the unflipped pixels; a flipped layer draws them mirrored.
+				const dx = (Number.isFinite(localX) ? localX - old.width / 2 : bounds.x + bounds.width / 2 - old.x - old.width / 2) * (old.flip_x && Number.isFinite(localX) ? -1 : 1);
+				const dy = (Number.isFinite(localY) ? localY - old.height / 2 : bounds.y + bounds.height / 2 - old.y - old.height / 2) * (old.flip_y && Number.isFinite(localY) ? -1 : 1);
 				const tx = dx + Math.tan((old.skew_x || 0) * Math.PI / 180) * dy;
 				const ty = dy + Math.tan((old.skew_y || 0) * Math.PI / 180) * dx;
 				session.box = { ...bounds, x: old.x + old.width / 2 + tx*Math.cos(r)-ty*Math.sin(r)-bounds.width/2,
 					y: old.y + old.height / 2 + tx*Math.sin(r)+ty*Math.cos(r)-bounds.height/2,
-					rotate: old.rotate || 0, skew_x: old.skew_x || 0, skew_y: old.skew_y || 0 };
+					rotate: old.rotate || 0, skew_x: old.skew_x || 0, skew_y: old.skew_y || 0, flip_x: !!old.flip_x, flip_y: !!old.flip_y };
 
 				session.snapshot.box = { ...session.box };
 			}
