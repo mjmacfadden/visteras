@@ -115,9 +115,10 @@ class GUI_menu_class {
 				isChecked = definition.check;
 			}
 
+			const isDisabled = this.is_disabled(definition);
 			return `
-				<li>
-					<a id="main_menu_${ level }_${ index }" role="menuitem" tabindex="-1" aria-haspopup="${ (!!definition.children) + '' }"
+				<li${ isDisabled ? ' class="disabled"' : '' }>
+					<a id="main_menu_${ level }_${ index }" role="menuitem" tabindex="-1" aria-haspopup="${ (!!definition.children) + '' }"${ isDisabled ? ' aria-disabled="true"' : '' }
 						href="${ definition.href ? definition.href : 'javascript:void(0)' }"
 						target="${ definition.href ? '_blank' : '_self' }"
 						data-level="${ level }" data-index="${ index }">
@@ -129,6 +130,16 @@ class GUI_menu_class {
 					</a>
 				</li>
 			`.trim();
+		}
+	}
+
+	/** Items may declare `enabled: () => bool`; a false (or throwing) result greys them out. */
+	is_disabled(definition) {
+		if (!definition || typeof definition.enabled !== 'function') return false;
+		try {
+			return !definition.enabled();
+		} catch (e) {
+			return true;
 		}
 	}
 
@@ -323,6 +334,7 @@ class GUI_menu_class {
 			children = children[childIndex].children;
 		}
 		let definition = children[index];
+		if (this.is_disabled(definition)) return;
 
 		// Close the dropdown
 		this.close_child_dropdowns(0);

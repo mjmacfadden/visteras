@@ -7,7 +7,8 @@ import config from './../config.js';
 import zoomView from './../libs/zoomView.js';
 import app from './../app.js';
 import Mask_class from './../modules/mask/mask.js';
-import { ref_point, skew_from_drag, snap_angle, scale_about } from './../libs/free-transform.js';
+import { ref_point, skew_from_drag, snap_angle, scale_about, layer_point } from './../libs/free-transform.js';
+import { mesh_point, valid_mesh } from './../libs/warp-mesh.js';
 
 
 var instance = null;
@@ -554,8 +555,36 @@ class Base_selection_class {
 		const screen=p=>({x:m[0]*p.x+m[2]*p.y+m[4]+margin,y:m[1]*p.x+m[3]*p.y+m[5]+margin});
 		ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
 		ctx.strokeStyle='#3f8ff7';ctx.fillStyle='#fff';ctx.lineWidth=1;
+		const transform=app.GUI?.modules?.['edit/transform'];
+		const warpLayer=transform?.mode?.()==='warp'?transform.warp_layer():null;
+		if(warpLayer&&valid_mesh(warpLayer.warp_mesh)) {
+			// Warp: Bézier grid lines, control-point handles and the tangent lines between them.
+			const mesh=warpLayer.warp_mesh,at=(u,v)=>{const q=mesh_point(mesh,u,v);return screen(layer_point(warpLayer,q.x,q.y));};
+			ctx.beginPath();
+			for(const t of [0,1/3,2/3,1]) for(const dir of [0,1]) for(let i=0;i<=24;i++) {
+				const p=dir?at(t,i/24):at(i/24,t);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y);
+			}
+			ctx.stroke();
+			const pts=mesh.map(p=>screen(layer_point(warpLayer,p.x,p.y)));
+			ctx.strokeStyle='rgba(63,143,247,.55)';ctx.beginPath();
+			for(const [a,b] of [[0,1],[2,3],[0,4],[8,12],[3,7],[11,15],[12,13],[14,15]]) {ctx.moveTo(pts[a].x,pts[a].y);ctx.lineTo(pts[b].x,pts[b].y);}
+			ctx.stroke();ctx.strokeStyle='#3f8ff7';
+			pts.forEach((p,i)=>{const r=[0,3,12,15].includes(i)?size/2:size/2-1.5;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();ctx.stroke();});
+			ctx.restore();
+			return;
+		}
 		const corners=['tl','tr','br','bl'].map(loc=>screen(ref_point(box,loc)));
 		ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke();
+		if(transform?.is_active?.()&&transform.guides) {
+			// Transform ▸ Toggle Guides: rule-of-thirds grid inside the box.
+			const lerp=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+			ctx.save();ctx.strokeStyle='rgba(63,143,247,.6)';ctx.beginPath();
+			for(const t of [1/3,2/3]) {
+				let a=lerp(corners[0],corners[1],t),b=lerp(corners[3],corners[2],t);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+				a=lerp(corners[0],corners[3],t);b=lerp(corners[1],corners[2],t);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+			}
+			ctx.stroke();ctx.restore();
+		}
 		for(const loc of ['tl','tc','tr','ml','mr','bl','bc','br']) {
 			const p=screen(ref_point(box,loc)),x=Math.round(p.x-size/2)+.5,y=Math.round(p.y-size/2)+.5;
 			ctx.fillRect(x,y,size,size);ctx.strokeRect(x,y,size,size);

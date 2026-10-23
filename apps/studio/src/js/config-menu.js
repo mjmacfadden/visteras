@@ -1,3 +1,10 @@
+// Edit ▸ Transform items grey out when nothing transformable is selected.
+const transform_module = () => (typeof window !== 'undefined' && window.app && window.app.GUI && window.app.GUI.modules) ? window.app.GUI.modules['edit/transform'] : null;
+const transform_can = (action) => {
+	const module = transform_module();
+	return !!(module && typeof module.can === 'function' && module.can(action));
+};
+
 const menuDefinition = [
 	{
 		name: 'File',
@@ -168,8 +175,113 @@ const menuDefinition = [
 			name: 'Transform',
 			children: [
 				{
+					name: 'Again',
+					shortcut: 'Ctrl + Alt + Shift + T',
+					target: 'edit/transform.again',
+					enabled: () => transform_can('again')
+				},
+				{
+					divider: true
+				},
+				{
+					name: 'Scale',
+					target: 'edit/transform.scale',
+					enabled: () => transform_can('scale')
+				},
+				{
+					name: 'Rotate',
+					target: 'edit/transform.rotate',
+					enabled: () => transform_can('rotate')
+				},
+				{
 					name: 'Skew',
-					target: 'edit/transform.skew'
+					target: 'edit/transform.skew',
+					enabled: () => transform_can('skew')
+				},
+				{
+					name: 'Distort',
+					target: 'edit/transform.distort',
+					enabled: () => transform_can('distort')
+				},
+				{
+					name: 'Perspective',
+					target: 'edit/transform.perspective',
+					enabled: () => transform_can('perspective')
+				},
+				{
+					divider: true
+				},
+				{
+					name: 'Warp',
+					target: 'edit/transform.warp',
+					enabled: () => transform_can('warp')
+				},
+				// TODO phase 2: multi-patch warp splits and anchor conversion.
+				{
+					name: 'Split Warp Horizontally',
+					enabled: () => false
+				},
+				// TODO phase 2: multi-patch warp splits and anchor conversion.
+				{
+					name: 'Split Warp Vertically',
+					enabled: () => false
+				},
+				// TODO phase 2: multi-patch warp splits and anchor conversion.
+				{
+					name: 'Split Warp Crosswise',
+					enabled: () => false
+				},
+				// TODO phase 2: multi-patch warp splits and anchor conversion.
+				{
+					name: 'Remove Warp Split',
+					enabled: () => false
+				},
+				{
+					divider: true
+				},
+				// TODO phase 2: multi-patch warp splits and anchor conversion.
+				{
+					name: 'Convert Warp Anchor Point',
+					enabled: () => false
+				},
+				{
+					divider: true
+				},
+				{
+					name: 'Toggle Guides',
+					target: 'edit/transform.toggle_guides',
+					check: () => transform_module()?.guides === true
+				},
+				{
+					divider: true
+				},
+				{
+					name: 'Rotate 180°',
+					target: 'edit/transform.rotate_180',
+					enabled: () => transform_can('rotate_180')
+				},
+				{
+					name: 'Rotate 90° Clockwise',
+					target: 'edit/transform.rotate_90_cw',
+					enabled: () => transform_can('rotate_90_cw')
+				},
+				{
+					name: 'Rotate 90° Counter Clockwise',
+					target: 'edit/transform.rotate_90_ccw',
+					enabled: () => transform_can('rotate_90_ccw')
+				},
+				{
+					divider: true
+				},
+				{
+					name: 'Flip Horizontal',
+					target: 'edit/transform.flip_horizontal',
+					enabled: () => transform_can('flip_horizontal')
+				},
+				{
+					name: 'Flip Vertical',
+					target: 'edit/transform.flip_vertical',
+					enabled: () => transform_can('flip_vertical')
 				}
 			]
 		}

@@ -257,3 +257,9 @@
 		padding-right: 50px;
 	}
 }
+/* Disabled menu items (definition.enabled() === false) */
+.main_menu > ul.menu_dropdown > li.disabled > a,
+.main_menu > ul.menu_dropdown > li > a[aria-disabled="true"] {
+	opacity: 0.4;
+	cursor: default;
+}
