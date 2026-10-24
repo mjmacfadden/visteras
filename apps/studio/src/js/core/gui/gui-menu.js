@@ -3,6 +3,7 @@
  * author: Vilius L.
  */
 
+import { fit_menu_vertically } from './../../libs/menu-fit.js';
 import config from './../../config.js';
 import menuDefinition from './../../config-menu.js';
 import Tools_translate_class from './../../modules/tools/translate.js';
@@ -115,9 +116,10 @@ class GUI_menu_class {
 				isChecked = definition.check;
 			}
 
+			const isDisabled = this.is_disabled(definition);
 			return `
-				<li>
-					<a id="main_menu_${ level }_${ index }" role="menuitem" tabindex="-1" aria-haspopup="${ (!!definition.children) + '' }"
+				<li${ isDisabled ? ' class="disabled"' : '' }>
+					<a id="main_menu_${ level }_${ index }" role="menuitem" tabindex="-1" aria-haspopup="${ (!!definition.children) + '' }"${ isDisabled ? ' aria-disabled="true"' : '' }
 						href="${ definition.href ? definition.href : 'javascript:void(0)' }"
 						target="${ definition.href ? '_blank' : '_self' }"
 						data-level="${ level }" data-index="${ index }">
@@ -129,6 +131,16 @@ class GUI_menu_class {
 					</a>
 				</li>
 			`.trim();
+		}
+	}
+
+	/** Items may declare `enabled: () => bool`; a false (or throwing) result greys them out. */
+	is_disabled(definition) {
+		if (!definition || typeof definition.enabled !== 'function') return false;
+		try {
+			return !definition.enabled();
+		} catch (e) {
+			return true;
 		}
 	}
 
@@ -323,6 +335,7 @@ class GUI_menu_class {
 			children = children[childIndex].children;
 		}
 		let definition = children[index];
+		if (this.is_disabled(definition)) return;
 
 		// Close the dropdown
 		this.close_child_dropdowns(0);
@@ -398,12 +411,25 @@ class GUI_menu_class {
 			const openerRect = this.dropdownStack[level].opener.getBoundingClientRect();
 
 			topNavHeight = openerRect.height;
-			const dropdownMaxHeight = vh - topNavHeight - this.dropdownMaxHeightMargin;
-			dropdownElement.style.maxHeight = dropdownMaxHeight + 'px';
+			// Measure the natural height first: menus are as tall as their content and
+			// only get a cap (and a scrollbar) when they really would run off screen.
+			dropdownElement.style.maxHeight = '';
+			dropdownElement.style.overflowY = '';
 			const dropdownRect = dropdownElement.getBoundingClientRect();
+			const fit = fit_menu_vertically({
+				anchor: level === 0 ? openerRect.y + openerRect.height : openerRect.y,
+				height: dropdownElement.scrollHeight + (dropdownRect.height - dropdownElement.clientHeight),
+				viewport: vh,
+				margin: this.dropdownMaxHeightMargin,
+				submenu: level !== 0,
+			});
+			if (fit.maxHeight != null) {
+				dropdownElement.style.maxHeight = fit.maxHeight + 'px';
+				dropdownElement.style.overflowY = 'auto';
+			}
+			dropdownElement.style.top = fit.top + 'px';
 
 			if (level === 0) {
-				dropdownElement.style.top = (openerRect.y + openerRect.height) + 'px';
 
 				let left = openerRect.x;
 				if (left + dropdownRect.width > vw) {
@@ -417,12 +443,6 @@ class GUI_menu_class {
 				}
 				dropdownElement.style.left = left + 'px';
 			} else {
-				let top = openerRect.y;
-				if (top + dropdownRect.height > vh - this.dropdownMaxHeightMargin) {
-					top = vh - this.dropdownMaxHeightMargin - dropdownRect.height;
-				}
-				dropdownElement.style.top = top + 'px';
-
 				let left = openerRect.x + openerRect.width + 1;
 				if (left + dropdownRect.width > vw) {
 					left = openerRect.x - dropdownRect.width - 1;

@@ -592,6 +592,18 @@ class GUI_shortcuts_class {
 				return;
 			}
 
+			// Transform Again: Photoshop ⇧⌘T / Ctrl+Shift+T is Chrome's "reopen closed tab",
+			// so T's reserved-letter rule applies: ⌃⇧⌘T on Mac / Ctrl+Alt+Shift+T on Win.
+			const isMacOSAgain = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
+			if (eventMatchesChord(event, { meta: true, shift: true, key: 'T' }, isMacOSAgain)) {
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				if (app.GUI && app.GUI.modules && app.GUI.modules['edit/transform']) {
+					app.GUI.modules['edit/transform'].again();
+				}
+				return;
+			}
+
 			// Free Transform: Photoshop ⌘T / Ctrl+T → browser-safe ⌃⌘T on Mac / Ctrl+Alt+T on Win
 			const isMacOSTransform = /Mac|iPhone|iPod|iPad/i.test(navigator.platform || navigator.userAgent || '');
 			if (eventMatchesChord(event, { meta: true, key: 'T' }, isMacOSTransform)) {

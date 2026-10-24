@@ -320,6 +320,24 @@ class Select_tool_class extends Base_tools_class {
 		// Hit test selection handles and rotation zone first
 		this.Base_selection.selected_object_actions(e);
 
+		// Move-tool resize handles (Show Transform Controls) share Free Transform's
+		// geometry: a handle dragged past the opposite edge mirrors the art, as in
+		// Photoshop. The legacy resize path could only clamp the box to positive size.
+		// Handle drag types arrive as strings ("1".."10"); 'rotate' / 'ref_point' are not resizes.
+		const drag_type = Number(this.Base_selection.selected_object_drag_type);
+		if (this.Base_selection.mouse_lock != null && Number.isInteger(drag_type) && drag_type > 0
+			&& transform && config.layer && config.layer.type !== 'text' && transform.can('scale')) {
+			this.Base_selection.mouse_lock = null;
+			await transform.free_transform();
+			if (transform.is_active()) {
+				transform.session.from_handles = true;
+				transform.pointer_down(mouse, e);
+				if (transform.drag && typeof transform.drag.handle === 'number') return;
+				transform.cancel();
+			}
+			this.Base_selection.selected_object_actions(e);
+		}
+
 		if (this.Base_selection.mouse_lock != null) {
 			this.resizing = true;
 			this.moving = false;
@@ -699,7 +717,12 @@ class Select_tool_class extends Base_tools_class {
 	async mouseup(e) {
 		var mouse = this.get_mouse_info(e);
 		const transform = app.GUI?.modules?.['edit/transform'];
-		if (transform?.is_active()) { transform.pointer_up(); return; }
+		if (transform?.is_active()) {
+			transform.pointer_up();
+			// A drag that began on the Move tool's own handles is one complete transform.
+			if (transform.session?.from_handles) await transform.commit('Transform');
+			return;
+		}
 		if (this.marquee) {
 			const box = this.marquee;
 			this.marquee = null;

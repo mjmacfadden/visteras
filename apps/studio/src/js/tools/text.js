@@ -2123,7 +2123,8 @@ class Text_editor_class {
 			const cursorCharacter = this.selection.isActiveSideEnd ? this.selection.end.character : this.selection.start.character;
 			const hasRotate = !!layer.rotate && !options.skipRotation;
 			const hasSkew = ((layer.skew_x != null && layer.skew_x !== 0) || (layer.skew_y != null && layer.skew_y !== 0)) && !options.skipRotation;
-			if (hasRotate || hasSkew) {
+			const hasFlip = (!!layer.flip_x || !!layer.flip_y) && !options.skipRotation;
+			if (hasRotate || hasSkew || hasFlip) {
 				const alpha = (layer.rotate * Math.PI) / 180;
 				ctx.save();
 				// Move the canvas to the center before rotating/skewing
@@ -2135,6 +2136,9 @@ class Text_editor_class {
 					const sxRad = ((layer.skew_x || 0) * Math.PI) / 180;
 					const syRad = ((layer.skew_y || 0) * Math.PI) / 180;
 					ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+				}
+				if (hasFlip) {
+					ctx.scale(layer.flip_x ? -1 : 1, layer.flip_y ? -1 : 1);
 				}
 				// Move it back after it
 				ctx.translate(-layer.x - layer.width / 2, -layer.y - layer.height / 2);
@@ -2315,7 +2319,7 @@ class Text_editor_class {
 			if (hasLayerScale) {
 				ctx.restore();
 			}
-			if (hasRotate || hasSkew) {
+			if (hasRotate || hasSkew || hasFlip) {
 				ctx.restore();
 			}
 		} catch (error) {

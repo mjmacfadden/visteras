@@ -237,3 +237,36 @@ test('cancel clears a transform cursor so it cannot leak into the next tool', as
  assert.equal(wrapper.style.cursor, 'crosshair');
  h.transform.cancel(); assert.equal(wrapper.style.cursor, 'default'); assert.equal(h.transform.last_pointer, null);
 });
+
+test('Shift+click on a middle handle (no movement) changes nothing and adds no undo step', async () => {
+ for (const [name, point] of [['top', { x: 60, y: 20 }], ['left', { x: 10, y: 50 }]]) {
+  const layer = { id: 1, type: 'image', x: 10, y: 20, width: 100, height: 60 };
+  const before = plain(layer);
+  const h = harness([layer]); await h.transform.free_transform();
+  h.transform.pointer_down(point, { shiftKey: true });
+  assert.equal(typeof h.transform.drag.handle, 'number', name);
+  h.transform.pointer_move({ ...point }, { shiftKey: true }); h.transform.pointer_up();
+  assert.equal(!!layer.flip_x || !!layer.flip_y, false, name + ': no flip while held');
+  await h.transform.commit('Transform');
+  assert.deepEqual(plain(layer), before, name); assert.equal(h.history.length, 0, name + ': no undo step');
+ }
+});
+
+test('Shift+drag of the top handle that stays above the bottom edge resizes without flipping', async () => {
+ const layer = { id: 1, type: 'image', x: 10, y: 20, width: 100, height: 60 };
+ const h = harness([layer]); await h.transform.free_transform();
+ h.transform.pointer_down({ x: 60, y: 20 }, { shiftKey: true });
+ h.transform.pointer_move({ x: 60, y: 40 }, { shiftKey: true }); h.transform.pointer_up();
+ await h.transform.commit('Transform');
+ assert.equal(!!layer.flip_y, false); assert.equal(!!layer.flip_x, false);
+ const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, a + ' ≈ ' + b);
+ near(layer.y, 40); near(layer.height, 40); near(layer.width, 100);
+ assert.equal(h.history.length, 1);
+ // Crossing the opposite edge (with or without Shift) is what flips.
+ const l2 = { id: 1, type: 'image', x: 10, y: 20, width: 100, height: 60 };
+ const h2 = harness([l2]); await h2.transform.free_transform();
+ h2.transform.pointer_down({ x: 60, y: 20 }, { shiftKey: true });
+ h2.transform.pointer_move({ x: 60, y: 110 }, { shiftKey: true }); h2.transform.pointer_up();
+ await h2.transform.commit('Transform');
+ assert.equal(l2.flip_y, true); near(l2.y, 80); near(l2.height, 30);
+});

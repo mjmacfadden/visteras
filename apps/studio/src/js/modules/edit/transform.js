@@ -19,7 +19,19 @@ import {
 	local_point,
 	resize_from_drag,
 	transform_layer_geometry,
+	flip_about,
+	repeat_transform,
+	layer_point,
+	layer_uv,
 } from './../../libs/free-transform.js';
+import { identity_mesh, valid_mesh, is_identity_mesh } from './../../libs/warp-mesh.js';
+
+// Edit ▸ Transform modes. 'free' is Free Transform; the rest constrain what a drag does.
+const TRANSFORM_MODES = ['free', 'scale', 'rotate', 'skew', 'distort', 'perspective', 'warp'];
+const CORNER_INDEX = { 5: 0, 9: 1, 10: 2, 6: 3 }; // tl, tr, br, bl in transform_quad order
+const UNIT_QUAD = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }];
+// Dragging a warp corner carries its two tangent handles and the inner point with it.
+const WARP_CORNER_FOLLOWERS = { 0: [1, 4, 5], 3: [2, 7, 6], 12: [8, 13, 9], 15: [11, 14, 10] };
 
 let instance = null;
 
@@ -33,6 +45,124 @@ export default class Transform_edit_class {
 		this.Base_layers = new Base_layers_class();
 		this.session = null;
 		this._updating_from_ui = false;
+		this.last_transform = null; // { from, to } boxes of the last committed transform (Transform ▸ Again)
+		this.guides = false; // Transform ▸ Toggle Guides: thirds grid inside the transform box
+	}
+
+	mode() {
+		return this.is_active() ? (this.session.mode || 'free') : null;
+	}
+
+	/** Selected layers a transform can act on, or null (with the reason) when there are none. */
+	transformable_layers() {
+		if (!config.layer || !config.layers || config.layers.length === 0) return { error: 'No layer selected.' };
+		const ids = config.selected_layer_ids && config.selected_layer_ids.length ? config.selected_layer_ids : [config.layer.id];
+		const layers = ids.map(id => app.Layers.get_layer(id, true)).filter(Boolean);
+		for (const l of [config.layer, ...layers]) {
+			if (l.type === 'group' || l.status === 'group') return { error: 'Cannot transform a layer group.' };
+			if (l.type === 'adjustment') return { error: 'Cannot transform an adjustment layer.' };
+			if (l.locked || l.is_locked) return { error: 'Cannot transform a locked layer.' };
+		}
+		if (!layers.length || layers.some(layer => !Number.isFinite(layer.width) || !Number.isFinite(layer.height) || layer.width <= 0 || layer.height <= 0)) {
+			return { error: 'Layer has no transformable content.' };
+		}
+		return { layers };
+	}
+
+	/** Menu enablement for Edit ▸ Transform items. */
+	can(action) {
+		if (this.is_active()) {
+			if (action === 'again') return false; // Again applies to a committed transform
+			if (action === 'warp') return this.session.snapshot.layers.length === 1 && !this.session.box.transform_quad;
+			return true;
+		}
+		const found = this.transformable_layers();
+		if (!found.layers) return false;
+		if (action === 'again') return !!this.last_transform;
+		if (action === 'warp') return found.layers.length === 1 && !found.layers[0].transform_quad;
+		return true;
+	}
+
+	/** Enter (or switch to) a Transform mode, keeping any in-progress geometry. */
+	async set_mode(mode) {
+		if (!TRANSFORM_MODES.includes(mode)) return;
+		if (!this.is_active()) {
+			await this.free_transform({ mode });
+			if (!this.is_active()) return;
+		}
+		if (mode === 'warp' && !this.can('warp')) {
+			alertify.warning('Warp needs a single layer without Distort or Perspective.');
+			return;
+		}
+		this.drag = null;
+		this.session.mode = mode;
+		if (mode === 'warp') this.begin_warp();
+		this.render_options_bar();
+		this.update_cursor(this.last_pointer_event || {});
+		this.Base_layers.render();
+	}
+
+	scale() { return this.set_mode('scale'); }
+	rotate() { return this.set_mode('rotate'); }
+	distort() { return this.set_mode('distort'); }
+	perspective() { return this.set_mode('perspective'); }
+	warp() { return this.set_mode('warp'); }
+
+	/** The single layer being warped (warp meshes live on the layer rectangle, not the content box). */
+	warp_layer() {
+		if (!this.is_active() || this.session.snapshot.layers.length !== 1) return null;
+		return app.Layers.get_layer(this.session.snapshot.layers[0].id, true);
+	}
+
+	begin_warp() {
+		const layer = this.warp_layer();
+		if (!layer) return;
+		if (!valid_mesh(layer.warp_mesh)) layer.warp_mesh = identity_mesh();
+	}
+
+	toggle_guides() {
+		this.guides = !this.guides;
+		this.Base_layers.render();
+	}
+
+	/**
+	 * Run a box change immediately. Inside a session it edits the in-progress
+	 * geometry; otherwise it is its own one-step transform.
+	 */
+	async instant(label, change) {
+		if (this.is_active()) {
+			this.preview_box(change(this.session.box, this.session.ref));
+			return;
+		}
+		const found = this.transformable_layers();
+		if (!found.layers) { alertify.warning(found.error); return; }
+		await this.free_transform();
+		if (!this.is_active()) return;
+		this.preview_box(change(this.session.box, ref_point(this.session.box, 'c')));
+		await this.commit(label);
+	}
+
+	rotate_180() { return this.instant('Rotate 180°', (box, ref) => rotate_about(box, ref, 180)); }
+	rotate_90_cw() { return this.instant('Rotate 90° Clockwise', (box, ref) => rotate_about(box, ref, 90)); }
+	rotate_90_ccw() { return this.instant('Rotate 90° Counter Clockwise', (box, ref) => rotate_about(box, ref, -90)); }
+	flip_horizontal() { return this.instant('Flip Horizontal', (box, ref) => flip_about(box, ref, 'x')); }
+	flip_vertical() { return this.instant('Flip Vertical', (box, ref) => flip_about(box, ref, 'y')); }
+
+	/** Transform ▸ Again: re-apply the last committed transform's change as one undo step. */
+	async again() {
+		if (this.is_active()) return;
+		const last = this.last_transform;
+		if (!last) { alertify.warning('No transform to repeat.'); return; }
+		const found = this.transformable_layers();
+		if (!found.layers) { alertify.warning(found.error); return; }
+		await this.free_transform();
+		if (!this.is_active()) return;
+		this.preview_box(repeat_transform(this.session.box, last.from, last.to));
+		if (last.warp_mesh && this.session.snapshot.layers.length === 1) {
+			const layer = this.warp_layer();
+			if (layer) layer.warp_mesh = last.warp_mesh.map(p => ({ ...p }));
+		}
+		await this.commit('Transform Again', { keep_last: true });
 	}
 
 	is_active() {
@@ -45,6 +175,7 @@ export default class Transform_edit_class {
 
 	async free_transform(options = {}) {
 		if (this.is_active()) {
+			if (options && options.mode && options.mode !== this.session.mode) await this.set_mode(options.mode);
 			return;
 		}
 
@@ -117,13 +248,14 @@ export default class Transform_edit_class {
 				const r = (old.rotate || 0) * Math.PI / 180;
 				const localX = (bounds.local_min_x + bounds.local_width / 2) * old.width / (old.link_canvas?.width || old.link?.naturalWidth || old.width);
 				const localY = (bounds.local_min_y + bounds.local_height / 2) * old.height / (old.link_canvas?.height || old.link?.naturalHeight || old.height);
-				const dx = Number.isFinite(localX) ? localX - old.width / 2 : bounds.x + bounds.width / 2 - old.x - old.width / 2;
-				const dy = Number.isFinite(localY) ? localY - old.height / 2 : bounds.y + bounds.height / 2 - old.y - old.height / 2;
+				// local_* are measured on the unflipped pixels; a flipped layer draws them mirrored.
+				const dx = (Number.isFinite(localX) ? localX - old.width / 2 : bounds.x + bounds.width / 2 - old.x - old.width / 2) * (old.flip_x && Number.isFinite(localX) ? -1 : 1);
+				const dy = (Number.isFinite(localY) ? localY - old.height / 2 : bounds.y + bounds.height / 2 - old.y - old.height / 2) * (old.flip_y && Number.isFinite(localY) ? -1 : 1);
 				const tx = dx + Math.tan((old.skew_x || 0) * Math.PI / 180) * dy;
 				const ty = dy + Math.tan((old.skew_y || 0) * Math.PI / 180) * dx;
 				session.box = { ...bounds, x: old.x + old.width / 2 + tx*Math.cos(r)-ty*Math.sin(r)-bounds.width/2,
 					y: old.y + old.height / 2 + tx*Math.sin(r)+ty*Math.cos(r)-bounds.height/2,
-					rotate: old.rotate || 0, skew_x: old.skew_x || 0, skew_y: old.skew_y || 0 };
+					rotate: old.rotate || 0, skew_x: old.skew_x || 0, skew_y: old.skew_y || 0, flip_x: !!old.flip_x, flip_y: !!old.flip_y };
 
 				session.snapshot.box = { ...session.box };
 			}
@@ -141,6 +273,10 @@ export default class Transform_edit_class {
 		session.aspect_locked = true;
 
 		this.session = session;
+		if (session.mode === 'warp') {
+			if (!this.can('warp')) { session.mode = 'free'; alertify.warning('Warp needs a single layer without Distort or Perspective.'); }
+			else this.begin_warp();
+		}
 		const select = app.GUI.GUI_tools.tools_modules?.select?.object;
 		if (select?.Base_selection) {
 			const settings = select.Base_selection.find_settings();
@@ -152,15 +288,16 @@ export default class Transform_edit_class {
 	}
 
 	skew() {
-		this.free_transform({ mode: 'skew' });
+		return this.set_mode('skew');
 	}
 
-	async commit() {
+	async commit(label = 'Free Transform', options = {}) {
 		if (!this.is_active()) {
 			return;
 		}
 
 		const session = this.session;
+		const committed_box = { ...session.box }; // restore_transform_session below resets session.box
 		this.drag = null;
 		this.session = null;
 		this.last_pointer = null;
@@ -171,6 +308,11 @@ export default class Transform_edit_class {
 		document.getElementById('action_attributes')?.classList.remove('free-transform-options');
 
 		const layers = session.snapshot.layers.map(s => app.Layers.get_layer(s.id, true)).filter(Boolean);
+		// An untouched warp grid is not a change.
+		for (const layer of layers) {
+			const before = session.snapshot.layers.find(s => s.id === layer.id);
+			if (layer.warp_mesh && is_identity_mesh(layer.warp_mesh) && !(before && before.warp_mesh)) delete layer.warp_mesh;
+		}
 		const final = layers.map(layer => {
 			const state = snapshot_transform_layer(layer);
 			const vec = this.vector_for(layer);
@@ -186,7 +328,7 @@ export default class Transform_edit_class {
 			const changes = {};
 			for (const key of TRANSFORM_FIELDS) {
 				if (key === 'mask') continue; // Update_layer synchronizes linked geometry from the restored mask.
-				const defaultZero = ['rotate', 'skew_x', 'skew_y'].includes(key);
+				const defaultZero = ['rotate', 'skew_x', 'skew_y', 'flip_x', 'flip_y'].includes(key);
 				if (defaultZero ? (state[key] || 0) !== (before[key] || 0) : JSON.stringify(state[key]) !== JSON.stringify(before[key])) changes[key] = state[key];
 			}
 			if (JSON.stringify(state.vector_paths) !== JSON.stringify(before.vector_paths)) changes.vector_paths = state.vector_paths;
@@ -194,8 +336,13 @@ export default class Transform_edit_class {
 		}
 
 		if (updateActions.length > 0) {
+			if (!options.keep_last) {
+				const warped = final.length === 1 && JSON.stringify(final[0].warp_mesh) !== JSON.stringify(session.snapshot.layers[0].warp_mesh);
+				this.last_transform = { from: { ...session.snapshot.box }, to: committed_box,
+					warp_mesh: warped && valid_mesh(final[0].warp_mesh) ? final[0].warp_mesh.map(p => ({ ...p })) : null };
+			}
 			await app.State.do_action(
-				new app.Actions.Bundle_action('free_transform', 'Free Transform', updateActions)
+				new app.Actions.Bundle_action('free_transform', label, updateActions)
 			);
 		}
 
@@ -246,6 +393,7 @@ export default class Transform_edit_class {
 			const next = transform_layer_geometry(old, initial, box);
 			if(next.transform_quad) layer.transform_quad=next.transform_quad; else delete layer.transform_quad;
 			for (const key of ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y']) layer[key] = next[key] || 0;
+			for (const key of ['flip_x', 'flip_y']) { if (next[key]) layer[key] = true; else delete layer[key]; }
 			const vec = this.vector_for(layer);
 			if (vec && old.vector_paths) {
 				const paths = JSON.parse(JSON.stringify(old.vector_paths));
@@ -274,8 +422,26 @@ export default class Transform_edit_class {
 		this.Base_layers.render();
 	}
 
+	/** Index of the warp control point under the mouse, or -1. */
+	hit_warp_point(mouse) {
+		const layer = this.warp_layer();
+		if (!layer || !valid_mesh(layer.warp_mesh)) return -1;
+		const radius = 8 / config.ZOOM;
+		let best = -1, bestDistance = radius;
+		layer.warp_mesh.forEach((p, i) => {
+			const w = layer_point(layer, p.x, p.y), d = Math.hypot(mouse.x - w.x, mouse.y - w.y);
+			// Corners win ties so the outer frame stays easy to grab.
+			if (d < bestDistance || (d === bestDistance && WARP_CORNER_FOLLOWERS[i])) { best = i; bestDistance = d; }
+		});
+		return best;
+	}
+
 	hit_handle(mouse) {
 		const box = this.session.box;
+		if (this.session.mode === 'warp') {
+			const index = this.hit_warp_point(mouse);
+			return index >= 0 ? 'warp:' + index : null;
+		}
 		const locators = { tl: 5, tc: 1, tr: 9, ml: 4, mr: 8, bl: 6, bc: 2, br: 10 };
 		let handle = null;
 		const radius = 10 / config.ZOOM;
@@ -309,17 +475,26 @@ export default class Transform_edit_class {
 		this.last_pointer = { x: mouse.x, y: mouse.y };
 		this.last_pointer_event = event;
 		this.drag = handle ? { handle, start: { x: mouse.x, y: mouse.y }, box: { ...box }, ref: { ...this.session.ref }, skew: !!(event.metaKey || event.ctrlKey || this.is_skew_mode()) } : null;
+		if (this.drag && typeof handle === 'string' && handle.startsWith('warp:')) {
+			const layer = this.warp_layer();
+			this.drag.mesh = layer.warp_mesh.map(p => ({ ...p }));
+			this.drag.layer = { x: layer.x, y: layer.y, width: layer.width, height: layer.height, rotate: layer.rotate, skew_x: layer.skew_x, skew_y: layer.skew_y, flip_x: layer.flip_x, flip_y: layer.flip_y };
+		}
 		this.update_cursor(event);
 	}
 
 	cursor_for_handle(handle, event = {}) {
-		if (handle === 'rotate') return "url('images/icons/rotate.svg') 12 12, default";
+		const mode = this.session?.mode || 'free';
+		if (typeof handle === 'string' && handle.startsWith('warp:')) return 'move';
+		if (mode === 'scale' && handle === 'rotate') return 'default';
+		if (handle === 'rotate' || (mode === 'rotate' && typeof handle === 'number')) return "url('images/icons/rotate.svg') 12 12, default";
 		if (handle === 'ref' || handle === 'move') return 'move';
 		const locators = { 1: 'tc', 2: 'bc', 4: 'ml', 8: 'mr', 5: 'tl', 6: 'bl', 9: 'tr', 10: 'br' };
 		if (!locators[handle]) return 'default';
-		const skew = this.drag?.skew || event.metaKey || event.ctrlKey || this.is_skew_mode();
+		const skew = mode !== 'scale' && (this.drag?.skew || event.metaKey || event.ctrlKey || this.is_skew_mode() || mode === 'perspective');
 		// Corner distortion moves a single point freely, rather than resizing the box.
-		if (skew && [5, 6, 9, 10].includes(handle)) return 'crosshair';
+		if ((skew || mode === 'distort') && [5, 6, 9, 10].includes(handle)) return 'crosshair';
+		if (mode === 'distort') return 'move';
 		const box = this.session.box;
 		let from, to;
 		if (skew) {
@@ -357,15 +532,58 @@ export default class Transform_edit_class {
 			this.sync_options_bar(); this.Base_layers.render(); return;
 		}
 		let next;
+		const mode = this.session.mode || 'free';
+		const modifier = mode !== 'scale' && (drag.skew || event.metaKey || event.ctrlKey);
+		if (typeof handle === 'string' && handle.startsWith('warp:')) {
+			const index = Number(handle.slice(5)), layer = this.warp_layer();
+			if (!layer) return;
+			const a = layer_uv(drag.layer, start), b = layer_uv(drag.layer, mouse);
+			let du = b.x - a.x, dv = b.y - a.y;
+			if (event.shiftKey) { if (Math.abs(du * drag.layer.width) >= Math.abs(dv * drag.layer.height)) dv = 0; else du = 0; }
+			const mesh = drag.mesh.map(p => ({ ...p }));
+			for (const i of [index, ...(WARP_CORNER_FOLLOWERS[index] || [])]) mesh[i] = { x: drag.mesh[i].x + du, y: drag.mesh[i].y + dv };
+			layer.warp_mesh = mesh;
+			this.Base_layers.render();
+			return;
+		}
+		if (mode === 'warp') return;
+		if (mode === 'scale' && handle === 'rotate') return;
 		if (handle === 'move') {
 			const dx = mouse.x - start.x, dy = mouse.y - start.y;
 			next = { ...box, x: box.x + dx, y: box.y + dy };
 			this.session.ref = { x: ref.x + dx, y: ref.y + dy };
-		} else if (handle === 'rotate') {
+		} else if (handle === 'rotate' || mode === 'rotate') {
 			let delta = (Math.atan2(mouse.y - ref.y, mouse.x - ref.x) - Math.atan2(start.y - ref.y, start.x - ref.x)) * 180 / Math.PI;
 			if (event.shiftKey) delta = snap_angle((box.rotate || 0) + delta) - (box.rotate || 0);
 			next = rotate_about(box, ref, delta);
-		} else if ([5,6,9,10].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
+		} else if ([5,6,9,10].includes(handle) && mode === 'perspective') {
+			// Perspective: the partner corner on the same edge mirrors the move, so the
+			// shape stays a symmetric trapezoid.
+			const q = (box.transform_quad || UNIT_QUAD).map(p => ({ ...p }));
+			const a = local_point(box, start), b = local_point(box, mouse);
+			const du = (b.x - a.x) / box.width, dv = (b.y - a.y) / box.height;
+			const index = CORNER_INDEX[handle];
+			if (Math.abs(du * box.width) >= Math.abs(dv * box.height)) {
+				const partner = { 0: 1, 1: 0, 2: 3, 3: 2 }[index];
+				q[index].x += du; q[partner].x -= du;
+			} else {
+				const partner = { 0: 3, 3: 0, 1: 2, 2: 1 }[index];
+				q[index].y += dv; q[partner].y -= dv;
+			}
+			const candidate = { ...box, transform_quad: q };
+			if (!valid_quad(['tl','tr','br','bl'].map(loc => ref_point(candidate, loc)))) return;
+			next = candidate;
+		} else if ([1, 2, 4, 8].includes(handle) && mode === 'distort') {
+			// Distort: a middle handle moves its whole edge freely.
+			const q = (box.transform_quad || UNIT_QUAD).map(p => ({ ...p }));
+			const a = local_point(box, start), b = local_point(box, mouse);
+			let du = (b.x - a.x) / box.width, dv = (b.y - a.y) / box.height;
+			if (event.shiftKey) { if (Math.abs(du * box.width) >= Math.abs(dv * box.height)) dv = 0; else du = 0; }
+			for (const i of { 1: [0, 1], 2: [3, 2], 4: [0, 3], 8: [1, 2] }[handle]) { q[i].x += du; q[i].y += dv; }
+			const candidate = { ...box, transform_quad: q };
+			if (!valid_quad(['tl','tr','br','bl'].map(loc => ref_point(candidate, loc)))) return;
+			next = candidate;
+		} else if ([5,6,9,10].includes(handle) && (mode === 'distort' || modifier || this.is_skew_mode())) {
 			const locators=['tl','tr','br','bl'];
 			const points=locators.map(loc=>ref_point(box,loc));
 			const index={5:0,9:1,10:2,6:3}[handle];
@@ -374,7 +592,7 @@ export default class Transform_edit_class {
 			points[index]={x:points[index].x+dx,y:points[index].y+dy};
 			if(!valid_quad(points)) return;
 			next={...box,transform_quad:points.map(p=>{const local=local_point(box,p);return {x:local.x/box.width+.5,y:local.y/box.height+.5};})};
-		} else if ([1, 2, 4, 8].includes(handle) && (drag.skew || this.is_skew_mode() || event.metaKey || event.ctrlKey)) {
+		} else if ([1, 2, 4, 8].includes(handle) && (modifier || this.is_skew_mode() || mode === 'perspective')) {
 			const a = local_point(box, start), b = local_point(box, mouse);
 			const side = { 1: 'top', 2: 'bottom', 4: 'left', 8: 'right' }[handle];
 			const skew = skew_from_drag(side, b.x - a.x, b.y - a.y, box);
@@ -384,6 +602,8 @@ export default class Transform_edit_class {
 			const moved = ref_point(next, opposite);
 			next.x += fixed.x - moved.x; next.y += fixed.y - moved.y;
 		} else {
+			// Shift toggles the aspect lock on every handle, as in Photoshop. A flip comes
+			// only from dragging past the opposite edge.
 			next = resize_from_drag(box, handle, start, mouse, this.session.aspect_locked !== !!event.shiftKey, event.altKey ? ref : null);
 		}
 		this.preview_box(next);

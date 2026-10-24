@@ -1,4 +1,4 @@
-import { ref_point } from './free-transform.js';
+import { ref_point, layer_point, layer_uv } from './free-transform.js';
 import { quad_matrix, map_point } from './quad-transform.js';
 import app from './../app.js';
 import config from './../config.js';
@@ -56,6 +56,16 @@ function get_bounds_aabb(b) {
  */
 export function get_layer_content_bounds(layer) {
 	if (!layer || layer.visible === false) return null;
+	if ((layer.flip_x || layer.flip_y) && !layer.transform_quad) {
+		// Mirrored layer: measure the unflipped content, then mirror its centre
+		// inside the layer frame so the box sits on the pixels actually drawn.
+		const plain = { ...layer, flip_x: false, flip_y: false };
+		const bounds = get_layer_content_bounds(plain);
+		if (!bounds) return null;
+		const uv = layer_uv(plain, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
+		const c = layer_point(plain, layer.flip_x ? 1 - uv.x : uv.x, layer.flip_y ? 1 - uv.y : uv.y);
+		return { ...bounds, x: c.x - bounds.width / 2, y: c.y - bounds.height / 2, flip_x: !!layer.flip_x, flip_y: !!layer.flip_y };
+	}
 	if(layer.transform_quad) {
 		const bounds=get_layer_content_bounds({...layer,transform_quad:undefined,rotate:0,skew_x:0,skew_y:0});
 		if(!bounds) return null;

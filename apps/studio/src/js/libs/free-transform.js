@@ -178,6 +178,8 @@ export function create_transform_session(layers) {
 			skew_x: list[0].skew_x || 0,
 			skew_y: list[0].skew_y || 0,
 			transform_quad: list[0].transform_quad ? list[0].transform_quad.map(p=>({...p})) : undefined,
+			flip_x: !!list[0].flip_x,
+			flip_y: !!list[0].flip_y,
 		};
 	} else if (list.length > 1) {
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -238,11 +240,11 @@ export function restore_transform_session(session, layers) {
 }
 
 
-export const TRANSFORM_FIELDS = ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y', 'params', 'data', 'mask', 'transform_quad'];
+export const TRANSFORM_FIELDS = ['x', 'y', 'width', 'height', 'rotate', 'skew_x', 'skew_y', 'params', 'data', 'mask', 'transform_quad', 'flip_x', 'flip_y', 'warp_mesh'];
 function clone_transform_value(key, value) {
 	// Mask bitmap/canvas references must retain their identity.
 	if (key === 'mask') return value ? { ...value } : value;
-	if ((key === 'params' || key === 'data' || key === 'vector_paths' || key === 'transform_quad') && value && typeof value === 'object') return JSON.parse(JSON.stringify(value));
+	if ((key === 'params' || key === 'data' || key === 'vector_paths' || key === 'transform_quad' || key === 'warp_mesh') && value && typeof value === 'object') return JSON.parse(JSON.stringify(value));
 	return value;
 }
 export function snapshot_transform_layer(layer) {
@@ -277,19 +279,37 @@ export function resize_from_drag(box, handle, start, point, proportional, pivot)
 	let sy = top || bottom ? 1 + (b.y - a.y) / yDen : 1;
 	if (proportional) {
 		const scale = !left && !right ? sy : !top && !bottom ? sx : Math.abs(sx - 1) > Math.abs(sy - 1) ? sx : sy;
-		sx = sy = scale;
+		// A middle handle only flips its own axis; the other axis follows the size, not the sign.
+		sx = !left && !right ? Math.abs(scale) : scale;
+		sy = !top && !bottom ? Math.abs(scale) : scale;
 	}
-	sx = Math.max(1 / box.width, sx); sy = Math.max(1 / box.height, sy);
-	const result = { ...box, width: box.width * sx, height: box.height * sy };
+	// Only dragging past the opposite edge gives a negative scale: keep the
+	// sign, store it as a flip, and keep the box itself positive so handles
+	// and cursors stay meaningful.
+	const minX = 1 / box.width, minY = 1 / box.height;
+	if (Math.abs(sx) < minX) sx = sx < 0 ? -minX : minX;
+	if (Math.abs(sy) < minY) sy = sy < 0 ? -minY : minY;
+	const result = { ...box, width: box.width * Math.abs(sx), height: box.height * Math.abs(sy) };
+	if (sx < 0) result.flip_x = !box.flip_x;
+	if (sy < 0) result.flip_y = !box.flip_y;
 	// Keeping a fixed locator also accounts for existing skew.
 	const u = (localRef.x / box.width) + 0.5, v = (localRef.y / box.height) + 0.5;
-	const dx = (u - 0.5) * result.width, dy = (v - 0.5) * result.height;
+	const dx = (u - 0.5) * box.width * sx, dy = (v - 0.5) * box.height * sy;
 	const skx = Math.tan((box.skew_x || 0) * Math.PI / 180), sky = Math.tan((box.skew_y || 0) * Math.PI / 180);
 	const r = (box.rotate || 0) * Math.PI / 180;
 	const tx = dx + skx * dy, ty = dy + sky * dx;
 	result.x = ref.x - tx * Math.cos(r) + ty * Math.sin(r) - result.width / 2;
 	result.y = ref.y - tx * Math.sin(r) - ty * Math.cos(r) - result.height / 2;
-	return result;
+	return quad_absorbs_flip(result, box);
+}
+
+/** A distorted box mirrors its quad corners instead of carrying flip flags, so its outline matches the layer. */
+function quad_absorbs_flip(next, before) {
+	if (!next.transform_quad) return next;
+	const mx = !!next.flip_x !== !!before.flip_x, my = !!next.flip_y !== !!before.flip_y;
+	if (!mx && !my) return next;
+	return { ...next, flip_x: !!before.flip_x, flip_y: !!before.flip_y,
+		transform_quad: next.transform_quad.map(p => ({ x: mx ? 1 - p.x : p.x, y: my ? 1 - p.y : p.y })) };
 }
 
 function axes(box) {
@@ -297,17 +317,28 @@ function axes(box) {
 	const x = Math.tan((box.skew_x || 0) * Math.PI / 180), y = Math.tan((box.skew_y || 0) * Math.PI / 180);
 	return [c - s * y, s + c * y, c * x - s, s * x + c];
 }
+/** Local axes including the content mirror: render order is rotate · skew · flip. */
+function axes_flipped(box) {
+	const m = axes(box), fx = box.flip_x ? -1 : 1, fy = box.flip_y ? -1 : 1;
+	return [m[0]*fx, m[1]*fx, m[2]*fy, m[3]*fy];
+}
+const GEOMETRY_KEYS = ['x','y','width','height','rotate','skew_x','skew_y'];
+const same_flip = (a, b) => !!a.flip_x === !!b.flip_x && !!a.flip_y === !!b.flip_y;
 function multiply(a, b) {
 	return [a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1], a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3]];
 }
 /** Apply a common affine box change to a layer, including rotated multi-selections. */
 export function transform_layer_geometry(layer, from, to) {
-	if(['x','y','width','height','rotate','skew_x','skew_y'].every(k=>(from[k]||0)===(to[k]||0)) && JSON.stringify(from.transform_quad)===JSON.stringify(to.transform_quad)) return {...layer};
+	if(GEOMETRY_KEYS.every(k=>(from[k]||0)===(to[k]||0)) && same_flip(from,to) && JSON.stringify(from.transform_quad)===JSON.stringify(to.transform_quad)) return {...layer};
 	if (from.transform_quad || to.transform_quad) {
 		const locators=['tl','tr','br','bl'];
 		const source=inverse_matrix(quad_matrix(locators.map(loc=>ref_point(from,loc))));
-		const destination=quad_matrix(locators.map(loc=>ref_point(to,loc)));
-		const cleanFrom={...from,transform_quad:undefined},cleanTo={...to,transform_quad:undefined};
+		// A quad layer keeps its mirror in the quad's winding instead of flip flags:
+		// mirror the destination corners across the box's own centre lines.
+		const mx=!!from.flip_x!==!!to.flip_x,my=!!from.flip_y!==!!to.flip_y;
+		const cleanFrom={...from,transform_quad:undefined,flip_x:false,flip_y:false},cleanTo={...to,transform_quad:undefined,flip_x:false,flip_y:false};
+		const mirror=p=>{if(!mx&&!my)return p;const l=local_point(cleanTo,p);return layer_point(cleanTo,(mx?-l.x:l.x)/cleanTo.width+.5,(my?-l.y:l.y)/cleanTo.height+.5);};
+		const destination=quad_matrix(locators.map(loc=>mirror(ref_point(to,loc))));
 		const next=transform_layer_geometry({...layer,transform_quad:undefined},cleanFrom,cleanTo);
 		next.transform_quad=locators.map(loc=>{
 			const p=map_point(destination,map_point(source,ref_point(layer,loc)));
@@ -316,8 +347,8 @@ export function transform_layer_geometry(layer, from, to) {
 		});
 		return next;
 	}
-	if (['x','y','width','height','rotate','skew_x','skew_y'].every(k => (from[k] || 0) === (to[k] || 0))) return { ...layer };
-	const a = axes(from), b = axes(to), det = a[0]*a[3]-a[1]*a[2];
+	if (GEOMETRY_KEYS.every(k => (from[k] || 0) === (to[k] || 0)) && same_flip(from, to)) return { ...layer };
+	const a = axes_flipped(from), b = axes_flipped(to), det = a[0]*a[3]-a[1]*a[2];
 	const sx = to.width / from.width, sy = to.height / from.height;
 	const map = multiply([b[0]*sx,b[1]*sx,b[2]*sy,b[3]*sy], [a[3]/det,-a[1]/det,-a[2]/det,a[0]/det]);
 	const dx = layer.x + layer.width/2 - from.x - from.width/2;
@@ -327,13 +358,57 @@ export function transform_layer_geometry(layer, from, to) {
 	// Aligned axes preserve both skew fields and the requested angle exactly.
 	if ((layer.rotate || 0) === (from.rotate || 0) && (layer.skew_x || 0) === (from.skew_x || 0) && (layer.skew_y || 0) === (from.skew_y || 0)) {
 		const width = layer.width*sx, height = layer.height*sy;
-		return { ...layer, x: cx-width/2, y: cy-height/2, width, height, rotate: to.rotate || 0, skew_x: to.skew_x || 0, skew_y: to.skew_y || 0 };
+		return { ...layer, x: cx-width/2, y: cy-height/2, width, height, rotate: to.rotate || 0, skew_x: to.skew_x || 0, skew_y: to.skew_y || 0,
+			flip_x: !!layer.flip_x !== (!!from.flip_x !== !!to.flip_x), flip_y: !!layer.flip_y !== (!!from.flip_y !== !!to.flip_y) };
 	}
-	const m = multiply(map, axes(layer));
+	let m = multiply(map, axes_flipped(layer));
+	// A mirrored result is stored as flip_x with a proper rotation/skew.
+	const flip_x = m[0]*m[3]-m[1]*m[2] < 0;
+	if (flip_x) m = [-m[0], -m[1], m[2], m[3]];
 	const scaleX = Math.hypot(m[0],m[1]);
 	const scaleY = (m[0]*m[3]-m[1]*m[2])/scaleX;
 	const width = layer.width*scaleX, height = layer.height*scaleY;
 	return { ...layer, x: cx-width/2, y: cy-height/2, width, height,
 		rotate: Math.atan2(m[1],m[0])*180/Math.PI,
-		skew_x: Math.atan((m[0]*m[2]+m[1]*m[3])/(scaleX*scaleY))*180/Math.PI, skew_y: 0 };
+		skew_x: Math.atan((m[0]*m[2]+m[1]*m[3])/(scaleX*scaleY))*180/Math.PI, skew_y: 0, flip_x, flip_y: false };
+}
+
+/** Document point for normalised layer coordinates (u, v in 0..1), honouring rotate · skew · flip. */
+export function layer_point(box, u, v) {
+	const m = axes_flipped(box);
+	const dx = (u - 0.5) * box.width, dy = (v - 0.5) * box.height;
+	return { x: box.x + box.width / 2 + m[0]*dx + m[2]*dy, y: box.y + box.height / 2 + m[1]*dx + m[3]*dy };
+}
+
+/** Inverse of layer_point. */
+export function layer_uv(box, point) {
+	const m = axes_flipped(box), det = m[0]*m[3]-m[1]*m[2];
+	const px = point.x - box.x - box.width / 2, py = point.y - box.y - box.height / 2;
+	return { x: (m[3]*px - m[2]*py) / det / box.width + 0.5, y: (-m[1]*px + m[0]*py) / det / box.height + 0.5 };
+}
+
+/** Mirror a box across the line through ref parallel to its local y (axis 'x') or x (axis 'y'). */
+export function flip_about(box, ref, axis) {
+	ref = ref || ref_point(box);
+	const p = local_point(box, ref), m = axes(box);
+	const ox = axis === 'x' ? 2 * p.x : 0, oy = axis === 'y' ? 2 * p.y : 0;
+	const next = { ...box, x: box.x + m[0]*ox + m[2]*oy, y: box.y + m[1]*ox + m[3]*oy };
+	if (axis === 'x') next.flip_x = !box.flip_x; else next.flip_y = !box.flip_y;
+	return quad_absorbs_flip(next, box);
+}
+
+/** Re-apply the change from one committed box (from -> to) to another box. */
+export function repeat_transform(box, from, to) {
+	const sx = to.width / from.width, sy = to.height / from.height;
+	const cx = box.x + box.width / 2 + (to.x + to.width / 2) - (from.x + from.width / 2);
+	const cy = box.y + box.height / 2 + (to.y + to.height / 2) - (from.y + from.height / 2);
+	const width = box.width * sx, height = box.height * sy;
+	const next = { ...box, width, height, x: cx - width / 2, y: cy - height / 2,
+		rotate: (((box.rotate || 0) + (to.rotate || 0) - (from.rotate || 0)) % 360 + 360) % 360,
+		skew_x: (box.skew_x || 0) + (to.skew_x || 0) - (from.skew_x || 0),
+		skew_y: (box.skew_y || 0) + (to.skew_y || 0) - (from.skew_y || 0),
+		flip_x: !!box.flip_x !== (!!from.flip_x !== !!to.flip_x),
+		flip_y: !!box.flip_y !== (!!from.flip_y !== !!to.flip_y) };
+	if (to.transform_quad && !from.transform_quad && !box.transform_quad) next.transform_quad = to.transform_quad.map(p => ({ ...p }));
+	return next;
 }

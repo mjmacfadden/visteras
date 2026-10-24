@@ -1,4 +1,5 @@
 import { draw_quad } from './../libs/quad-transform.js';
+import { draw_warp, is_identity_mesh, valid_mesh } from './../libs/warp-mesh.js';
 import { ref_point } from './../libs/free-transform.js';
 import { resampleRaster } from '../libs/raster-resample.js';
 import { composite_group_layers } from '../libs/group-composite.js';
@@ -843,9 +844,30 @@ class Base_layers_class {
 			draw_quad(ctx,source,['tl','tr','br','bl'].map(loc=>ref_point(object,loc)),()=>document.createElement('canvas'));
 			return;
 		}
+		if (object.warp_mesh && valid_mesh(object.warp_mesh) && !is_identity_mesh(object.warp_mesh)) {
+			// Warp: render the flat content once, then map it through the Bézier patch
+			// inside the layer's own rotate · skew · flip frame.
+			const source=document.createElement('canvas');
+			source.width=Math.max(1,Math.ceil(object.width));source.height=Math.max(1,Math.ceil(object.height));
+			const scratch=source.getContext('2d');scratch.translate(-object.x,-object.y);
+			this._draw_layer_content(scratch,{...object,warp_mesh:undefined,rotate:0,skew_x:0,skew_y:0,flip_x:false,flip_y:false},is_preview);
+			ctx.save();
+			const wcx=object.x+object.width/2, wcy=object.y+object.height/2;
+			ctx.translate(wcx,wcy);
+			if (object.rotate) ctx.rotate(object.rotate*Math.PI/180);
+			if (object.skew_x || object.skew_y) ctx.transform(1,Math.tan((object.skew_y||0)*Math.PI/180),Math.tan((object.skew_x||0)*Math.PI/180),1,0,0);
+			if (object.flip_x || object.flip_y) ctx.scale(object.flip_x?-1:1,object.flip_y?-1:1);
+			ctx.translate(-wcx,-wcy);
+			draw_warp(ctx,source,{x:object.x,y:object.y,width:object.width,height:object.height},object.warp_mesh);
+			ctx.restore();
+			return;
+		}
 		const hasRotate = object.type !== 'text' && object.rotate != null && object.rotate !== 0;
 		const hasSkew = object.type !== 'text' && ((object.skew_x != null && object.skew_x !== 0) || (object.skew_y != null && object.skew_y !== 0));
-		if (hasRotate || hasSkew) {
+		// Flip (Transform ▸ Flip, or dragging a handle past the opposite edge) mirrors the
+		// content in the layer's local frame, after rotate and skew. Text applies its own.
+		const hasFlip = object.type !== 'text' && (!!object.flip_x || !!object.flip_y);
+		if (hasRotate || hasSkew || hasFlip) {
 			ctx.save();
 			const cx = (object.x || 0) + (object.width || 0) / 2;
 			const cy = (object.y || 0) + (object.height || 0) / 2;
@@ -857,6 +879,9 @@ class Base_layers_class {
 				const sxRad = ((object.skew_x || 0) * Math.PI) / 180;
 				const syRad = ((object.skew_y || 0) * Math.PI) / 180;
 				ctx.transform(1, Math.tan(syRad), Math.tan(sxRad), 1, 0, 0);
+			}
+			if (hasFlip) {
+				ctx.scale(object.flip_x ? -1 : 1, object.flip_y ? -1 : 1);
 			}
 			ctx.translate(-cx, -cy);
 		}
@@ -913,7 +938,7 @@ class Base_layers_class {
 			}
 		}
 
-		if (hasRotate || hasSkew) {
+		if (hasRotate || hasSkew || hasFlip) {
 			ctx.restore();
 		}
 	}
@@ -1723,7 +1748,8 @@ class Base_layers_class {
 		scratch.height = H;
 		var skew_x = layer.skew_x || 0;
 		var skew_y = layer.skew_y || 0;
-		var hasTransform = (rad !== 0 || skew_x !== 0 || skew_y !== 0) && mask.linked !== false;
+		var flip_x = !!layer.flip_x, flip_y = !!layer.flip_y;
+		var hasTransform = (rad !== 0 || skew_x !== 0 || skew_y !== 0 || flip_x || flip_y) && mask.linked !== false;
 		sctx.imageSmoothingEnabled = (mw !== sw || mh !== sh || rad !== 0 || skew_x !== 0 || skew_y !== 0);
 
 		if (hasTransform) {
@@ -1732,6 +1758,7 @@ class Base_layers_class {
 			if (skew_x !== 0 || skew_y !== 0) {
 				sctx.transform(1, Math.tan(skew_y * Math.PI / 180), Math.tan(skew_x * Math.PI / 180), 1, 0, 0);
 			}
+			if (flip_x || flip_y) sctx.scale(flip_x ? -1 : 1, flip_y ? -1 : 1);
 			sctx.translate(-lw / 2, -lh / 2);
 			sctx.drawImage(alpha, 0, 0, sw, sh, mx - lx, my - ly, mw, mh);
 		}
