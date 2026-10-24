@@ -19,6 +19,8 @@ export interface RssStory {
   url: string;
   image?: string | null;
   source: string;
+  /** True when served from a stale localStorage copy after a failed fetch. */
+  cached?: boolean;
   publishedAt: string; // ISO
   category: StoryCategory;
 }
