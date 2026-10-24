@@ -643,6 +643,19 @@ const hasWireStories =
           .replace(/"/g, '&quot;');
       }
 
+      /**
+       * Escape prose and add soft break points (<wbr>) inside URLs and very long
+       * tokens so justified columns don't leave huge gaps or overflow.
+       * Breaks after / ? & = . _ - per common typesetting practice.
+       */
+      function proseHtml(t: string) {
+        return escapeHtml(t).replace(/\S{24,}/g, (tok) =>
+          /^(https?:\/\/|www\.)/i.test(tok) || /[\/?&=._-]/.test(tok)
+            ? tok.replace(/([\/?=._-]|&amp;)(?=\S)/g, '$1<wbr>')
+            : tok,
+        );
+      }
+
       function escapeAttr(t: string) {
         return (t || '')
           .replace(/&/g, '&amp;')
@@ -766,7 +779,7 @@ const hasWireStories =
                 return storyImageHtml(b.src);
               }
               if (b.text) {
-                return `<p class="deck">${escapeHtml(b.text)}</p>`;
+                return `<p class="deck">${proseHtml(b.text)}</p>`;
               }
               return '';
             })
@@ -779,8 +792,8 @@ const hasWireStories =
             ? s.paragraphs
             : (s.description || '').split(/\n\s*\n/).filter(Boolean);
           const parasHtml = paragraphs.length
-            ? paragraphs.map((p) => `<p class="deck">${escapeHtml(p)}</p>`).join('')
-            : `<p class="deck">${escapeHtml(s.description)}</p>`;
+            ? paragraphs.map((p) => `<p class="deck">${proseHtml(p)}</p>`).join('')
+            : `<p class="deck">${proseHtml(s.description)}</p>`;
           bodyHtml = `${storyImageHtml(s.imageUrl || s.image || undefined)}${parasHtml}`;
         }
 
@@ -851,7 +864,7 @@ const hasWireStories =
             roundupHtml = `<aside class="roundup-box brief-item" aria-label="Morning brief">
               <div class="kicker">Brief · Morning roundup</div>
               <h3 style="font-family: var(--serif-display); font-size: 1.05rem; margin: 0 0 0.25rem;">From the Automation</h3>
-              ${paras.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}
+              ${paras.map((p) => `<p>${proseHtml(p)}</p>`).join('')}
             </aside>`;
           }
           root.innerHTML = roundupHtml || emptyLeadHtml();
@@ -867,7 +880,7 @@ const hasWireStories =
           roundupHtml = `<aside class="roundup-box brief-item" aria-label="Morning brief">
             <div class="kicker">Brief · Morning roundup</div>
             <h3 style="font-family: var(--serif-display); font-size: 1.05rem; margin: 0 0 0.25rem;">From the Automation</h3>
-            ${paras.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}
+            ${paras.map((p) => `<p>${proseHtml(p)}</p>`).join('')}
           </aside>`;
         } else if (!clearRoundup) {
           const existing = root.querySelector('.roundup-box');
@@ -925,7 +938,7 @@ const hasWireStories =
         }
         root.innerHTML = `<aside class="grok-weather-box weather-box brief-item" aria-label="Weather from Automation">
           <h2 class="section-label">Weather</h2>
-          <div class="weather-prose">${sec.paragraphs.map((p) => `<p>${escapeHtml(p)}</p>`).join('')}</div>
+          <div class="weather-prose">${sec.paragraphs.map((p) => `<p>${proseHtml(p)}</p>`).join('')}</div>
         </aside>`;
       }
 
@@ -991,7 +1004,7 @@ const hasWireStories =
                 return storyImageHtml(b.src);
               }
               if (b.text) {
-                return `<p class="deck">${escapeHtml(b.text)}</p>`;
+                return `<p class="deck">${proseHtml(b.text)}</p>`;
               }
               return '';
             })
@@ -1004,7 +1017,7 @@ const hasWireStories =
             ? story.paragraphs
             : (story.description || '').split(/\n\s*\n/).filter(Boolean);
           const parasHtml = paragraphs.length
-            ? paragraphs.map((p) => `<p class="deck">${escapeHtml(p)}</p>`).join('')
+            ? paragraphs.map((p) => `<p class="deck">${proseHtml(p)}</p>`).join('')
             : `<p class="deck">${escapeHtml(story.description || '')}</p>`;
           bodyHtml = `${storyImageHtml(story.imageUrl || story.image)}${parasHtml}`;
         }

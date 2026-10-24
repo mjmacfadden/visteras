@@ -2926,3 +2926,35 @@ body:has(#paged-edition .page-sheet) .edition-document:not(.is-source-only) {
 .custom-feed-edit:hover {
   color: var(--news-teal, #14b8a6);
 }
+
+/* ==========================================================================
+   Text wrapping safety net for narrow newspaper columns.
+   - overflow-wrap:anywhere lets unbreakable tokens (URLs, IDs) break instead of
+     spilling into gutters; normal words still hyphenate via hyphens:auto (lang="en").
+   - min-width:0 stops grid/flex children from growing to their longest word.
+   ========================================================================== */
+.story-item,
+.story-column,
+.flow-block,
+.lead-body,
+.also-today,
+.roundup-box,
+.weather-prose {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.story-item h3,
+.also-today h3,
+.lead-story h2 {
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.story-item .deck a,
+.lead-body a,
+.also-today a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
