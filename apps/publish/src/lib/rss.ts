@@ -105,7 +105,14 @@ export function extractStoryBlocks(descRaw: string, contentRaw: string): {
   leadImage: string | null;
 } {
   const subtitle = cleanParagraphHtml(descRaw || '');
-  const html = (contentRaw || '').trim() || (descRaw || '').trim();
+  const hasContent = !!(contentRaw || '').trim();
+  // Only fall back to the description as body HTML when it was NOT already used
+  // as the subtitle; otherwise feeds without content:encoded (ESPN, BBC, HN)
+  // render the description twice.
+  // With content:encoded: description is a standfirst + content is the body.
+  // Without it: the description IS the body, so parse it once (keeping its own
+  // <p> structure, e.g. HN's Article URL / Comments URL / Points lines).
+  const html = hasContent ? contentRaw.trim() : (descRaw || '').trim();
 
   const cleanHtml = cleanSubstackMentions(html)
     .replace(/<div class="subscription-widget[\s\S]*?<\/div>\s*<\/div>/gi, '')
@@ -117,7 +124,7 @@ export function extractStoryBlocks(descRaw: string, contentRaw: string): {
   const paragraphs: string[] = [];
   let leadImage: string | null = null;
 
-  if (subtitle && subtitle.length > 5) {
+  if (hasContent && subtitle && subtitle.length > 5) {
     rawBlocks.push({ type: 'paragraph', text: subtitle });
     paragraphs.push(subtitle);
   }
@@ -157,7 +164,57 @@ export function extractStoryBlocks(descRaw: string, contentRaw: string): {
     }
   }
 
-  return { blocks: rawBlocks, paragraphs, leadImage };
+  return dedupeStoryBlocks(rawBlocks, leadImage);
+}
+
+/** Comparison key: lowercase, entities/punctuation/whitespace collapsed, trailing ellipsis dropped. */
+function paraKey(text: string): string {
+  return decodeHtmlEntities(text)
+    .toLowerCase()
+    .replace(/(\.\.\.|…)\s*(read more|continue reading)?[^a-z0-9]*$/i, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/**
+ * Remove repeated paragraphs: exact/normalized duplicates, and a summary that is
+ * just a (possibly truncated) copy of a body paragraph (keeps the longer one).
+ * Distinct paragraphs are never dropped.
+ */
+function dedupeStoryBlocks(
+  blocks: StoryContentBlock[],
+  leadImage: string | null,
+): { blocks: StoryContentBlock[]; paragraphs: string[]; leadImage: string | null } {
+  const out: StoryContentBlock[] = [];
+  const keys: (string | null)[] = [];
+  const MIN_PREFIX = 40; // only treat as near-identical when the shared prefix is substantial
+  for (const b of blocks) {
+    if (b.type !== 'paragraph' || !b.text) {
+      out.push(b);
+      keys.push(null);
+      continue;
+    }
+    const k = paraKey(b.text);
+    if (!k) continue;
+    let skip = false;
+    for (let i = 0; i < out.length; i++) {
+      const pk = keys[i];
+      if (!pk) continue;
+      if (pk === k) { skip = true; break; }
+      if (k.length >= MIN_PREFIX && pk.startsWith(k)) { skip = true; break; } // new is truncated copy
+      if (pk.length >= MIN_PREFIX && k.startsWith(pk)) { // earlier was truncated copy: replace it
+        out[i] = b;
+        keys[i] = k;
+        skip = true;
+        break;
+      }
+    }
+    if (skip) continue;
+    out.push(b);
+    keys.push(k);
+  }
+  const paragraphs = out.filter((b) => b.type === 'paragraph' && b.text).map((b) => b.text as string);
+  return { blocks: out, paragraphs, leadImage };
 }
 
 function pickLink(item: Record<string, unknown>): string {
@@ -275,7 +332,7 @@ function extractItems(doc: unknown): Record<string, unknown>[] {
 }
 
 /* ---------- Feed cache (localStorage, per feed URL) ---------- */
-const FEED_CACHE_PREFIX = 'publish-feed-cache-v1:';
+const FEED_CACHE_PREFIX = 'publish-feed-cache-v2:';
 export const FEED_CACHE_TTL_MS = 15 * 60 * 1000;
 type FeedCacheEntry = { t: number; stories: RssStory[] };
 
