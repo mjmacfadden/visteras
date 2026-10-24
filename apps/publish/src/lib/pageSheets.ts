@@ -479,7 +479,14 @@ function resolveOverflow(
   return false;
 }
 
-async function waitForAssets(root: ParentNode, timeoutMs = 400) {
+/**
+ * Wait for fonts and images before measuring.
+ * Root cause of clipped stories: images in the hidden source edition were
+ * loading="lazy", so they never loaded; pagination waited only 400ms and then
+ * measured them at ~0px. Their clones loaded later inside the sheets, grew, and
+ * pushed text/images past the column bottom (overflow:hidden clipped them).
+ */
+async function waitForAssets(root: ParentNode, timeoutMs = 5000) {
   try {
     await document.fonts?.ready;
   } catch {
@@ -488,20 +495,126 @@ async function waitForAssets(root: ParentNode, timeoutMs = 400) {
   const imgs = Array.from(
     (root as Document | Element).querySelectorAll?.('img') || [],
   ) as HTMLImageElement[];
+  // Lazy images inside a hidden source never start loading — force them.
+  imgs.forEach((img) => {
+    if (img.loading === 'lazy') img.loading = 'eager';
+  });
   const pending = imgs.filter((img) => !img.complete && img.src);
-  if (!pending.length) return;
-  await Promise.race([
-    Promise.all(
-      pending.map(
-        (img) =>
-          new Promise<void>((resolve) => {
-            img.addEventListener('load', () => resolve(), { once: true });
-            img.addEventListener('error', () => resolve(), { once: true });
-          }),
+  if (pending.length) {
+    await Promise.race([
+      Promise.all(
+        pending.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              img.addEventListener('load', () => resolve(), { once: true });
+              img.addEventListener('error', () => resolve(), { once: true });
+            }),
+        ),
       ),
-    ),
-    new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
-  ]);
+      new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
+    ]);
+  }
+  // Lock intrinsic size onto the element so clones reserve the right box
+  // immediately (CSS width:100%/height:auto keeps the aspect ratio).
+  imgs.forEach((img) => {
+    if (img.complete && img.naturalWidth && !img.getAttribute('width')) {
+      img.setAttribute('width', String(img.naturalWidth));
+      img.setAttribute('height', String(img.naturalHeight));
+    }
+  });
+}
+
+/** Re-paginate (via the page's listener) when an image finishes loading after layout. */
+function watchLateImages(host: HTMLElement) {
+  let fired = false;
+  host.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
+    if (img.complete) return;
+    const onDone = () => {
+      if (fired) return;
+      fired = true;
+      window.dispatchEvent(new CustomEvent('publish:repaginate'));
+    };
+    img.addEventListener('load', onDone, { once: true });
+    img.addEventListener('error', onDone, { once: true });
+  });
+}
+
+const COL_FIT_BLOCKS =
+  'p, li, h2, h3, h4, blockquote, figure, table, pre, .column-image-wrap, img, .story-cycle-controls, .custom-feed-header, .meta';
+
+/**
+ * Safety net: never show a partially visible line or image at a column bottom.
+ * Hides (reversibly) whole trailing blocks that cross the column/folio limit and
+ * marks the cut story with an ellipsis. Runs after pagination and whenever print
+ * media toggles (print metrics differ slightly from screen).
+ */
+export function fitSheetColumns(root: ParentNode = document): void {
+  const host = (root as Document).getElementById
+    ? (root as Document).getElementById(PAGED_HOST_ID)
+    : (root as HTMLElement);
+  if (!host) return;
+  host.querySelectorAll<HTMLElement>('[data-col-fit-hidden]').forEach((el) => {
+    el.style.display = '';
+    el.removeAttribute('data-col-fit-hidden');
+  });
+  host.querySelectorAll('.col-fit-ellipsis').forEach((el) => el.remove());
+
+  host.querySelectorAll<HTMLElement>('.page-sheet').forEach((sheet) => {
+    const folio = sheet.querySelector<HTMLElement>('.page-sheet-folio');
+    const folioTop = folio ? folio.getBoundingClientRect().top : Infinity;
+    sheet.querySelectorAll<HTMLElement>('.page-col').forEach((col) => {
+      const limit = Math.min(col.getBoundingClientRect().bottom, folioTop) + 1;
+      const blocks = Array.from(col.querySelectorAll<HTMLElement>(COL_FIT_BLOCKS)).filter((el) => {
+        // outermost matching block only (e.g. hide image wrap, not the img inside)
+        const parentBlock = el.parentElement?.closest(COL_FIT_BLOCKS);
+        return !parentBlock || !col.contains(parentBlock);
+      });
+      const cut = new Set<HTMLElement>();
+      for (const el of blocks) {
+        if (el.style.display === 'none') continue;
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > limit) {
+          el.style.display = 'none';
+          el.setAttribute('data-col-fit-hidden', '');
+          const story = el.closest<HTMLElement>('article, .story-item, .sheet-unit');
+          if (story) cut.add(story);
+        }
+      }
+      cut.forEach((story) => {
+        const visible = Array.from(story.querySelectorAll<HTMLElement>('p, li')).filter(
+          (e) => e.style.display !== 'none' && !e.closest('[data-col-fit-hidden]') && !e.matches('.meta'),
+        );
+        const last = visible[visible.length - 1];
+        if (last) {
+          const mark = document.createElement('span');
+          mark.className = 'col-fit-ellipsis';
+          mark.textContent = ' …';
+          last.appendChild(mark);
+          // The ellipsis itself must not push the line over.
+          if (last.getBoundingClientRect().bottom > limit) mark.remove();
+        } else if (!story.querySelector('h2, h3, h4, img')?.closest('[data-col-fit-hidden]')) {
+          // Only a headline/label is left: hide the orphan too.
+          const visibleKids = Array.from(story.querySelectorAll<HTMLElement>(COL_FIT_BLOCKS)).filter(
+            (e) => e.style.display !== 'none' && !e.closest('[data-col-fit-hidden]'),
+          );
+          if (visibleKids.length && visibleKids.every((e) => e.matches('h2, h3, h4, .meta, .custom-feed-header, .story-cycle-controls'))) {
+            story.style.display = 'none';
+            story.setAttribute('data-col-fit-hidden', '');
+          }
+        }
+      });
+    });
+  });
+}
+
+let colFitPrintBound = false;
+function bindColumnFitForPrint() {
+  if (colFitPrintBound || typeof window === 'undefined') return;
+  colFitPrintBound = true;
+  const refit = () => fitSheetColumns(document);
+  window.matchMedia?.('print').addEventListener?.('change', refit);
+  window.addEventListener('beforeprint', refit);
+  window.addEventListener('afterprint', refit);
 }
 
 function ensureHost(shell: HTMLElement): HTMLElement {
@@ -796,6 +909,10 @@ export async function paginateEdition(options: { paperName?: string } = {}): Pro
       folio.innerHTML = `<span>${escapeHtml(paperName)}</span><span>Page ${n}</span>`;
     }
   });
+
+  fitSheetColumns(host);
+  bindColumnFitForPrint();
+  watchLateImages(host);
 
   return { pageCount: sheets.length };
 }

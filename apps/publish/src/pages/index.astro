@@ -509,6 +509,8 @@ const hasWireStories =
         }
       }
 
+      window.addEventListener('publish:repaginate', () => schedulePaginate());
+
       function schedulePaginate() {
         window.clearTimeout(paginateTimer);
         paginateTimer = window.setTimeout(() => {
