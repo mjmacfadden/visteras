@@ -6,7 +6,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { RssStory, StoryCategory } from '../data/types';
 import { NEWS_FEEDS, type FeedConfig, type FeedSection } from '../data/feeds';
 import { isSameChicagoDay } from './dateFilter';
-import { fetchWithCorsFallback } from './corsFetch';
+import { fetchWithCorsFallback, looksLikeFeedXml } from './corsFetch';
 import { cleanSubstackMentions } from './htmlToMarkdown';
 
 const parser = new XMLParser({
@@ -319,6 +319,7 @@ export async function fetchFeed(
         headers: {
           Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
         },
+        validate: (body) => looksLikeFeedXml(body),
       },
       6000,
     );
