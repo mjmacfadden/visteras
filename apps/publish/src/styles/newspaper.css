@@ -2922,3 +2922,7 @@ body:has(#paged-edition .page-sheet) .edition-document:not(.is-source-only) {
   }
 }
 
+
+.custom-feed-edit:hover {
+  color: var(--news-teal, #14b8a6);
+}

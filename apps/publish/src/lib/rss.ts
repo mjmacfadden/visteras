@@ -6,7 +6,7 @@ import { XMLParser } from 'fast-xml-parser';
 import type { RssStory, StoryCategory } from '../data/types';
 import { NEWS_FEEDS, type FeedConfig, type FeedSection } from '../data/feeds';
 import { isSameChicagoDay } from './dateFilter';
-import { fetchWithCorsFallback } from './corsFetch';
+import { fetchWithCorsFallback, looksLikeFeedXml } from './corsFetch';
 import { cleanSubstackMentions } from './htmlToMarkdown';
 
 const parser = new XMLParser({
@@ -167,6 +167,16 @@ function pickLink(item: Record<string, unknown>): string {
     const o = link as Record<string, unknown>;
     if (o['@_href']) return String(o['@_href']);
     if (o['#text']) return String(o['#text']);
+    // e.g. ESPN: <link><![CDATA[https://...]]></link>
+    const t = textOf(o).trim();
+    if (t) return t;
+  }
+  if (Array.isArray(link)) {
+    for (const l of link) {
+      const href = l && typeof l === 'object' ? (l as Record<string, unknown>)['@_href'] : null;
+      const rel = l && typeof l === 'object' ? (l as Record<string, unknown>)['@_rel'] : null;
+      if (href && (!rel || rel === 'alternate')) return String(href);
+    }
   }
   const id = item.guid ?? item.id;
   if (typeof id === 'string' && id.startsWith('http')) return id;
@@ -264,90 +274,121 @@ function extractItems(doc: unknown): Record<string, unknown>[] {
   return [];
 }
 
-async function fetchRss2Json(feed: FeedConfig): Promise<RssStory[]> {
-  const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.status !== 'ok' || !Array.isArray(data.items)) {
-    throw new Error(data.message || 'rss2json conversion failed');
+/* ---------- Feed cache (localStorage, per feed URL) ---------- */
+const FEED_CACHE_PREFIX = 'publish-feed-cache-v1:';
+export const FEED_CACHE_TTL_MS = 15 * 60 * 1000;
+type FeedCacheEntry = { t: number; stories: RssStory[] };
+
+function readFeedCache(url: string): FeedCacheEntry | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(FEED_CACHE_PREFIX + url);
+    if (!raw) return null;
+    const e = JSON.parse(raw);
+    return e && typeof e.t === 'number' && Array.isArray(e.stories) ? e : null;
+  } catch {
+    return null;
   }
-  return data.items
-    .map((item: any, idx: number): RssStory | null => {
-      const title = stripHtml(textOf(item.title));
-      const link = item.link || item.guid || '';
-      if (!title || !link) return null;
-      const rawDesc = textOf(item.description || '');
-      const rawContent = textOf(item.content || '');
-      const { blocks, paragraphs, leadImage } = extractStoryBlocks(rawDesc, rawContent);
-      const image =
-        item.thumbnail ||
-        (item.enclosure && item.enclosure.link ? String(item.enclosure.link) : null) ||
-        leadImage ||
-        null;
-      const publishedAt =
-        textOf(item.pubDate || item.published || item.updated) ||
-        new Date().toISOString();
-      return {
-        id: `${feed.id}-${idx}-${safeIdKey(link)}`,
-        title,
-        description: paragraphs.join('\n\n'),
-        paragraphs,
-        blocks,
-        url: link,
-        image,
-        source: feed.name,
-        publishedAt,
-        category: sectionToCategory(feed.section),
-      };
-    })
-    .filter((s): s is RssStory => s !== null);
+}
+
+function writeFeedCache(url: string, stories: RssStory[]): void {
+  if (typeof localStorage === 'undefined') return;
+  const value = JSON.stringify({ t: Date.now(), stories } satisfies FeedCacheEntry);
+  try {
+    localStorage.setItem(FEED_CACHE_PREFIX + url, value);
+  } catch {
+    // Quota exceeded: evict oldest feed-cache entries and retry once; never throw.
+    try {
+      const entries: { k: string; t: number }[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith(FEED_CACHE_PREFIX)) continue;
+        let t = 0;
+        try { t = JSON.parse(localStorage.getItem(k) || '{}').t || 0; } catch { /* corrupt */ }
+        entries.push({ k, t });
+      }
+      entries.sort((x, y) => x.t - y.t);
+      for (const e of entries.slice(0, Math.max(1, Math.ceil(entries.length / 2)))) localStorage.removeItem(e.k);
+      localStorage.setItem(FEED_CACHE_PREFIX + url, value);
+    } catch {
+      /* give up silently; cache is best-effort */
+    }
+  }
+}
+
+/* Global limiter + in-flight dedupe so overlapping refreshes never exceed
+   FEED_CONCURRENCY network fetches or fetch the same URL twice. */
+let feedSlotsInUse = 0;
+const feedSlotWaiters: (() => void)[] = [];
+async function withFeedSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (feedSlotsInUse >= FEED_CONCURRENCY) {
+    await new Promise<void>((resolve) => feedSlotWaiters.push(resolve));
+  } else {
+    feedSlotsInUse++;
+  }
+  try {
+    return await fn();
+  } finally {
+    const next = feedSlotWaiters.shift();
+    if (next) next(); // hand the slot over directly
+    else feedSlotsInUse--;
+  }
+}
+const inflightFeeds = new Map<string, Promise<RssStory[]>>();
+
+function fetchFeedCandidates(feed: FeedConfig): Promise<RssStory[]> {
+  const existing = inflightFeeds.get(feed.url);
+  if (existing) return existing.then((list) => list.map((st) => ({ ...st, source: feed.name })));
+  const p = withFeedSlot(() => fetchFeedCandidatesNow(feed)).finally(() => inflightFeeds.delete(feed.url));
+  inflightFeeds.set(feed.url, p);
+  return p;
+}
+
+async function fetchFeedCandidatesNow(feed: FeedConfig): Promise<RssStory[]> {
+  const res = await fetchWithCorsFallback(
+    feed.url,
+    {
+      headers: {
+        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
+      },
+      validate: (body) => looksLikeFeedXml(body),
+    },
+    6000,
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const xml = await res.text();
+  const doc = parser.parse(xml);
+  const items = extractItems(doc);
+  const candidates: RssStory[] = [];
+  for (let i = 0; i < items.length && candidates.length < 25; i++) {
+    const story = normalizeItem(items[i], feed, i);
+    if (story) candidates.push(story);
+  }
+  if (!candidates.length) throw new Error('Feed parsed but contained no items');
+  return candidates;
 }
 
 export async function fetchFeed(
   feed: FeedConfig,
   opts: { todayOnly?: boolean; editionDate?: string } = {},
 ): Promise<RssStory[]> {
-  let candidates: RssStory[] = [];
-  let directError: any = null;
-
-  // 1. Try direct XML fetch + parser
-  try {
-    const res = await fetchWithCorsFallback(
-      feed.url,
-      {
-        headers: {
-          Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*',
-        },
-      },
-      6000,
-    );
-    if (res.ok) {
-      const xml = await res.text();
-      const doc = parser.parse(xml);
-      const items = extractItems(doc);
-      for (let i = 0; i < items.length && candidates.length < 25; i++) {
-        const story = normalizeItem(items[i], feed, i);
-        if (story) candidates.push(story);
-      }
-    } else {
-      directError = new Error(`HTTP ${res.status}`);
-    }
-  } catch (e) {
-    directError = e;
-  }
-
-  // 2. If direct/CORS XML fetch failed or produced no candidates, try rss2json converter
-  if (!candidates.length) {
+  let candidates: RssStory[];
+  const cached = readFeedCache(feed.url);
+  if (cached && cached.stories.length && Date.now() - cached.t < FEED_CACHE_TTL_MS) {
+    // Fresh cache: no network.
+    candidates = cached.stories.map((st) => ({ ...st, source: feed.name }));
+  } else {
     try {
-      candidates = await fetchRss2Json(feed);
-    } catch {
-      // Both failed
+      candidates = await fetchFeedCandidates(feed);
+      writeFeedCache(feed.url, candidates);
+    } catch (err) {
+      if (cached && cached.stories.length) {
+        // Network/proxies failed: fall back to last good copy (any age), marked as cached.
+        candidates = cached.stories.map((st) => ({ ...st, source: `${feed.name} · cached`, cached: true }));
+      } else {
+        throw err;
+      }
     }
-  }
-
-  if (!candidates.length) {
-    throw directError || new Error('Could not fetch or parse feed');
   }
 
   const limit = feed.limit ?? 5;
@@ -410,6 +451,22 @@ export interface FetchFeedsOptions {
   editionDate?: string;
 }
 
+/** Max feeds fetched at once (keeps free proxies under their rate limits). */
+export const FEED_CONCURRENCY = 3;
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 /** Fetch configured feeds; never throws. */
 export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<FetchedSections> {
   const empty: FetchedSections = {
@@ -463,8 +520,10 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
     })),
   ];
 
-  const results = await Promise.all(
-    jobs.map(async ({ feed, todayOnly }) => {
+  const results = await mapLimit(
+    jobs,
+    FEED_CONCURRENCY,
+    async ({ feed, todayOnly }) => {
       try {
         const stories = await fetchFeed(feed, {
           todayOnly,
@@ -475,7 +534,7 @@ export async function fetchAllFeeds(opts: FetchFeedsOptions = {}): Promise<Fetch
         const msg = e instanceof Error ? e.message : String(e);
         return { feed, stories: [] as RssStory[], error: msg };
       }
-    }),
+    },
   );
 
   const feedResults: FeedResult[] = [];
