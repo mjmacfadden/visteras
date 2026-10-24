@@ -769,6 +769,7 @@ export async function paginateEdition(options: { paperName?: string } = {}): Pro
       else inner.appendChild(wrap);
     }
     state = featState;
+    fitFeaturesSheet(featState.sheet);
   }
 
   // Drop trailing empty sheets (should not happen, but keep verify clean).
@@ -798,6 +799,100 @@ export async function paginateEdition(options: { paperName?: string } = {}): Pro
 
   return { pageCount: sheets.length };
 }
+
+/**
+ * Make the dedicated features page fit above its folio.
+ * The band heights depend on the day's content (comic aspect ratios, number and
+ * length of history/birthday entries, joke length) and on how many meta cells
+ * are visible (Joke of the Day adds a 4th column, narrowing History/Birthdays so
+ * they wrap taller). Nothing previously constrained this, so it spilled past the
+ * folio/page edge. Reversible, lowest-priority first:
+ *   1. shrink comic images (2.5in -> 1.3in),
+ *   2. hide trailing History / Birthdays items (keep >= 2 each),
+ *   3. tighten the meta band font size slightly.
+ */
+export function fitFeaturesSheet(sheet: Element | null): void {
+  if (!sheet) return;
+  const body = sheet.querySelector<HTMLElement>('.page-sheet-features-body');
+  const features = body?.firstElementChild as HTMLElement | null;
+  const folio = sheet.querySelector<HTMLElement>('.page-sheet-folio');
+  if (!body || !features) return;
+
+  // Reset previous adjustments.
+  features.querySelectorAll<HTMLElement>('.comic-image').forEach((img) => (img.style.maxHeight = ''));
+  features.querySelectorAll<HTMLElement>('[data-fit-hidden]').forEach((el) => {
+    el.style.display = '';
+    el.removeAttribute('data-fit-hidden');
+  });
+  const meta = features.querySelector<HTMLElement>('.features-meta-band');
+  if (meta) meta.style.fontSize = '';
+
+  const limit = () => {
+    const inner = sheet.querySelector<HTMLElement>('.page-sheet-inner') || (sheet as HTMLElement);
+    const ir = inner.getBoundingClientRect();
+    const cs = getComputedStyle(inner);
+    const bottom = folio ? folio.getBoundingClientRect().top - 4 : ir.bottom - parseFloat(cs.paddingBottom || '0');
+    return bottom;
+  };
+  const contentBottom = () => {
+    let max = features.getBoundingClientRect().top;
+    features.querySelectorAll<HTMLElement>('.comics-band, .games-band, .features-meta-band, .feature-cell, .game-cell').forEach((el) => {
+      if (getComputedStyle(el).display === 'none') return;
+      max = Math.max(max, el.getBoundingClientRect().bottom);
+    });
+    return max;
+  };
+  const fits = () => contentBottom() <= limit();
+  if (fits()) return;
+
+  // 1. Comics are the most elastic element.
+  const comics = Array.from(features.querySelectorAll<HTMLElement>('.comic-image'));
+  if (comics.length) {
+    for (let inches = 2.3; inches >= 1.3 - 1e-6; inches -= 0.1) {
+      comics.forEach((img) => (img.style.maxHeight = `${inches.toFixed(1)}in`));
+      if (fits()) return;
+    }
+  }
+
+  // 2. Trim trailing list items from the longer of History / Birthdays.
+  const lists = Array.from(
+    features.querySelectorAll<HTMLElement>('.feature-history .feature-list, .feature-birthdays .feature-list'),
+  ).filter((l) => getComputedStyle(l).display !== 'none');
+  const visibleItems = (l: HTMLElement) =>
+    Array.from(l.querySelectorAll<HTMLElement>(':scope > li')).filter((li) => !li.hasAttribute('data-fit-hidden'));
+  for (let guard = 0; guard < 40 && !fits(); guard++) {
+    const candidates = lists
+      .map((l) => ({ l, items: visibleItems(l), h: l.getBoundingClientRect().height }))
+      .filter((c) => c.items.length > 2)
+      .sort((a, b) => b.h - a.h);
+    if (!candidates.length) break;
+    const last = candidates[0].items[candidates[0].items.length - 1];
+    last.style.display = 'none';
+    last.setAttribute('data-fit-hidden', '');
+  }
+  if (fits()) return;
+
+  // 3. Last resort: slightly smaller meta band text.
+  if (meta) {
+    for (const size of ['0.95em', '0.9em', '0.85em']) {
+      meta.style.fontSize = size;
+      if (fits()) return;
+    }
+  }
+}
+
+let featuresPrintRefitBound = false;
+function bindFeaturesPrintRefit() {
+  if (featuresPrintRefitBound || typeof window === 'undefined') return;
+  featuresPrintRefitBound = true;
+  const refit = () =>
+    document.querySelectorAll(`#${PAGED_HOST_ID} .page-sheet--features`).forEach((sh) => fitFeaturesSheet(sh));
+  // Print styles change fonts/metrics; re-fit for print and back for screen.
+  window.matchMedia?.('print').addEventListener?.('change', refit);
+  window.addEventListener('beforeprint', refit);
+  window.addEventListener('afterprint', refit);
+}
+if (typeof window !== 'undefined') bindFeaturesPrintRefit();
 
 export function getPageSheetCount(): number {
   return document.querySelectorAll(`#${PAGED_HOST_ID} .page-sheet`).length;
