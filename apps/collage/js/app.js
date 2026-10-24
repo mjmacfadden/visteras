@@ -16,6 +16,7 @@ import {
   restoreImgFraming,
   applyFillTileFraming,
 } from './loc-iiif.js';
+import { fetchWithRetry, createTtlCache, createLimiter, locSizedUrl } from './loc-net.js';
 
 (function() {
   'use strict';
@@ -1001,7 +1002,7 @@ import {
   }
 
   // --- UI Toast / Feedback ---
-  function showToast(msg) {
+  function showToast(msg, { actionLabel = '', onAction = null, durationMs = 2200 } = {}) {
     const toast = document.createElement('div');
     toast.style.position = 'fixed';
     toast.style.bottom = '32px';
@@ -1016,12 +1017,22 @@ import {
     toast.style.zIndex = '9999';
     toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
     toast.textContent = msg;
+    if (actionLabel && onAction) {
+      toast.style.pointerEvents = 'auto';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toast-action';
+      btn.textContent = actionLabel;
+      btn.style.cssText = 'margin-left:10px;background:#a855f7;color:#fff;border:0;border-radius:2px;padding:2px 8px;font-size:11px;cursor:pointer;';
+      btn.addEventListener('click', () => { toast.remove(); onAction(); });
+      toast.appendChild(btn);
+    }
     document.body.appendChild(toast);
     setTimeout(() => {
       toast.style.transition = 'opacity 0.2s';
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 200);
-    }, 2200);
+    }, durationMs);
   }
 
   // --- Viewport Zoom & Pan System ---
@@ -1460,10 +1471,16 @@ import {
   const previewQueue = [];
   let activePreviews = 0;
 
+  const LOC_FIRST_PAINT_HEIGHT = 360;
+  function locFirstPaintUrl(path) {
+    return path && /^https:\/\/tile\.loc\.gov\//.test(path) ? locSizedUrl(path, LOC_FIRST_PAINT_HEIGHT) : path;
+  }
+
   // Warm a small look-ahead, not every full-resolution newspaper scan.
   function warmPreviews(pool, start = 0) {
     for (let i = 0; i < Math.min(12, pool.length); i++) {
-      const path = pool[(start + i) % pool.length].path;
+      // Warm the small first-paint rendition; the full preview loads per tile.
+      const path = locFirstPaintUrl(pool[(start + i) % pool.length].path);
       if (!path || warmedPreviews.has(path)) continue;
       warmedPreviews.add(path);
       previewQueue.push(path);
@@ -1529,76 +1546,106 @@ import {
     return request;
   }
 
+  // Search results are cached (memory + one localStorage key, results only,
+  // never documents) for 6h; stale entries up to 7 days back a failed request.
+  const LOC_SEARCH_CACHE_KEY = 'visteras_collage_loc_search_v1';
+  const LOC_PAGE_SIZE = 50;
+  let locSearchCache = null;
+  function getLocSearchCache() {
+    if (!locSearchCache) {
+      let storage = null;
+      try { storage = typeof localStorage !== 'undefined' ? localStorage : null; } catch { storage = null; }
+      locSearchCache = createTtlCache({ storage, storageKey: LOC_SEARCH_CACHE_KEY, ttlMs: 6 * 3600e3, maxEntries: 12 });
+    }
+    return locSearchCache;
+  }
+
+  function mapLocResults(results) {
+    const mapped = [];
+    for (const item of results) {
+      if (!item.image_url || !Array.isArray(item.image_url)) continue;
+      const jpgs = item.image_url.filter(u => typeof u === 'string' && u.includes('.jpg'));
+      if (jpgs.length === 0) continue;
+
+      // Preview thumbnails stay small. largePath is often IIIF full/pct:12.5
+      // (~640px); downloadJpg/printCollage upgrade LoC IIIF via loc-iiif.js.
+      const preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
+      const large = jpgs[jpgs.length - 1].split('#')[0];
+
+      const link = item.url || 'https://www.loc.gov/collections/chronicling-america/';
+      // Chronicling America URLs contain the newspaper's LCCN (sn########)
+      // before the issue date. Keep it so the pool can be diversified.
+      const sourceMatch = `${item.id || ''} ${link}`.match(/(?:resource\/|\/)(sn\d{6,})\//i);
+      const sourceLabel = item.partof_title || item.title || 'unknown source';
+      const sourceKey = sourceMatch ? sourceMatch[1].toLowerCase() :
+        String(sourceLabel).trim().toLowerCase();
+      mapped.push({
+        id: `loc-${item.id || item.date || Math.random()}`,
+        path: preview,
+        largePath: large,
+        attribution: item.title ? `${item.title.slice(0, 40)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
+        link,
+        sourceKey,
+        source: 'loc'
+      });
+    }
+    const varied = [];
+    const usedSources = new Set();
+    for (const hit of mapped) {
+      if (usedSources.has(hit.sourceKey)) continue;
+      usedSources.add(hit.sourceKey);
+      varied.push(hit);
+    }
+    // Keep additional pages after every available newspaper is represented.
+    for (const hit of mapped) if (!varied.includes(hit)) varied.push(hit);
+    return varied;
+  }
+
   async function requestLocImages(query) {
     const q = (query || '').trim();
     const cacheKey = `loc|${q}`;
     if (state.apiCache[cacheKey]) {
       return state.apiCache[cacheKey];
     }
+    const cache = getLocSearchCache();
+    const cached = cache.get(cacheKey);
+    if (cached && cached.fresh && cached.value.length) {
+      state.apiCache[cacheKey] = cached.value;
+      return cached.value;
+    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-
-    const params = new URLSearchParams({ fo: 'json', dl: 'page', c: '100' });
+    const params = new URLSearchParams({ fo: 'json', dl: 'page', c: String(LOC_PAGE_SIZE) });
     if (q) { params.set('qs', q); params.set('ops', 'AND'); }
     const url = `https://www.loc.gov/collections/chronicling-america/?${params}`;
+    let data;
     try {
-      const res = await fetch(url, {
-        headers: { 'Accept': 'application/json' },
-        signal: controller.signal
+      // 15s per attempt, up to 2 retries with jittered backoff on timeouts,
+      // dropped sockets, 429 (honours Retry-After) and 5xx.
+      data = await fetchWithRetry(url, {
+        fetchImpl: fetch,
+        init: { headers: { 'Accept': 'application/json' } },
+        timeoutMs: 15000,
+        retries: 2,
+        setTimer: (fn, ms) => setTimeout(fn, ms),
+        clearTimer: id => clearTimeout(id),
       });
-      if (!res.ok) throw new Error(`Library of Congress returned HTTP ${res.status}. Please try again later.`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.results) && data.results.length > 0) {
-          const mapped = [];
-          for (const item of data.results) {
-            if (!item.image_url || !Array.isArray(item.image_url)) continue;
-            const jpgs = item.image_url.filter(u => typeof u === 'string' && u.includes('.jpg'));
-            if (jpgs.length === 0) continue;
-
-            // Preview thumbnails stay small. largePath is often IIIF full/pct:12.5
-            // (~640px); downloadJpg/printCollage upgrade LoC IIIF via loc-iiif.js.
-            const preview = (jpgs[Math.min(1, jpgs.length - 1)] || jpgs[0]).split('#')[0];
-            const large = jpgs[jpgs.length - 1].split('#')[0];
-
-            const link = item.url || 'https://www.loc.gov/collections/chronicling-america/';
-            // Chronicling America URLs contain the newspaper's LCCN (sn########)
-            // before the issue date. Keep it so the pool can be diversified.
-            const sourceMatch = `${item.id || ''} ${link}`.match(/(?:resource\/|\/)(sn\d{6,})\//i);
-            const sourceLabel = item.partof_title || item.title || 'unknown source';
-            const sourceKey = sourceMatch ? sourceMatch[1].toLowerCase() :
-              String(sourceLabel).trim().toLowerCase();
-            mapped.push({
-              id: `loc-${item.id || item.date || Math.random()}`,
-              path: preview,
-              largePath: large,
-              attribution: item.title ? `${item.title.slice(0, 40)} (${item.date || 'LOC'})` : 'Chronicling America (LOC)',
-              link,
-              sourceKey,
-              source: 'loc'
-            });
-          }
-          if (mapped.length > 0) {
-            const varied = [];
-            const usedSources = new Set();
-            for (const hit of mapped) {
-              if (usedSources.has(hit.sourceKey)) continue;
-              usedSources.add(hit.sourceKey);
-              varied.push(hit);
-            }
-            // Keep additional pages after every available newspaper is represented.
-            for (const hit of mapped) if (!varied.includes(hit)) varied.push(hit);
-            state.apiCache[cacheKey] = varied;
-            return varied;
-          }
-        }
-      }
     } catch (err) {
-      if (err.name === 'AbortError') throw new Error('Library of Congress search timed out. Please try again.');
-      throw err;
-    } finally {
-      clearTimeout(timer);
+      if (cached && cached.value.length) {
+        console.warn('LOC search failed; using cached results', err);
+        state.apiCache[cacheKey] = cached.value;
+        return cached.value;
+      }
+      if (err.kind === 'timeout') throw new Error('Library of Congress search timed out. Please try again.');
+      if (err.kind === 'http') throw new Error(`Library of Congress returned HTTP ${err.status}. Please try again later.`);
+      throw new Error('Library of Congress could not be reached. Please check your connection and try again.');
+    }
+    if (data && Array.isArray(data.results) && data.results.length > 0) {
+      const varied = mapLocResults(data.results);
+      if (varied.length > 0) {
+        state.apiCache[cacheKey] = varied;
+        cache.set(cacheKey, varied);
+        return varied;
+      }
     }
     return [];
   }
@@ -1638,10 +1685,99 @@ import {
     }
   }
 
+  // --- Progressive tile images ---
+  // LoC tiles paint a small IIIF rendition (",360" ~25KB) first, then swap
+  // to the stored preview (pct:12.5, ~250KB) through a small concurrency
+  // limit so zoom keeps full detail. Saved documents keep the preview path.
+  const tileUpgradeLimit = createLimiter(4);
+  const upgradedPreviews = new Set();
+  function setTileImageSource(img, path) {
+    img.decoding = 'async';
+    delete img.dataset.retries;
+    if (path && !upgradedPreviews.has(path)) {
+      const small = locFirstPaintUrl(path);
+      if (small !== path) {
+        img.dataset.fullSrc = path;
+        img.src = small;
+        return;
+      }
+    }
+    delete img.dataset.fullSrc;
+    img.src = path;
+  }
+
+  function upgradeTileImage(img) {
+    const full = img.dataset.fullSrc;
+    if (!full || img.src === full) return;
+    tileUpgradeLimit(() => new Promise(resolve => {
+      const pre = new Image();
+      pre.crossOrigin = 'anonymous';
+      const timer = setTimeout(() => { pre.src = ''; resolve(); }, 20000);
+      pre.onload = () => {
+        clearTimeout(timer);
+        upgradedPreviews.add(full);
+        if (upgradedPreviews.size > 400) upgradedPreviews.delete(upgradedPreviews.values().next().value);
+        if (img.dataset.fullSrc === full) { delete img.dataset.fullSrc; img.src = full; }
+        resolve();
+      };
+      pre.onerror = () => { clearTimeout(timer); resolve(); };
+      pre.src = full;
+    }));
+  }
+
+  // Returns true when another attempt has been scheduled.
+  function recoverTileImage(img, tile, spinnerEl, itemData) {
+    const full = img.dataset.fullSrc;
+    if (full) { delete img.dataset.fullSrc; img.src = full; return true; }
+    const tries = Number(img.dataset.retries || 0);
+    const base = String(img.src || '').replace(/[?&]retry=\d+$/, '');
+    if (tries < 2 && base && !base.startsWith('blob:') && !base.startsWith('data:')) {
+      img.dataset.retries = String(tries + 1);
+      setTimeout(() => {
+        if (!img.isConnected) return;
+        img.src = `${base}${base.includes('?') ? '&' : '?'}retry=${tries + 1}`;
+      }, 800 * 2 ** tries + Math.random() * 400);
+      return true;
+    }
+    showTileLoadError(img, tile, spinnerEl, itemData, base);
+    return false;
+  }
+
+  function showTileLoadError(img, tile, spinnerEl, itemData, src) {
+    if (!tile || tile.querySelector('.tile-load-error')) return;
+    tile.classList.add('tile-load-failed');
+    const box = document.createElement('div');
+    box.className = 'tile-load-error';
+    box.setAttribute('data-html2canvas-ignore', 'true');
+    box.innerHTML = '<span>Image didn\u2019t load</span><button type="button" class="tile-load-retry">Retry</button>';
+    const retryBtn = box.querySelector('button');
+    // Tiles capture the pointer for panning; keep presses on Retry local.
+    for (const type of ['pointerdown', 'mousedown', 'touchstart']) {
+      retryBtn.addEventListener(type, ev => ev.stopPropagation());
+    }
+    retryBtn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      clearTileLoadError(tile);
+      if (spinnerEl) spinnerEl.classList.remove('hidden');
+      delete img.dataset.retries;
+      img.src = `${src}${src.includes('?') ? '&' : '?'}retry=${Date.now() % 100000}`;
+    });
+    tile.appendChild(box);
+  }
+
+  function clearTileLoadError(tile) {
+    if (!tile) return;
+    tile.classList.remove('tile-load-failed');
+    const box = tile.querySelector('.tile-load-error');
+    if (box) box.remove();
+  }
+
   // --- Tile Image Load & Spinner Binding ---
   function bindTileImageEvents(img, spinnerEl, itemData, tile) {
     function markDone() {
       img.classList.add('loaded');
+      clearTileLoadError(tile);
+      upgradeTileImage(img);
       if (spinnerEl) spinnerEl.classList.add('hidden');
       requestAnimationFrame(() => {
         updateTileTransform(img, itemData, tile);
@@ -1661,6 +1797,7 @@ import {
       if (spinnerEl) spinnerEl.classList.remove('hidden');
       img.onload = markDone;
       img.onerror = function() {
+        if (recoverTileImage(img, tile, spinnerEl, itemData)) return;
         if (spinnerEl) spinnerEl.classList.add('hidden');
       };
     }
@@ -1710,7 +1847,7 @@ import {
     const img = document.createElement('img');
     img.crossOrigin = 'anonymous';
     if (itemData.image && itemData.image.path) {
-      img.src = itemData.image.path;
+      setTileImageSource(img, itemData.image.path);
       img.dataset.largeSrc = itemData.image.largePath || itemData.image.path;
       img.alt = itemData.image.attribution || `Collage tile ${i + 1}`;
       bindTileImageEvents(img, spinner, itemData, tile);
@@ -1764,7 +1901,7 @@ import {
       itemData.panY = 0;
       zoomSlider.value = 1;
       zoomValText.textContent = '100%';
-      img.src = next.path;
+      setTileImageSource(img, next.path);
       img.dataset.largeSrc = next.largePath || next.path;
       img.alt = next.attribution || `Collage tile ${i + 1}`;
       bindTileImageEvents(img, spinner, itemData, tile);
@@ -1948,7 +2085,7 @@ import {
             const img = tile.querySelector('img');
             const spinnerEl = tile.querySelector('.tile-spinner');
             if (img && spinnerEl) {
-              img.src = chosenImg.path;
+              setTileImageSource(img, chosenImg.path);
               img.dataset.largeSrc = chosenImg.largePath || chosenImg.path;
               img.alt = chosenImg.attribution || `Collage tile ${i + 1}`;
               bindTileImageEvents(img, spinnerEl, state.items[i], tile);
@@ -2122,7 +2259,7 @@ import {
       state.onlinePool = [];
       const message = err.message && err.message.startsWith('Library of Congress')
         ? err.message : 'Image search could not connect. Please try again.';
-      showToast(message);
+      showToast(message, { actionLabel: 'Retry', onAction: () => generateFodder(), durationMs: 9000 });
       if (el.statusBarStatus) {
         el.statusBarStatus.textContent = message;
       }

@@ -254,12 +254,53 @@ async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DEFAULT_TI
   }
 }
 
+/**
+ * One overall deadline (default 45s, so the print fallback timing is
+ * unchanged) with quick retries for transient failures: network errors,
+ * 408/429/5xx. A timeout is never retried — it falls through to the caller's
+ * fallback. Parsing runs inside the attempt so truncated bodies retry too.
+ */
+export async function fetchWithDeadline(url, {
+  fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS, retries = 2, parse = r => r,
+  minRemainingMs = 5000, now = () => Date.now(), sleep = ms => new Promise(r => setTimeout(r, ms)),
+} = {}) {
+  const deadline = now() + timeoutMs;
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const remaining = deadline - now();
+    if (remaining <= 0) break;
+    try {
+      const res = await fetchWithTimeout(url, { fetchImpl, timeoutMs: remaining });
+      if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+      return await parse(res);
+    } catch (err) {
+      lastErr = err;
+      if (err && err.name === 'AbortError') throw err;
+      const st = err && err.status;
+      const transient = !st || st === 408 || st === 429 || st >= 500;
+      if (!transient || attempt === retries) throw err;
+      const wait = 500 * 2 ** attempt;
+      if (deadline - now() - wait < minRemainingMs) throw err;
+      await sleep(wait);
+    }
+  }
+  throw lastErr || Object.assign(new Error('deadline exceeded'), { name: 'AbortError' });
+}
+
 export async function fetchIiifInfo(base, { fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS, cache } = {}) {
   const key = `info:${base}`;
   if (cache?.has(key)) return cache.get(key);
-  const res = await fetchWithTimeout(iiifInfoUrl(base), { fetchImpl, timeoutMs });
-  if (!res.ok) throw new Error(`IIIF info.json HTTP ${res.status}`);
-  const info = await res.json();
+  let info;
+  try {
+    info = await fetchWithDeadline(iiifInfoUrl(base), { fetchImpl, timeoutMs, parse: r => r.json() });
+  } catch (err) {
+    if (err && err.status) throw new Error(`IIIF info.json HTTP ${err.status}`);
+    throw err;
+  }
   const out = {
     width: Number(info.width) || 0,
     height: Number(info.height) || 0,
@@ -356,10 +397,18 @@ export async function fetchLocPrintObjectUrl(plan, {
   if (!plan?.upgraded || !plan.url) throw new Error('no plan');
   const key = `blob:${plan.url}`;
   if (cache?.has(key)) return cache.get(key);
-  const res = await fetchWithTimeout(plan.url, { fetchImpl, timeoutMs });
-  if (!res.ok) throw new Error(`IIIF image HTTP ${res.status}`);
-  const blob = await res.blob();
-  if (!blob || !blob.size) throw new Error('empty IIIF image');
+  let blob;
+  try {
+    blob = await fetchWithDeadline(plan.url, { fetchImpl, timeoutMs, parse: async res => {
+      const b = await res.blob();
+      if (!b || !b.size) throw Object.assign(new Error('empty IIIF image'), { status: 502, empty: true });
+      return b;
+    } });
+  } catch (err) {
+    if (err && err.empty) throw new Error('empty IIIF image');
+    if (err && err.status) throw new Error(`IIIF image HTTP ${err.status}`);
+    throw err;
+  }
   const objectUrl = URL.createObjectURL(blob);
   const entry = { objectUrl, revoke: () => { try { URL.revokeObjectURL(objectUrl); } catch { /* ignore */ } } };
   cache?.set(key, entry);

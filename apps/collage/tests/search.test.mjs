@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fetchWithRetry, createTtlCache, locSizedUrl } from '../js/loc-net.js';
 
 const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const locCode = source.slice(source.indexOf('  // --- Library of Congress newspaper page search'), source.indexOf('  // --- Tile Dimension'));
@@ -20,15 +21,21 @@ test('new documents use Historic News while explicit saved searches remain intac
   assert.equal(saved.imageSource, 'pixabay');
   assert.equal(saved.selectedColors.length, 0);
 });
-function locHarness(fetch) {
+function memoryStorage(initial = {}) {
+  const data = { ...initial };
+  return { data, getItem: k => (k in data ? data[k] : null), setItem: (k, v) => { data[k] = String(v); } };
+}
+function locHarness(fetch, { localStorage = memoryStorage() } = {}) {
   const timers = [];
   const cleared = [];
+  // Request timeouts (>=10s) stay pending; short backoff waits fire at once.
   const context = vm.createContext({ state: { apiCache: {}, items: [] }, fetch, URLSearchParams, AbortController,
+    fetchWithRetry, createTtlCache, locSizedUrl, localStorage, console: { warn() {} },
     Image: class { set src(value) { this.onload?.(); } },
-    setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+    setTimeout: (fn, ms) => { timers.push({ fn, ms }); if (ms < 10000) Promise.resolve().then(fn); return timers.length; },
     clearTimeout: id => cleared.push(id) });
   vm.runInContext(locCode, context);
-  return { search: context.fetchChroniclingAmericaImagesFast, next: context.nextPoolImage, state: context.state, timers, cleared };
+  return { search: context.fetchChroniclingAmericaImagesFast, next: context.nextPoolImage, state: context.state, timers, cleared, localStorage };
 }
 
 test('LOC searches exact entered words at page level and maps supplied image sizes', async () => {
@@ -40,7 +47,7 @@ test('LOC searches exact entered words at page level and maps supplied image siz
   const hits = await h.search('  birds & flowers  ');
   assert.equal(url.searchParams.get('qs'), 'birds & flowers');
   assert.equal(url.searchParams.get('dl'), 'page');
-  assert.equal(url.searchParams.get('c'), '100');
+  assert.equal(url.searchParams.get('c'), '50');
   assert.equal(url.searchParams.get('q'), null);
   assert.equal(hits[0].path, 'https://example.org/medium.jpg');
   assert.equal(hits[0].largePath, 'https://example.org/large.jpg');
@@ -90,12 +97,53 @@ test('blank search does not silently insert vintage', async () => {
 });
 
 test('HTTP and timeout errors are not reported as empty results', async () => {
-  const failed = locHarness(async () => ({ ok: false, status: 429 }));
+  let calls = 0;
+  const failed = locHarness(async () => { calls++; return { ok: false, status: 429, headers: { get: () => null } }; });
   await assert.rejects(failed.search('birds'), /HTTP 429/);
-  assert.deepEqual(failed.cleared, [1]);
+  assert.equal(calls, 3, '429 is retried twice before giving up');
+  assert.deepEqual(failed.cleared, [1, 3, 5]);
   const timed = locHarness(async () => { throw Object.assign(new Error(), { name: 'AbortError' }); });
   await assert.rejects(timed.search('birds'), /timed out/);
-  assert.deepEqual(timed.cleared, [1]);
+  calls = 0;
+  const notFound = locHarness(async () => { calls++; return { ok: false, status: 404 }; });
+  await assert.rejects(notFound.search('birds'), /HTTP 404/);
+  assert.equal(calls, 1, '4xx other than 408/429 is not retried');
+});
+
+test('a dropped socket mid-body is retried and then succeeds', async () => {
+  let calls = 0;
+  const h = locHarness(async () => {
+    calls++;
+    if (calls === 1) return { ok: true, json: async () => { throw new TypeError('terminated'); } };
+    if (calls === 2) return { ok: false, status: 503, headers: { get: () => null } };
+    return { ok: true, json: async () => ({ results: [{ id: 'p', image_url: ['https://example.org/p.jpg'] }] }) };
+  });
+  const hits = await h.search('birds');
+  assert.equal(calls, 3);
+  assert.equal(hits.length, 1);
+});
+
+test('search results persist to one storage key and are reused across reloads', async () => {
+  const storage = memoryStorage();
+  let calls = 0;
+  const ok = async () => { calls++; return { ok: true, json: async () => ({ results: [{ id: 'p', image_url: ['https://example.org/p.jpg'] }] }) }; };
+  await locHarness(ok, { localStorage: storage }).search('birds');
+  assert.deepEqual(Object.keys(storage.data), ['visteras_collage_loc_search_v1']);
+  const again = await locHarness(ok, { localStorage: storage }).search('birds');
+  assert.equal(calls, 1, 'fresh cache hit makes no request');
+  assert.equal(again[0].path, 'https://example.org/p.jpg');
+});
+
+test('a failed search falls back to stale cached results', async () => {
+  const stale = JSON.stringify([['loc|birds', { t: Date.now() - 24 * 3600e3, v: [{ id: 'old', path: 'old.jpg' }] }]]);
+  const storage = memoryStorage({ visteras_collage_loc_search_v1: stale });
+  let calls = 0;
+  const h = locHarness(async () => { calls++; throw new TypeError('Failed to fetch'); }, { localStorage: storage });
+  const hits = await h.search('birds');
+  assert.equal(calls, 3, 'stale entry is not fresh, so the network is tried first');
+  assert.equal(hits[0].id, 'old');
+  const none = locHarness(async () => { throw new TypeError('Failed to fetch'); });
+  await assert.rejects(none.search('birds'), /could not be reached/);
 });
 
 test('LOC source labels may be arrays without breaking search', async () => {

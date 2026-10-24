@@ -323,3 +323,20 @@ test('preview framing vs export fill-tile: same normalized crop for zoomed+panne
     assert.ok(Math.abs(backToSource.h - previewNorm.h) < 1e-12);
   }
 });
+
+test('fetchWithDeadline retries transient failures but never retries a timeout', async () => {
+  const { fetchWithDeadline } = await import('../js/loc-iiif.js');
+  let n = 0;
+  const out = await fetchWithDeadline('u', { timeoutMs: 45000, sleep: async () => {}, parse: r => r.v,
+    fetchImpl: async () => { n++; return n < 3 ? { ok: false, status: 503 } : { ok: true, v: 'img' }; } });
+  assert.equal(out, 'img');
+  assert.equal(n, 3);
+  n = 0;
+  await assert.rejects(fetchWithDeadline('u', { timeoutMs: 30, sleep: async () => {},
+    fetchImpl: (url, { signal }) => { n++; return new Promise((_, rej) => signal.addEventListener('abort', () => rej(Object.assign(new Error('t'), { name: 'AbortError' })))); } }),
+    e => e.name === 'AbortError');
+  assert.equal(n, 1);
+  n = 0;
+  await assert.rejects(fetchWithDeadline('u', { sleep: async () => {}, fetchImpl: async () => { n++; return { ok: false, status: 404 }; } }), e => e.status === 404);
+  assert.equal(n, 1);
+});
